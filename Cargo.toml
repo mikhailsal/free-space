@@ -1,0 +1,36 @@
+[workspace]
+resolver = "3"
+members = ["core", "cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/mikhailsal/free-space"
+homepage = "https://github.com/mikhailsal/free-space"
+authors = ["Mikhail Salnikov"]
+
+[workspace.dependencies]
+freespace-core = { path = "core", version = "0.1.0" }
+libc = "0.2"
+regex = "1.11"
+rusqlite = { version = "0.40", features = ["bundled", "functions", "hooks"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+toml = "1"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[profile.dev]
+# The disk this is developed on is ~97% full: keep debug info small.
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"
