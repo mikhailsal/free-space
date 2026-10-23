@@ -194,6 +194,9 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "freespace-core",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

@@ -1,0 +1,1532 @@
+{
+  "$defs": {
+    "DiffEntry": {
+      "properties": {
+        "allocated": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "allocated_prev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "delta": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "items": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "items_prev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "mtime": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "newest_mtime": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "path_raw": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/DiffStatus"
+        }
+      },
+      "required": [
+        "path",
+        "name",
+        "kind",
+        "status",
+        "allocated",
+        "allocated_prev",
+        "delta",
+        "items",
+        "items_prev",
+        "mtime",
+        "newest_mtime"
+      ],
+      "type": "object"
+    },
+    "DiffResponse": {
+      "description": "`diff`: what changed since the previous full scan.",
+      "properties": {
+        "age_seconds": {
+          "description": "Age of the oldest part of the requested subtree.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "delta": {
+          "description": "allocated(current) − allocated(prev) of the requested path itself.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "depth": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/DiffEntry"
+          },
+          "type": "array"
+        },
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "incomplete": {
+          "description": "Some directories could not be read: sizes under `unknown_subtrees` are unknown (D13).\nReport this to the user before any numbers.",
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "os": {
+          "type": "string"
+        },
+        "partial": {
+          "description": "Subtrees were refreshed after `prev`: deltas mix two baselines.",
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "path_raw": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prev_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "prev_scanned_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "refreshed": {
+          "items": {
+            "$ref": "#/$defs/Refreshed"
+          },
+          "type": "array"
+        },
+        "roots_changed": {
+          "description": "The root set differs between the generations.",
+          "type": "boolean"
+        },
+        "scanned_at": {
+          "description": "Start of the last full scan (UNIX seconds).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "schema_version": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "snapshot_id": {
+          "type": "string"
+        },
+        "total_count": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "unknown_subtrees": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "host",
+        "os",
+        "generation",
+        "scanned_at",
+        "age_seconds",
+        "schema_version",
+        "snapshot_id",
+        "incomplete",
+        "unknown_subtrees",
+        "path",
+        "prev_scanned_at",
+        "depth",
+        "kind",
+        "partial",
+        "refreshed",
+        "roots_changed",
+        "delta",
+        "entries",
+        "total_count",
+        "truncated",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "DiffStatus": {
+      "enum": [
+        "new",
+        "gone",
+        "changed",
+        "same"
+      ],
+      "type": "string"
+    },
+    "EntryOut": {
+      "description": "One snapshot entry.",
+      "properties": {
+        "allocated": {
+          "description": "Bytes on disk (st_blocks × 512), subtree total for directories.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "apparent": {
+          "description": "Apparent size (st_size), subtree total for directories.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "denied": {
+          "description": "This directory could not be read.",
+          "type": "boolean"
+        },
+        "errors": {
+          "description": "Unreadable entries in the subtree.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hardlink_alias": {
+          "description": "Hardlink counted under another path (`allocated` is 0 here).",
+          "type": "boolean"
+        },
+        "hardlink_owner": {
+          "description": "For `nlink > 1`: the path that carries the size.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "description": "Descendant count (directories).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "mount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MountOut"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filesystem mounted here (kind = mount)."
+        },
+        "mtime": {
+          "description": "UNIX seconds; 0 = unknown.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "newest_mtime": {
+          "description": "Newest file inside (directories) or `min(mtime, scanned_at)` (files); 0 = unknown.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "nlink": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Full path, UTF-8 (invalid bytes replaced).",
+          "type": "string"
+        },
+        "path_raw": {
+          "description": "Hex of the exact path bytes; present only when `path` is lossy. Pass it\nback with `--path-raw` / `?path_raw=`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scanned_at": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "name",
+        "kind",
+        "allocated",
+        "apparent",
+        "mtime",
+        "newest_mtime",
+        "nlink",
+        "items",
+        "errors",
+        "scanned_at"
+      ],
+      "type": "object"
+    },
+    "ErrorBody": {
+      "description": "`{\"error\": {...}}` printed on stdout under `--json` (D16).",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "type": "object"
+    },
+    "ErrorCode": {
+      "oneOf": [
+        {
+          "const": "GENERIC",
+          "description": "Unexpected failure (I/O, SQLite, publish step).",
+          "type": "string"
+        },
+        {
+          "const": "SPACE",
+          "description": "Not enough free space for a new snapshot (precheck or reserve).",
+          "type": "string"
+        },
+        {
+          "const": "USAGE",
+          "description": "Bad command line or query parameter.",
+          "type": "string"
+        },
+        {
+          "const": "CONFIG",
+          "description": "`config.toml` unreadable or invalid.",
+          "type": "string"
+        },
+        {
+          "const": "GUI_NO_TTY",
+          "description": "`gui` without a terminal on stdin and stdout.",
+          "type": "string"
+        },
+        {
+          "const": "PATH_NOT_FOUND",
+          "description": "The path is not in the snapshot.",
+          "type": "string"
+        },
+        {
+          "const": "NO_PREV",
+          "description": "`diff` without a previous generation.",
+          "type": "string"
+        },
+        {
+          "const": "ROTATED",
+          "description": "The snapshot rotated between opening current and prev.",
+          "type": "string"
+        },
+        {
+          "const": "SCHEMA",
+          "description": "Snapshot schema differs from this binary.",
+          "type": "string"
+        },
+        {
+          "const": "LOCK",
+          "description": "Another scan or refresh holds the lock.",
+          "type": "string"
+        },
+        {
+          "const": "HASH_COLLISION",
+          "description": "Two paths share a path hash in a diff answer.",
+          "type": "string"
+        },
+        {
+          "const": "NO_SNAPSHOT",
+          "description": "No snapshot published yet.",
+          "type": "string"
+        },
+        {
+          "const": "SNAPSHOT_ACCESS",
+          "description": "The snapshot exists but this user cannot read it.",
+          "type": "string"
+        },
+        {
+          "const": "NOT_ROOT",
+          "description": "Operation needs root.",
+          "type": "string"
+        },
+        {
+          "const": "NOT_SUPPORTED",
+          "description": "Feature not available on this OS or host.",
+          "type": "string"
+        }
+      ]
+    },
+    "ErrorContext": {
+      "properties": {
+        "config": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LastError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`state.json` last_error, when it explains this failure."
+        },
+        "scanning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Scanning"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Running scan, when the lock is held."
+        },
+        "snapshot_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
+    "ErrorDetail": {
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "context": {
+          "$ref": "#/$defs/ErrorContext"
+        },
+        "docs": {
+          "type": "string"
+        },
+        "exit": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "fix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "recovery": {
+          "$ref": "#/$defs/Recovery"
+        }
+      },
+      "required": [
+        "code",
+        "exit",
+        "message",
+        "recovery",
+        "context",
+        "docs"
+      ],
+      "type": "object"
+    },
+    "FindEntry": {
+      "description": "One snapshot entry.",
+      "properties": {
+        "allocated": {
+          "description": "Bytes on disk (st_blocks × 512), subtree total for directories.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "apparent": {
+          "description": "Apparent size (st_size), subtree total for directories.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "denied": {
+          "description": "This directory could not be read.",
+          "type": "boolean"
+        },
+        "errors": {
+          "description": "Unreadable entries in the subtree.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hardlink_alias": {
+          "description": "Hardlink counted under another path (`allocated` is 0 here).",
+          "type": "boolean"
+        },
+        "hardlink_owner": {
+          "description": "For `nlink > 1`: the path that carries the size.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "description": "Descendant count (directories).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "mount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MountOut"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filesystem mounted here (kind = mount)."
+        },
+        "mtime": {
+          "description": "UNIX seconds; 0 = unknown.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nested": {
+          "description": "Inside another matched directory: counted in `total.count` only.",
+          "type": "boolean"
+        },
+        "newest_mtime": {
+          "description": "Newest file inside (directories) or `min(mtime, scanned_at)` (files); 0 = unknown.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "nlink": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Full path, UTF-8 (invalid bytes replaced).",
+          "type": "string"
+        },
+        "path_raw": {
+          "description": "Hex of the exact path bytes; present only when `path` is lossy. Pass it\nback with `--path-raw` / `?path_raw=`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scanned_at": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "name",
+        "kind",
+        "allocated",
+        "apparent",
+        "mtime",
+        "newest_mtime",
+        "nlink",
+        "items",
+        "errors",
+        "scanned_at",
+        "nested"
+      ],
+      "type": "object"
+    },
+    "FindResponse": {
+      "description": "`find`: matches under a path, with totals over all of them.",
+      "properties": {
+        "age_seconds": {
+          "description": "Age of the oldest part of the requested subtree.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/FindEntry"
+          },
+          "type": "array"
+        },
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "incomplete": {
+          "description": "Some directories could not be read: sizes under `unknown_subtrees` are unknown (D13).\nReport this to the user before any numbers.",
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "os": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "path_raw": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prev_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "scanned_at": {
+          "description": "Start of the last full scan (UNIX seconds).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "schema_version": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "snapshot_id": {
+          "type": "string"
+        },
+        "sort": {
+          "type": "string"
+        },
+        "total": {
+          "$ref": "#/$defs/Total",
+          "description": "Over all matches, not just `entries`."
+        },
+        "total_allocated": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total_count": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "unknown_subtrees": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "host",
+        "os",
+        "generation",
+        "scanned_at",
+        "age_seconds",
+        "schema_version",
+        "snapshot_id",
+        "incomplete",
+        "unknown_subtrees",
+        "path",
+        "kind",
+        "sort",
+        "entries",
+        "total",
+        "total_count",
+        "total_allocated",
+        "truncated",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "FsOut": {
+      "properties": {
+        "avail": {
+          "description": "Available now (live statvfs); null when the mount is gone.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fs_type": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "total": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "used": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "fs_type",
+        "total",
+        "used"
+      ],
+      "type": "object"
+    },
+    "Kind": {
+      "oneOf": [
+        {
+          "enum": [
+            "file",
+            "dir",
+            "symlink",
+            "other"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "mount",
+          "description": "Mount point under a root: shown, never traversed.",
+          "type": "string"
+        }
+      ]
+    },
+    "LastError": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "op": {
+          "description": "Step that failed: \"scan\", \"refresh\", \"precheck\", \"write\", \"reserve\", \"publish\".",
+          "type": "string"
+        },
+        "ts": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ts",
+        "op",
+        "message"
+      ],
+      "type": "object"
+    },
+    "LsResponse": {
+      "description": "`ls`: the children of one folder.",
+      "properties": {
+        "age_seconds": {
+          "description": "Age of the oldest part of the requested subtree.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/EntryOut"
+          },
+          "type": "array"
+        },
+        "entry": {
+          "$ref": "#/$defs/EntryOut"
+        },
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "incomplete": {
+          "description": "Some directories could not be read: sizes under `unknown_subtrees` are unknown (D13).\nReport this to the user before any numbers.",
+          "type": "boolean"
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "os": {
+          "type": "string"
+        },
+        "prev_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "scanned_at": {
+          "description": "Start of the last full scan (UNIX seconds).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "schema_version": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "snapshot_id": {
+          "type": "string"
+        },
+        "sort": {
+          "type": "string"
+        },
+        "total_count": {
+          "description": "Number of children of `entry`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "unknown_subtrees": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "host",
+        "os",
+        "generation",
+        "scanned_at",
+        "age_seconds",
+        "schema_version",
+        "snapshot_id",
+        "incomplete",
+        "unknown_subtrees",
+        "entry",
+        "entries",
+        "total_count",
+        "truncated",
+        "limit",
+        "sort"
+      ],
+      "type": "object"
+    },
+    "MountOut": {
+      "properties": {
+        "fs_type": {
+          "type": "string"
+        },
+        "root": {
+          "description": "The scanned root for this mount point, when it is in the root set.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "total": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "used": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "fs_type"
+      ],
+      "type": "object"
+    },
+    "PrevOut": {
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scanned_at": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "generation",
+        "scanned_at"
+      ],
+      "type": "object"
+    },
+    "Progress": {
+      "properties": {
+        "elapsed_seconds": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "entries_expected": {
+          "description": "Used inodes of the scanned filesystems; null when unavailable.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entries_seen": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "op": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "percent": {
+          "description": "0–99 until publish; null without `entries_expected`.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stage": {
+          "description": "\"walk\", \"write\" or \"publish\"",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "updated_at": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "path",
+        "stage",
+        "started_at",
+        "updated_at",
+        "elapsed_seconds",
+        "entries_seen"
+      ],
+      "type": "object"
+    },
+    "Recovery": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/RecoveryAction"
+        },
+        "max_retries": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "side_effects": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "side_effects",
+        "max_retries"
+      ],
+      "type": "object"
+    },
+    "RecoveryAction": {
+      "oneOf": [
+        {
+          "const": "retry",
+          "description": "Retry the same command (up to `max_retries`).",
+          "type": "string"
+        },
+        {
+          "const": "wait",
+          "description": "Wait for the running or next scan, then retry.",
+          "type": "string"
+        },
+        {
+          "const": "fix_input",
+          "description": "Correct the arguments.",
+          "type": "string"
+        },
+        {
+          "const": "use_json",
+          "description": "Use the `--json` commands instead.",
+          "type": "string"
+        },
+        {
+          "const": "ask_human",
+          "description": "Show `fix` to a human; an agent must not run it on its own.",
+          "type": "string"
+        }
+      ]
+    },
+    "Refreshed": {
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "scanned_at": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "scanned_at",
+        "generation"
+      ],
+      "type": "object"
+    },
+    "RootOut": {
+      "properties": {
+        "allocated": {
+          "description": "Bytes counted by the scan under this root.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fs_avail": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fs_total": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fs_type": {
+          "type": "string"
+        },
+        "fs_used": {
+          "description": "statvfs at scan time.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "items": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "fs_type",
+        "allocated",
+        "items",
+        "fs_used",
+        "fs_total",
+        "fs_avail"
+      ],
+      "type": "object"
+    },
+    "Scanning": {
+      "description": "A scan or refresh in progress (`status.scanning`).",
+      "properties": {
+        "elapsed_seconds": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "op": {
+          "description": "\"scan\" or \"refresh\"",
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_at": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "path",
+        "started_at",
+        "elapsed_seconds",
+        "pid"
+      ],
+      "type": "object"
+    },
+    "StatusResponse": {
+      "description": "`status`: snapshot identity and freshness, filesystems, last error, running scan.",
+      "properties": {
+        "age_seconds": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fs": {
+          "items": {
+            "$ref": "#/$defs/FsOut"
+          },
+          "type": "array"
+        },
+        "generation": {
+          "description": "null until the first snapshot is published.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "host": {
+          "type": "string"
+        },
+        "incomplete": {
+          "type": "boolean"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LastError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "From state.json."
+        },
+        "last_success_ts": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "os": {
+          "type": "string"
+        },
+        "prev": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrevOut"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prev_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Progress"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "refreshed": {
+          "items": {
+            "$ref": "#/$defs/Refreshed"
+          },
+          "type": "array"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/$defs/RootOut"
+          },
+          "type": "array"
+        },
+        "scanned_at": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "scanning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Scanning"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A scan or refresh holds the lock right now."
+        },
+        "schema_version": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "snapshot_dir": {
+          "type": "string"
+        },
+        "snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state_error": {
+          "description": "state.json exists but cannot be read.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unknown_subtrees": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "host",
+        "os",
+        "version",
+        "snapshot_dir",
+        "refreshed",
+        "roots",
+        "fs",
+        "incomplete",
+        "unknown_subtrees",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "TopResponse": {
+      "description": "`top`: the largest files, or the topmost folders matching the filters.",
+      "properties": {
+        "age_seconds": {
+          "description": "Age of the oldest part of the requested subtree.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/EntryOut"
+          },
+          "type": "array"
+        },
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "incomplete": {
+          "description": "Some directories could not be read: sizes under `unknown_subtrees` are unknown (D13).\nReport this to the user before any numbers.",
+          "type": "boolean"
+        },
+        "kind": {
+          "description": "\"file\" or \"dir\"",
+          "type": "string"
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "min_size": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "older_than": {
+          "description": "Cut-off timestamp of `--older-than`.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "os": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "path_raw": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prev_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "scanned_at": {
+          "description": "Start of the last full scan (UNIX seconds).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "schema_version": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "snapshot_id": {
+          "type": "string"
+        },
+        "sort": {
+          "type": "string"
+        },
+        "total": {
+          "$ref": "#/$defs/Total"
+        },
+        "total_allocated": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total_count": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "unknown_subtrees": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "host",
+        "os",
+        "generation",
+        "scanned_at",
+        "age_seconds",
+        "schema_version",
+        "snapshot_id",
+        "incomplete",
+        "unknown_subtrees",
+        "path",
+        "kind",
+        "sort",
+        "entries",
+        "total",
+        "total_count",
+        "total_allocated",
+        "truncated",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "Total": {
+      "properties": {
+        "allocated": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "apparent": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "count": {
+          "description": "All matches.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "counted": {
+          "description": "Matches that add to the sums (not nested in another match).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "count",
+        "counted",
+        "allocated",
+        "apparent"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/StatusResponse"
+    },
+    {
+      "$ref": "#/$defs/LsResponse"
+    },
+    {
+      "$ref": "#/$defs/TopResponse"
+    },
+    {
+      "$ref": "#/$defs/FindResponse"
+    },
+    {
+      "$ref": "#/$defs/DiffResponse"
+    },
+    {
+      "$ref": "#/$defs/ErrorBody"
+    }
+  ],
+  "commands": {
+    "diff": {
+      "$ref": "#/$defs/DiffResponse"
+    },
+    "error": {
+      "$ref": "#/$defs/ErrorBody"
+    },
+    "find": {
+      "$ref": "#/$defs/FindResponse"
+    },
+    "ls": {
+      "$ref": "#/$defs/LsResponse"
+    },
+    "status": {
+      "$ref": "#/$defs/StatusResponse"
+    },
+    "top": {
+      "$ref": "#/$defs/TopResponse"
+    }
+  },
+  "description": "Every answer type, for `freespace schema --json`.",
+  "title": "freespace JSON answers",
+  "x-schema-version": 1
+}
