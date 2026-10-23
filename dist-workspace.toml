@@ -1,0 +1,18 @@
+[workspace]
+members = ["cargo:."]
+
+# Release builds (T36): static musl tarballs that install.sh downloads.
+[dist]
+cargo-dist-version = "0.33.0"
+ci = "github"
+installers = []
+targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"]
+unix-archive = ".tar.gz"
+checksum = "sha256"
+# build.rs bundles web/ with bun (eng D5)
+github-build-setup = "../build-setup.yml"
+pr-run-mode = "upload"
+
+[dist.github-custom-runners]
+x86_64-unknown-linux-musl = "ubuntu-22.04"
+aarch64-unknown-linux-musl = "ubuntu-22.04-arm"

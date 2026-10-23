@@ -98,7 +98,7 @@ pub fn hex_encode(b: &[u8]) -> String {
 
 pub fn hex_decode(h: &str) -> Result<Vec<u8>> {
     let h = h.trim();
-    if h.len() % 2 != 0 || !h.bytes().all(|c| c.is_ascii_hexdigit()) {
+    if !h.len().is_multiple_of(2) || !h.bytes().all(|c| c.is_ascii_hexdigit()) {
         return Err(Error::usage(format!(
             "bad --path-raw {h:?}: expected hex bytes"
         )));

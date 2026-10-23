@@ -52,6 +52,18 @@ jobs:
           path: web/playwright-report
           retention-days: 7
 
+  # rust-version in Cargo.toml is a promise: let-chains need 1.88.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: cargo check --workspace --all-targets
+
   # Building without bun must stop with the install hint, not a cryptic error.
   no-bun:
     runs-on: ubuntu-latest
@@ -80,8 +92,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: shellcheck scripts/*.sh
 
-  # T37/T44 on a real systemd VM: install, first scan through the unit, doctor,
-  # uninstall; afterwards nothing from the file-mode table may remain.
+  # T36/T37/T44 on a real systemd VM: install.sh from a local release layout
+  # (no TTY + no sudo → the escalation line; fresh install; rerun), first scan
+  # through the unit, serve, doctor, uninstall; afterwards nothing from the
+  # file-mode table may remain.
   install:
     runs-on: ubuntu-latest
     steps:
@@ -98,13 +112,48 @@ jobs:
         run: |
           sudo chown root:root /usr/local /usr/local/bin
           sudo chmod go-w /usr/local /usr/local/bin
-      - name: install-timer
+      - name: a release layout like GitHub's, from this build
         run: |
-          sudo ./target/release/freespace install-timer --roots "$PWD/core" --json | tee install.json
+          a=freespace-x86_64-unknown-linux-musl.tar.gz
+          d=/tmp/releases
+          mkdir -p "$d/latest/download" "$d/download/v0.1.0" /tmp/pkg/freespace-x86_64-unknown-linux-musl
+          cp target/release/freespace LICENSE README.md /tmp/pkg/freespace-x86_64-unknown-linux-musl/
+          tar -C /tmp/pkg -czf "$d/latest/download/$a" freespace-x86_64-unknown-linux-musl
+          (cd "$d/latest/download" && sha256sum "$a" > "$a.sha256")
+          cp "$d/latest/download/"* "$d/download/v0.1.0/"
+          chmod -R a+rX "$d"
+      - name: without a terminal and without sudo, install.sh hands over to a human
+        run: |
+          sudo useradd -m nosudo
+          cp install.sh /tmp/install.sh
+          code=0
+          sudo -u nosudo env FREESPACE_RELEASES=/tmp/releases setsid sh /tmp/install.sh < /dev/null 2> esc.log || code=$?
+          cat esc.log
+          test "$code" = 1
+          grep -F "ask a human to run in their terminal: curl -fsSL" esc.log
+          test ! -e /usr/local/bin/freespace
+      - name: install.sh
+        run: |
+          FREESPACE_RELEASES=/tmp/releases sh install.sh -- --roots "$PWD/core" --json > install.json 2> install.log
+          cat install.log
+          grep -E "^freespace 0\.1\.0 installed in [0-9]+ s" install.log
           test "$(jq -r .access install.json)" = acl
           test "$(jq -r .scan_started install.json)" = true
           test "$(stat -c '%U %a' /usr/local/bin/freespace)" = "root 755"
           systemctl is-enabled freespace.timer
+          test -s /usr/local/share/bash-completion/completions/freespace
+          test -s /usr/local/share/zsh/site-functions/_freespace
+          test -s /usr/local/share/fish/vendor_completions.d/freespace.fish
+          test "$(stat -c %U "$HOME/.claude/skills/freespace/SKILL.md")" = "$USER"
+      - name: rerunning install.sh with --version reinstalls in place
+        run: |
+          FREESPACE_RELEASES=/tmp/releases sh install.sh --version 0.1.0 --no-timer 2> rerun.log
+          cat rerun.log
+          grep -F "replacing 0.1.0" rerun.log
+          code=0
+          FREESPACE_RELEASES=/tmp/releases sh install.sh --version 9.9.9 2> missing.log || code=$?
+          test "$code" = 1
+          grep -F "is 9.9.9 a release?" missing.log
       - name: first scan publishes through the unit
         run: |
           for _ in $(seq 60); do
@@ -128,7 +177,6 @@ jobs:
           wait "$pid"
       - name: doctor
         run: |
-          freespace skill install
           freespace doctor || true
           freespace doctor --json | jq -e '[.checks[] | select(.id != "path") | .ok] | all'
       - name: uninstall leaves only the group

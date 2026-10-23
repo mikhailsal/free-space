@@ -6,7 +6,8 @@
     "build": "rm -rf dist && bun build src/main.ts --outdir dist --minify --target=browser --entry-naming=[name].[ext] --asset-naming=[name]-[hash].[ext] && cp index.html favicon.svg dist/ && mkdir -p dist/fonts && cp fonts/*.woff2 fonts/fonts.css dist/fonts/",
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/unit",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "shots": "playwright test -c playwright.shots.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

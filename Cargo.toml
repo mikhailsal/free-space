@@ -5,7 +5,7 @@ members = ["core", "cli"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 license = "MIT"
 repository = "https://github.com/mikhailsal/free-space"
 homepage = "https://github.com/mikhailsal/free-space"
@@ -34,3 +34,7 @@ debug = false
 lto = "thin"
 codegen-units = 4
 strip = "debuginfo"
+
+# Release archives built by cargo-dist (dist-workspace.toml)
+[profile.dist]
+inherits = "release"
