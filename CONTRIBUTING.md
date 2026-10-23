@@ -26,10 +26,13 @@ The web page has its own checks (run inside `web/`):
 ```sh
 bun install
 bunx tsc --noEmit
+bunx biome format .
 bun test tests/unit
 bunx playwright install chromium
 bunx playwright test
 ```
+
+`bunx biome format --write .` fixes the formatting (Biome 2.6.2, line width 140, two-space indent).
 
 A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh` must be clean.
 
@@ -46,6 +49,7 @@ cargo run -- ls ~/some/folder
 - Every `freespace` command in `README.md` and `skill/SKILL.md` runs in `cli/tests/skill_contract.rs`; `--json` commands must validate against `skill/schema.json`. Mark a block that must not run (sudo, gui, curl) with `<!-- no-run -->` on the line before it; its commands are still parsed. Mark sample output with `<!-- output -->`.
 - After changing a `--json` answer, regenerate the schema: `UPDATE_SCHEMA=1 cargo test -p freespace-core --test schema`. The same test fails when the file is stale.
 - Every error code needs a row with an anchor in the README errors table.
+- A new e2e spec in `web/tests/e2e/` goes into every e2e list under `dependencies` in `.gstack/pregate.json` (the lists are literal paths, no globs); `web/tests/unit/test-files.test.ts` fails until it does.
 - freespace never deletes, moves or changes files it scans. Changes that would need write access to scanned trees are out of scope.
 
 ## Pull requests

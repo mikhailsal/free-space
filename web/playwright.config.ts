@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
-const port = 4173;
+// scripts/test-files.sh (the pre-gate runner) sets E2E_PORT to a free port for each run.
+const port = Number(process.env.E2E_PORT || 4173);
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -18,7 +19,8 @@ export default defineConfig({
   webServer: {
     command: `bun run build && PORT=${port} bun tests/e2e/serve.ts`,
     url: `http://127.0.0.1:${port}/`,
-    reuseExistingServer: !process.env.CI,
+    // a server already on a port the runner picked belongs to someone else
+    reuseExistingServer: !process.env.CI && !process.env.E2E_PORT,
     stdout: "pipe",
   },
 });

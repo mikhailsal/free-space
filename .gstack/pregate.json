@@ -1,0 +1,135 @@
+{
+  "runner": "scripts/test-files.sh {files}",
+  "dependencies": {
+    "web/src/**": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/src/*.css": [
+      "web/tests/unit/contrast.test.ts"
+    ],
+    "web/index.html": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/favicon.svg": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/fonts/**": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/package.json": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/bun.lock": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/tsconfig.json": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/playwright.config.ts": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/tests/e2e/serve.ts": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts"
+    ],
+    "web/playwright.shots.config.ts": [
+      "web/tests/shots/readme.spec.ts",
+      "web/tests/unit/test-files.test.ts"
+    ],
+    "web/tests/e2e/*.spec.ts": [
+      "web/tests/unit/test-files.test.ts"
+    ],
+    ".gstack/pregate.json": [
+      "web/tests/unit/test-files.test.ts"
+    ],
+    "web/biome.json": [],
+    "docs/**": [],
+    "core/**": [],
+    "cli/**": [],
+    "skill/**": [],
+    "Cargo.toml": [],
+    "Cargo.lock": [],
+    "clippy.toml": [],
+    "dist-workspace.toml": [],
+    "scripts/**": [],
+    "install.sh": [],
+    ".github/**": [],
+    ".githooks/**": []
+  },
+  "guards": [
+    {
+      "id": "web",
+      "when": [
+        "web/**"
+      ],
+      "command": "cd web && bun install --frozen-lockfile && bunx tsc --noEmit && bunx biome format .",
+      "fix": "run the failing command in web/; bunx biome format --write . fixes the format",
+      "timeout_s": 600
+    },
+    {
+      "id": "rust",
+      "when": [
+        "core/**",
+        "cli/**",
+        "skill/**",
+        "README.md",
+        "Cargo.toml",
+        "Cargo.lock",
+        "clippy.toml"
+      ],
+      "command": "cargo fmt --all --check && nice -n 19 cargo clippy --workspace --all-targets -j 2 -- -D warnings && nice -n 19 cargo test --workspace -j 2",
+      "fix": "the same three commands as the CI rust job; cargo fmt --all fixes the format",
+      "timeout_s": 2400
+    },
+    {
+      "id": "shell",
+      "when": [
+        "scripts/**",
+        "install.sh",
+        ".githooks/**"
+      ],
+      "command": "shellcheck install.sh scripts/*.sh",
+      "fix": "fix the shellcheck finding"
+    }
+  ],
+  "strays": {
+    "allow": [
+      ".gstack"
+    ]
+  }
+}
