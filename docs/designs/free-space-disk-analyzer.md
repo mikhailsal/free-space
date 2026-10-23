@@ -108,7 +108,7 @@ freespace install-timer [--interval daily] [--at 02:00] [--roots / /home]
 
 **Привилегии и запись `refresh`.** В v1 `refresh` только из CLI под root. Кнопка «Refresh this folder» в GUI (и в TUI с v1.1) показывает готовую команду и копирует её; root-помощник (pkexec или сокет-демон) отложен в v2. Путь записи: `refresh` не копирует файл и не вставляет строки «на место» (плотные DFS-preorder `id`/`subtree_end` этого не допускают, OV-1): новый снимок собирается заново одной транзакцией потоковым проходом по старому `entries` в порядке `id`, где поддерево `/path` заменяется свежесканированным, а `id`, `subtree_end`, `parent_id` перенумеровываются на лету (одна линейная проходка, ~7M строк); затем публикуется тем же протоколом, что и полный скан (см. «Протокол публикации»). Стоимость `refresh` = запись полного снимка + скан поддерева, это и измеряет Open Question 5. `refresh` **не** ротирует `snapshot.prev.db`: предыдущая генерация остаётся ночным baseline, а `diff` помечает ответ `partial: true` и перечисляет `refreshed[]`, если текущая генерация содержит поддеревья, пересканированные после `prev`. `scan` и `refresh` держат один lock-файл `.lock` в каталоге снимка (flock); второй процесс завершается с ошибкой `another scan is running` (exit 6), а не ждёт. `refresh` проходит тот же precheck, что и `scan`, с `N = 2` (prev не ротируется: current + tmp). Hardlinks при `refresh` (по таблице `hardlinks` старого снимка): ссылки, у которых хотя бы одна запись лежит вне пересканированного поддерева, сохраняют прежнюю атрибуцию; если атрибутированная запись лежала внутри поддерева и исчезла, размер переходит к наименьшему оставшемуся пути; внутри поддерева правило «наименьший путь» применяется заново. Ссылка внутри поддерева с `nlink > 1`, чей inode отсутствует в `hardlinks`, атрибутируется обычным правилом (наименьший путь), если обход поддерева увидел ровно `nlink` её ссылок (все ссылки новые и внутренние, OV-11); иначе хотя бы одна ссылка лежит вне поддерева (на момент полного скана у inode была одна ссылка вне поддерева, OV-2), и запись получает `allocated = 0`: внешняя ссылка уже посчитана и не пересканируется; если её тем временем удалили, размер недосчитывается до ночного `scan` (ответ помечен `partial`), но никогда не считается дважды. Агрегаты предков пересчитываются по цепочке `parent_id` до корня в той же транзакции: аддитивные (`allocated`, `items`, `errors`) по дельте, неаддитивные (`min_scanned_at`, `newest_mtime`) повторной свёрткой по прямым детям предка (`SELECT min(min_scanned_at), max(newest_mtime) FROM entries WHERE parent_id = ?`, один индексный запрос на предка; eng review run 2, F2: дельта не умеет понижать максимум, когда самый новый файл поддерева удалён).
 
-**Изменяемое состояние (`state.json`).** Снимки неизменяемы, поэтому всё, что меняется между сканами, живёт в `snapshot_dir/state.json` (`0640 root:freespace`, запись через tmp + rename под тем же lock-файлом): `last_error {ts, op, message}`, `last_success_ts`, `prev_generation`, `current_generation`. Список обновлённых поддеревьев живёт не здесь, а в самом снимке: таблица `refreshes(path, scanned_at, generation)`, которую полный `scan` пишет пустой, а `refresh` дополняет (OV-5). `status` читает `meta` текущего снимка и `state.json`; при расхождении `meta` главнее: `prev_generation` берётся из `prev.db`, `partial` в `diff` = «таблица `refreshes` текущего снимка непуста» (сравнение по `scanned_at` не годится: после любого полного скана все каталоги новее `prev`, OV-5); `refreshed[]` в ответах `diff`/`status` берётся из этой таблицы. Если `state.json` отсутствует, его поля `null`; если он есть, но не читается или повреждён, `status` отдаёт `state_error: "<причина>"` и остальные поля из `meta` (CEO review, Section 1). Провалившийся precheck пишет `last_error` и не трогает снимки (exit 1, как и любая другая непредвиденная ошибка). Запросы без снимка: `error: no snapshot yet, run: sudo freespace scan` (exit 8).
+**Изменяемое состояние (`state.json`).** Снимки неизменяемы, поэтому всё, что меняется между сканами, живёт в `snapshot_dir/state.json` (`0640 root:freespace`, запись через tmp + rename под тем же lock-файлом): `last_error {ts, op, message}`, `last_success_ts`, `prev_generation`, `current_generation`. Список обновлённых поддеревьев живёт не здесь, а в самом снимке: таблица `refreshes(path, scanned_at, generation)`, которую полный `scan` пишет пустой, а `refresh` дополняет (OV-5). `status` читает `meta` текущего снимка и `state.json`; при расхождении `meta` главнее: `prev_generation` берётся из `prev.db`, `partial` в `diff` = «таблица `refreshes` текущего снимка непуста» (сравнение по `scanned_at` не годится: после любого полного скана все каталоги новее `prev`, OV-5); `refreshed[]` в ответах `diff`/`status` берётся из этой таблицы. Если `state.json` отсутствует, его поля `null`; если он есть, но не читается или повреждён, `status` отдаёт `state_error: "<причина>"` и остальные поля из `meta` (CEO review, Section 1). Провалившийся precheck пишет `last_error` и не трогает снимки (exit 1, как и любая другая непредвиденная ошибка). Запросы без снимка: `no snapshot in /var/lib/freespace (NO_SNAPSHOT). fix: ask a human to run: curl -fsSL …/install.sh | sh`, а при занятом `.lock` — `scanning / since 12:03, wait` (exit 8; DX D10/D16). Снимок есть, но не читается этим пользователем: exit 9 `SNAPSHOT_ACCESS`, fix `sudo freespace install-timer` (DX D8/D16).
 
 **Место под снимок.** Ожидаемый размер: 50–100 байт на запись, то есть 0.4–0.7 GB на 7M записей в SQLite с индексами; точная цифра из бенчмарка. После публикации предыдущая генерация сохраняется как `snapshot.prev.db` (для `diff`, D6), более старые удаляются, поэтому на диске постоянно живут два снимка, а в момент записи три (prev, current, tmp). Перед записью ядро проверяет `free ≥ N × size(current) + 512 MB`, где `current` — текущий опубликованный снимок (он станет `prev`), `N = 3` при `keep_previous = true` (prev + current + tmp) и `N = 2` при `false`; precheck выполняется после обхода, когда число записей известно точно, поэтому `size(current)` заменяется на `max(size(current), 100 B × entries_scanned)` (OV-4); на первом скане `size(current) = 0` и остаётся вторая оценка, а если число записей по какой-то причине неизвестно (btrfs без statvfs-инодов на этапе оценки) — `max(1 GB, 2% от used)`. Во время записи tmp-файла ядро каждые 64 MB проверяет statvfs и прерывает запись (удаляя tmp, `last_error.op = "reserve"`), как только `free < 512 MB`: диск не доводится до ENOSPC, а соседние процессы не теряют место (OV-4). `N×` — намеренный запас, а не подсчёт файлов: реально нужен один tmp-файл, запас защищает диск на 97%. Иначе скан не пишется, старый снимок остаётся, в `status.last_error` появляется запись. При `keep_previous = false` существующий `prev` удаляется при следующем успешном скане, а `diff` отвечает ошибкой `no previous generation` (exit 3).
 
@@ -186,8 +186,9 @@ freespace install-timer [--interval daily] [--at 02:00] [--roots / /home]
 ## Distribution Plan
 
 - GitHub Releases через cargo-dist: статический musl-бинарник для Linux x86_64/aarch64, позже macOS и Windows.
-- `curl | sh` установщик или ручной `install-timer`.
-- README с двумя скриншотами в v1: GUI и JSON для агента (TUI добавится в v1.1). Skill публикуется в том же репозитории.
+- `curl -fsSL …/releases/latest/download/install.sh | sh` (DX D7): свой install.sh ставит root-owned бинарь в `/usr/local/bin`, completions (D19), skill (D9) и вызывает `sudo freespace install-timer`; `sh -s -- --version X` ставит конкретный релиз и служит откатом (D18). cargo-dist только собирает архивы и sha256.
+- Лицензия MIT (DX D20): `LICENSE` в корне, `license = "MIT"` в Cargo.toml.
+- README с двумя скриншотами в v1: GUI и JSON для агента (TUI добавится в v1.1). Skill публикуется в том же репозитории. Структура README и прогон его команд в CI: DX review, Pass 4 (D17).
 - Termux: сборка под aarch64-linux-android в v2.
 
 ## Next Steps
@@ -457,7 +458,7 @@ Only `core` touches files; `cli` is argument parsing plus JSON printing; `web` a
 
 **Production failure scenarios.** (a) Timer fires while the user runs `refresh`: loser exits 6, timer unit shows failed, `Persistent=true` does not re-run until next schedule → a night without a fresh snapshot, visible as `age_seconds` in `status`. Handled, but see Section 8 for making it visible. (b) Disk fills between precheck and write: ENOSPC path handles it. (c) Snapshot directory on a different filesystem that is unmounted: `scan` fails at tmp creation, exit 1, `last_error` cannot be written either → only stderr/journal shows it. **WARNING**: `status` must then say `state.json unreadable` rather than `null` silently. Resolved under existing row EXP-1 mechanics (factual completion, no new behavior): `status` prints `state_error` when `state.json` is unreadable.
 
-**Rollback posture.** Uninstall = `systemctl disable --now freespace.timer`, remove the binary; snapshots are inert files. Time: under a minute. A new binary refusing an old snapshot (exit 5) is rolled back by rerunning `scan`.
+**Rollback posture.** Uninstall = `systemctl disable --now freespace.timer`, remove the binary; snapshots are inert files. Time: under a minute. A new binary refusing an old snapshot (exit 5) is rolled back by rerunning `scan`. *(DX review: after an upgrade `install-timer` starts that rescan itself (D13); rollback to a release is `curl … | sh -s -- --version X` (D18); full removal is `sudo freespace install-timer --uninstall` with the manifest in the DX section.)*
 
 **Value test (artifacts about the work).** `docs/benchmarks.md`: consumed by Open Questions 1, 3 and 5 and by the latency targets; smallest version is one table; retires when the numbers are folded into README. `state.json`, `status`: product observability, not process artifacts.
 
@@ -491,6 +492,7 @@ Capability rows (strategy depth). Exception classes are the Rust error enum vari
   core::state                | state.json unreadable / corrupt       | State::Unreadable
   core::lock                 | lock held                             | Lock::Busy
   core::reader               | snapshot missing                      | Read::NoSnapshot
+                             | EACCES opening snapshot / state.json  | Read::Permission
                              | schema_version mismatch               | Read::Schema
                              | prev.generation >= current.generation | Read::NoPrev / Read::Rotated
                              | path_hash collision in top-N          | Read::HashCollision
@@ -498,9 +500,11 @@ Capability rows (strategy depth). Exception classes are the Rust error enum vari
   cli::gui                   | XDG_RUNTIME_DIR missing               | Gui::NoRuntimeDir
                              | xdg-open missing / fails              | Gui::NoBrowser
                              | port bind fails                       | Serve::Bind
+                             | no TTY on stdin and stdout            | Gui::NoTty
   cli::serve                 | bad/missing token or Origin           | Http::Forbidden (403)
                              | unknown route / bad params            | Http::NotFound / 400
   cli::install-timer         | not root; systemd absent; unit exists | Install::NotRoot / NoSystemd / Exists
+                             | first-scan unit fails to start        | Install::UnitFailed
   cli::refresh               | path not in snapshot                  | Args::Usage
   ---------------------------|---------------------------------------|------------------
 
@@ -515,18 +519,23 @@ Capability rows (strategy depth). Exception classes are the Rust error enum vari
   Write::Enospc         | Y        | delete tmp, last_error, exit 1                  | status.last_error
   Publish::Link/Rename  | Y        | abort publish, keep tmp for inspection, exit 1  | last_error names the step
   State::Unreadable     | Y        | status.state_error, other fields from meta      | visible, not silent
-  Lock::Busy            | Y        | exit 6 immediately                              | "another scan is running"
-  Read::NoSnapshot      | Y        | exit 8 with the scan command                    | actionable hint
-  Read::Schema          | Y        | exit 5 "rescan"                                 | actionable hint
+  Lock::Busy            | Y        | retry LOCK_EX for 2 s, then exit 6 (DX OV-15)   | "scan pid N since 12:03, wait"
+  Read::NoSnapshot      | Y        | exit 8 NO_SNAPSHOT; "scanning since" if locked  | install one-liner (DX D16)
+  Read::Permission      | Y        | exit 9 SNAPSHOT_ACCESS (DX D8/D16)              | "sudo freespace install-timer"
+  Read::Schema          | Y        | exit 5; "rescan running since" during DX D13    | actionable hint
   Read::NoPrev/Rotated  | Y        | exit 3 / exit 4 "retry"                         | actionable hint
   Read::HashCollision   | Y        | exit 7, names both paths                        | rare, loud
   Args::Usage           | Y        | exit 2, clap message                            | usage text
   Gui::NoRuntimeDir     | Y        | private 0700 dir under $TMPDIR                  | transparent
   Gui::NoBrowser        | Y        | print URL + token file path to stderr           | manual open
+  Gui::NoTty            | Y        | exit 2 GUI_NO_TTY, server not started (DX D15)  | fix: --json commands, ssh -t
   Serve::Bind           | Y        | retry 3 random ports then exit 1                | transparent / error
   Http::Forbidden       | Y        | 403, no body details                            | page shows "session expired, rerun gui"
   Install::*            | Y        | exit 1 with the exact fix                       | actionable
+  Install::UnitFailed   | Y        | wait ≤5 s for lock or is-failed (DX OV-5)       | journalctl -u freespace -n 50
 ```
+
+**DX review amendments (2026-10-23).** Under `--json` every rescued error also prints the D16 `ErrorBody` on stdout (`code`, `exit`, `message`, `fix`, `recovery {action, side_effects, max_retries}`, `context {version, snapshot_dir, config}`, `docs`); the text line stays on stderr; `/api/*` returns the same body with its HTTP status. Agents key on `error.code`, not the exit number (exit 2 covers usage, `Config::Invalid` and `GUI_NO_TTY`). Unexpected failures go through the panic hook: `freespace <ver> crashed: <msg>`, crash log path from the DX file-mode table, `RUST_BACKTRACE=1` hint, `last_error` when the lock is held.
 
 **GAP (EMFILE):** jwalk with 8 workers on a directory with very wide fan-out can exceed the soft fd limit. Rescue: raise `RLIMIT_NOFILE` soft limit to the hard limit at `scan` start and cap parallel open directories; user sees nothing. This is an implementation safeguard within ARCH-1 "parallel scan", not new behavior; recorded as task T3.
 
@@ -680,22 +689,22 @@ No LLM/prompt patterns in CLAUDE.md (none exists).
 * **Alerting.** Deferred by D8 (EXP-3). Until then, the systemd unit's failure is visible via `systemctl status freespace.timer` and `status.last_error`. **WARNING** recorded: no push signal exists in v1; accepted by D8.
 * **Dashboards.** None in v1; the web page header already shows snapshot age and disk fill (the plan's sketch).
 * **Debuggability.** Three weeks later: journald has every scan with generation and timings; `state.json` has the last error; the prev snapshot allows reproducing a `diff`. Sufficient.
-* **Admin tooling.** `freespace status`, `freespace install-timer --uninstall` (needs to exist: **gap**, T12 under ARCH-1 "one install command" which implies removal), `journalctl -u freespace`.
-* **Runbooks (one line each).** Snapshot stale: `systemctl list-timers`, `journalctl -u freespace -n 50`. Precheck failing: lower `keep_previous` or move `snapshot_dir`. Exit 5 after upgrade: `sudo freespace scan`. Lock stuck: it cannot be (flock), but `fuser snapshot_dir/.lock` confirms.
+* **Admin tooling.** `freespace status`, `freespace install-timer --uninstall` (needs to exist: **gap**, T12 under ARCH-1 "one install command" which implies removal), `journalctl -u freespace`. *(DX review: `freespace doctor [--json]` (D12) is the first stop for every symptom; uninstall owns the full manifest from the DX section.)*
+* **Runbooks (one line each).** Snapshot stale: `systemctl list-timers`, `journalctl -u freespace -n 50`. Precheck failing: lower `keep_previous` or move `snapshot_dir` (edit the config, then `sudo freespace install-timer` re-renders `ReadWritePaths` and re-applies the ACL; DX OV-6). Exit 5 after upgrade: `install-timer` already started the rescan (DX D13); otherwise `sudo freespace install-timer`. Lock stuck: it cannot be (flock), but `fuser snapshot_dir/.lock` confirms.
 * **Joy to operate (SELECTIVE EXPANSION).** `freespace status` first line as a sentence ("14 G free · snapshot 7 h old · +9 G since prev in Downloads"): zero cost, it is a formatter over fields already present (`diff --depth 1 --limit 1`). Included as a polish task (T13) under D6's accepted `diff` output; no new data.
 
 **Decision gate.** No new choice. Findings: 2 gaps (uninstall path; no push alert, accepted by D8).
 
 ### Section 9: Deployment & Rollout Review
 
-* **Migrations.** No database to migrate: `schema_version` in `meta`; a newer binary refuses an older snapshot (exit 5) and the fix is a rescan. Backward-compatible by construction; zero downtime (file replacement is atomic).
+* **Migrations.** No database to migrate: `schema_version` in `meta`; a newer binary refuses an older snapshot (exit 5) and the fix is a rescan, which `install-timer` starts by itself after an upgrade (DX D13). Backward-compatible by construction; zero downtime (file replacement is atomic).
 * **Feature flags.** `keep_previous` is the only switch; no flags for diff/top features (they are read-only queries).
-* **Rollout order.** Install binary → `install-timer` (writes config, unit, group, adds user to group) → first `scan` (manual, so the user sees timing) → `gui`. Group membership needs a re-login; `install-timer` must print that (T12).
-* **Rollback.** `systemctl disable --now freespace.timer && rm /usr/local/bin/freespace`; snapshots can stay or be deleted; `userdel`-free (group stays, harmless). Under a minute.
+* **Rollout order.** *(Superseded by DX review D5/D7/D8/D9/D22.)* `curl … | sh` → install.sh puts the root-owned binary in `/usr/local/bin` → `sudo freespace install-timer` (config, unit with `ExecStart=/usr/local/bin/freespace`, group, ACL for `$SUDO_USER`, no re-login) starts the first scan through the unit → `freespace gui` shows progress and opens the tree. Re-login is needed only on the no-ACL fallback (group membership).
+* **Rollback.** `systemctl disable --now freespace.timer && rm /usr/local/bin/freespace`; snapshots can stay or be deleted; `userdel`-free (group stays, harmless). Under a minute. *(DX review: rollback = `install.sh --version X` (D18); full removal = `sudo freespace install-timer --uninstall`.)*
 * **Deploy-time risk window.** Old binary (timer) and new binary (user) coexisting: new reader + old snapshot → exit 5 until the next scan; old reader + new snapshot → also exit 5 by `schema_version` check. Acceptable for a personal tool; documented.
 * **Environment parity.** No staging; the VM is production. The synthetic 7M-entry fixture is the stand-in.
 * **Post-deploy checks.** First 5 min: `freespace status --json` exit 0, `gui` opens, `ls /` returns. First hour/night: timer fired (`list-timers`), `age_seconds` reset.
-* **Smoke tests.** `freespace --version`, `status`, `ls / --limit 1`, run by the installer at the end.
+* **Smoke tests.** `freespace --version`, `freespace status --json` (exit 0 with `scanning` set or a snapshot present), `freespace doctor --json`, run by install.sh at the end. `ls / --limit 1` is not a smoke test before the first publish: it exits 8 by design. *(DX review D7/D12.)*
 * **Routine shipping (SELECTIVE EXPANSION).** cargo-dist + a tagged release gives a one-line installer; the accepted cherry-picks do not change the risk profile (no new daemon, no new files outside `snapshot_dir`); `diff` adds a second file to clean up on uninstall (T12).
 
 **Decision gate.** No new choice. Findings: 2 risks (re-login after group add; version skew), both documented with handling.
@@ -1203,6 +1212,8 @@ No row is RESCUED=N with TEST=N and USER SEES=Silent: **0 CRITICAL GAPS**. 22 ca
                             group freespace may stay (harmless)        ──► under 1 minute
 ```
 
+*(DX review 2026-10-23: deployment sequence 5 and the rollback flowchart are superseded. `install.sh` replaces the cargo-dist installer; `install-timer` applies an ACL instead of a re-login and starts the first scan itself; exit 5 after an upgrade starts a rescan automatically; rollback is `install.sh --version X`; removal is `install-timer --uninstall` with the full manifest. Updated sequence: DX section, Magical Moment Specification.)*
+
 ### Stale Diagram Audit
 
 ASCII diagrams in files this plan touches: the architecture block in «Recommended Approach: A′» (updated for `tui/` → v1.1 in D3, still accurate), the Section 1/2/4/6/11 diagrams written today, the two above. The sketch PNG matches Section 11 (no Δ column drawn yet: add the toggle when `web/` is built, noted in T14). None stale.
@@ -1255,7 +1266,7 @@ finding above. Run with Claude Code or Codex; checkbox as you ship.
   - Surfaced by: Section 7 (composite index), OV-3, OV-5
   - Files: to be determined (`core/schema.sql`)
   - Verify: `EXPLAIN QUERY PLAN` for `ls --sort allocated --limit 30` uses the composite index
-- [ ] **T12 (P2, human: ~2h / CC: ~15min)** — cli — `install-timer --uninstall` removing unit, timer, config and both snapshots; print the re-login note after adding the user to group `freespace`
+- [ ] **T12 (P2, human: ~2h / CC: ~15min)** — cli — `install-timer --uninstall` removing unit, timer, config and both snapshots; print the re-login note after adding the user to group `freespace` *(DX review: the uninstall owns the full manifest (completions D19, the `$SUDO_USER` skill D9, the snapshot directory with its ACL, then `/usr/local/bin/freespace`; the group stays); the re-login note is printed only on the no-ACL fallback (D8))*
   - Surfaced by: Section 8 (admin tooling gap), Section 9 (re-login risk)
   - Files: to be determined (`cli/install`)
   - Verify: install then uninstall leaves no file under `/etc/systemd/system/freespace*`, `/etc/freespace`, `/var/lib/freespace`
@@ -1599,7 +1610,7 @@ B) Plain unit
 
 State: approved
 Actual answer: A) Hardened unit (D7, 2026-10-22)
-Accepted scope: `install-timer` writes `freespace.service` with `Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir> /var/lib/freespace`, `NoNewPrivileges=true` (`PrivateTmp` is NOT set: it would hide the host `/tmp` from the scanner — OV-10), `ProtectHome=read-only` is NOT set (scan must read `/home`); lock file and `state.json` live under `snapshot_dir` so one `ReadWritePaths` entry covers writes; a unit test asserts the rendered unit contains these keys (T12).
+Accepted scope: `install-timer` writes `freespace.service` with `Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir> /var/lib/freespace`, `NoNewPrivileges=true` (`PrivateTmp` is NOT set: it would hide the host `/tmp` from the scanner — OV-10), `ProtectHome=read-only` is NOT set (scan must read `/home`); lock file and `state.json` live under `snapshot_dir` so one `ReadWritePaths` entry covers writes; a unit test asserts the rendered unit contains these keys (T12). *(DX D22: `ExecStart=/usr/local/bin/freespace scan`; when `install-timer` runs from another path it first installs a root-owned copy there (tmp + rename, 0755) and refuses if the target or any parent directory is writable by non-root.)*
 History: D7 asked, A chosen as recommended.
 
 ### R6: Lifetime of `serve` started by `gui`
@@ -2259,11 +2270,11 @@ Two gaps remain: step 0 (first-run wait) and step 5 (payoff action). Asked as D1
 
 **Spec (binding for T4 core/status, T15 web, T16 skill).**
 
-- **Lock file content.** `scan` and `refresh`, right after taking `flock`, write `{ "op": "scan"|"refresh", "path": "/", "started_at": <unix>, "pid": N }` into `.lock` (truncate + write; the lock is held by fd, content is informational). `status` tries a non-blocking `flock(LOCK_SH|LOCK_NB)`: success → `scanning: null`; busy → parse the content → `scanning: {op, path, started_at, elapsed_seconds}`; unparsable → `scanning: {op: "unknown", started_at: null}`. Cost: one syscall + one small read.
+- **Lock file content.** `scan` and `refresh`, right after taking `flock`, write `{ "op": "scan"|"refresh", "path": "/", "started_at": <unix>, "pid": N }` into `.lock` (truncate + write; the lock is held by fd, content is informational). `status` tries a non-blocking `flock(LOCK_SH|LOCK_NB)`: success → `scanning: null`; busy → parse the content → `scanning: {op, path, started_at, elapsed_seconds}`; unparsable → `scanning: {op: "unknown", started_at: null}`. Cost: one syscall + one small read. *(DX D14 + OV-3: progress (`entries_seen`, `entries_expected`) is written once per second to `progress.json` via tmp + rename, never into `.lock`; `.lock` and `progress.json` are `0640 root:freespace`; `status` reads `progress.json` only when the lock is busy. The scanner retries `LOCK_EX` for 2 s before exit 6, so this probe cannot cost the nightly scan.)*
 - **No-snapshot page, scan running:**
   ```
   No snapshot yet
-  Scanning / … started 48 s ago. A first scan of a 7M-file disk takes about 1–2 min.
+  Scanning / · 2.1 M of ~7.3 M files · 29% · 48 s        (DX D14; no time estimate until T1 measures one)
   This page opens the snapshot by itself when the scan finishes.
   ```
   Elapsed time ticks client-side every second; `/api/status` polled every 5 s (D7). On `snapshot_id` appearing → navigate to `#/` (first row selected, D6).
@@ -2274,7 +2285,7 @@ Two gaps remain: step 0 (first-run wait) and step 5 (payoff action). Asked as D1
   Or install the nightly timer:   sudo freespace install-timer     [Copy]
   ```
   If `state.last_error` exists, it is shown under the commands in the notice-2 red style (D5) with its `op` and message, so a failed first scan is not silent.
-- **With a snapshot, scan running** (nightly or `refresh`): identity row gains a muted `Scanning / · 1 m 12 s` text after the snapshot age; when it finishes, notice 3 "Newer snapshot available · Load latest" (D5/D10) takes over. No spinner, no progress percentage (none available).
+- **With a snapshot, scan running** (nightly or `refresh`): identity row gains a muted `Scanning / · 1 m 12 s` text after the snapshot age; when it finishes, notice 3 "Newer snapshot available · Load latest" (D5/D10) takes over. No spinner; `2.1 M of ~7.3 M files · 29%` when `entries_expected` is known, elapsed time only otherwise (DX D14).
 - **CLI/skill.** `freespace status` first-line sentence (T13) appends `· scanning / since 12:03` when applicable; SKILL.md documents `scanning` so an agent waits instead of starting a second scan (exit 6).
 
 **Plan amendments.** `state.json`/lock paragraph (Section "Изменяемое состояние") gains the lock-file content; `status --json` field list adds `scanning`; D7 state table row "No snapshot" is replaced by the two variants above.
@@ -2433,7 +2444,7 @@ Open in the plan before this pass: the Top files screen (a button, no layout), t
 - **Delete from the GUI.** v1 does not delete (plan rule, unchanged); the end of the journey is "Hide until next scan" + copy actions (D11).
 - **Dark theme.** Deferred by D14 (light only; semantic variables make it a second value block). TODOS.md.
 - **Single-column phone layout.** Deferred by D16 (v1: no breakage down to 360 px; v2 spec recorded in Pass 6). TODOS.md.
-- **Scan progress percentage.** Only elapsed time is shown (D12); the scanner has no total to report against.
+- ~~**Scan progress percentage.**~~ Reopened and accepted by DX review D14: statvfs used inodes give the total (7,255,851 on this VM), null where the filesystem reports none (btrfs); clamped ≤99% until publish.
 - **Visual mockups.** Designer unavailable in this run (no OpenAI key); accent and spacing are verified on the live page by `/design-review`.
 - **TUI view parity.** "Same view as TUI" removed; TUI (v1.1) shares the token vocabulary and copy, not the layout.
 - **Hidden list across browsers/machines.** Hidden rows live in one browser's localStorage (D11 accepted con); no server state.
@@ -2510,7 +2521,7 @@ Pass 4 (Typography):     6/10 → 9/10   (D13 IBM Plex Sans + Mono bundled, D14 
 Pass 5 (Tokens):         3/10 → 9/10   (D15 full token sheet → web/DESIGN.md + tokens.css)
 Pass 6 (Responsive/a11y):4/10 → 8/10   (D16 v2 phone spec, v1 no-break ≤360 px; a11y contract)
 Pass 7 (Challenge):      14 issues resolved, 2 deferred (dark theme D19, phone layout D20)
-NOT in scope:      9 items (delete, dark theme, phone layout, progress %, mockups, TUI parity, cross-browser hidden list, search-as-you-type, cleanup suggestions)
+NOT in scope:      9 items (delete, dark theme, phone layout, progress % (reopened by DX D14), mockups, TUI parity, cross-browser hidden list, search-as-you-type, cleanup suggestions)
 What already exists: sketch, <table> semantics, share bar, footer keys, hash routing, status poll, state.json fields, find dedup rule, T14 list
 TODOS updates:     2 (dark theme, phone layout)
 Approved Mockups:  0 generated, 0 approved (designer unavailable: no OpenAI key)
@@ -2968,18 +2979,385 @@ Critical gaps open: 0.
 - Hardlinked file counted once for size but its mtime folds into every directory that contains a link — correct for "touched", no change.
 <!-- eng-review-2:end -->
 
+## DX Review (plan-devex-review, 2026-10-23)
+
+Mode: **DX EXPANSION** (D6, every expansion its own opt-in). Surfaces graded (D1): CLI, skill, web GUI; `/api/*` for parity only. Rubric: agent-ready-v1. Plan only, no code. Decisions D1–D22 below are the user's answers in this review; "routine" items are follow-through of an approved answer and needed no new approval. Earlier CEO/eng/design decisions are unchanged except where a line below names the DX decision that amends them.
+
+### Developer Persona Card
+
+```
+PERSONA (D2): owner-operator + their agent
+  Human:  tass, on their own Linux machines; this VM first (ext4 root 97% full,
+          7,255,851 used inodes, rotational virtual disk, 15 GB RAM, I/O scheduler `none`).
+          Installs with sudo once, opens the gui, decides what to delete.
+  Agent:  Claude with SKILL.md; calls `freespace … --json` locally or `ssh host freespace … --json`;
+          cannot sudo, cannot answer prompts, reads errors literally, pays per token.
+  Job:    "what takes space in /, and what grew since yesterday" on any machine, answered
+          before the urge to clean arrives.
+  Clock:  start = first install command on a machine with freespace absent;
+          end = first understood answer to "what takes space in /", including the first scan.
+  Target: Competitive, 2–5 min (D4). The first-scan time is unmeasured until T1.
+```
+
+### Developer Empathy Narrative
+
+Before the review (approved as realistic in D3, with the request to make it more convenient):
+
+> "I'm tass and my VM disk is at 97% again. I run the curl | sh installer from GitHub Releases; it runs its smoke checks (--version, status, ls / --limit 1), and I can't tell what those print before any scan exists. I run sudo freespace install-timer. It creates the group freespace, adds me and tells me to log in again. I'm mid-session, so I skip that. I run sudo freespace scan; the plan says 'about 1-2 min' in one place and 'a few minutes' in another. Then I run freespace gui as myself; the snapshot is 0640 root:freespace and my shell isn't in the group yet, and I can't tell whether I get a generic exit 1 or 'no snapshot yet' right after a scan that worked. After logging in again, the browser opens, the fill bar shows 97%, and two clicks later I find 61 G in .cache/huggingface. Then I hand SKILL.md to Claude. With no snapshot it gets exit 8, 'run: sudo freespace scan'. It can't sudo, so it asks me. No README, no --help text and no behavior for a bare 'freespace' are written yet."
+
+After the review (D3 correction applied through D5, D7–D22):
+
+> "I copy one line from the README: `curl -fsSL …/install.sh | sh`. Before asking for my password it tells me what it will do: binary to /usr/local/bin, a nightly unit, read access for me via ACL, the Claude skill. Twenty seconds later it prints `freespace 0.1.0 installed in 18 s · First scan started · Open: freespace gui`. No re-login. `freespace gui` shows `Scanning / · 2.1 M of ~7.3 M files · 29% · 48 s`, and when the scan publishes the page switches to the tree with the biggest folder already selected: 61 G in .cache/huggingface. I ask Claude to clean up. The skill is already installed; it runs `status --json`, gets `diff` exit 3 on day one and falls back to `top --older-than` and `ls`, shows me a table with path, size, date and why each item is safe, and deletes only after I say yes to that list. On my second machine over ssh, `freespace gui` prints the exact `ssh -N -L` line to run on my laptop. When something looks wrong, `freespace doctor` tells me which check failed and the command that fixes it."
+
+### Competitive DX Benchmark
+
+Clock as in the persona card. Peer numbers are published scan benchmarks (gdu README, SSD, ~400k files), not measured here; only baobab is installed on this VM.
+
+| Tool | Start → result | Time, kind of estimate | DX choice |
+|---|---|---|---|
+| ncdu | `apt install ncdu` → `sudo ncdu -x /` | 33 s on 400k files [reported]; 7M ≈ 10 min [estimated, linear] | zero config, live progress; snapshot only via `-o`/`-O` by hand |
+| gdu | release binary → `sudo gdu /` | 4.7 s on 400k [reported]; 7M ≈ 1.4 min [estimated] | fastest scan; `--db x.sqlite` + `-r` reuse; non-interactive without a TTY |
+| duc | `apt install duc` → `sudo duc index /` → `duc ui` | 32.9 s on 400k [reported] | closest architecture (index once, query many, JSON, CGI web); no scheduler, db in `$HOME` |
+| dust | package → `sudo dust /` | 6.2 s on 400k [reported] | one-shot tree, optional JSON; no snapshot |
+| baobab | installed → Scan | [unknown] | zero install, chart; no CLI/JSON; partial `/` without root |
+| freespace, before review | `curl \| sh` → `sudo freespace install-timer` → re-login → `sudo freespace scan` → `freespace gui` | ≈ 4–14 min, 5 steps [estimated] | only one with timer, diff, JSON contract, skill |
+| **freespace, after review** | `curl … \| sh` → `freespace gui` | **≈ 0.5 min install + first scan [unmeasured, T1] + ≈ 0.5 min reading; 2 commands** | progress with a total (D14), auto-switch to the answer (D5), no re-login (D8), skill pre-installed (D9); day two: `ls` ≤ 300 ms, `status` ≤ 50 ms [plan targets] |
+
+Rank: **Competitive** (target D4), conditional on the first scan landing within ~4 min in the unit (Pass 8 measures it).
+
+### Magical Moment Specification
+
+Vehicle (D5): the gui switches itself to the answer when the first scan publishes; progress (D14) fills the wait.
+
+```
+curl -fsSL …/releases/latest/download/install.sh | sh
+  ├─ prints plan (binary, unit, ACL, skill) before the first sudo; `sudo -n` check without a TTY
+  ├─ arch → cargo-dist musl tarball → sha256 → sudo install -o root -m 0755 /usr/local/bin/freespace
+  ├─ sudo freespace install-timer
+  │    ├─ config, unit (ExecStart=/usr/local/bin/freespace scan, D22), timer, group
+  │    ├─ snapshot_dir created; setfacl u:$SUDO_USER:rx + default d:u:$SUDO_USER:r (D8; group fallback + re-login note without ACL)
+  │    ├─ daemon-reload; schema check → start, or restart --no-block when the unit is active (D13, OV-4)
+  │    └─ waits ≤5 s: lock held → "First scan started · Open: freespace gui"; is-failed → journalctl line (OV-5)
+  ├─ skill install as $SUDO_USER when ~/.claude exists (home via getent, D9/OV-14); completions (D19)
+  └─ smoke: --version, status --json (scanning or snapshot), doctor --json; prints "installed in N s"
+freespace gui
+  ├─ no snapshot + lock busy → "Scanning / · 2.1 M of ~7.3 M files · 29% · 48 s" (progress.json, ≤99% until publish)
+  └─ snapshot_id appears → navigate #/ with the biggest folder selected (design D6/D12)
+```
+
+Requirements: the moment needs no command beyond the two above; no step prints success before it is true (OV-5); without a TTY nothing waits on a prompt (D15, `sudo -n`).
+
+### Developer Journey Map
+
+```
+STAGE          | WHAT THE DEVELOPER DOES                            | FRICTION BEFORE                               | STATUS
+---------------|----------------------------------------------------|-----------------------------------------------|---------------------------
+1. Discover    | README: one-liner, 2 screenshots, agent section    | no README (plan 186–191)                      | fixed (Pass 4, D17)
+2. Install     | curl …/install.sh | sh → binary, unit, ACL, skill  | cargo-dist ≠ /usr/local/bin; re-login; skill  | fixed (D7, D8, D9, D22)
+3. Hello World | freespace → status + Next; gui opens the tree      | separate sudo scan; bare freespace = exit 2   | fixed (D5, D10, D14)
+4. Real Usage  | gui over ssh prints the ssh -L line; agent --json  | random port, tunnel by hand; gui hangs agent  | fixed (D11, D15)
+5. Debug       | freespace doctor [--json]: ok/fail + fix command   | runbooks in your head; shadowed binary        | fixed (D12, D16)
+6. Upgrade     | rerun install.sh → rescan on schema change         | exit 5 until night; no rollback               | fixed (D13, D18)
+```
+
+### First-Time Developer Confusion Report
+
+Roleplay of tass on this VM with the plan as reviewed; each item annotated with its resolution.
+
+```
+T+0:00  sudo prompt inside the pipe: "what will it do as root?"            → routine: plan printed before sudo
+T+0:20  install output                                                       → D7–D9, D19, D22; "installed in N s"
+T+0:30  bare freespace                                                       → D10: "Scanning / since 12:03" + Next
+T+0:40  gui: unmeasured "about 1–2 min", no progress → "is it stuck?"        → D14 progress; copy line amended (design D12)
+T+N     auto-switch; .cache/huggingface 61 G; Hide until next scan           → D5 (+ design D11)
+T+N+1   agent: diff exit 3 on day one                                        → routine: SKILL.md falls back to top/ls
+T+N+1   agent: "delete these?"                                               → D21: table + explicit consent for each deletion
+T+N+3   second machine over ssh: tunnel; binary missing → exit 127           → D11; SKILL.md prints the one-liner (plan 1041)
+T+N+3   `ssh -L … host freespace gui` one-liner has no TTY                   → OV-10: GUI_NO_TTY fix names `ssh -t`
+```
+
+### DX Decision Ledger
+
+| D | Question | Answer | Accepted scope (exact) |
+|---|---|---|---|
+| D1 | Surfaces | CLI, skill, web | `/api/*` graded for parity only |
+| D2 | Persona | A owner-operator + agent | persona card above |
+| D3 | Narrative | realistic; make it more convenient | narrative "after" above |
+| D4 | TTHW target | B Competitive 2–5 min | clock above; first scan verified in Pass 8 |
+| D5 | Magical moment | A gui switches itself | `install-timer` starts the first scan via the unit, prints "First scan started. Open: freespace gui"; gui shows Scanning and auto-switches to the tree with the biggest folder selected |
+| D6 | Mode | A DX EXPANSION | each expansion its own opt-in |
+| D7 | Install | A custom install.sh → /usr/local/bin | arch, cargo-dist musl tarball, sha256, `sudo install -o root -m 0755`, `sudo freespace install-timer`; smoke accepts scanning; rerun = upgrade; shellcheck + CI test |
+| D8 | Access | A ACL + group | `setfacl -m u:$SUDO_USER:rx` + default `d:u:$SUDO_USER:r`; group kept; no-ACL fallback = group + re-login note |
+| D9 | Skill | A `freespace skill install [--dir]` / `skill print` | SKILL.md + schema.json embedded; install.sh runs it as $SUDO_USER when ~/.claude exists; every upgrade refreshes it |
+| D10 | Bare `freespace` | A status sentence + 3 Next lines, exit 0 | no snapshot → install command; scanning → "Scanning / since 12:03"; same text as T13 |
+| D11 | gui over ssh | A print the tunnel command | SSH_CONNECTION set and no DISPLAY/WAYLAND_DISPLAY → no xdg-open; `ssh -N -L <port>:127.0.0.1:<port> <host>` + token URL; `--port` / config `port` |
+| D12 | Diagnostics | A `freespace doctor [--json]` | timer + next run, binary root-owned and not shadowed in PATH, ACL/group access, precheck margin, last_error, skill version = binary version; each failure prints its fix; `checks[{id, ok, detail, fix}]`, exit 0/1; status stays ≤50 ms and adds "Run: freespace doctor" when age > 26 h or last_error |
+| D13 | Upgrade | A auto-rescan on schema change | after replacing the binary, schema_version ≠ binary → rescan via the unit; install.sh prints "0.3.0 → 0.4.0 · snapshot schema 3 → 4, rescan started"; exit 5 during rescan says "rescan running since 12:03" |
+| D14 | Progress | A counter + inode share | scanner reports entries_seen / entries_expected once per second; expected = used inodes of the roots' filesystems (statvfs), null when unavailable; "2.1 M of ~7.3 M files · 29% · 48 s", ≤99% until publish; tests for hardlinks and DENIED |
+| D15 | gui without TTY | A exit 2 + hint | stdin and stdout not terminals → exit 2 GUI_NO_TTY, fix names `--json` commands; server not started; bare freespace prints `--json` Next lines when piped; `serve` unchanged; eng D8 unchanged for TTY use |
+| D16 | Errors under `--json` | A JSON error on stdout | `{"error":{code, exit, message, fix, recovery{action, side_effects, max_retries}, context{version, snapshot_dir, config}, docs}}`; stderr text kept; ErrorBody in schema.json; test per exit code; `/api/*` same body with HTTP status |
+| D17 | README in CI | A README in the T23 harness | fenced `freespace …` blocks run on the synthetic snapshot; sudo / curl / gui lines marked `<!-- no-run -->`, parsed by clap only |
+| D18 | Rollback | A `install.sh --version X` | installs `releases/download/vX/` through the same path; D13 rescan also on downgrade; container/runner test holds two archives |
+| D19 | Completions | A `freespace completions <shell>` + install.sh | bash/zsh/fish; values for `--kind`; dir hints; refreshed on upgrade, removed by uninstall; paths under `/usr/local/share` (factual correction of the option text) |
+| D20 | License | B MIT | `LICENSE`, `license = "MIT"` |
+| D21 | Agent deletions | user-modified A | SKILL.md guidance, **no hard prohibitions** (`sudo rm` allowed): table (path, allocated, modified, why safe), `stat` before rm (snapshot can be 26 h old), `path_raw` for non-UTF-8, native cleaners first (`docker system prune`, `pip cache purge`, `journalctl --vacuum-size`), warn on system paths; **explicit user consent for every deletion** |
+| D22 | ExecStart | B self-install into /usr/local/bin | unit always runs `/usr/local/bin/freespace`; `install-timer` from another path installs a root-owned copy there (tmp + rename, 0755) and prints it; refuses when target or parents are writable by non-root |
+| D23 | TODO: first-scan priority if TTHW > 5 min | Skip (user: "looks like a really extreme scenario") | not added; the TTHW row in docs/benchmarks.md still records the number |
+
+### Pass results
+
+| Pass | Before → after | What moved it | Residual |
+|---|---|---|---|
+| 1 Getting Started | 4 → 8 | D5, D7–D10, D14; install.sh prints its plan before sudo | first-scan time unmeasured (T1) |
+| 2 API/CLI | 6 → 8 | routine: human tables on a TTY for ls/top/diff/find (same columns, no color when piped, no auto-JSON); `--help` groups Look (ls, top, diff, find, gui) / Maintain (status, doctor, scan, refresh) / Setup (install-timer, skill, schema, completions), two examples each | grammar mismatch `install-timer --uninstall` vs `skill install` kept |
+| 3 Errors (agent-ready-v1) | 4 → 8 | D15 removed the CAP4 (gui hang); D16 channel; routine corrected lines below | wording proven only by the per-code test |
+| 4 Docs | 5 → 9 | README structure (routine), D17; SKILL.md embedded (D9) | no sandbox beyond gui itself |
+| 5 Upgrade | 4 → 8 | D13, D18; semver 0.x + CHANGELOG.md (cargo-dist release notes, Breaking section with the replacement command); remote version skew via `error.context.version` | no flag deprecation window in 0.x |
+| 6 Dev env | 6 → 8 | D19; install.sh shellcheck + runner-VM test (OV-9); dependency check up front | web edits need a binary rebuild (include_dir) |
+| 7 Community | 3 → 7 | D20 MIT; issue template asking for `freespace --version` + `freespace doctor --json`; short CONTRIBUTING | no channels beyond issues; no crates.io/AUR |
+| 8 Measurement | 2 → 7 | one measured TTHW run from a clean, cold start (method below); /devex-review re-measures after ship | one run; no telemetry by design |
+
+**Pass 3 corrected error lines (routine):**
+
+```
+NO_SNAPSHOT (8)     no snapshot in /var/lib/freespace (NO_SNAPSHOT). fix: ask a human to run:
+                    curl -fsSL …/install.sh | sh   (if status shows scanning: wait, poll
+                    freespace status --json every 10 s, up to 30 min)
+SNAPSHOT_ACCESS (9) cannot read /var/lib/freespace/snapshot.db as tass: permission denied
+                    (SNAPSHOT_ACCESS). fix: ask a human to run: sudo freespace install-timer
+SPACE (1)           scan not written: need 2.1 G free in /var/lib/freespace, have 1.4 G (SPACE).
+                    Previous snapshot kept (side effects: none). fix: set keep_previous = false
+                    in /etc/freespace/config.toml or move snapshot_dir, then sudo freespace install-timer
+LOCK (6)            scan pid 4121 running since 12:03 (LOCK). recovery: wait, retry after it ends
+GUI_NO_TTY (2)      gui needs a terminal and a browser (GUI_NO_TTY). fix: for data run
+                    freespace ls / --json; for a human: run freespace gui in their terminal
+                    (over ssh: ssh -t -L 8710:127.0.0.1:8710 host freespace gui --port 8710)
+panic               freespace 0.1.0 crashed: <msg>. trace: <crash log path>. rerun with RUST_BACKTRACE=1
+install.sh, no TTY  sudo needs a password and no terminal is attached. fix: ask a human to run
+                    curl -fsSL …/install.sh | sh in their terminal
+```
+
+Matrix after the fixes: every traced path (NO_SNAPSHOT, SNAPSHOT_ACCESS, SPACE, GUI_NO_TTY, panic) passes what / fix / recovery / code / context / trace / redaction / channel, with N/A only where the class makes it so (usage error: no recovery or context; environment errors: no trace). Safety model: read-only tool, no delete (D21 governs the agent), loopback only, token never in argv or in any error body.
+
+**SKILL.md rules (routine follow-through of D9–D16, D21):** NO_SNAPSHOT → ask the human for the one-liner; `scanning` set → poll `status --json` every 10 s up to 30 min; exit 3 → `top --older-than` then `ls`; never call `gui`; stuck → `doctor --json`; act on `error.recovery.action` and key on `error.code`; USAGE error from a remote host → compare `error.context.version` with local `freespace --version` and suggest rerunning install.sh there; deletions per D21 plus: `nlink > 1` frees nothing until every link is gone, open files free nothing until closed (`lsof +L1` when `df` does not move), check `df` after deleting (OV-12).
+
+**README structure (routine, D7/D9/D12/D16/D17/D18):** 1) install one-liner and what it does; 2) first minute: `freespace`, `freespace gui`, GUI screenshot; 3) over ssh (D11, `ssh -t` form); 4) for agents: `freespace skill install`, the three questions diff → top --older-than → ls, JSON screenshot; 5) something wrong: `freespace doctor`, errors table with one anchor per code (`#errors-no_snapshot` …); 6) upgrade, rollback (`--version X`, works back to the first public release), uninstall.
+
+**Pass 8 TTHW method (routine proof of D4):** start state = `sudo freespace install-timer --uninstall` (full manifest), then `sync; echo 3 | sudo tee /proc/sys/vm/drop_caches`; run the real path (`curl … | sh`, unit scan, `freespace gui`); record install seconds (printed by install.sh), first-scan seconds (`status` after publish), reading time (stopwatch) as a "TTHW" row in `docs/benchmarks.md`, next to T1's normal-priority cold scan. Factual note from the outside voice check: this VM's active I/O scheduler is `[none]`, so `IOSchedulingClass=idle` has no effect here; only `Nice=19` differs from a manual scan. The eng hardening decision is unchanged; T1 records the difference.
+
+### Claude Code Skill DX Checklist
+
+- [x] AskUserQuestion design: N/A for a query skill; D21 defines the one consent point (a concrete list).
+- [x] State storage: snapshot in `/var/lib/freespace` (global), skill in `~/.claude/skills/freespace`, no per-session state.
+- [x] Progressive consent: install.sh says where it put the skill and how to remove it (`freespace skill uninstall`, routine pair of `skill install`).
+- [x] Auto-upgrade: skill refreshed with the binary (D9); mismatch caught by doctor (D12). No network version check (the tool never calls home).
+- [x] Skill composition: N/A.
+- [x] Error recovery: atomic publish, previous snapshot kept, D16 `recovery`.
+- [x] Agent-readable errors: D16.
+- [x] Session continuity: the snapshot is the persistent state.
+- [x] Bounded autonomy: D21 (guidance + explicit consent for every deletion, no hard prohibitions by user choice).
+
+### Outside Voice (DX phase)
+
+Codex (gpt-6-astra) timed out after 5 minutes (exit 124): no outside coverage for this phase. Native fallback: Claude Plan subagent, completed within the 5-minute timer, 15 findings; verified against the plan text and this VM before classification.
+
+| # | Finding (severity) | Verdict | Disposition |
+|---|---|---|---|
+| 1 | Root timer may run a user-writable binary (High) | real | **D22 B** |
+| 2 | `.lock` / tmp modes unspecified; default-ACL mask `---` on 0600 files (High) | real | routine (D8): file-mode table below |
+| 3 | Per-second `.lock` rewrites → torn reads (Medium) | real | routine (D14 implementation): `progress.json` via tmp + rename; `.lock` written once |
+| 4 | "rescan started" false when the unit is active; daemon-reload; prev schema (Medium) | real | routine (D13): `restart --no-block` when active; `daemon-reload`; on a schema-change rescan the old-schema current is not rotated into prev, so `diff` answers exit 3 honestly; README notes rollback reaches back to the first public release |
+| 5 | "starting" and "failed" look the same (Medium) | real | routine (D5): wait ≤5 s for lock or `is-failed`; `snapshot_dir` created before start; journalctl line on failure |
+| 6 | Moving `snapshot_dir` breaks ReadWritePaths and ACL (Medium) | real | routine (D8/D12): apply via `sudo freespace install-timer`; doctor compares unit and ACL with the config; runbook amended |
+| 7 | TTHW protocol measures warm; scheduler semantics (Medium) | real; scheduler fact corrected (`[none]` is active, not mq-deadline) | routine: drop_caches in the start state; compare with T1 |
+| 8 | No single uninstall (Medium) | partly: T12 already removes unit, timer, config, snapshots (line 1261) | routine (D9/D19): T12 manifest extended; before/after filesystem test; group stays |
+| 9 | Container test cannot exercise systemd (Medium) | real | routine (D7 proof): runner VM for the systemd path, debian container for the no-ACL fallback |
+| 10 | D15 refuses the `ssh -L … gui` one-liner; exit 2 overloaded (Low/Medium) | real | routine: fix line and README show `ssh -t`; no SSH exemption (would re-open the agent hang); SKILL keys on `error.code` |
+| 11 | Host check vs mismatched tunnel port (Low) | real | routine: D11 already requires the same port; the 403 text names the expected port; Host check unchanged (eng) |
+| 12 | "allocated" ≠ space freed (Low) | real | routine (D21 accuracy): nlink / open-file notes, `lsof +L1`, `df` check |
+| 13 | Crash log location (Low) | real | routine: file-mode table |
+| 14 | No `$SUDO_USER` in a root shell; HOME=/root (Low) | real | routine (D8/D9): `install-timer --user NAME`; home via `getent passwd`; otherwise skip ACL and skill and print the exact command |
+| 15 | `status` shared-lock probe can make the nightly scan exit 6 (Low) | real | routine: scanner retries `LOCK_EX` for 2 s |
+
+Cross-model tension: no external model completed, so there is no cross-model comparison for this phase; the native subagent agreed with every DX decision and found specification gaps under them, none reversing an answer.
+
+### File ownership and modes (OV-2, OV-13)
+
+| Path | Owner:group | Mode | Written by | Read by |
+|---|---|---|---|---|
+| `/usr/local/bin/freespace` | root:root | 0755 | install.sh / `install-timer` self-install (D22) | everyone; unit `ExecStart` |
+| `snapshot_dir/` (default `/var/lib/freespace`) | root:freespace | 0750 + ACL `u:$USER:rx`, default `d:u:$USER:r` | `install-timer` | user via ACL or group |
+| `snapshot.db`, `snapshot.prev.db`, `snapshot.<gen>.tmp` | root:freespace | 0640 (explicit `fchmod` before rename) | scan | user |
+| `state.json`, `.lock`, `progress.json` | root:freespace | 0640 (explicit `fchmod`, umask-independent; ACL mask `r--`) | scan / refresh | status, gui, agent |
+| `crash-<ts>.log` | root:freespace in `snapshot_dir` (scan); user in `$XDG_STATE_HOME/freespace/` (user commands) | 0640 / 0600 | panic hook | human, doctor |
+| `/etc/freespace/config.toml` | root:root | 0644 | `install-timer` | scan, doctor |
+| `/etc/systemd/system/freespace.{service,timer}` | root:root | 0644 | `install-timer` | systemd, doctor |
+| `/usr/local/share/{bash-completion/completions/freespace, zsh/site-functions/_freespace, fish/vendor_completions.d/freespace.fish}` | root:root | 0644 | install.sh (D19) | shells |
+| `~/.claude/skills/freespace/{SKILL.md, schema.json}` | user | 0644 | `skill install` as the user (D9) | agent |
+
+### Install / uninstall manifest (OV-8)
+
+`sudo freespace install-timer --uninstall` removes, in order: timer and unit (`disable --now`, `daemon-reload`), `/etc/freespace`, `snapshot_dir` with its ACL, completions, the `$SUDO_USER` skill, then `/usr/local/bin/freespace`. The group `freespace` stays (harmless, line 694). Test: snapshot the filesystem paths above before install and after uninstall; the only difference allowed is the group.
+
+### NOT in scope (DX review)
+
+- First-scan priority override when TTHW > 5 min (D23 skipped by the user as an extreme case).
+- Fast web edit loop (serving `web/` from disk in debug builds): developer-of-freespace DX, not the persona's; include_dir rebuild accepted.
+- Flag deprecation window before 1.0: CHANGELOG "Breaking" with the replacement command covers 0.x.
+- crates.io, AUR, distro packages, "awesome" lists: single owner-operator; install.sh is the channel.
+- Network update check in doctor: the tool never leaves the machine.
+- Offline `freespace help <CODE>`: the D16 body already carries fix and recovery.
+- SSH exemption for GUI_NO_TTY: would re-open the agent hang closed by D15.
+- Telemetry of any kind.
+
+### What already exists (reuse)
+
+- Contract harness T23 (SKILL.md commands → schema.json validation) and T22 (`schemars`, `freespace schema --json`): D16 ErrorBody and D17 README runs extend them.
+- Lock payload and `status.scanning` (design D12, line 2262): D10, D13 and D14 read it.
+- T13 status first-line sentence: D10 and D12 reuse the text.
+- T12 `install-timer --uninstall` and its Verify: extended, not replaced.
+- Structured scan logs and `generation` as correlation id (Section 8): doctor and crash logs point to them.
+- cargo-dist release workflow (T18, eng D4): install.sh downloads its artifacts and checksums.
+- CEO precheck inode estimate (CEO scope line 35): the same statvfs read gives D14's total.
+
+### TODOS.md updates
+
+None added. D23 (first-scan priority) skipped by the user; the two smaller candidates are listed under NOT in scope.
+
+## Implementation Tasks (plan-devex-review, 2026-10-23)
+Synthesized from this review's findings. Each task derives from a specific finding above. Effort ratio assumptions: features ~30x, tests ~50x, docs ~20x (human ÷ CC).
+
+- [ ] **T36 (P1, human: ~1.5d / CC: ~45min)** — install — `install.sh`: arch detect, cargo-dist musl tarball, sha256, plan printed before sudo, `sudo -n` check without a TTY, dependency check (curl, tar, sha256sum, sudo), `sudo install -o root -m 0755`, `sudo freespace install-timer`, completions, skill as `$SUDO_USER` (home via getent), `--version X`, "installed in N s" and the version/schema transition line, smoke `--version` + `status --json` + `doctor --json`
+  - Surfaced by: Pass 1, D7, D18, D19, OV-14
+  - Files: `install.sh`, `.github/workflows/ci.yml`
+  - Verify: shellcheck clean; CI on the ubuntu runner VM: fresh install, rerun = upgrade, rollback across two local archives, no-TTY path prints the escalation line; debian container without `acl` → group fallback + re-login note
+- [ ] **T37 (P1, human: ~1d / CC: ~30min)** — cli/install — `install-timer`: ACL + default ACL (D8), `--user NAME` when `$SUDO_USER` is unset, `ExecStart=/usr/local/bin/freespace scan` with self-install and the non-root-writable check (D22), `snapshot_dir` created before start, `daemon-reload`, schema check → `start` or `restart --no-block` (D13, OV-4), wait ≤5 s for lock or `is-failed` (OV-5), "First scan started · Open: freespace gui" (D5)
+  - Surfaced by: D5, D8, D13, D22, OV-1, OV-4, OV-5, OV-14
+  - Files: `cli/install.rs`, `core/systemd.rs`
+  - Verify: unit test on the rendered unit (ExecStart path, keys); runner-VM test: lock held within 5 s after install; an induced unit failure prints the journalctl line and exits 1; running from `./target/release` installs a root-owned copy and refuses a user-writable target
+- [ ] **T38 (P1, human: ~1d / CC: ~30min)** — core — file modes and progress: explicit `fchmod 0640 root:freespace` for snapshot tmp, `.lock`, `progress.json`, `state.json`, crash logs; `progress.json` once per second via tmp + rename with `entries_seen`, `entries_expected` (statvfs used inodes, null when unavailable), clamp ≤99% until publish; `LOCK_EX` retry for 2 s before exit 6
+  - Surfaced by: D14, OV-2, OV-3, OV-13, OV-15
+  - Files: `core/scan.rs`, `core/lock.rs`, `core/publish.rs`, `core/state.rs`
+  - Verify: as an unprivileged user with only the ACL, `status`, `ls`, progress and crash log are readable under umask 077; fixture with hardlinks and a DENIED dir never shows >99%; a concurrent `status` probe loop does not make `scan` exit 6
+- [ ] **T39 (P1, human: ~1d / CC: ~30min)** — cli — error contract: D16 `ErrorBody` on stdout under `--json`, text on stderr, `ErrorBody` in schema.json, `/api/*` same body; exit 9 SNAPSHOT_ACCESS; GUI_NO_TTY (D15) with the `ssh -t` fix; corrected NO_SNAPSHOT / SPACE / LOCK lines; panic hook with crash log path; 403 text names the expected port (OV-11)
+  - Surfaced by: Pass 3, D15, D16, OV-10, OV-11
+  - Files: `cli/error.rs`, `cli/output.rs`, `cli/serve.rs`, `skill/schema.json`
+  - Verify: a test drives every exit code, validates the stdout body against schema.json and greps both channels for the token (must be absent); `freespace gui </dev/null >/dev/null` exits 2 without binding a port
+- [ ] **T40 (P1, human: ~0.5d / CC: ~20min)** — cli — bare `freespace` (D10): status sentence + three Next lines, `--json` Next lines when piped (D15), "Run: freespace doctor" when age > 26 h or last_error (D12)
+  - Surfaced by: D10, D12, D15
+  - Files: `cli/main.rs`, `cli/status.rs`
+  - Verify: assert_cmd with and without a pty (`script -qc`); no snapshot → install command; lock busy → "Scanning / since"
+- [ ] **T41 (P1, human: ~0.5d / CC: ~30min)** — cli — `freespace doctor [--json]`: timer + next run, ExecStart target root-owned (D22), binary not shadowed in PATH, ACL/group access, unit `ReadWritePaths` and ACL match the configured `snapshot_dir` (OV-6), precheck margin, last_error, skill version = binary version; each failure prints its fix; exit 0/1
+  - Surfaced by: D12, OV-6
+  - Files: `cli/doctor.rs`
+  - Verify: one fixture per failing check prints its fix and exits 1; all green exits 0; `status` timing stays ≤50 ms (no systemd call)
+- [ ] **T42 (P2, human: ~2h / CC: ~15min)** — cli — `gui` over ssh (D11): tunnel line + token URL when `SSH_CONNECTION` is set without DISPLAY/WAYLAND_DISPLAY; `--port`
+  - Surfaced by: D11
+  - Files: `cli/gui.rs`
+  - Verify: env-driven test: prints `ssh -N -L <p>:127.0.0.1:<p> <host>` and does not exec xdg-open
+- [ ] **T43 (P2, human: ~0.5d / CC: ~15min)** — cli — `freespace skill install|print|uninstall` (D9) with a version stamp; `freespace completions <shell>` (D19)
+  - Surfaced by: D9, D19, Skill checklist
+  - Files: `cli/skill.rs`, `cli/completions.rs`
+  - Verify: `skill install --dir $tmp` equals the embedded files; `bash -n` on the bash completion; zsh/fish files generated
+- [ ] **T44 (P2, human: ~2h / CC: ~15min)** — cli/tests — extend T12 uninstall to the full manifest; before/after filesystem test
+  - Surfaced by: OV-8, D9, D19
+  - Files: `cli/install.rs`, `cli/tests/install_manifest.rs`
+  - Verify: runner VM: install then uninstall leaves no path from the file-mode table except the group
+- [ ] **T45 (P2, human: ~1d / CC: ~30min)** — skill — SKILL.md rules (Pass 3/4 list) and D21 deletion guidance incl. nlink / open-file notes (OV-12)
+  - Surfaced by: D9–D16, D21, OV-10, OV-12
+  - Files: `skill/SKILL.md`
+  - Verify: T23 green; a scripted agent session on the fixture shows the table and waits for consent before any rm
+- [ ] **T46 (P1, human: ~1d / CC: ~30min)** — docs — README (structure above, errors table with anchors), `CHANGELOG.md`, `LICENSE` (MIT, D20), `CONTRIBUTING.md`, issue template asking for `--version` + `doctor --json`; T23 harness extended to README with `<!-- no-run -->` markers (D17)
+  - Surfaced by: Pass 4, Pass 5, Pass 7, D16, D17, D20
+  - Files: `README.md`, `CHANGELOG.md`, `LICENSE`, `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/bug.md`, `cli/tests/skill_contract.rs`, `Cargo.toml`
+  - Verify: a bogus flag in a README block fails CI; every error code has an anchor the D16 `docs` field points to
+- [ ] **T47 (P2, human: ~0.5d / CC: ~20min)** — cli — human table output on a TTY for ls/top/diff/find; grouped `--help` (Look / Maintain / Setup) with two examples per command
+  - Surfaced by: Pass 2
+  - Files: `cli/output.rs`, `cli/main.rs`
+  - Verify: pty snapshot of the table; piped output has no ANSI codes; `--help` lists the three groups
+- [ ] **T48 (P2, human: ~2h / CC: ~10min)** — benchmark — TTHW row: clean cold start (uninstall + drop_caches), real install path, install / first-scan / reading seconds next to T1's normal-priority cold scan
+  - Surfaced by: Pass 8, D4, OV-7
+  - Files: `docs/benchmarks.md`
+  - Verify: the row exists with three timings and the scheduler noted
+
+**Amendments to earlier tasks (DX review):** T12 → manifest per T44 and re-login note only on the no-ACL fallback; T13 → shared text with bare `freespace` (D10); T23 → also README (D17) and ErrorBody (D16); T26 → no-snapshot "scanning" variant shows D14 progress instead of the "1–2 min" copy; T18 → shellcheck + runner-VM install job (T36).
+
+## DX Review Scorecard
+
+```
++====================================================================+
+|              DX PLAN REVIEW — SCORECARD                             |
++====================================================================+
+| Dimension            | Score  | Prior  | Trend  |
+|----------------------|--------|--------|--------|
+| Getting Started      |  8/10  |  4/10  | +4 ↑   |
+| API/CLI/SDK          |  8/10  |  6/10  | +2 ↑   |
+| Error Messages       |  8/10  |  4/10  | +4 ↑   |
+| Documentation        |  9/10  |  5/10  | +4 ↑   |
+| Upgrade Path         |  8/10  |  4/10  | +4 ↑   |
+| Dev Environment      |  8/10  |  6/10  | +2 ↑   |
+| Community            |  7/10  |  3/10  | +4 ↑   |
+| DX Measurement       |  7/10  |  2/10  | +5 ↑   |
++--------------------------------------------------------------------+
+| TTHW                 | 2–5 min (target, first scan unmeasured) | 4–14 min (5 steps, est.) | ↓ |
+| Competitive Rank     | Competitive (target; verified by T48)        |
+| Magical Moment       | designed via gui auto-switch + progress (D5, D14) |
+| Product Type         | CLI + Claude Code skill + local web GUI      |
+| Mode                 | EXPANSION                                    |
+| Overall DX           |  8/10 (7.9) |  4/10 (4.3) | +4 ↑ |
++====================================================================+
+| DX PRINCIPLE COVERAGE                                               |
+| Zero Friction      | covered (2 commands, no re-login)              |
+| Learn by Doing     | covered (Next lines, README run in CI)         |
+| Fight Uncertainty  | covered (progress, doctor, D16 recovery)       |
+| Opinionated + Escape Hatches | covered (--port, --version, --user, config) |
+| Code in Context    | covered (--help examples, README on fixture)   |
+| Magical Moments    | covered (D5)                                   |
+| Agents Are Users   | covered (D9, D15, D16, D21)                    |
++====================================================================+
+Prior = this review's starting score (no earlier DX review of this plan).
+```
+
+No pass below 6 and the TTHW target is under 10 min, so there is no critical DX debt. Two passes stay at 7: Community (a personal tool with issues as the only channel, by scope) and Measurement (one manual TTHW run, no telemetry by design). The one number the target depends on, the first scan inside the unit, is measured by T1/T48.
+
+```
+DX IMPLEMENTATION CHECKLIST
+============================
+[ ] Time to hello world < 5 min (T48 measures it from a clean, cold start)
+[ ] Installation is one command (curl … | sh, T36)
+[ ] First run produces meaningful output (bare freespace, progress, auto-switch: T40, T38, T26)
+[ ] Magical moment delivered via the gui auto-switch after the first scan (D5)
+[ ] Every error message meets the agent-ready error contract (T39 per-code test)
+[ ] API/CLI naming is guessable without docs (grouped --help, completions: T47, T43)
+[ ] Every parameter has a sensible default (roots, at, port 0 = random, keep_previous)
+[ ] Docs have copy-paste examples that actually work (README in the T23 harness, T46)
+[ ] Examples show real use cases (diff → top --older-than → ls; cleanup flow D21)
+[ ] Upgrade path documented (rerun install.sh, D13 rescan, --version X rollback)
+[ ] Breaking changes listed with the replacement command (CHANGELOG "Breaking"; no codemods needed)
+[ ] Types included: schema.json for every response and ErrorBody (T22, T39)
+[ ] Works in CI/CD without special configuration (--json, no prompts, GUI_NO_TTY, sudo -n)
+[ ] Free tier available, no credit card required (MIT, no service)
+[ ] Changelog exists and is maintained (CHANGELOG.md → cargo-dist release notes)
+[ ] Search works in documentation (single README + --help; N/A for a docs site)
+[ ] Community channel exists and is monitored (GitHub Issues with template)
+```
+
+### Unresolved Decisions
+
+None. Every question in this review (D1–D23) has an answer; D23 was answered "Skip".
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 2 | CLEAR | 6 proposals, 3 accepted, 2 deferred (+3 HOLD items deferred) |
-| Outside Review | codex (gpt-6-astra) via `/plan-ceo-review`, `/plan-eng-review` ×2, `/plan-design-review` | Independent 2nd opinion | 4 | completed (issues_found) | CEO phase: 7 findings, 7 resolved. Eng phase run 1: 8 findings, 6 corrected (OV-9…OV-14), 2 decided (D12, D13). Design phase: 15 codex + 15 Claude-subagent findings, folded into Passes 1–7. Eng phase run 2: 7 findings, 5 adopted as mechanics (T33/T24), 2 decided (D4, D5), 0 rejected |
+| Outside Review | codex (gpt-6-astra) via `/plan-ceo-review`, `/plan-eng-review` ×2, `/plan-design-review`, `/plan-devex-review` | Independent 2nd opinion | 5 | 4 completed (issues_found); DX phase unavailable (codex timeout) | CEO phase: 7 findings, 7 resolved. Eng phase run 1: 8 findings, 6 corrected (OV-9…OV-14), 2 decided (D12, D13). Design phase: 15 codex + 15 Claude-subagent findings, folded into Passes 1–7. Eng phase run 2: 7 findings, 5 adopted as mechanics (T33/T24), 2 decided (D4, D5), 0 rejected. DX phase: codex timed out after 5 min (exit 124); native Claude Plan subagent fallback, 15 findings: 1 decided (D22), 14 routine follow-through, 0 rejected (in-host, not outside coverage) |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR (FULL_REVIEW, 0 critical gaps) — run 2 covered T33 `newest_mtime` (D18) | Run 1: 15 findings → R1–R8 approved + 7 task notes; D1–D14. Run 2: 16 findings (3+3+3 sections, 7 codex), R11–R16, D1–D7 answered, 24 test paths mapped, T33/T24/T34 amended |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL_REVIEW) | score: 3/10 → 8/10; 14 decisions (D5–D18), 2 deferred to TODOS (D19, D20); tasks T25–T35; 0 mockups (designer unavailable) |
-| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 1 | CLEAR (EXPANSION) | score: 4/10 → 8/10, TTHW: 4–14 min (5 steps) → 2–5 min target (2 commands; first scan unmeasured until T1/T48); 23 decisions (D1–D23), tasks T36–T48 |
 
-- **OUTSIDE COVERAGE:** provider codex, model gpt-6-astra, phases plan-review (CEO, Eng ×2) and design (2026-10-22/23). Eng run 2 prompt: D18 spec, T33, the full run-2 block; codex found the clamp promise contradiction (D4), the dedup/sort-order and totals holes, the invariant under partial refresh, the dir-mtime label mismatch (D5), the wrong Top budget and the signed max identity. All closed in T33/T24 or decided.
-- **CROSS-MODEL:** native eng pass (Claude Fable 5.1) found the refresh re-fold hole (F2), the tie-break (F3) and the plan contradiction (F1); codex extended F3 to all sort orders and totals and corrected a false promise in the native R13 record; no disagreement remained after D4/D5. Design-phase overrides (D11, D17, D18) stand.
-- **VERDICT:** CEO + ENG + DESIGN CLEARED — ready for implementation; T33 is unblocked (schema change reviewed), benchmark gate T1/T24 still decides indexes.
+- **OUTSIDE COVERAGE:** provider codex, model gpt-6-astra, phases plan-review (CEO, Eng ×2) and design (2026-10-22/23), completed. Eng run 2 prompt: D18 spec, T33, the full run-2 block; codex found the clamp promise contradiction (D4), the dedup/sort-order and totals holes, the invariant under partial refresh, the dir-mtime label mismatch (D5), the wrong Top budget and the signed max identity. All closed in T33/T24 or decided. DX phase (plan-review, 2026-10-23): codex unavailable (timed out after 5 minutes); the native Claude Plan subagent fallback completed in-host with 15 findings and does not count as outside coverage.
+- **CROSS-MODEL:** native eng pass (Claude Fable 5.1) found the refresh re-fold hole (F2), the tie-break (F3) and the plan contradiction (F1); codex extended F3 to all sort orders and totals and corrected a false promise in the native R13 record; no disagreement remained after D4/D5. Design-phase overrides (D11, D17, D18) stand. DX phase: no completed external review, so no cross-model comparison.
+- **VERDICT:** CEO + ENG + DESIGN + DX CLEARED — ready for implementation; the benchmark gate T1/T24 still decides indexes, and T48 verifies the 2–5 min TTHW target.
 
 NO UNRESOLVED DECISIONS
