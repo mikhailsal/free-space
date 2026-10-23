@@ -112,7 +112,7 @@ pub fn find(snap: &Snapshot, p: &FindParams) -> Result<FindResponse> {
     let mut rows = st.query(params![
         scope.id,
         scope.subtree_end,
-        min_size.unwrap_or(0) as i64,
+        i64::try_from(min_size.unwrap_or(0)).unwrap_or(i64::MAX),
         older,
         newer,
         pattern,

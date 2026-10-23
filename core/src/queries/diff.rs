@@ -224,6 +224,15 @@ pub fn diff_pair(
                 let nb = b.0.as_ref().or(b.1.as_ref()).map(|r| &r.row.name);
                 na.cmp(&nb)
             })
+            .then_with(|| {
+                // deterministic: current rows by id, then gone rows by their prev id
+                let key = |x: &(Option<LevelRow>, Option<LevelRow>)| match (&x.0, &x.1) {
+                    (Some(c), _) => (0, c.row.id),
+                    (None, Some(p)) => (1, p.row.id),
+                    (None, None) => (2, 0),
+                };
+                key(a).cmp(&key(b))
+            })
     });
     let total_count = pairs.len() as u64;
     pairs.truncate(limit as usize);

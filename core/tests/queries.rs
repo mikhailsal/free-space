@@ -489,6 +489,7 @@ fn refresh_keeps_hardlinks_counted_once() {
     let now = now_secs();
     f.file("in/y", 100 << 10, now);
     f.mkdir("out");
+    f.mkdir("other");
     fs::hard_link(f.p("in/y"), f.p("out/x")).unwrap();
     f.scan(false);
     let total = f.entry("").allocated;
@@ -529,6 +530,88 @@ fn refresh_keeps_hardlinks_counted_once() {
     assert!(n1.allocated >= 30 << 10);
     assert_eq!(n2.allocated, 0);
     assert!(n2.hardlink_alias);
+
+    // the zeroed z stays at 0 through later refreshes, inside and elsewhere
+    let z_of = || {
+        f.ls("in")
+            .entries
+            .into_iter()
+            .find(|e| e.name == "z")
+            .unwrap()
+    };
+    let before = f.entry("").allocated;
+    f.refresh("in");
+    assert_eq!(f.entry("").allocated, before, "second refresh of in");
+    f.refresh("other");
+    assert_eq!(f.entry("").allocated, before, "unrelated refresh");
+    assert_eq!(z_of().allocated, 0);
+
+    // refreshing the other side observes both links: counted once, at the smaller path
+    f.refresh("out");
+    let z = z_of();
+    assert!(z.allocated >= 50 << 10 && !z.hardlink_alias);
+    let w = f
+        .ls("out")
+        .entries
+        .into_iter()
+        .find(|e| e.name == "w")
+        .unwrap();
+    assert_eq!(w.allocated, 0);
+    assert!(w.hardlink_alias);
+    assert_eq!(f.entry("").allocated, before + z.allocated);
+}
+
+#[test]
+fn huge_min_size_matches_nothing() {
+    let f = fx();
+    f.file("a", 10 << 10, now_secs());
+    f.scan(false);
+    let r = f.top(TopParams {
+        min_size: Some("8388608T".into()),
+        ..Default::default()
+    });
+    assert_eq!(r.total_count, 0);
+    let r = queries::find(
+        &f.snap(),
+        &FindParams {
+            path: Some(f.s("")),
+            min_size: Some("8388608T".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(r.total_count, 0);
+}
+
+#[test]
+fn diff_ties_are_ordered_by_path() {
+    let f = fx();
+    for d in ["p1", "p2", "p3", "p4"] {
+        f.file(&format!("{d}/x/f"), 10 << 10, now_secs());
+    }
+    f.scan(true);
+    for d in ["p1", "p2", "p3", "p4"] {
+        fs::remove_dir_all(f.p(&format!("{d}/x"))).unwrap();
+    }
+    f.scan(true);
+    for _ in 0..4 {
+        let r = queries::diff(
+            &f.dir,
+            &DiffParams {
+                path: Some(f.s("")),
+                depth: Some(2),
+                kind: Some("dir".into()),
+                limit: Some(1),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(
+            r.entries[0].path.ends_with("/p1/x"),
+            "{}",
+            r.entries[0].path
+        );
+    }
 }
 
 #[test]

@@ -45,7 +45,7 @@ pub fn top(snap: &Snapshot, p: &TopParams) -> Result<TopResponse> {
     let input = PathArg::new(p.path.clone(), p.path_raw.clone()).bytes()?;
     let (scope, path) = resolve(snap, &input)?;
     let conn = &snap.conn;
-    let min = min_size.unwrap_or(0) as i64;
+    let min = i64::try_from(min_size.unwrap_or(0)).unwrap_or(i64::MAX);
 
     // gstack-shortcut(dec-ac91ac89): unknown/unreadable dates pass --older-than, upgrade when a
     // running-service dir is listed as untouched or mtime=0 appears in a real snapshot.

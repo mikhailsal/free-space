@@ -1,9 +1,10 @@
 //! `fs_glob(name, pattern, icase)`: glob over entry names (T17).
 //!
-//! The glob is translated to a `regex::bytes` pattern so names that are not
-//! valid UTF-8 still match byte-wise: `*` = any bytes, `?` = one character
-//! (or one byte when the name is not UTF-8 there), `[..]`/`[!..]` classes,
-//! `\` escapes. `icase` compiles with `(?i)` and Unicode case folding.
+//! The glob is translated to `regex::bytes` patterns so names that are not
+//! valid UTF-8 still match: `*` = any bytes, `?` = one character in a UTF-8
+//! name and one byte in a name that is not UTF-8 (two compiled regexes),
+//! `[..]`/`[!..]` classes, `\` escapes. `icase` compiles with `(?i)` and
+//! Unicode case folding.
 
 use std::sync::Arc;
 
@@ -14,7 +15,8 @@ use rusqlite::types::ValueRef;
 
 use crate::error::{Error, Result};
 
-pub fn glob_to_regex(glob: &str) -> std::result::Result<String, String> {
+/// `bytewise`: `?` matches one byte (for names that are not UTF-8).
+pub fn glob_to_regex(glob: &str, bytewise: bool) -> std::result::Result<String, String> {
     let mut re = String::from("^");
     let chars: Vec<char> = glob.chars().collect();
     let mut i = 0;
@@ -22,7 +24,8 @@ pub fn glob_to_regex(glob: &str) -> std::result::Result<String, String> {
         let c = chars[i];
         match c {
             '*' => re.push_str("(?s-u:.)*"),
-            '?' => re.push_str("(?:(?s:.)|(?s-u:.))"),
+            '?' if bytewise => re.push_str("(?s-u:.)"),
+            '?' => re.push_str("(?s:.)"),
             '\\' => {
                 i += 1;
                 match chars.get(i) {
@@ -79,15 +82,38 @@ pub fn glob_to_regex(glob: &str) -> std::result::Result<String, String> {
     Ok(re)
 }
 
-pub fn compile(glob: &str, icase: bool) -> Result<Regex> {
-    let re = glob_to_regex(glob)
-        .map_err(|e| Error::usage(format!("bad --name pattern {glob:?}: {e}")))?;
+/// A compiled pattern: one regex for UTF-8 names, one for the rest.
+pub struct Matcher {
+    utf8: Regex,
+    bytes: Regex,
+}
+
+impl Matcher {
+    pub fn is_match(&self, name: &[u8]) -> bool {
+        if std::str::from_utf8(name).is_ok() {
+            self.utf8.is_match(name)
+        } else {
+            self.bytes.is_match(name)
+        }
+    }
+}
+
+fn build(glob: &str, icase: bool, bytewise: bool) -> Result<Regex> {
+    let bad = |e: String| Error::usage(format!("bad --name pattern {glob:?}: {e}"));
+    let re = glob_to_regex(glob, bytewise).map_err(bad)?;
     RegexBuilder::new(&re)
         .case_insensitive(icase)
         .unicode(true)
         .size_limit(1 << 22)
         .build()
-        .map_err(|e| Error::usage(format!("bad --name pattern {glob:?}: {e}")))
+        .map_err(|e| bad(e.to_string()))
+}
+
+pub fn compile(glob: &str, icase: bool) -> Result<Matcher> {
+    Ok(Matcher {
+        utf8: build(glob, icase, false)?,
+        bytes: build(glob, icase, true)?,
+    })
 }
 
 /// Validate a pattern before running a query (usage error, exit 2).
@@ -103,7 +129,7 @@ pub fn register(conn: &Connection) -> Result<()> {
         FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
         |ctx| {
             let icase: bool = ctx.get::<i64>(2).unwrap_or(0) != 0;
-            let re: Arc<Regex> = ctx.get_or_create_aux(1, |v: ValueRef<'_>| -> std::result::Result<Regex, Box<dyn std::error::Error + Send + Sync>> {
+            let re: Arc<Matcher> = ctx.get_or_create_aux(1, |v: ValueRef<'_>| -> std::result::Result<Matcher, Box<dyn std::error::Error + Send + Sync>> {
                 let p = v.as_str().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 compile(p, icase).map_err(|e| e.message.clone().into())
             })?;
@@ -143,6 +169,15 @@ mod tests {
         assert!(m("*видео*", true, "Видео.mkv".as_bytes()));
         assert!(!m("*видео*", false, "Видео.mkv".as_bytes()));
         assert!(m("?идео.mkv", false, "Видео.mkv".as_bytes()));
+    }
+
+    #[test]
+    fn question_mark_is_one_character() {
+        assert!(m("??", false, b"ab"));
+        assert!(!m("??", false, "é".as_bytes()));
+        assert!(m("??", false, "日本".as_bytes()));
+        assert!(!m("??????", false, "日本".as_bytes()));
+        assert!(m("?", false, "é".as_bytes()));
     }
 
     #[test]

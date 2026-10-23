@@ -1,6 +1,8 @@
 //! `status`: snapshot identity, freshness, roots and filesystems, last error,
 //! running scan. Must stay ≤ 50 ms: no systemd calls, no full-table scans.
 
+use std::os::unix::ffi::OsStrExt;
+
 use rusqlite::params;
 
 use super::common::{lossy, unknown_subtrees};
@@ -88,7 +90,7 @@ pub fn status(dir: &SnapshotDir) -> Result<StatusResponse> {
     for (path, fs_type, alloc, items, used, total, avail, min_sc) in rows {
         oldest = oldest.min(min_sc);
         let p = lossy(&path);
-        let live = platform::statvfs(std::path::Path::new(&p)).ok();
+        let live = platform::statvfs(std::path::Path::new(std::ffi::OsStr::from_bytes(&path))).ok();
         resp.fs.push(FsOut {
             path: p.clone(),
             fs_type: fs_type.clone(),

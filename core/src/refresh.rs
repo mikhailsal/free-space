@@ -314,44 +314,56 @@ pub fn graft(
         }
     }
 
-    // Hardlink rules (T19, OV-11).
+    // Hardlink rules (T19, OV-11). Per inode: a previous owner that is still
+    // known keeps the size; otherwise count the links we know of (old rows
+    // outside the subtree + links seen by this walk). Fewer than `nlink` means
+    // an unrecorded link elsewhere carries the size (an earlier OV-11 zeroing
+    // or a link made outside since), so nobody here is counted.
     let mut policy = LinkPolicy::default();
     let mut old_by_key: HashMap<(u64, u64), Vec<&OldLink>> = HashMap::new();
     for l in &loaded.links {
         old_by_key.entry((l.1, l.2)).or_default().push(l);
     }
-    for (key, links) in &old_by_key {
-        if links.iter().all(|l| removed.contains_key(&l.0)) {
-            continue; // every link was inside: the smallest-path rule applies anew
-        }
-        let Some(owner) = links.iter().find(|l| l.5) else {
-            continue;
-        };
-        match removed.get(&owner.0) {
-            None => {
-                policy.forced_raw.insert(*key, owner.0);
-            }
-            Some(&id) => {
-                // owner was inside: keep it if the same path still exists, else smallest remaining
-                policy.forced_path.insert(*key, conn_paths.path(id)?);
-            }
-        }
+    let mut new_by_key: HashMap<(u64, u64), Vec<u32>> = HashMap::new();
+    for &(raw, dev, ino) in &new_links {
+        new_by_key.entry((dev, ino)).or_default().push(raw);
     }
-    // New inodes seen only inside: counted normally iff every link was observed.
-    let mut seen: HashMap<(u64, u64), u32> = HashMap::new();
-    for &(_, dev, ino) in &new_links {
-        *seen.entry((dev, ino)).or_default() += 1;
-    }
-    for (key, count) in seen {
-        if old_by_key.contains_key(&key) {
-            continue;
-        }
-        let nlink = new_links
+    let mut keys: Vec<(u64, u64)> = old_by_key
+        .keys()
+        .chain(new_by_key.keys())
+        .copied()
+        .collect();
+    keys.sort_unstable();
+    keys.dedup();
+    for key in keys {
+        let old = old_by_key.get(&key).map(Vec::as_slice).unwrap_or(&[]);
+        let outside: Vec<u32> = old
             .iter()
-            .find(|l| (l.1, l.2) == key)
-            .map(|l| tree.nodes[l.0 as usize].nlink)
+            .filter(|l| !removed.contains_key(&l.0))
+            .map(|l| l.0)
+            .collect();
+        if !outside.is_empty()
+            && let Some(owner) = old.iter().find(|l| l.5)
+        {
+            match removed.get(&owner.0) {
+                None => {
+                    policy.forced_raw.insert(key, owner.0);
+                }
+                Some(&id) => {
+                    // owner was inside: keep it if the same path still exists, else smallest remaining
+                    policy.forced_path.insert(key, conn_paths.path(id)?);
+                }
+            }
+            continue;
+        }
+        let new = new_by_key.get(&key).map(Vec::as_slice).unwrap_or(&[]);
+        let nlink = new
+            .iter()
+            .chain(&outside)
+            .map(|&r| tree.nodes[r as usize].nlink)
+            .max()
             .unwrap_or(0);
-        if count < nlink {
+        if ((outside.len() + new.len()) as u64) < u64::from(nlink) {
             policy.zeroed.insert(key);
         }
     }
@@ -413,7 +425,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let sub = if os_path.exists() {
         let opts = scan::WalkOptions {
             roots: vec![os_path.clone()],
-            one_file_system: true,
+            one_file_system: snap.meta.one_file_system,
             workers: req.workers,
             seen,
             expected: Some(x.items as u64 + 1),
