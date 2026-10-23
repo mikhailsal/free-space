@@ -821,3 +821,31 @@ fn unreadable_folder_marks_every_answer_incomplete() {
     assert!(t.entries.iter().any(|e| e.name == "locked"));
     assert!(t.header.incomplete);
 }
+
+#[test]
+fn refresh_of_a_folder_now_a_file_points_at_the_parent() {
+    let f = fx();
+    let now = now_secs();
+    f.file("tc/d/sub/a", 8192, now - DAY);
+    f.scan(false);
+    fs::remove_dir_all(f.p("tc/d")).unwrap();
+    fs::write(f.p("tc/d"), vec![1u8; 4096]).unwrap();
+    let e = refresh::run_refresh(RefreshRequest {
+        path: f.p("tc/d").as_os_str().as_bytes().to_vec(),
+        workers: 2,
+        dir: f.dir.clone(),
+        on_progress: None,
+    })
+    .unwrap_err();
+    assert_eq!(e.code, ErrorCode::Usage, "{}", e.message);
+    let parent = f.p("tc");
+    assert_eq!(
+        e.fix.as_deref(),
+        Some(format!("sudo freespace refresh {}", parent.display()).as_str())
+    );
+    // the parent picks up the new kind
+    f.refresh("tc");
+    let d = f.entry("tc/d");
+    assert_eq!(d.kind, Kind::File);
+    assert_eq!(f.snap().meta.generation, 2);
+}
