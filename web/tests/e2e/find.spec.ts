@@ -15,9 +15,7 @@ test("typing sends nothing; Enter sends one search (D9)", async ({ page }) => {
   expect(api.count("find")).toBe(1);
   await expect(page.locator("table.grid tbody tr")).toHaveCount(1);
   await expect(page.locator("table.grid tbody tr")).toContainText("Downloads/ubuntu.iso");
-  await expect(page.locator("aside .cmdline code")).toHaveText(
-    "freespace find /home/tass --name '*.iso' --kind any --min-size 1G --json",
-  );
+  await expect(page.locator("aside .cmdline code")).toHaveText("freespace find /home/tass --name '*.iso' --kind any --min-size 1G --json");
   // single-key shortcuts are off inside fields
   await page.locator("#f-name").press("t");
   await expect(page.getByRole("tab", { name: "Find" })).toHaveAttribute("aria-selected", "true");

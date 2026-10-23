@@ -7,8 +7,19 @@ import { DAY, G, M, MockApi, NOW, type Node } from "../e2e/mock";
 type Day = "today" | "yesterday";
 
 const K = 2 ** 10;
-const dir = (name: string, mtime: number, items: number, children: Node[]): Node => ({ name, kind: "dir", mtime: NOW - mtime, items, children });
-const file = (name: string, allocated: number, mtime: number): Node => ({ name, kind: "file", allocated: Math.round(allocated), mtime: NOW - mtime });
+const dir = (name: string, mtime: number, items: number, children: Node[]): Node => ({
+  name,
+  kind: "dir",
+  mtime: NOW - mtime,
+  items,
+  children,
+});
+const file = (name: string, allocated: number, mtime: number): Node => ({
+  name,
+  kind: "file",
+  allocated: Math.round(allocated),
+  mtime: NOW - mtime,
+});
 const h = 3600;
 
 function home(day: Day): Node {
@@ -29,9 +40,15 @@ function home(day: Day): Node {
           dir("mozilla", 5 * h, 4_270, [file("cache2", 1.3 * G, 5 * h)]),
         ]),
         dir("Projects", 2 * h, 412_877, [
-          dir("ml-notebooks", 6 * DAY, 61_032, [dir("data", 6 * DAY, 212, [file("events.parquet", 11 * G, 6 * DAY)]), dir(".venv", 40 * DAY, 58_400, [file("lib", 4.8 * G, 40 * DAY)])]),
+          dir("ml-notebooks", 6 * DAY, 61_032, [
+            dir("data", 6 * DAY, 212, [file("events.parquet", 11 * G, 6 * DAY)]),
+            dir(".venv", 40 * DAY, 58_400, [file("lib", 4.8 * G, 40 * DAY)]),
+          ]),
           dir("rust-cli", 2 * h, 9_118, [dir("target", 2 * h, 8_300, [file("debug", (today ? 9.4 : 7.1) * G, 2 * h)])]),
-          dir("webshop", 1 * DAY, 201_660, [dir("node_modules", 12 * DAY, 198_004, [file("packages", 2.1 * G, 12 * DAY)]), dir(".git", 1 * DAY, 3_120, [file("objects", 640 * M, 1 * DAY)])]),
+          dir("webshop", 1 * DAY, 201_660, [
+            dir("node_modules", 12 * DAY, 198_004, [file("packages", 2.1 * G, 12 * DAY)]),
+            dir(".git", 1 * DAY, 3_120, [file("objects", 640 * M, 1 * DAY)]),
+          ]),
           dir("old-blog", 610 * DAY, 141_065, [dir("node_modules", 610 * DAY, 140_870, [file("packages", 1.4 * G, 610 * DAY)])]),
         ]),
         dir("VirtualBox VMs", 120 * DAY, 9, [dir("Windows 11", 120 * DAY, 7, [file("Windows 11.vdi", 24 * G, 120 * DAY)])]),
@@ -54,9 +71,9 @@ function home(day: Day): Node {
         ...only(dir(".ollama", 3 * h, 31, [dir("models", 3 * h, 28, [file("qwen3-14b", 8.9 * G, 3 * h)])]), "today"),
         dir("Pictures", 30 * DAY, 8_812, [file("Camera", 7.4 * G, 30 * DAY)]),
         dir(".rustup", 25 * DAY, 31_904, [file("toolchains", 3.1 * G, 25 * DAY)]),
-        dir(".cargo", 2 * h, 48_660, [file("registry", (today ? 2.6 * G : 2.42 * G), 2 * h)]),
-        dir(".npm", 1 * DAY, 39_120, [file("_cacache", (today ? 1.9 * G : 1.6 * G), 1 * DAY)]),
-        dir("Documents", 3 * DAY, 2_418, [file("scans", (today ? 1.2 * G : 1.19 * G), 3 * DAY)]),
+        dir(".cargo", 2 * h, 48_660, [file("registry", today ? 2.6 * G : 2.42 * G, 2 * h)]),
+        dir(".npm", 1 * DAY, 39_120, [file("_cacache", today ? 1.9 * G : 1.6 * G, 1 * DAY)]),
+        dir("Documents", 3 * DAY, 2_418, [file("scans", today ? 1.2 * G : 1.19 * G, 3 * DAY)]),
         dir(".config", 2 * h, 6_031, [file("Code", 640 * M, 2 * h)]),
         dir(".vscode", 7 * DAY, 3_877, [file("extensions", 480 * M, 7 * DAY)]),
         file(".bash_history", (today ? 1204 : 1196) * K, 2 * h),

@@ -60,7 +60,12 @@ test("the token moves to sessionStorage and survives a hash without it", async (
 
 test("snapshot not readable by this user (DX D8)", async ({ page }) => {
   const api = new MockApi();
-  api.failWith = { status: 403, code: "SNAPSHOT_ACCESS", message: "cannot read /var/lib/freespace/snapshot.db", fix: "sudo freespace install-timer" };
+  api.failWith = {
+    status: 403,
+    code: "SNAPSHOT_ACCESS",
+    message: "cannot read /var/lib/freespace/snapshot.db",
+    fix: "sudo freespace install-timer",
+  };
   await api.install(page);
   await page.goto(url());
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Cannot read the snapshot");
