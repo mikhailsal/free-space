@@ -3,6 +3,7 @@
 
 pub mod config;
 pub mod error;
+pub mod fault;
 pub mod format;
 pub mod job;
 pub mod platform;

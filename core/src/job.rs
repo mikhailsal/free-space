@@ -7,6 +7,7 @@ use std::sync::atomic::AtomicU64;
 use std::time::Instant;
 
 use crate::error::{Error, ErrorCode, Result};
+use crate::fault;
 use crate::platform;
 use crate::scan::{self, Finalized, NO_PARENT, Tree};
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
@@ -181,6 +182,7 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     let fin = tree.finalize();
     let finalize_seconds = t.elapsed().as_secs_f64();
     let denied = denied_paths(&tree, &fin);
+    fault::point(&req.dir, "walked");
 
     pw.set_stage(progress::STAGE_WRITE);
     let factor = if req.keep_previous { 3 } else { 2 };
@@ -192,6 +194,7 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
         });
         e
     })?;
+    fault::point(&req.dir, "prechecked");
     let (generation, current_gen) = next_generation(&req.dir);
     let has_current = req.dir.current().exists();
     let prev_generation = if req.keep_previous && has_current {
@@ -204,6 +207,7 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     meta.scan_seconds = Some(walk_seconds);
     let tmp = req.dir.tmp(generation);
     let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
+    fault::point(&req.dir, "written");
 
     pw.set_stage(progress::STAGE_PUBLISH);
     let t = Instant::now();

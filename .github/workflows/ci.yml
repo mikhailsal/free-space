@@ -24,6 +24,9 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # T10: precheck and a disk that fills up mid-write, on a real tmpfs
+      - name: fault injection on a full filesystem
+        run: sudo scripts/fault-fs.sh target/debug/freespace
 
   # The page: types, unit tests (format, router, hidden, contrast) and the
   # Playwright suite against a mocked /api at 1280, 700 and 360 px with axe.

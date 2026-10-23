@@ -472,6 +472,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
         });
         e
     })?;
+    crate::fault::point(&req.dir, "prechecked");
     let (generation, _) = crate::job::next_generation(&req.dir);
     let mut meta = WriteMeta::new(generation, snap.meta.prev_generation, snap.meta.scanned_at);
     meta.one_file_system = snap.meta.one_file_system;
@@ -498,6 +499,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let tmp = req.dir.tmp(generation);
     let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
     drop(snap);
+    crate::fault::point(&req.dir, "written");
 
     pw.set_stage(progress::STAGE_PUBLISH);
     let t = Instant::now();

@@ -211,6 +211,56 @@
       ],
       "type": "string"
     },
+    "DoctorCheck": {
+      "description": "One `doctor` check; `fix` is set when it failed.",
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "fix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable id: `config`, `snapshot`, `timer`, `binary`, `path`, `access`, `space`, `skill`, …",
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "ok",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "DoctorResponse": {
+      "description": "`doctor --json`: exit 0 when `ok`, 1 otherwise.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/DoctorCheck"
+          },
+          "type": "array"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "version",
+        "checks"
+      ],
+      "type": "object"
+    },
     "EntryOut": {
       "description": "One snapshot entry.",
       "properties": {
@@ -1503,12 +1553,18 @@
       "$ref": "#/$defs/DiffResponse"
     },
     {
+      "$ref": "#/$defs/DoctorResponse"
+    },
+    {
       "$ref": "#/$defs/ErrorBody"
     }
   ],
   "commands": {
     "diff": {
       "$ref": "#/$defs/DiffResponse"
+    },
+    "doctor": {
+      "$ref": "#/$defs/DoctorResponse"
     },
     "error": {
       "$ref": "#/$defs/ErrorBody"

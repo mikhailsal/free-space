@@ -273,6 +273,24 @@ pub struct StatusResponse {
     pub progress: Option<Progress>,
 }
 
+/// One `doctor` check; `fix` is set when it failed.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DoctorCheck {
+    /// Stable id: `config`, `snapshot`, `timer`, `binary`, `path`, `access`, `space`, `skill`, …
+    pub id: String,
+    pub ok: bool,
+    pub detail: String,
+    pub fix: Option<String>,
+}
+
+/// `doctor --json`: exit 0 when `ok`, 1 otherwise.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DoctorResponse {
+    pub ok: bool,
+    pub version: String,
+    pub checks: Vec<DoctorCheck>,
+}
+
 /// Every answer type, for `freespace schema --json`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
@@ -282,6 +300,7 @@ pub enum AnyResponse {
     Top(Box<TopResponse>),
     Find(Box<FindResponse>),
     Diff(Box<DiffResponse>),
+    Doctor(Box<DoctorResponse>),
     Error(Box<crate::error::ErrorBody>),
 }
 
@@ -295,6 +314,7 @@ pub fn schema_document() -> serde_json::Value {
         "top": {"$ref": "#/$defs/TopResponse"},
         "find": {"$ref": "#/$defs/FindResponse"},
         "diff": {"$ref": "#/$defs/DiffResponse"},
+        "doctor": {"$ref": "#/$defs/DoctorResponse"},
         "error": {"$ref": "#/$defs/ErrorBody"}
     });
     if let Some(o) = v.as_object_mut() {
