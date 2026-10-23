@@ -160,8 +160,10 @@ pub fn run(a: &GuiArgs) -> Result<()> {
         let port = srv.port;
         if over_ssh() {
             eprintln!(
-                "freespace gui is running on {host}, port {port}. On your computer run:\n  \
-                 ssh -N -L {port}:127.0.0.1:{port} {host}\nthen open:\n  {url}\npress Ctrl-C to stop",
+                "freespace gui is running on {host}, port {port}. Open:\n  {url}\n\
+                 If this ssh session does not forward the port (-L {port}:127.0.0.1:{port}), \
+                 first run on your computer:\n  ssh -N -L {port}:127.0.0.1:{port} {host}\n\
+                 press Ctrl-C to stop",
                 host = platform::hostname()
             );
             return srv.run(None).await;

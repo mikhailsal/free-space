@@ -1228,93 +1228,93 @@ finding above. Run with Claude Code or Codex; checkbox as you ship.
   - Surfaced by: Reality rows (numbers), Section 7, Open Questions 1/3/5, OV-1
   - Files: to be determined (`docs/benchmarks.md`, `core/`)
   - Verify: `docs/benchmarks.md` has one table with [measured] values replacing every [estimated] number in the plan
-- [ ] **T2 (P1, human: ~1h / CC: ~10min)** — cli — Add `state_error` to `status` and the `prev_generation` meta rule to the CLI/HTTP contract text and SKILL.md
+- [x] **T2 (P1, human: ~1h / CC: ~10min)** — cli — Add `state_error` to `status` and the `prev_generation` meta rule to the CLI/HTTP contract text and SKILL.md
   - Surfaced by: Section 1 (state.json unreadable), Section 4 (prev pairing)
   - Files: to be determined (`skill/SKILL.md`, `cli/`)
   - Verify: `freespace status --json` on a corrupt `state.json` prints `state_error`, exit 0
-- [ ] **T3 (P1, human: ~2h / CC: ~15min)** — core — Raise `RLIMIT_NOFILE` soft→hard at `scan` start and cap concurrently open directories
+- [x] **T3 (P1, human: ~2h / CC: ~15min)** — core — Raise `RLIMIT_NOFILE` soft→hard at `scan` start and cap concurrently open directories
   - Surfaced by: Section 2 GAP (EMFILE)
   - Files: to be determined (`core/scanner`)
   - Verify: fixture with 20k-wide fan-out and `ulimit -n 256` completes without `Walk::Io(EMFILE)`
-- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — serve — CSP `default-src 'self'`, `Referrer-Policy: no-referrer`, "serve never touches the filesystem" rule, pool keyed by snapshot inode with 5 s idle close
+- [x] **T4 (P1, human: ~2h / CC: ~15min)** — serve — CSP `default-src 'self'`, `Referrer-Policy: no-referrer`, "serve never touches the filesystem" rule, pool keyed by snapshot inode with 5 s idle close
   - Surfaced by: Section 3 threat 3/6, OV-6
   - Files: to be determined (`cli/serve`)
   - Verify: `curl -H 'Origin: http://evil' …/api/status` → 403; headers present; after a publish the next request returns the new `generation` and `lsof` shows no old inode after 5 s idle
-- [ ] **T5 (P1, human: ~3h / CC: ~20min)** — core/cli — Lossless path contract: `path_raw` output, `--path-raw`/`?path_raw=` input, `mtime` as i64 with "unknown" for 0
+- [x] **T5 (P1, human: ~3h / CC: ~20min)** — core/cli — Lossless path contract: `path_raw` output, `--path-raw`/`?path_raw=` input, `mtime` as i64 with "unknown" for 0
   - Surfaced by: Section 4 WARNING, Section 5, OV-7
   - Files: to be determined (`core/queries`, `cli/`, `skill/SKILL.md`)
   - Verify: hostile fixture with a 300-byte non-UTF-8 directory name: `ls --json` → `path_raw`; `ls --path-raw <hex> --json` returns the same entry
-- [ ] **T6 (P1, human: ~4h / CC: ~30min)** — core — `prev_generation` written to `meta` before publish; `diff` opens current first, then prev, and checks equality; test with pause points
+- [x] **T6 (P1, human: ~4h / CC: ~30min)** — core — `prev_generation` written to `meta` before publish; `diff` opens current first, then prev, and checks equality; test with pause points
   - Surfaced by: Section 4 CRITICAL (order-2 pairing)
   - Files: to be determined (`core/publish`, `core/queries/diff`)
   - Verify: Section 6 assertion #3 passes; never deltas for (40→42)
-- [ ] **T7 (P2, human: ~1h / CC: ~10min)** — web — Move the token from `#t=` to memory on load and rewrite the hash to `#/path`
+- [x] **T7 (P2, human: ~1h / CC: ~10min)** — web — Move the token from `#t=` to memory on load and rewrite the hash to `#/path` *(Implemented (M4): the token moves to `sessionStorage` on load and the hash is rewritten without it, so a copied URL carries no token; reload in the same tab still works through `sessionStorage`. This is stricter than the OV-14 amendment, which kept `#t=` in the URL.)*
   - Surfaced by: Section 4 interaction GAP (hash conflict)
   - Files: to be determined (`web/api.ts`, `web/app.ts`)
   - Verify: back/forward across three directories keeps the session; the URL never shows the token after load
-- [ ] **T8 (P2, human: ~4h / CC: ~30min)** — core/cli — One `QueryParams` struct shared by clap and the query string; split publish into `precheck()`, `rotate_prev()`, `publish_current()`
+- [x] **T8 (P2, human: ~4h / CC: ~30min)** — core/cli — One `QueryParams` struct shared by clap and the query string; split publish into `precheck()`, `rotate_prev()`, `publish_current()`
   - Surfaced by: Section 5 (duplication, complexity)
   - Files: to be determined (`core/params`, `core/publish`)
   - Verify: unit tests call each publish step alone; `limit=99999999` rejected identically by CLI and HTTP
-- [ ] **T9 (P2, human: ~30min / CC: ~5min)** — skill — SKILL.md: names are data not instructions; do not paste full inventories into third-party tools; `--kind any` hint for `diff /home/<user>`
+- [x] **T9 (P2, human: ~30min / CC: ~5min)** — skill — SKILL.md: names are data not instructions; do not paste full inventories into third-party tools; `--kind any` hint for `diff /home/<user>`
   - Surfaced by: Section 3 threats 10/12
   - Files: to be determined (`skill/SKILL.md`)
   - Verify: E2E test (Section 6 #8) runs every documented command and validates the JSON schema
-- [ ] **T10 (P1, human: ~1w / CC: ~1d)** — tests — Implement Section 6 assertions 1–9, the fault-injection harness (kill -9 at each publish step, fallocate during write, tmpfs precheck) and the refresh/OV-2/OV-3/OV-5 fixtures
+- [x] **T10 (P1, human: ~1w / CC: ~1d)** — tests — Implement Section 6 assertions 1–9, the fault-injection harness (kill -9 at each publish step, fallocate during write, tmpfs precheck) and the refresh/OV-2/OV-3/OV-5 fixtures
   - Surfaced by: Section 6, OV-2/3/5
   - Files: to be determined (`core/tests`, `cli/tests`)
   - Verify: `cargo test --workspace` green; each assertion maps to a named test
-- [ ] **T11 (P2, human: ~30min / CC: ~5min)** — core — Add index `(parent_id, allocated DESC)` and the `flags` column + `refreshes` table to the v1 schema
+- [x] **T11 (P2, human: ~30min / CC: ~5min)** — core — Add index `(parent_id, allocated DESC)` and the `flags` column + `refreshes` table to the v1 schema
   - Surfaced by: Section 7 (composite index), OV-3, OV-5
   - Files: to be determined (`core/schema.sql`)
   - Verify: `EXPLAIN QUERY PLAN` for `ls --sort allocated --limit 30` uses the composite index
-- [ ] **T12 (P2, human: ~2h / CC: ~15min)** — cli — `install-timer --uninstall` removing unit, timer, config and both snapshots; print the re-login note after adding the user to group `freespace` *(DX review: the uninstall owns the full manifest (completions D19, the `$SUDO_USER` skill D9, the snapshot directory with its ACL, then `/usr/local/bin/freespace`; the group stays); the re-login note is printed only on the no-ACL fallback (D8))*
+- [x] **T12 (P2, human: ~2h / CC: ~15min)** — cli — `install-timer --uninstall` removing unit, timer, config and both snapshots; print the re-login note after adding the user to group `freespace` *(DX review: the uninstall owns the full manifest (completions D19, the `$SUDO_USER` skill D9, the snapshot directory with its ACL, then `/usr/local/bin/freespace`; the group stays); the re-login note is printed only on the no-ACL fallback (D8))*
   - Surfaced by: Section 8 (admin tooling gap), Section 9 (re-login risk)
   - Files: to be determined (`cli/install`)
   - Verify: install then uninstall leaves no file under `/etc/systemd/system/freespace*`, `/etc/freespace`, `/var/lib/freespace`
-- [ ] **T13 (P3, human: ~1h / CC: ~10min)** — cli — `status` human first line as a sentence ("14 G free · snapshot 7 h old · +9 G since prev in Downloads")
+- [x] **T13 (P3, human: ~1h / CC: ~10min)** — cli — `status` human first line as a sentence ("14 G free · snapshot 7 h old · +9 G since prev in Downloads")
   - Surfaced by: Section 8 (joy to operate)
   - Files: to be determined (`cli/status`)
   - Verify: `freespace status` (no `--json`) prints that line first; with no prev the delta clause is omitted
-- [ ] **T14 (P1, human: ~0.5d / CC: ~30min)** — web — Polish within the accepted page: `?` key overlay, `nlink > 1` link icon with tooltip, hash memory of the last path. *(Design review: raised to P1; Δ toggle → T27, copy path → T30, column collapse → T35, reload banner → T29.)*
+- [x] **T14 (P1, human: ~0.5d / CC: ~30min)** — web — Polish within the accepted page: `?` key overlay, `nlink > 1` link icon with tooltip, hash memory of the last path. *(Design review: raised to P1; Δ toggle → T27, copy path → T30, column collapse → T35, reload banner → T29.)*
   - Surfaced by: Section 11
   - Files: to be determined (`web/`)
   - Verify: `/design-review` on the running page; keyboard-only walk through the user journey
 
-- [ ] **T15 (P1, human: ~2d / CC: ~2h)** — core/cli/web — `find` query (name glob, date bounds, min-size, kind, total over all matches, nested-dir dedup by id range), `/api/find`, web filter box with total row and hash state *(Design review: web filter box replaced by the Find mode form and two-line totals of T28; `/api/find` additionally returns `total_count`, `total_allocated`, `truncated`, `limit`.)*
+- [x] **T15 (P1, human: ~2d / CC: ~2h)** — core/cli/web — `find` query (name glob, date bounds, min-size, kind, total over all matches, nested-dir dedup by id range), `/api/find`, web filter box with total row and hash state *(Design review: web filter box replaced by the Find mode form and two-line totals of T28; `/api/find` additionally returns `total_count`, `total_allocated`, `truncated`, `limit`.)*
   - Surfaced by: D15 (EXP-6), section «Поиск с итогом»
   - Files: to be determined (`core/queries/find`, `cli/`, `web/`, `skill/SKILL.md`)
   - Verify: fixture with `daily1.mp4`…`daily3.mp4` and a nested `node_modules`: `find / --name 'daily*.mp4' --json` total equals the sum of the three; `find / --name node_modules --kind dir` counts the outer directory once; `--older-than 2023-01-01` excludes a file dated 2023-01-01 00:00 local
 
-- [ ] **T16 (P1, human: ~0.5d / CC: ~20min)** — cli/web — `cli/build.rs`: resolve `$CARGO_MANIFEST_DIR/../web`, check `bun --version`, run `bun build …/src/main.ts --outdir $OUT_DIR/web --minify`, emit `rerun-if-changed` for `../web/src` and `../web/index.html`, embed via `include_dir!(concat!(env!("OUT_DIR"), "/web"))`
+- [x] **T16 (P1, human: ~0.5d / CC: ~20min)** — cli/web — `cli/build.rs`: resolve `$CARGO_MANIFEST_DIR/../web`, check `bun --version`, run `bun build …/src/main.ts --outdir $OUT_DIR/web --minify`, emit `rerun-if-changed` for `../web/src` and `../web/index.html`, embed via `include_dir!(concat!(env!("OUT_DIR"), "/web"))`
   - Surfaced by: Eng R3 (D5), OV-13
   - Files: `cli/build.rs`, `web/src/main.ts`, `web/tsconfig.json`
   - Verify: `cargo build` without bun fails with the install message; editing `web/src/app.ts` triggers a rebuild; the binary serves the new bundle
-- [ ] **T17 (P1, human: ~0.5d / CC: ~15min)** — core — `fs_glob(name, pattern, icase)` scalar: glob→regex translation compiled by `regex` with `(?iu)`; byte-wise fallback for invalid UTF-8; registered by the connection factory used by CLI and the pool
+- [x] **T17 (P1, human: ~0.5d / CC: ~15min)** — core — `fs_glob(name, pattern, icase)` scalar: glob→regex translation compiled by `regex` with `(?iu)`; byte-wise fallback for invalid UTF-8; registered by the connection factory used by CLI and the pool
   - Surfaced by: Eng R2 (D9), OV-9
   - Files: `core/queries/glob.rs`, `core/db.rs`
   - Verify: `--iname '*видео*'` matches `Видео.mkv`; literal `\[` matches `[x]`; a connection opened without the factory fails the registration test
-- [ ] **T18 (P1, human: ~0.5d / CC: ~20min)** — ci — `.github/workflows/ci.yml` (fmt, clippy -D warnings, `cargo test --workspace`, `cargo audit`, `tsc --noEmit`, negative job on a runner without bun) and cargo-dist `release.yml` with `oven-sh/setup-bun@v2`; musl x86_64 + aarch64
+- [x] **T18 (P1, human: ~0.5d / CC: ~20min)** — ci — `.github/workflows/ci.yml` (fmt, clippy -D warnings, `cargo test --workspace`, `cargo audit`, `tsc --noEmit`, negative job on a runner without bun) and cargo-dist `release.yml` with `oven-sh/setup-bun@v2`; musl x86_64 + aarch64
   - Surfaced by: Eng R1 (D4), Scope Challenge finding 1
   - Files: `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `Cargo.toml` (dist metadata)
   - Verify: PR CI green; `cargo dist plan` lists both targets; the no-bun job fails with the expected message
-- [ ] **T19 (P1, human: ~2h / CC: ~15min)** — core — refresh hardlink rule OV-11: inode absent from old `hardlinks` with all `nlink` links observed inside the subtree is attributed normally; otherwise `allocated = 0` + `partial`
+- [x] **T19 (P1, human: ~2h / CC: ~15min)** — core — refresh hardlink rule OV-11: inode absent from old `hardlinks` with all `nlink` links observed inside the subtree is attributed normally; otherwise `allocated = 0` + `partial`
   - Surfaced by: Outside Voice codex #4
   - Files: `core/refresh.rs`
   - Verify: fixture: new file with 2 internal links → counted once, non-zero; file with 1 internal + 1 external link → 0 inside, `partial: true`
-- [ ] **T20 (P1, human: ~2h / CC: ~15min)** — core/cli/web — `DENIED` as anomaly (D13): `warnings[]` in `state.json`/`status`; `incomplete: true` + `unknown_subtrees[]` on every response; stderr warning line; red banner in web; SKILL.md instruction
+- [x] **T20 (P1, human: ~2h / CC: ~15min)** — core/cli/web — `DENIED` as anomaly (D13): `warnings[]` in `state.json`/`status`; `incomplete: true` + `unknown_subtrees[]` on every response; stderr warning line; red banner in web; SKILL.md instruction
   - Surfaced by: Outside Voice codex #5, R10
   - Files: `core/queries/*.rs`, `cli/output.rs`, `web/src/app.ts`, `skill/SKILL.md`
   - Verify: synthetic snapshot with one DENIED dir → all five commands print `"incomplete": true`; `freespace ls / --json 2>err` → `err` contains the warning
-- [ ] **T21 (P2, human: ~2h / CC: ~15min)** — cli — systemd unit rendering per D7/OV-10 (`Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir> /var/lib/freespace`, `NoNewPrivileges=true`, no `PrivateTmp`), `systemd-analyze verify` after write
+- [x] **T21 (P2, human: ~2h / CC: ~15min)** — cli — systemd unit rendering per D7/OV-10 (`Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir> /var/lib/freespace`, `NoNewPrivileges=true`, no `PrivateTmp`), `systemd-analyze verify` after write
   - Surfaced by: Eng R5 (D7), Outside Voice codex #3
   - Files: `cli/install.rs`, `cli/templates/freespace.service`
   - Verify: unit test asserts each key present and `PrivateTmp` absent; on a systemd host `systemctl start freespace.service` writes a snapshot
-- [ ] **T22 (P1, human: ~0.5d / CC: ~20min)** — core/cli/skill — `schemars` derive on all response structs; `freespace schema --json`; `skill/schema.json` generated and committed; SKILL.md links it (no schema text in SKILL.md)
+- [x] **T22 (P1, human: ~0.5d / CC: ~20min)** — core/cli/skill — `schemars` derive on all response structs; `freespace schema --json`; `skill/schema.json` generated and committed; SKILL.md links it (no schema text in SKILL.md)
   - Surfaced by: Eng R7 (D10)
   - Files: `core/queries/types.rs`, `cli/schema.rs`, `skill/schema.json`, `skill/SKILL.md`
   - Verify: test `schema_json_is_current` fails after renaming a field until `schema.json` is regenerated
-- [ ] **T23 (P1, human: ~1d / CC: ~30min)** — tests — contract harness: extract every `freespace …` fenced command from SKILL.md, run via `assert_cmd` on a synthetic snapshot, validate stdout against `skill/schema.json` with `jsonschema`
+- [x] **T23 (P1, human: ~1d / CC: ~30min)** — tests — contract harness: extract every `freespace …` fenced command from SKILL.md, run via `assert_cmd` on a synthetic snapshot, validate stdout against `skill/schema.json` with `jsonschema`
   - Surfaced by: Eng R7 (D10), CEO test #8
   - Files: `cli/tests/skill_contract.rs`, `core/tests/fixtures/`
   - Verify: adding a bogus flag to a SKILL.md example fails CI; all documented commands exit 0
@@ -2466,47 +2466,47 @@ Two deferred items proposed and both accepted (D19, D20): dark theme (D14) and p
 
 ### Design review tasks (appended to `## Implementation Tasks` as T25–T35; amendments to T14, T15 noted there)
 
-- [ ] **T25 (P1, human: ~1d / CC: ~1h)** — web — Header per D5/D6: identity row (host, snapshot age with amber/red thresholds, fill bar), single notice slot with the priority table and "+N notice" chip, folder row with breadcrumbs, folder size, mode tabs Browse | Top files | Find | Changes, "Copy refresh command" text button; look per mockup B (`docs/designs/free-space-browse-mockup.png`): 4 px fill line under the identity row, underline tabs, share-row tint in the Browse table
+- [x] **T25 (P1, human: ~1d / CC: ~1h)** — web — Header per D5/D6: identity row (host, snapshot age with amber/red thresholds, fill bar), single notice slot with the priority table and "+N notice" chip, folder row with breadcrumbs, folder size, mode tabs Browse | Top files | Find | Changes, "Copy refresh command" text button; look per mockup B (`docs/designs/free-space-browse-mockup.png`): 4 px fill line under the identity row, underline tabs, share-row tint in the Browse table
   - Surfaced by: Pass 1 — Issues 1–2 (D5, D6)
   - Files: `web/src/header.ts`, `web/src/notices.ts`, `web/src/app.ts`
   - Verify: synthetic `status` with `incomplete`, `last_error` and a newer snapshot shows only the incomplete banner + "+2 notices"; age 40 h renders amber, 8 d red with the timer sentence; a 1280×800 screenshot of Browse on the mockup state (`docs/designs/mockups/browse-b/data.js`) matches mockup B side by side: header rows, tabs, row tint, inspector order
-- [ ] **T26 (P1, human: ~1d / CC: ~45min)** — web — All twelve interaction states with copy and primary action per D7, plus the two no-snapshot variants per D12 (scanning / nothing running, with `last_error` under the commands); 300 ms loading grace, 2 px progress line, "Showing N of M · Show more"
+- [x] **T26 (P1, human: ~1d / CC: ~45min)** — web — All twelve interaction states with copy and primary action per D7, plus the two no-snapshot variants per D12 (scanning / nothing running, with `last_error` under the commands); 300 ms loading grace, 2 px progress line, "Showing N of M · Show more"
   - Surfaced by: Pass 2 — Issue 3 (D7); Pass 3 — Issue 8 (D12)
   - Files: `web/src/states.ts`, `web/src/table.ts`
   - Verify: Playwright walk hitting each state via mocked `/api/*` responses; every state has visible copy and a focusable action
-- [ ] **T27 (P1, human: ~1d / CC: ~1h)** — web — Changes mode over `/api/diff` (key `d`, `?mode=changes`): columns name / allocated / Δ allocated / Δ items / modified, ▲/▼ with danger/success hues, ghost "gone" rows, "new" badge, context line "vs <prev> (gen N)" with partial / roots-changed badges; segment disabled with "No previous snapshot" when `prev` is absent
+- [x] **T27 (P1, human: ~1d / CC: ~1h)** — web — Changes mode over `/api/diff` (key `d`, `?mode=changes`): columns name / allocated / Δ allocated / Δ items / modified, ▲/▼ with danger/success hues, ghost "gone" rows, "new" badge, context line "vs <prev> (gen N)" with partial / roots-changed badges; segment disabled with "No previous snapshot" when `prev` is absent
   - Surfaced by: Pass 2 — Issue 4 (D8); supersedes the "Δ column toggle" in T14
   - Files: `web/src/changes.ts`, `web/src/api.ts`
   - Verify: fixture with two generations: rows ordered by |Δ|, a deleted dir renders as ghost, totals line matches `diff --depth 1 --json`
-- [ ] **T28 (P1, human: ~1d / CC: ~1h)** — web/core — Find mode per D9: labeled form row (Name pattern + ignore case, Modified before/after, Min size, Kind), submit on Enter/Find only, "Find within /path, including subfolders", relative-path rows, "in parent total" badge, removable filter chips, two-line total; `/api/find` returns `total_count`, `total_allocated`, `truncated`, `limit`
+- [x] **T28 (P1, human: ~1d / CC: ~1h)** — web/core — Find mode per D9: labeled form row (Name pattern + ignore case, Modified before/after, Min size, Kind), submit on Enter/Find only, "Find within /path, including subfolders", relative-path rows, "in parent total" badge, removable filter chips, two-line total; `/api/find` returns `total_count`, `total_allocated`, `truncated`, `limit`
   - Surfaced by: Pass 2 — Issue 5 (D9); amends T15 (web part)
   - Files: `web/src/find.ts`, `core/queries/find.rs`, `cli/serve/api.rs`
   - Verify: 128-match fixture with limit 30: total line shows 128 and the full sum; typing does not fire requests (network log); Esc returns to Browse at the same path
-- [ ] **T29 (P1, human: ~0.5d / CC: ~30min)** — web — Snapshot refresh continuity per D10: `/api/status` poll every 60 s + on focus/visibility, never auto-reload; "Load latest" re-hydrates path/mode/filters/sort/selection; ancestor walk + toast when the path or row is gone; `r` key; `snapshot=` param on `/api/ls|find` for rotation races
+- [x] **T29 (P1, human: ~0.5d / CC: ~30min)** — web — Snapshot refresh continuity per D10: `/api/status` poll every 60 s + on focus/visibility, never auto-reload; "Load latest" re-hydrates path/mode/filters/sort/selection; ancestor walk + toast when the path or row is gone; `r` key; `snapshot=` param on `/api/ls|find` for rotation races
   - Surfaced by: Pass 2 — Issue 6 (D10)
   - Files: `web/src/snapshot.ts`, `web/src/router.ts`, `cli/serve/api.rs`
   - Verify: unit tests for the ancestor walk (path gone / row gone / both alive); Playwright: swap the mocked snapshot id while in Find with filters → same filters, new totals, no page reload
-- [ ] **T30 (P2, human: ~0.5d / CC: ~40min)** — web/core — Inspector actions per D11 and Pass 7: "Hide until next scan" (`h`, localStorage key `freespace.hidden.<host>.<snapshot_id>`, purge other keys on load, Undo toast, "N hidden · X G" chip with show/unhide), Copy path, Copy refresh command, "CLI command" line tracking the mode; per-kind inspector layouts; directory inspector order per mockup B (name, size + share + apparent, path, Biggest inside with mini bars, details, CLI command, primary "Hide until next scan", Copy links); hardlink line using `hardlink_owner` added to `/api/ls` rows with `nlink > 1`
+- [x] **T30 (P2, human: ~0.5d / CC: ~40min)** — web/core — Inspector actions per D11 and Pass 7: "Hide until next scan" (`h`, localStorage key `freespace.hidden.<host>.<snapshot_id>`, purge other keys on load, Undo toast, "N hidden · X G" chip with show/unhide), Copy path, Copy refresh command, "CLI command" line tracking the mode; per-kind inspector layouts; directory inspector order per mockup B (name, size + share + apparent, path, Biggest inside with mini bars, details, CLI command, primary "Hide until next scan", Copy links); hardlink line using `hardlink_owner` added to `/api/ls` rows with `nlink > 1`
   - Surfaced by: Pass 3 — Issue 7 (D11); Pass 7 mechanics
   - Files: `web/src/inspector.ts`, `web/src/hidden.ts`, `core/queries/ls.rs`
   - Verify: hide a row → absent in Browse/Top/Find/Changes, chip count and size correct, reload keeps it, a new snapshot id clears it; `ls` JSON for a 2-link inode shows the owner path on the non-owner row
-- [ ] **T31 (P1, human: ~0.5d / CC: ~30min)** — core/cli/skill — `scanning` in `status` per D12: `scan`/`refresh` write `{op, path, started_at, pid}` into `.lock` after `flock`; `status` tries `LOCK_SH|LOCK_NB` and reports `scanning {op, path, started_at, elapsed_seconds}` or `null`; first-line sentence appends "· scanning / since HH:MM"; SKILL.md tells agents to wait instead of starting a second scan
+- [x] **T31 (P1, human: ~0.5d / CC: ~30min)** — core/cli/skill — `scanning` in `status` per D12: `scan`/`refresh` write `{op, path, started_at, pid}` into `.lock` after `flock`; `status` tries `LOCK_SH|LOCK_NB` and reports `scanning {op, path, started_at, elapsed_seconds}` or `null`; first-line sentence appends "· scanning / since HH:MM"; SKILL.md tells agents to wait instead of starting a second scan
   - Surfaced by: Pass 3 — Issue 8 (D12)
   - Files: `core/lock.rs`, `core/status.rs`, `cli/status.rs`, `skill/SKILL.md`
   - Verify: hold the lock in a test with a written payload → `status --json` has `scanning.op == "scan"`; unparsable payload → `op: "unknown"`; no lock → `null`
-- [ ] **T32 (P1, human: ~0.5d / CC: ~30min)** — web/build — Typography and tokens per D13/D15: `web/fonts/` IBM Plex Sans 400/500 + Plex Mono 400 woff2 (latin, latin-ext, cyrillic) with OFL file, served immutable; `web/src/tokens.css` with every value from the Pass 5 sheet (start from `docs/designs/mockups/browse-b/tokens.css`, which already carries the mockup-B tokens); `web/DESIGN.md` written from the same sheet; `color-scheme: light`; themed `::selection`, caret, scrollbar, link underline
+- [x] **T32 (P1, human: ~0.5d / CC: ~30min)** — web/build — Typography and tokens per D13/D15: `web/fonts/` IBM Plex Sans 400/500 + Plex Mono 400 woff2 (latin, latin-ext, cyrillic) with OFL file, served immutable; `web/src/tokens.css` with every value from the Pass 5 sheet (start from `docs/designs/mockups/browse-b/tokens.css`, which already carries the mockup-B tokens); `web/DESIGN.md` written from the same sheet; `color-scheme: light`; themed `::selection`, caret, scrollbar, link underline
   - Surfaced by: Pass 4 — Issue 9 (D13); Pass 5 — Issue 11 (D15)
   - Files: `web/fonts/*`, `web/src/tokens.css`, `web/DESIGN.md`, `cli/build.rs`
   - Verify: no `system-ui` as primary in computed styles; contrast test over `tokens.css` passes 4.5:1 for every fg/bg pair, including `fg` on the share-row tint (13 % over `bg`, 22 % over `accent-bg`); `cargo build` embeds the three font files (size delta ≤ 200 KB)
-- [ ] **T33 (P1, human: ~1d / CC: ~45min)** — core/cli/skill — `newest_mtime` per D18: column in `entries`, computed in the post-walk aggregation, recomputed up the parent chain by `refresh`, emitted in every JSON entry, `top --kind dir --older-than` compares `newest_mtime` and returns only topmost qualifying dirs; `schema_version` bump; `schema.json` regenerated; SKILL.md wording updated *(Eng review run 2: fold = one `SubtreeAgg::merge` shared by scan and refresh, identity `i64::MIN` for `newest_mtime`; files only (D5), each file clamped `min(mtime, own scanned_at)` (D3/D4), dir mtimes excluded, no files → 0; refresh re-folds `min_scanned_at`/`newest_mtime` over direct children at each ancestor (F2), child aggregates merge unchanged (invariant `newest_mtime <= max(scanned_at over subtree)`); dir query `ORDER BY id`, topmost dedup by `[id, subtree_end]`, totals over the topmost set, then `--sort`/`--limit` (codex #3/#4; F3 "stop at limit" withdrawn); `find` dir rows use `newest_mtime` (D2); no special case for 0/DENIED (D1 = B, marker `gstack-shortcut(dec-ac91ac89)` in `core/queries/top.rs`); tests 1–6 of Section 3 run 2 plus: mixed-refresh parent/child test, limit-1 totals test with two disjoint and one nested match, `--sort mtime` dir dedup test, identity test; T23 harness rows added.)*
+- [x] **T33 (P1, human: ~1d / CC: ~45min)** — core/cli/skill — `newest_mtime` per D18: column in `entries`, computed in the post-walk aggregation, recomputed up the parent chain by `refresh`, emitted in every JSON entry, `top --kind dir --older-than` compares `newest_mtime` and returns only topmost qualifying dirs; `schema_version` bump; `schema.json` regenerated; SKILL.md wording updated *(Eng review run 2: fold = one `SubtreeAgg::merge` shared by scan and refresh, identity `i64::MIN` for `newest_mtime`; files only (D5), each file clamped `min(mtime, own scanned_at)` (D3/D4), dir mtimes excluded, no files → 0; refresh re-folds `min_scanned_at`/`newest_mtime` over direct children at each ancestor (F2), child aggregates merge unchanged (invariant `newest_mtime <= max(scanned_at over subtree)`); dir query `ORDER BY id`, topmost dedup by `[id, subtree_end]`, totals over the topmost set, then `--sort`/`--limit` (codex #3/#4; F3 "stop at limit" withdrawn); `find` dir rows use `newest_mtime` (D2); no special case for 0/DENIED (D1 = B, marker `gstack-shortcut(dec-ac91ac89)` in `core/queries/top.rs`); tests 1–6 of Section 3 run 2 plus: mixed-refresh parent/child test, limit-1 totals test with two disjoint and one nested match, `--sort mtime` dir dedup test, identity test; T23 harness rows added.)*
   - Surfaced by: Pass 7 — Issue 14 (D18, user-initiated); amends T5, T19, T22
   - Files: `core/schema.rs`, `core/scan/aggregate.rs`, `core/refresh.rs`, `core/queries/top.rs`, `skill/SKILL.md`, `skill/schema.json`
   - Verify: fixture equality against a brute-force max per directory; refreshing a subtree updates ancestors; `top / --kind dir --older-than 180d --json` excludes nested dirs of a returned dir
-- [ ] **T34 (P1, human: ~0.5d / CC: ~30min)** — web — Top screen per D17/D18: header "Top files within /path · larger than [10 M|100 M|1 G] · [ ] Untouched for [3|6|12] months", Files | Folders switch (Folders: Untouched on by default, "newest file" column), rows name + muted parent path (56 px), no share bar, two-line total, "Show in folder"; hash `mode=top&kind=&min=&untouched=`; CLI line mirrors flags
+- [x] **T34 (P1, human: ~0.5d / CC: ~30min)** — web — Top screen per D17/D18: header "Top files within /path · larger than [10 M|100 M|1 G] · [ ] Untouched for [3|6|12] months", Files | Folders switch (Folders: Untouched on by default, "newest file" column), rows name + muted parent path (56 px), no share bar, two-line total, "Show in folder"; hash `mode=top&kind=&min=&untouched=`; CLI line mirrors flags
   - Surfaced by: Pass 7 — Issues 13–14 (D17, D18)
   - Files: `web/src/top.ts`
   - Verify: fixture with a 40 G ISO dated 2023 and a 100 M file dated 1970: both shown in size order under Untouched; Folders returns the project dir once; "Show in folder" lands on Browse with the row selected
-- [ ] **T35 (P2, human: ~1d / CC: ~45min)** — web/tests — Accessibility and narrow-screen contract per Pass 6: landmarks, `aria-sort`/`aria-selected`/roving tabindex, `role=alert|status`, focus trap + restore for the sheet and help overlay, shortcut suppression inside inputs, `prefers-reduced-motion`, 44 px targets under 700 px, sticky name column, no horizontal page scroll at 360 px, help overlay "recent messages" list; mode tabs (mockup B) as `role="tablist"` with `aria-selected`; the "N hidden" text button keeps a ≥ 32 px hit area
+- [x] **T35 (P2, human: ~1d / CC: ~45min)** — web/tests — Accessibility and narrow-screen contract per Pass 6: landmarks, `aria-sort`/`aria-selected`/roving tabindex, `role=alert|status`, focus trap + restore for the sheet and help overlay, shortcut suppression inside inputs, `prefers-reduced-motion`, 44 px targets under 700 px, sticky name column, no horizontal page scroll at 360 px, help overlay "recent messages" list; mode tabs (mockup B) as `role="tablist"` with `aria-selected`; the "N hidden" text button keeps a ≥ 32 px hit area
   - Surfaced by: Pass 6 — a11y mechanics and D16 v1 rule
   - Files: `web/src/a11y.ts`, `web/src/responsive.css`, `web/tests/a11y.spec.ts`
   - Verify: Playwright + axe at 1280, 700 and 360 px: zero serious violations; keyboard-only journey from `/` to a hidden row and back; `document.scrollingElement.scrollWidth == clientWidth` at 360 px
@@ -3251,51 +3251,51 @@ None added. D23 (first-scan priority) skipped by the user; the two smaller candi
 ## Implementation Tasks (plan-devex-review, 2026-10-23)
 Synthesized from this review's findings. Each task derives from a specific finding above. Effort ratio assumptions: features ~30x, tests ~50x, docs ~20x (human ÷ CC).
 
-- [ ] **T36 (P1, human: ~1.5d / CC: ~45min)** — install — `install.sh`: arch detect, cargo-dist musl tarball, sha256, plan printed before sudo, `sudo -n` check without a TTY, dependency check (curl, tar, sha256sum, sudo), `sudo install -o root -m 0755`, `sudo freespace install-timer`, completions, skill as `$SUDO_USER` (home via getent), `--version X`, "installed in N s" and the version/schema transition line, smoke `--version` + `status --json` + `doctor --json`
+- [x] **T36 (P1, human: ~1.5d / CC: ~45min)** — install — `install.sh`: arch detect, cargo-dist musl tarball, sha256, plan printed before sudo, `sudo -n` check without a TTY, dependency check (curl, tar, sha256sum, sudo), `sudo install -o root -m 0755`, `sudo freespace install-timer`, completions, skill as `$SUDO_USER` (home via getent), `--version X`, "installed in N s" and the version/schema transition line, smoke `--version` + `status --json` + `doctor --json`
   - Surfaced by: Pass 1, D7, D18, D19, OV-14
   - Files: `install.sh`, `.github/workflows/ci.yml`
   - Verify: shellcheck clean; CI on the ubuntu runner VM: fresh install, rerun = upgrade, rollback across two local archives, no-TTY path prints the escalation line; debian container without `acl` → group fallback + re-login note
-- [ ] **T37 (P1, human: ~1d / CC: ~30min)** — cli/install — `install-timer`: ACL + default ACL (D8), `--user NAME` when `$SUDO_USER` is unset, `ExecStart=/usr/local/bin/freespace scan` with self-install and the non-root-writable check (D22), `snapshot_dir` created before start, `daemon-reload`, schema check → `start` or `restart --no-block` (D13, OV-4), wait ≤5 s for lock or `is-failed` (OV-5), "First scan started · Open: freespace gui" (D5)
+- [x] **T37 (P1, human: ~1d / CC: ~30min)** — cli/install — `install-timer`: ACL + default ACL (D8), `--user NAME` when `$SUDO_USER` is unset, `ExecStart=/usr/local/bin/freespace scan` with self-install and the non-root-writable check (D22), `snapshot_dir` created before start, `daemon-reload`, schema check → `start` or `restart --no-block` (D13, OV-4), wait ≤5 s for lock or `is-failed` (OV-5), "First scan started · Open: freespace gui" (D5)
   - Surfaced by: D5, D8, D13, D22, OV-1, OV-4, OV-5, OV-14
   - Files: `cli/install.rs`, `core/systemd.rs`
   - Verify: unit test on the rendered unit (ExecStart path, keys); runner-VM test: lock held within 5 s after install; an induced unit failure prints the journalctl line and exits 1; running from `./target/release` installs a root-owned copy and refuses a user-writable target
-- [ ] **T38 (P1, human: ~1d / CC: ~30min)** — core — file modes and progress: explicit `fchmod 0640 root:freespace` for snapshot tmp, `.lock`, `progress.json`, `state.json`, crash logs; `progress.json` once per second via tmp + rename with `entries_seen`, `entries_expected` (statvfs used inodes, null when unavailable), clamp ≤99% until publish; `LOCK_EX` retry for 2 s before exit 6
+- [x] **T38 (P1, human: ~1d / CC: ~30min)** — core — file modes and progress: explicit `fchmod 0640 root:freespace` for snapshot tmp, `.lock`, `progress.json`, `state.json`, crash logs; `progress.json` once per second via tmp + rename with `entries_seen`, `entries_expected` (statvfs used inodes, null when unavailable), clamp ≤99% until publish; `LOCK_EX` retry for 2 s before exit 6
   - Surfaced by: D14, OV-2, OV-3, OV-13, OV-15
   - Files: `core/scan.rs`, `core/lock.rs`, `core/publish.rs`, `core/state.rs`
   - Verify: as an unprivileged user with only the ACL, `status`, `ls`, progress and crash log are readable under umask 077; fixture with hardlinks and a DENIED dir never shows >99%; a concurrent `status` probe loop does not make `scan` exit 6
-- [ ] **T39 (P1, human: ~1d / CC: ~30min)** — cli — error contract: D16 `ErrorBody` on stdout under `--json`, text on stderr, `ErrorBody` in schema.json, `/api/*` same body; exit 9 SNAPSHOT_ACCESS; GUI_NO_TTY (D15) with the `ssh -t` fix; corrected NO_SNAPSHOT / SPACE / LOCK lines; panic hook with crash log path; 403 text names the expected port (OV-11)
+- [x] **T39 (P1, human: ~1d / CC: ~30min)** — cli — error contract: D16 `ErrorBody` on stdout under `--json`, text on stderr, `ErrorBody` in schema.json, `/api/*` same body; exit 9 SNAPSHOT_ACCESS; GUI_NO_TTY (D15) with the `ssh -t` fix; corrected NO_SNAPSHOT / SPACE / LOCK lines; panic hook with crash log path; 403 text names the expected port (OV-11)
   - Surfaced by: Pass 3, D15, D16, OV-10, OV-11
   - Files: `cli/error.rs`, `cli/output.rs`, `cli/serve.rs`, `skill/schema.json`
   - Verify: a test drives every exit code, validates the stdout body against schema.json and greps both channels for the token (must be absent); `freespace gui </dev/null >/dev/null` exits 2 without binding a port
-- [ ] **T40 (P1, human: ~0.5d / CC: ~20min)** — cli — bare `freespace` (D10): status sentence + three Next lines, `--json` Next lines when piped (D15), "Run: freespace doctor" when age > 26 h or last_error (D12)
+- [x] **T40 (P1, human: ~0.5d / CC: ~20min)** — cli — bare `freespace` (D10): status sentence + three Next lines, `--json` Next lines when piped (D15), "Run: freespace doctor" when age > 26 h or last_error (D12)
   - Surfaced by: D10, D12, D15
   - Files: `cli/main.rs`, `cli/status.rs`
   - Verify: assert_cmd with and without a pty (`script -qc`); no snapshot → install command; lock busy → "Scanning / since"
-- [ ] **T41 (P1, human: ~0.5d / CC: ~30min)** — cli — `freespace doctor [--json]`: timer + next run, ExecStart target root-owned (D22), binary not shadowed in PATH, ACL/group access, unit `ReadWritePaths` and ACL match the configured `snapshot_dir` (OV-6), precheck margin, last_error, skill version = binary version; each failure prints its fix; exit 0/1
+- [x] **T41 (P1, human: ~0.5d / CC: ~30min)** — cli — `freespace doctor [--json]`: timer + next run, ExecStart target root-owned (D22), binary not shadowed in PATH, ACL/group access, unit `ReadWritePaths` and ACL match the configured `snapshot_dir` (OV-6), precheck margin, last_error, skill version = binary version; each failure prints its fix; exit 0/1
   - Surfaced by: D12, OV-6
   - Files: `cli/doctor.rs`
   - Verify: one fixture per failing check prints its fix and exits 1; all green exits 0; `status` timing stays ≤50 ms (no systemd call)
-- [ ] **T42 (P2, human: ~2h / CC: ~15min)** — cli — `gui` over ssh (D11): tunnel line + token URL when `SSH_CONNECTION` is set without DISPLAY/WAYLAND_DISPLAY; `--port`
+- [x] **T42 (P2, human: ~2h / CC: ~15min)** — cli — `gui` over ssh (D11): tunnel line + token URL when `SSH_CONNECTION` is set without DISPLAY/WAYLAND_DISPLAY; `--port`
   - Surfaced by: D11
   - Files: `cli/gui.rs`
   - Verify: env-driven test: prints `ssh -N -L <p>:127.0.0.1:<p> <host>` and does not exec xdg-open
-- [ ] **T43 (P2, human: ~0.5d / CC: ~15min)** — cli — `freespace skill install|print|uninstall` (D9) with a version stamp; `freespace completions <shell>` (D19)
+- [x] **T43 (P2, human: ~0.5d / CC: ~15min)** — cli — `freespace skill install|print|uninstall` (D9) with a version stamp; `freespace completions <shell>` (D19)
   - Surfaced by: D9, D19, Skill checklist
   - Files: `cli/skill.rs`, `cli/completions.rs`
   - Verify: `skill install --dir $tmp` equals the embedded files; `bash -n` on the bash completion; zsh/fish files generated
-- [ ] **T44 (P2, human: ~2h / CC: ~15min)** — cli/tests — extend T12 uninstall to the full manifest; before/after filesystem test
+- [x] **T44 (P2, human: ~2h / CC: ~15min)** — cli/tests — extend T12 uninstall to the full manifest; before/after filesystem test
   - Surfaced by: OV-8, D9, D19
   - Files: `cli/install.rs`, `cli/tests/install_manifest.rs`
   - Verify: runner VM: install then uninstall leaves no path from the file-mode table except the group
-- [ ] **T45 (P2, human: ~1d / CC: ~30min)** — skill — SKILL.md rules (Pass 3/4 list) and D21 deletion guidance incl. nlink / open-file notes (OV-12)
+- [x] **T45 (P2, human: ~1d / CC: ~30min)** — skill — SKILL.md rules (Pass 3/4 list) and D21 deletion guidance incl. nlink / open-file notes (OV-12)
   - Surfaced by: D9–D16, D21, OV-10, OV-12
   - Files: `skill/SKILL.md`
   - Verify: T23 green; a scripted agent session on the fixture shows the table and waits for consent before any rm
-- [ ] **T46 (P1, human: ~1d / CC: ~30min)** — docs — README (structure above, errors table with anchors), `CHANGELOG.md`, `LICENSE` (MIT, D20), `CONTRIBUTING.md`, issue template asking for `--version` + `doctor --json`; T23 harness extended to README with `<!-- no-run -->` markers (D17)
+- [x] **T46 (P1, human: ~1d / CC: ~30min)** — docs — README (structure above, errors table with anchors), `CHANGELOG.md`, `LICENSE` (MIT, D20), `CONTRIBUTING.md`, issue template asking for `--version` + `doctor --json`; T23 harness extended to README with `<!-- no-run -->` markers (D17)
   - Surfaced by: Pass 4, Pass 5, Pass 7, D16, D17, D20
   - Files: `README.md`, `CHANGELOG.md`, `LICENSE`, `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/bug.md`, `cli/tests/skill_contract.rs`, `Cargo.toml`
   - Verify: a bogus flag in a README block fails CI; every error code has an anchor the D16 `docs` field points to
-- [ ] **T47 (P2, human: ~0.5d / CC: ~20min)** — cli — human table output on a TTY for ls/top/diff/find; grouped `--help` (Look / Maintain / Setup) with two examples per command
+- [x] **T47 (P2, human: ~0.5d / CC: ~20min)** — cli — human table output on a TTY for ls/top/diff/find; grouped `--help` (Look / Maintain / Setup) with two examples per command
   - Surfaced by: Pass 2
   - Files: `cli/output.rs`, `cli/main.rs`
   - Verify: pty snapshot of the table; piped output has no ANSI codes; `--help` lists the three groups

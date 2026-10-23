@@ -34,6 +34,32 @@ usage: install.sh [--version X] [--no-timer] [--no-skill] [-- install-timer opti
 USAGE
 }
 
+# root-owned and not group/other-writable from $1 up to /: the nightly unit
+# runs /usr/local/bin/freespace as root (install-timer refuses otherwise)
+check_root_only() {
+    d=$(readlink -f "$1")
+    while :; do
+        if [ -e "$d" ]; then
+            uid=$(stat -c %u "$d")
+            mode=$(stat -c %a "$d")
+            m=${mode#"${mode%???}"}
+            g=${m#?}
+            g=${g%?}
+            o=${m#??}
+            if [ "$uid" != 0 ] || [ $((g & 2)) -ne 0 ] || [ $((o & 2)) -ne 0 ]; then
+                say "freespace install: $d is writable by a non-root user ($(stat -c '%U:%G %a' "$d"))."
+                say "The nightly scan runs $BIN as root, so every directory above it must be root-only."
+                say "fix: sudo chown root:root $d && sudo chmod go-w $d (or rerun with --no-timer)"
+                exit 1
+            fi
+        fi
+        [ "$d" = / ] && break
+        d=$(dirname "$d")
+    done
+}
+
+# Everything runs from main, so a download cut short runs nothing.
+main() {
 version=""
 timer=1
 skill=1
@@ -87,7 +113,10 @@ else
 fi
 archive="freespace-$target.tar.gz"
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT INT TERM
+trap 'rm -rf "$tmp"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 fetch() {
     case $1 in
@@ -105,7 +134,9 @@ tar -xzf "$tmp/$archive" -C "$tmp"
 new=$(find "$tmp" -type f -name freespace | head -n 1)
 [ -n "$new" ] || die "no freespace binary in $archive"
 chmod 0755 "$new"
-ver=$("$new" --version | cut -d ' ' -f 2) || die "the downloaded binary does not run on this machine"
+out=$("$new" --version 2> /dev/null) ||
+    die "the downloaded binary does not run here (is $tmp on a noexec filesystem? set TMPDIR to another directory)"
+ver=${out#* }
 
 old=""
 if [ -x "$BIN" ]; then
@@ -127,6 +158,16 @@ if [ "$skill" = 1 ] && [ -n "$home" ]; then
     say "  install the skill    $home/.claude/skills/freespace (remove: freespace skill uninstall)"
 fi
 
+# refuse before writing anything, not halfway through
+if [ "$timer" = 1 ]; then
+    [ -d /run/systemd/system ] ||
+        die "systemd is not running here, so there is no timer to install; rerun with --no-timer and run sudo freespace scan by hand or from cron"
+    check_root_only "$(dirname "$BIN")"
+fi
+if [ "$timer" = 1 ] && [ -z "$user" ]; then
+    say "note: run as root without sudo: only root will read the snapshots (install-timer --user NAME gives someone access)"
+fi
+
 if [ -n "$SUDO" ] && ! sudo -n true 2> /dev/null; then
     # sudo prompts on the controlling terminal; without one it can only fail
     if ! (: < /dev/tty) 2> /dev/null; then
@@ -137,6 +178,7 @@ if [ -n "$SUDO" ] && ! sudo -n true 2> /dev/null; then
     say "sudo may ask for your password."
 fi
 
+$SUDO install -d -m 0755 "$(dirname "$BIN")"
 $SUDO install -o root -g root -m 0755 "$new" "$BIN"
 for sh in bash zsh fish; do
     case $sh in
@@ -144,20 +186,26 @@ for sh in bash zsh fish; do
         zsh) dest=/usr/local/share/zsh/site-functions/_freespace ;;
         fish) dest=/usr/local/share/fish/vendor_completions.d/freespace.fish ;;
     esac
-    "$BIN" completions "$sh" > "$tmp/completion"
-    $SUDO install -D -o root -g root -m 0644 "$tmp/completion" "$dest"
+    { "$BIN" completions "$sh" > "$tmp/completion" &&
+        $SUDO install -D -o root -g root -m 0644 "$tmp/completion" "$dest"; } ||
+        say "note: could not write $dest"
 done
 if [ "$timer" = 1 ]; then
-    $SUDO "$BIN" install-timer "$@"
+    $SUDO "$BIN" install-timer "$@" ||
+        die "install-timer failed (the binary is installed); fix what it printed above, then: sudo freespace install-timer"
 fi
 if [ "$skill" = 1 ] && [ -n "$home" ]; then
     # as the user, so the files are theirs; under sudo the binary chowns them
-    "$BIN" skill install > /dev/null
+    "$BIN" skill install > /dev/null || say "note: the skill was not installed; retry: freespace skill install"
 fi
 
 "$BIN" --version > /dev/null
 smoke=""
-"$BIN" status --json > /dev/null 2>&1 || smoke="status"
+code=""
+if ! st=$("$BIN" status --json 2> /dev/null); then
+    code=$(printf '%s\n' "$st" | sed -n 's/.*"code": *"\([A-Z_]*\)".*/\1/p' | head -n 1)
+    smoke="status${code:+ ($code)}"
+fi
 if ! "$BIN" doctor --json > /dev/null 2>&1; then
     smoke="${smoke:+$smoke, }doctor"
 fi
@@ -168,5 +216,12 @@ if [ -n "$old" ] && [ "$old" != "$ver" ]; then
 fi
 say "$line · Open: freespace gui"
 if [ -n "$smoke" ]; then
-    say "note: $smoke did not pass yet (normal while the first scan runs); check: freespace doctor"
+    case $timer:$code in
+        1:NO_SNAPSHOT | 1:SCHEMA) say "note: $smoke did not pass yet, normal while the first scan runs; check: freespace doctor" ;;
+        0:SCHEMA) say "note: the snapshot is from an older freespace; rescan: sudo freespace scan" ;;
+        *) say "note: $smoke did not pass; check: freespace doctor" ;;
+    esac
 fi
+}
+
+main "$@"

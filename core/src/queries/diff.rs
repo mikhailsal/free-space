@@ -29,6 +29,12 @@ pub fn open_pair(dir: &SnapshotDir) -> Result<(Snapshot, Snapshot)> {
         Err(e) if e.code == ErrorCode::NoSnapshot => {
             return Err(no_prev("snapshot.prev.db does not exist"));
         }
+        // left from before an upgrade: there is nothing to compare with yet
+        Err(e) if e.code == ErrorCode::Schema => {
+            return Err(no_prev(
+                "snapshot.prev.db is from another freespace version",
+            ));
+        }
         Err(e) => return Err(e),
     };
     if prev.meta.generation == cur.meta.generation {

@@ -17,7 +17,7 @@ Before it asks for your sudo password, the installer prints what it will do:
 
 1. download the release binary for your CPU and check its sha256;
 2. install it as `/usr/local/bin/freespace` (root, 0755) with bash, zsh and fish completions;
-3. run `sudo freespace install-timer`: a nightly scan at 02:00 (`freespace.timer`, idle CPU and I/O priority), read access to the snapshots for you (an ACL, so no re-login), and the first scan right away;
+3. run `sudo freespace install-timer`: a nightly scan at 02:00 (`freespace.timer`, idle CPU and I/O priority), read access to the snapshots for you (an ACL, so no re-login; on a filesystem without ACLs, the `freespace` group and one re-login), and the first scan right away;
 4. install the Claude Code skill in `~/.claude/skills/freespace`.
 
 It ends with a line like "freespace 0.1.0 installed in 18 s · Open: freespace gui". Options go after `sh -s --`:
@@ -75,7 +75,7 @@ ALLOCATED  SHARE  ITEMS  MODIFIED    NAME
 ssh -t -L 8710:127.0.0.1:8710 myserver freespace gui --port 8710
 ```
 
-then open the URL it prints in your local browser. Keep the `-t`: `gui` refuses to run without a terminal (so an agent never hangs on it). Started inside an ssh session, `freespace gui` prints the matching `ssh -N -L …` line to run on your computer instead.
+then open the URL it prints in your local browser. Keep the `-t`: `gui` refuses to run without a terminal (so an agent never hangs on it). In a plain ssh session without `-L`, `freespace gui` prints the `ssh -N -L …` line to run on your computer instead.
 
 ## For AI agents
 
@@ -85,7 +85,7 @@ The installer puts a skill in `~/.claude/skills/freespace`; `freespace skill ins
 2. what is big and untouched: `freespace top / --kind dir --older-than 180d --limit 20 --json`;
 3. where exactly: `freespace ls /home --json`, descending into the biggest child.
 
-It shows you a table of candidates with the reason each one is safe, and deletes nothing until you say yes to that list. Every `--json` answer has a JSON Schema (`freespace schema --json`, also `skill/schema.json`). CI runs every JSON command in this README and in `skill/SKILL.md` against a test snapshot and validates the output, so the examples here cannot drift from the binary.
+It shows you a table of candidates with the reason each one is safe, and deletes nothing until you say yes to that list. Every `--json` answer has a JSON Schema (`freespace schema --json`, also `skill/schema.json`). CI runs every command in this README and in `skill/SKILL.md` against a test snapshot (the JSON ones are validated against the schema), so a renamed flag or field breaks the build, not your script. The sample output below is illustrative.
 
 A `top` answer, trimmed:
 
@@ -169,11 +169,11 @@ sudo freespace install-timer --uninstall
 
 ## Configuration
 
-`/etc/freespace/config.toml`, written by `install-timer` (every key is optional):
+`/etc/freespace/config.toml`, written by `install-timer`. Every key is optional; `roots` is filled in with the real filesystems mounted at install time, and an empty list means "every real filesystem at scan time":
 
 <!-- output -->
 ```toml
-roots = []                      # empty: every real filesystem
+roots = ["/", "/home"]
 snapshot_dir = "/var/lib/freespace"
 keep_previous = true            # previous snapshot for diff; needs room for both
 # workers = 4                   # walker threads; default min(CPUs, 8)
