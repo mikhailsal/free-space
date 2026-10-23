@@ -11,7 +11,7 @@ import { Hidden } from "./hidden";
 import { inspector, type InspectorHost } from "./inspector";
 import { details, renderNotices, type Notice } from "./notices";
 import { fromDiff, fromEntry, type Row } from "./rows";
-import { format, parentOf, parse, relative, sameView, type Mode, type Route } from "./router";
+import { ancestors, format, parentOf, parentPlace, parse, relative, sameView, type Mode, type Place, type Route } from "./router";
 import { continuity, nearestExisting } from "./snapshot";
 import * as pages from "./states";
 import { copy, mountToasts, toast } from "./toast";
@@ -104,9 +104,12 @@ export class App {
 
   async start(): Promise<void> {
     const t = this.route.t || api.storedToken();
-    if (t) {
-      api.setToken(t);
-      this.route.t = t;
+    if (t) api.setToken(t);
+    if (this.route.t) {
+      // from here on the token lives in sessionStorage only, never in the
+      // address bar, history or a copied link (T7)
+      this.route.t = undefined;
+      history.replaceState(null, "", format(this.route));
     }
     mountToasts(document.body);
     window.addEventListener("hashchange", () => this.apply(parse(location.hash)));
@@ -274,7 +277,7 @@ export class App {
         h("button", {
           type: "button",
           class: "ghost",
-          onclick: () => void copy(refreshCommand(this.route.path || "/"), "Command copied"),
+          onclick: () => void copy(refreshCommand(this.place.path ? this.place : { path: "/" }), "Command copied"),
           text: "Copy refresh command",
         }),
         h("button", {
@@ -340,7 +343,7 @@ export class App {
   // ---- navigation ----
 
   navigate(patch: Partial<Route>, push = true): void {
-    const next: Route = { ...this.route, ...patch, t: this.route.t };
+    const next: Route = { ...this.route, ...patch };
     const hash = format(next);
     if (push && hash !== location.hash) {
       location.hash = hash; // hashchange → apply
@@ -351,7 +354,6 @@ export class App {
   }
 
   private apply(next: Route): void {
-    next.t = this.route.t;
     const prev = this.route;
     this.route = next;
     if (this.page !== "main") return;
@@ -419,13 +421,13 @@ export class App {
   }
 
   up(): void {
-    const p = parentOf(this.route.path);
-    if (p !== null) this.navigate({ path: p, raw: undefined, sel: this.route.path, limit: undefined });
+    const p = parentPlace(this.place);
+    if (p) this.navigate({ path: p.path, raw: p.raw, sel: this.scope, limit: undefined });
   }
 
   showInFolder(r: Row): void {
-    const p = parentOf(r.path) ?? "/";
-    this.navigate({ mode: "browse", path: p, raw: undefined, sel: r.path, limit: undefined, ...this.noFilters() });
+    const p = parentPlace(r) ?? { path: "/" };
+    this.navigate({ mode: "browse", path: p.path, raw: p.raw, sel: r.path, limit: undefined, ...this.noFilters() });
   }
 
   // ---- loading ----
@@ -670,6 +672,11 @@ export class App {
 
   get scope(): string {
     return this.view?.folder.path ?? this.route.path;
+  }
+
+  get place(): Place {
+    const f = this.view?.folder;
+    return f ? { path: f.path, raw: f.path_raw } : { path: this.route.path, raw: this.route.raw };
   }
 
   private buildRows(): void {
@@ -1021,19 +1028,19 @@ export class App {
 
   private renderFolder(): void {
     const ui = this.ui!;
-    const path = this.scope;
-    const segs = path === "/" ? [] : path.split("/").slice(1);
+    const chain = ancestors(this.place);
     const parts: Node[] = [];
-    const link = (p: string, label: string) =>
-      h("a", { href: format({ ...this.route, path: p, raw: undefined, sel: undefined, limit: undefined }), text: label });
-    if (segs.length === 0) {
+    const link = (p: Place, label: string) =>
+      h("a", { href: format({ ...this.route, path: p.path, raw: p.raw, sel: undefined, limit: undefined }), text: label });
+    if (chain.length === 1) {
       parts.push(h("h1", { text: "/" }));
     } else {
-      parts.push(link("/", "/"));
-      segs.forEach((s, i) => {
-        const p = "/" + segs.slice(0, i + 1).join("/");
+      parts.push(link(chain[0], "/"));
+      const below = chain.slice(1);
+      below.forEach((p, i) => {
+        const s = p.path.slice(p.path.lastIndexOf("/") + 1);
         if (i > 0) parts.push(h("span", { class: "sep", "aria-hidden": "true", text: "›" }));
-        parts.push(i === segs.length - 1 ? h("h1", { text: s }) : link(p, s));
+        parts.push(i === below.length - 1 ? h("h1", { text: s }) : link(p, s));
       });
     }
     const f = this.view?.folder;
@@ -1455,6 +1462,7 @@ export class App {
     return {
       route: this.route,
       scope: this.scope,
+      place: this.place,
       folderSize: this.view?.folder.allocated ?? 0,
       now: now(),
       biggest: (p) => this.biggest(p),

@@ -28,7 +28,7 @@ test("keyboard moves, opens and goes up, keeping the place (Pass 6)", async ({ p
   await expect(selected(page)).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator(".crumbs h1")).toHaveText("Downloads");
-  await expect(page).toHaveURL(/#\/home\/tass\/Downloads\?/);
+  await expect(page).toHaveURL(/#\/home\/tass\/Downloads$/);
   await expect(selected(page)).toContainText("ubuntu.iso");
   await page.keyboard.press("End");
   await expect(selected(page)).toContainText("notes.txt");

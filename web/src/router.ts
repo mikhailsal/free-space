@@ -1,5 +1,6 @@
-// Hash state: `#/home/tass?mode=find&name=*.iso&t=<token>`. The token stays in
-// the fragment (never sent to a server, OV-14) and in sessionStorage.
+// Hash state: `#/home/tass?mode=find&name=*.iso`. The token arrives as `t=` in
+// the fragment (never sent to a server, OV-14), moves to sessionStorage on load
+// and is never written back into the URL (T7).
 
 export type Mode = "browse" | "top" | "find" | "changes";
 
@@ -105,7 +106,6 @@ export function format(r: Route): string {
   set("sort", r.sort);
   set("limit", r.limit);
   set("sel", r.sel);
-  set("t", r.t);
   const q = p.toString().replace(/%2F/g, "/");
   return `#${encodePath(r.path || "/")}${q ? `?${q}` : ""}`;
 }
@@ -114,6 +114,50 @@ export function format(r: Route): string {
 export function sameView(a: Route, b: Route): boolean {
   const strip = (r: Route) => format({ ...r, sel: undefined, t: undefined });
   return strip(a) === strip(b);
+}
+
+/** A folder as the API names it: the lossy `path`, plus its bytes in hex when
+ * the name is not valid UTF-8. */
+export interface Place {
+  path: string;
+  raw?: string;
+}
+
+export function hexBytes(raw: string): Uint8Array {
+  const b = new Uint8Array(raw.length >> 1);
+  for (let i = 0; i < b.length; i++) b[i] = parseInt(raw.slice(2 * i, 2 * i + 2), 16);
+  return b;
+}
+
+const exact = new TextDecoder("utf-8", { fatal: true });
+const lossy = new TextDecoder("utf-8");
+
+function placeOf(b: Uint8Array): Place {
+  try {
+    return { path: exact.decode(b) };
+  } catch {
+    return { path: lossy.decode(b), raw: Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("") };
+  }
+}
+
+/** "/" down to `p`, each folder with its raw form when it needs one, so going
+ * up from a non-UTF-8 folder asks for the real bytes, not the lossy name. */
+export function ancestors(p: Place): Place[] {
+  const out: Place[] = [{ path: "/" }];
+  if (p.raw) {
+    const b = hexBytes(p.raw);
+    for (let i = 1; i < b.length; i++) if (b[i] === 0x2f) out.push(placeOf(b.subarray(0, i)));
+    out.push(placeOf(b));
+    return out;
+  }
+  const segs = p.path === "/" || p.path === "" ? [] : p.path.split("/").slice(1);
+  segs.forEach((_, i) => out.push({ path: "/" + segs.slice(0, i + 1).join("/") }));
+  return out;
+}
+
+export function parentPlace(p: Place): Place | null {
+  const a = ancestors(p);
+  return a.length > 1 ? a[a.length - 2] : null;
 }
 
 export function parentOf(path: string): string | null {

@@ -5,12 +5,13 @@ use std::io::Write;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::Duration;
 
 use clap::Args;
 use freespace_core::error::{Error, ErrorCode, Result};
 use freespace_core::platform;
+use tokio::process::Command;
 
 use super::{Server, runtime};
 use crate::output::{stdin_is_tty, stdout_is_tty};
@@ -82,7 +83,28 @@ fn private_dir() -> Result<PathBuf> {
 }
 
 fn write_bootstrap(url: &str) -> Result<PathBuf> {
-    write_bootstrap_in(&private_dir()?, url)
+    let dir = private_dir()?;
+    sweep_bootstraps(&dir, Duration::from_secs(BOOTSTRAP_TTL));
+    write_bootstrap_in(&dir, url)
+}
+
+/// Remove redirect files a killed `gui` left behind (their tokens are dead,
+/// but the name of the folder it opened is not).
+fn sweep_bootstraps(dir: &Path, older_than: Duration) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in rd.flatten() {
+        let name = e.file_name();
+        let n = name.to_string_lossy();
+        let stale = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .is_ok_and(|t| t.elapsed().unwrap_or_default() > older_than);
+        if n.starts_with("freespace-gui-") && n.ends_with(".html") && stale {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
 }
 
 fn write_bootstrap_in(dir: &Path, url: &str) -> Result<PathBuf> {
@@ -103,16 +125,17 @@ fn write_bootstrap_in(dir: &Path, url: &str) -> Result<PathBuf> {
     Ok(p)
 }
 
-/// `xdg-open <file>`; false when it is missing or fails.
-fn open_browser(file: &Path) -> bool {
+/// `xdg-open <file>`; false when it is missing or fails. Async, so a browser
+/// that keeps `xdg-open` in the foreground never holds up Ctrl-C.
+async fn open_browser(file: &Path) -> bool {
     Command::new("xdg-open")
         .arg(file)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .await
+        .is_ok_and(|s| s.success())
 }
 
 pub fn run(a: &GuiArgs) -> Result<()> {
@@ -153,21 +176,27 @@ pub fn run(a: &GuiArgs) -> Result<()> {
         eprintln!("freespace gui on http://127.0.0.1:{port}/ · press Ctrl-C to stop");
         if let Some(f) = file.clone() {
             let st = srv.state.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(BOOTSTRAP_TTL)).await;
+                st.consume_bootstrap();
+            });
+            let st = srv.state.clone();
             let url = url.clone();
             tokio::spawn(async move {
-                let opened = tokio::task::spawn_blocking(move || open_browser(&f))
-                    .await
-                    .unwrap_or(false);
-                if !opened {
-                    eprintln!("no browser opened; open {url}");
-                } else {
-                    tokio::time::sleep(Duration::from_secs(OPEN_GRACE)).await;
-                    if st.bootstrap_pending() {
-                        eprintln!("the page has not loaded yet; open {url}");
+                let grace = Duration::from_secs(OPEN_GRACE);
+                let start = tokio::time::Instant::now();
+                // xdg-open may stay in the foreground with the browser: stop waiting
+                match tokio::time::timeout(grace, open_browser(&f)).await {
+                    Ok(false) => {
+                        eprintln!("no browser opened; open {url}");
+                        return;
                     }
+                    Ok(true) => tokio::time::sleep_until(start + grace).await,
+                    Err(_) => {}
                 }
-                tokio::time::sleep(Duration::from_secs(BOOTSTRAP_TTL - OPEN_GRACE)).await;
-                st.consume_bootstrap();
+                if st.bootstrap_pending() {
+                    eprintln!("the page has not loaded yet; open {url}");
+                }
             });
         }
         srv.run(file).await
@@ -215,5 +244,19 @@ mod tests {
         assert!(html.contains("no-referrer"));
         // a stale file of the same name is replaced, not followed
         assert!(write_bootstrap_in(d.path(), &url).is_ok());
+    }
+
+    #[test]
+    fn leftover_redirect_files_are_swept() {
+        let d = tempfile::tempdir().unwrap();
+        let old = d.path().join("freespace-gui-1.html");
+        let other = d.path().join("notes.html");
+        std::fs::write(&old, "x").unwrap();
+        std::fs::write(&other, "x").unwrap();
+        sweep_bootstraps(d.path(), Duration::from_secs(60));
+        assert!(old.exists(), "a fresh file may still be in use");
+        sweep_bootstraps(d.path(), Duration::ZERO);
+        assert!(!old.exists());
+        assert!(other.exists());
     }
 }

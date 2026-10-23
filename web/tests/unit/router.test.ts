@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { format, isUnder, parentOf, parse, relative, sameView, type Route } from "../../src/router";
+import { ancestors, format, isUnder, parentOf, parentPlace, parse, relative, sameView, type Route } from "../../src/router";
 
 const base: Route = { path: "/home/tass", mode: "browse" };
 
@@ -30,10 +30,9 @@ describe("hash round trip", () => {
       after: "180d",
       run: true,
       limit: 60,
-      t: "tok",
     };
     const back = parse(format(r));
-    expect(back).toEqual({ ...r, raw: undefined, sort: undefined, untouched: undefined });
+    expect(back).toEqual({ ...r, raw: undefined, sort: undefined, untouched: undefined, t: undefined });
   });
 
   test("slashes stay readable, other characters are escaped", () => {
@@ -79,4 +78,25 @@ test("path helpers", () => {
   expect(isUnder("/home/tass/x", "/home/tass")).toBe(true);
   expect(isUnder("/home/tassel", "/home/tass")).toBe(false);
   expect(isUnder("/anything", "/")).toBe(true);
+});
+
+describe("places", () => {
+  test("plain paths go up by name", () => {
+    expect(ancestors({ path: "/home/tass" })).toEqual([{ path: "/" }, { path: "/home" }, { path: "/home/tass" }]);
+    expect(parentPlace({ path: "/" })).toBeNull();
+    expect(parentPlace({ path: "/home" })).toEqual({ path: "/" });
+  });
+
+  test("non-UTF-8 paths keep their bytes on the way up", () => {
+    // /data/<ff>/sub: the parent still needs raw, the grandparent does not
+    const p = { path: "/data/\ufffd/sub", raw: "2f646174612fff2f737562" };
+    expect(parentPlace(p)).toEqual({ path: "/data/\ufffd", raw: "2f646174612fff" });
+    expect(ancestors(p).map((a) => a.raw ?? a.path)).toEqual(["/", "/data", "2f646174612fff", "2f646174612fff2f737562"]);
+  });
+
+  test("the token is read from the hash but never written back", () => {
+    const r = parse("#/home?t=abc");
+    expect(r.t).toBe("abc");
+    expect(format(r)).toBe("#/home");
+  });
 });

@@ -1,5 +1,7 @@
 // Numbers and dates as the CLI prints them (core/src/format.rs).
 
+import { hexBytes, type Place } from "./router";
+
 const UNITS = ["K", "M", "G", "T", "P", "E"];
 
 export function size(bytes: number): string {
@@ -91,8 +93,28 @@ export function bigCount(n: number): string {
   return count(n);
 }
 
-/** Single-quote for a POSIX shell unless the word is plain. */
+// C0 controls, DEL and bidi overrides: invisible in the page, live in a terminal
+const UNSAFE = /[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]/;
+
+/** Single-quote for a POSIX shell unless the word is plain. File names are
+ * chosen by anyone who can write a file, so control characters never reach
+ * the clipboard raw: such words use bash `$'\xHH'`. */
 export function shellWord(s: string): string {
   if (/^[A-Za-z0-9_\/.,:=+@%-]+$/.test(s)) return s;
+  if (UNSAFE.test(s)) return ansiC(new TextEncoder().encode(s));
   return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/** A path for the shell; `raw` (hex) gives its exact bytes. */
+export function shellPath(p: Place): string {
+  return p.raw ? ansiC(hexBytes(p.raw)) : shellWord(p.path);
+}
+
+/** bash `$'…'`: printable ASCII as is, every other byte as `\xHH`. */
+function ansiC(bytes: Uint8Array): string {
+  let out = "";
+  for (const b of bytes) {
+    out += b >= 0x20 && b < 0x7f && b !== 0x27 && b !== 0x5c ? String.fromCharCode(b) : `\\x${b.toString(16).padStart(2, "0")}`;
+  }
+  return `$'${out}'`;
 }

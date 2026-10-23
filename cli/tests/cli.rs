@@ -513,6 +513,63 @@ fn gui_hands_the_token_through_a_private_file_it_then_removes() {
 }
 
 #[test]
+fn gui_exits_on_ctrl_c_while_the_browser_holds_xdg_open() {
+    let e = Env::new();
+    e.fixture();
+    e.scan();
+    let run = e.tmp.path().join("run");
+    let bin = e.tmp.path().join("bin");
+    fs::create_dir_all(&run).unwrap();
+    fs::create_dir_all(&bin).unwrap();
+    let pidfile = e.tmp.path().join("xdg.pid");
+    // like a first browser window: xdg-open stays in the foreground
+    let fake = bin.join("xdg-open");
+    fs::write(
+        &fake,
+        format!(
+            "#!/bin/sh
+echo $$ > {}
+exec sleep 60
+",
+            pidfile.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let path = format!("{}:/usr/bin:/bin", bin.display());
+    let Some(mut child) = under_tty(
+        &e,
+        "gui --port 0",
+        &[
+            ("XDG_RUNTIME_DIR", s(&run)),
+            ("PATH", &path),
+            ("DISPLAY", ":99"),
+        ],
+    ) else {
+        return;
+    };
+    let rx = lines_of(child.stdout.take().unwrap());
+    wait_for(&rx, "freespace gui on http://127.0.0.1:");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !pidfile.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let t = std::time::Instant::now();
+    stop_under_tty(child);
+    let took = t.elapsed();
+    if let Some(pid) = fs::read_to_string(&pidfile)
+        .ok()
+        .and_then(|p| p.trim().parse::<i32>().ok())
+    {
+        // SAFETY: kill(2) on the stand-in browser this test started
+        unsafe { libc::kill(pid, libc::SIGKILL) };
+    }
+    assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+    let left: Vec<_> = fs::read_dir(&run).unwrap().flatten().collect();
+    assert!(left.is_empty(), "redirect file left behind: {left:?}");
+}
+
+#[test]
 fn gui_over_ssh_prints_the_tunnel_instead_of_opening_a_browser() {
     let e = Env::new();
     e.fixture();

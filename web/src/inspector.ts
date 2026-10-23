@@ -3,7 +3,7 @@
 import { command, refreshCommand, SCAN_COMMAND } from "./cli";
 import { h } from "./dom";
 import * as fmt from "./format";
-import { parentOf, type Route } from "./router";
+import { parentPlace, type Place, type Route } from "./router";
 import { isFolder, lowerBound, type Row } from "./rows";
 import { copy } from "./toast";
 import type { Entry } from "./types";
@@ -11,6 +11,8 @@ import type { Entry } from "./types";
 export interface InspectorHost {
   route: Route;
   scope: string;
+  /** The scope with its raw bytes. */
+  place: Place;
   folderSize: number;
   now: number;
   biggest(path: string): Promise<Entry[] | null>;
@@ -163,12 +165,12 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
 }
 
 function actions(host: InspectorHost, r: Row, withCli: boolean): HTMLElement {
-  const folder = isFolder(r) ? r.path : parentOf(r.path) ?? "/";
+  const folder: Place = isFolder(r) ? r : (parentPlace(r) ?? { path: "/" });
   const mode = host.route.mode;
   return h(
     "div",
     { class: "actions" },
-    withCli ? cliLine(command(host.route, mode === "browse" && isFolder(r) ? r.path : host.scope)) : null,
+    withCli ? cliLine(command(host.route, mode === "browse" && isFolder(r) ? r : host.place)) : null,
     r.status === "gone"
       ? null
       : r.hidden

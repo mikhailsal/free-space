@@ -72,11 +72,18 @@ export function sessionEnded(lastPath: string): HTMLElement {
   );
 }
 
+/** A server `fix` gets a Copy button only when it is a freespace command: after
+ * the server stops, whatever else binds the port answers on this origin. */
+function fixRow(fix: string): HTMLElement {
+  const cmd = fix.replace(/^ask a human to run: /, "");
+  return /^(sudo )?freespace [a-z-]+( [^\x00-\x1f\x7f]*)?$/.test(cmd) ? cmdRow("Fix:", cmd) : h("p", { text: `Fix: ${fix}` });
+}
+
 export function noAccess(e: ErrorDetail): HTMLElement {
   return page(
     "Cannot read the snapshot",
     h("p", { text: e.message }),
-    e.fix ? cmdRow("Fix:", e.fix.replace(/^ask a human to run: /, "")) : null,
+    e.fix ? fixRow(e.fix) : null,
     details(e.code, e.exit, e.message),
   );
 }
@@ -85,7 +92,7 @@ export function fatal(e: ErrorDetail): HTMLElement {
   return page(
     "freespace cannot show this snapshot",
     h("p", { text: e.message }),
-    e.fix ? cmdRow("Fix:", e.fix.replace(/^ask a human to run: /, "")) : null,
+    e.fix ? fixRow(e.fix) : null,
     details(e.code, e.exit, e.message),
   );
 }

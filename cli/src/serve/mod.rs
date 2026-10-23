@@ -17,8 +17,12 @@ use clap::Args;
 use freespace_core::config;
 use freespace_core::error::{Error, Result};
 use tokio::net::TcpListener;
+use tokio::sync::Notify;
 
 pub use gui::{GuiArgs, run as gui};
+
+/// After a stop signal, how long open browser connections may finish.
+const STOP_GRACE: Duration = Duration::from_secs(2);
 
 #[derive(Args)]
 pub struct ServeArgs {
@@ -113,10 +117,20 @@ impl Server {
             }
         });
         let app = api::router(self.state.clone());
-        let res = axum::serve(self.listener, app)
-            .with_graceful_shutdown(self.stop)
-            .await
-            .map_err(|e| Error::io("server failed", e));
+        let stopping = Arc::new(Notify::new());
+        let (stop, notify) = (self.stop, stopping.clone());
+        let serve = axum::serve(self.listener, app).with_graceful_shutdown(async move {
+            stop.await;
+            notify.notify_one();
+        });
+        // open browser connections get a short grace, not a veto over exiting
+        let res = tokio::select! {
+            r = serve.into_future() => r.map_err(|e| Error::io("server failed", e)),
+            _ = async {
+                stopping.notified().await;
+                tokio::time::sleep(STOP_GRACE).await;
+            } => Ok(()),
+        };
         self.state.consume_bootstrap();
         res
     }

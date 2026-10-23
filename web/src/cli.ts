@@ -1,7 +1,7 @@
 // The "CLI command" line of the inspector: mirrors the current mode and filters.
 
-import { shellWord } from "./format";
-import type { Route } from "./router";
+import { shellPath, shellWord } from "./format";
+import type { Place, Route } from "./router";
 
 export function months(n: number): string {
   return `${n * 30}d`;
@@ -13,8 +13,8 @@ export function untouched(r: Route): number {
   return r.kind === "dir" ? 6 : 0;
 }
 
-export function command(r: Route, scope: string): string {
-  const p = shellWord(scope);
+export function command(r: Route, at: Place): string {
+  const p = shellPath(at);
   switch (r.mode) {
     case "browse": {
       const sort = r.sort && r.sort !== "allocated" ? ` --sort ${r.sort}` : "";
@@ -42,8 +42,8 @@ export function command(r: Route, scope: string): string {
   }
 }
 
-export function refreshCommand(folder: string): string {
-  return `sudo freespace refresh ${shellWord(folder)}`;
+export function refreshCommand(folder: Place): string {
+  return `sudo freespace refresh ${shellPath(folder)}`;
 }
 
 export const SCAN_COMMAND = "sudo freespace scan";

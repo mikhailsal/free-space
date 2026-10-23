@@ -36,7 +36,8 @@ test("narrow screens: the inspector is a sheet that traps and returns focus", as
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Close" })).toBeFocused();
   const box = await sheet.getByRole("button", { name: "Close" }).boundingBox();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
+  // layout heights are fractional (43.99997 px for 44 px rows at some widths)
+  expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
   for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
   expect(await page.evaluate(() => !!document.activeElement?.closest("aside"))).toBe(true);
   const r = await new AxeBuilder({ page }).include("aside").analyze();

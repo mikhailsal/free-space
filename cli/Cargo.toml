@@ -21,7 +21,7 @@ clap_complete = "4.6"
 serde.workspace = true
 serde_json.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
-tokio = { version = "1", features = ["rt", "net", "signal", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "net", "signal", "time", "macros", "process", "sync"] }
 include_dir = "0.7"
 serde_urlencoded = "0.7"
 libc.workspace = true

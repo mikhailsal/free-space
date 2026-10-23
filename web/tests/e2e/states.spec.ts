@@ -49,6 +49,10 @@ test("the token moves to sessionStorage and survives a hash without it", async (
   await page.goto(url());
   await expect(page.locator(".crumbs h1")).toHaveText("tass");
   expect(await page.evaluate(() => sessionStorage.getItem("freespace.token"))).toBe(TOKEN);
+  // T7: gone from the address bar, history and every link on the page
+  expect(page.url()).not.toContain(TOKEN);
+  const hrefs = await page.locator("a[href]").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
+  expect(hrefs.filter((h) => h.includes("t="))).toEqual([]);
   await page.goto("/#/home/tass/Downloads");
   await page.reload();
   await expect(page.locator(".crumbs h1")).toHaveText("Downloads");
