@@ -217,3 +217,101 @@ fn refresh_republishes_and_diff_sees_changes() {
     let t = text(&o);
     assert!(t.contains("since"), "{t}");
 }
+
+#[test]
+fn install_timer_needs_root() {
+    if euid_is_root() {
+        return;
+    }
+    let e = Env::new();
+    let o = e.run(&["install-timer", "--json"]);
+    assert_eq!(code(&o), 1);
+    assert_eq!(json(&o)["error"]["code"], "NOT_ROOT");
+    assert!(
+        json(&o)["error"]["fix"]
+            .as_str()
+            .unwrap()
+            .starts_with("sudo freespace install-timer")
+    );
+}
+
+fn euid_is_root() -> bool {
+    Command::new("id")
+        .arg("-u")
+        .output()
+        .is_ok_and(|o| o.stdout.starts_with(b"0\n"))
+}
+
+#[test]
+fn doctor_reports_checks_with_fixes() {
+    let e = Env::new();
+    e.fixture();
+    e.scan();
+    let o = e.run(&["doctor", "--json"]);
+    let v = json(&o);
+    let checks = v["checks"].as_array().unwrap();
+    let ids: Vec<&str> = checks.iter().map(|c| c["id"].as_str().unwrap()).collect();
+    for id in [
+        "config",
+        "timer",
+        "binary",
+        "path",
+        "unit",
+        "access",
+        "freshness",
+        "last_error",
+        "space",
+        "skill",
+    ] {
+        assert!(ids.contains(&id), "{id} missing from {ids:?}");
+    }
+    for c in checks {
+        assert_eq!(c["ok"].as_bool().unwrap(), c["fix"].is_null(), "{c}");
+    }
+    let access = checks.iter().find(|c| c["id"] == "access").unwrap();
+    assert_eq!(access["ok"], true);
+    assert_eq!(code(&o), if v["ok"] == true { 0 } else { 1 });
+}
+
+#[test]
+fn skill_install_writes_stamped_files() {
+    let e = Env::new();
+    let dir = e.tmp.path().join("skills/freespace");
+    let o = e.run(&["skill", "install", "--dir", s(&dir)]);
+    assert_eq!(code(&o), 0, "{}", String::from_utf8_lossy(&o.stderr));
+    let md = fs::read_to_string(dir.join("SKILL.md")).unwrap();
+    assert!(md.starts_with("---\nname: freespace\n"));
+    assert!(md.contains(&format!(
+        "<!-- freespace-version: {} -->",
+        env!("CARGO_PKG_VERSION")
+    )));
+    let printed = text(&e.run(&["skill", "print"]));
+    assert_eq!(printed, md);
+    let schema = fs::read(dir.join("schema.json")).unwrap();
+    let want =
+        fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../skill/schema.json")).unwrap();
+    assert_eq!(schema, want);
+    assert_eq!(code(&e.run(&["skill", "uninstall", "--dir", s(&dir)])), 0);
+    assert!(!dir.exists());
+}
+
+#[test]
+fn completions_for_three_shells() {
+    let e = Env::new();
+    for sh in ["bash", "zsh", "fish"] {
+        let o = e.run(&["completions", sh]);
+        assert_eq!(code(&o), 0);
+        let t = text(&o);
+        assert!(t.contains("install-timer"), "{sh}");
+        assert!(t.contains("any"), "{sh}: --kind values");
+    }
+    let bash = e.run(&["completions", "bash"]).stdout;
+    let mut check = Command::new("bash")
+        .arg("-n")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    use std::io::Write;
+    check.stdin.take().unwrap().write_all(&bash).unwrap();
+    assert!(check.wait().unwrap().success());
+}

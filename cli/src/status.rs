@@ -98,6 +98,19 @@ pub fn scanning_line(sc: &Scanning, p: Option<&Progress>, capital: bool) -> Stri
     s
 }
 
+/// D12: "Run: freespace doctor" when the snapshot is stale or the last run failed.
+pub fn doctor_hint(r: &StatusResponse) -> Option<String> {
+    let stale = r
+        .age_seconds
+        .is_some_and(|a| a > crate::doctor::STALE_SECONDS);
+    let failed = match (&r.last_error, r.last_success_ts) {
+        (Some(e), Some(ok)) => e.ts > ok,
+        (Some(_), None) => true,
+        _ => false,
+    };
+    (stale || failed).then(|| "Run: freespace doctor".to_owned())
+}
+
 pub fn run(a: &StatusArgs) -> Result<()> {
     let dir = config::load()?.snapshot_dir();
     let s = gather(&dir)?;
@@ -223,6 +236,10 @@ fn details(s: &Summary) -> String {
     out.push('\n');
     for (k, v) in rows {
         out.push_str(&format!("{k:<w$}  {v}\n"));
+    }
+    if let Some(h) = doctor_hint(r) {
+        out.push_str(&h);
+        out.push('\n');
     }
     out
 }

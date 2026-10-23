@@ -72,8 +72,11 @@ pub fn run(json: bool) -> Result<()> {
             third,
         ]
     };
+    let hint = status::doctor_hint(r)
+        .map(|h| format!("{h}\n"))
+        .unwrap_or_default();
     output::print(&format!(
-        "{}\nNext:\n{}",
+        "{}\n{hint}Next:\n{}",
         status::sentence(&s),
         next(&lines)
     ));

@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 freespace-core.workspace = true
 clap = { version = "4.6", features = ["derive", "wrap_help"] }
+clap_complete = "4.6"
 serde.workspace = true
 serde_json.workspace = true
 

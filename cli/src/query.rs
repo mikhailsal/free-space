@@ -22,6 +22,7 @@ use crate::scan::count;
 #[derive(Args)]
 pub struct PathOpts {
     /// Folder in the snapshot (default /); relative paths start at the current directory
+    #[arg(value_hint = clap::ValueHint::DirPath)]
     pub path: Option<PathBuf>,
     /// The path as hex bytes, for names that are not UTF-8 (`path_raw` in JSON answers)
     #[arg(long, value_name = "HEX", conflicts_with = "path")]
@@ -33,7 +34,7 @@ pub struct LsArgs {
     #[command(flatten)]
     pub at: PathOpts,
     /// allocated | apparent | mtime (oldest first)
-    #[arg(long, value_name = "KEY")]
+    #[arg(long, value_name = "KEY", value_parser = ["allocated", "apparent", "mtime"])]
     pub sort: Option<String>,
     /// Rows to show (default 30, max 10000)
     #[arg(long)]
@@ -50,7 +51,7 @@ pub struct TopArgs {
     #[command(flatten)]
     pub at: PathOpts,
     /// file (default) | dir: topmost folders, none counted twice
-    #[arg(long)]
+    #[arg(long, value_parser = ["file", "dir"])]
     pub kind: Option<String>,
     /// Only entries at least this big: 500M, 1G, 2T
     #[arg(long, value_name = "SIZE")]
@@ -59,7 +60,7 @@ pub struct TopArgs {
     #[arg(long, value_name = "AGE")]
     pub older_than: Option<String>,
     /// allocated | apparent | mtime (oldest first)
-    #[arg(long, value_name = "KEY")]
+    #[arg(long, value_name = "KEY", value_parser = ["allocated", "apparent", "mtime"])]
     pub sort: Option<String>,
     #[arg(long)]
     pub limit: Option<u32>,
@@ -86,10 +87,10 @@ pub struct FindArgs {
     #[arg(long, value_name = "SIZE")]
     pub min_size: Option<String>,
     /// file | dir | any (default any)
-    #[arg(long)]
+    #[arg(long, value_parser = ["file", "dir", "any"])]
     pub kind: Option<String>,
     /// allocated | apparent | mtime (oldest first)
-    #[arg(long, value_name = "KEY")]
+    #[arg(long, value_name = "KEY", value_parser = ["allocated", "apparent", "mtime"])]
     pub sort: Option<String>,
     #[arg(long)]
     pub limit: Option<u32>,
@@ -107,7 +108,7 @@ pub struct DiffArgs {
     #[arg(long)]
     pub depth: Option<u32>,
     /// dir (default) | file | any
-    #[arg(long)]
+    #[arg(long, value_parser = ["file", "dir", "any"])]
     pub kind: Option<String>,
     #[arg(long)]
     pub limit: Option<u32>,

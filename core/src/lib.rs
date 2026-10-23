@@ -10,6 +10,7 @@ pub mod queries;
 pub mod refresh;
 pub mod scan;
 pub mod snapshot;
+pub mod systemd;
 
 /// The one-liner every "no snapshot" message points to.
 pub const INSTALL_CMD: &str =

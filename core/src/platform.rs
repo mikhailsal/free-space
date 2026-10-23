@@ -253,3 +253,56 @@ mod tests {
         assert!(!below.contains(&PathBuf::from("/")));
     }
 }
+
+/// A passwd entry: what `install-timer` and `skill install` need to act for
+/// `$SUDO_USER` (ACL, home directory, file ownership).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserInfo {
+    pub name: String,
+    pub uid: u32,
+    pub gid: u32,
+    pub home: PathBuf,
+}
+
+fn user_from(pw: *const libc::passwd) -> Option<UserInfo> {
+    if pw.is_null() {
+        return None;
+    }
+    let pw = unsafe { &*pw };
+    let s = |p: *const libc::c_char| {
+        unsafe { std::ffi::CStr::from_ptr(p) }
+            .to_string_lossy()
+            .into_owned()
+    };
+    Some(UserInfo {
+        name: s(pw.pw_name),
+        uid: pw.pw_uid,
+        gid: pw.pw_gid,
+        home: PathBuf::from(s(pw.pw_dir)),
+    })
+}
+
+pub fn user_by_name(name: &str) -> Option<UserInfo> {
+    let c = std::ffi::CString::new(name).ok()?;
+    user_from(unsafe { libc::getpwnam(c.as_ptr()) })
+}
+
+pub fn user_by_uid(uid: u32) -> Option<UserInfo> {
+    user_from(unsafe { libc::getpwuid(uid) })
+}
+
+/// The human behind this process: `$SUDO_USER` under sudo, else the caller.
+pub fn invoking_user() -> Option<UserInfo> {
+    match std::env::var("SUDO_USER") {
+        Ok(n) if !n.is_empty() && n != "root" => user_by_name(&n),
+        _ => {
+            let uid = unsafe { libc::geteuid() };
+            if uid == 0 { None } else { user_by_uid(uid) }
+        }
+    }
+}
+
+/// The passwd entry of the effective user.
+pub fn current_user() -> Option<UserInfo> {
+    user_by_uid(unsafe { libc::geteuid() })
+}
