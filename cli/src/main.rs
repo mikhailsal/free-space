@@ -8,6 +8,7 @@ mod query;
 mod refresh;
 mod scan;
 mod schema;
+mod serve;
 mod skill;
 mod status;
 
@@ -25,6 +26,8 @@ Look:
   top             Largest files, or folders untouched for a while
   find            Everything matching a filter, with the total size
   diff            What grew or shrank since the previous scan
+  gui             Browse the snapshot in your browser
+  serve           The gui's local server, without opening a browser
 
 Maintain:
   status          Snapshot age, free space, last error, running scan
@@ -81,6 +84,12 @@ enum Command {
         after_help = "Examples:\n  freespace diff /\n  freespace diff /home/tass --kind any --json"
     )]
     Diff(query::DiffArgs),
+    /// Browse the snapshot in your browser
+    #[command(after_help = "Examples:\n  freespace gui\n  freespace gui ~/Downloads --port 8710")]
+    Gui(serve::GuiArgs),
+    /// The gui's local server, without opening a browser
+    #[command(after_help = "Examples:\n  freespace serve\n  freespace serve --port 8710")]
+    Serve(serve::ServeArgs),
     /// Snapshot age, free space, last error, running scan
     #[command(after_help = "Examples:\n  freespace status\n  freespace status --json")]
     Status(status::StatusArgs),
@@ -135,6 +144,8 @@ fn main() -> ExitCode {
         Some(Command::Top(a)) => (query::top(&a), a.json),
         Some(Command::Find(a)) => (query::find(&a), a.json),
         Some(Command::Diff(a)) => (query::diff(&a), a.json),
+        Some(Command::Gui(a)) => (serve::gui(&a), false),
+        Some(Command::Serve(a)) => (serve::run(&a), false),
         Some(Command::Doctor(a)) => {
             return if doctor::run(&a) {
                 ExitCode::SUCCESS

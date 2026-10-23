@@ -315,3 +315,279 @@ fn completions_for_three_shells() {
     check.stdin.take().unwrap().write_all(&bash).unwrap();
     assert!(check.wait().unwrap().success());
 }
+
+/// Reads a child's output lines on a thread so a test can wait for one.
+fn lines_of(r: impl std::io::Read + Send + 'static) -> std::sync::mpsc::Receiver<String> {
+    use std::io::BufRead;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for l in std::io::BufReader::new(r).lines().map_while(|l| l.ok()) {
+            if tx.send(l).is_err() {
+                break;
+            }
+        }
+    });
+    rx
+}
+
+fn wait_for(rx: &std::sync::mpsc::Receiver<String>, what: &str) -> String {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    let mut seen = String::new();
+    while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
+        match rx.recv_timeout(left) {
+            Ok(l) if l.contains(what) => return l,
+            Ok(l) => seen.push_str(&format!("{l}\n")),
+            Err(_) => break,
+        }
+    }
+    panic!("no line with {what:?}; got:\n{seen}");
+}
+
+/// Token and port from a `http://127.0.0.1:P/#...t=TOKEN` line.
+fn url_parts(line: &str) -> (u16, String) {
+    let at = line.find("http://127.0.0.1:").unwrap() + "http://127.0.0.1:".len();
+    let port = line[at..].split('/').next().unwrap().parse().unwrap();
+    let t = line.rsplit("t=").next().unwrap();
+    let token: String = t.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+    assert_eq!(token.len(), 64, "{line}");
+    (port, token)
+}
+
+fn http_get(port: u16, path: &str, token: &str) -> String {
+    use std::io::{Read, Write};
+    let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+    write!(
+        s,
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-Freespace-Token: {token}\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    let mut out = String::new();
+    s.read_to_string(&mut out).unwrap();
+    out
+}
+
+fn signal(child: &std::process::Child, sig: i32) {
+    // SAFETY: plain kill(2) on our own child's pid
+    unsafe { libc::kill(child.id() as i32, sig) };
+}
+
+/// Stop the freespace that `script` runs (not `script` itself: closing the
+/// pty under a live server leaves it blocked on the terminal), then reap both.
+fn stop_under_tty(mut child: std::process::Child) {
+    let list = format!("/proc/{0}/task/{0}/children", child.id());
+    let inner: Vec<i32> = fs::read_to_string(list)
+        .unwrap_or_default()
+        .split_whitespace()
+        .filter_map(|p| p.parse().ok())
+        .collect();
+    for pid in inner {
+        // SAFETY: kill(2) on the server our `script` child started
+        unsafe { libc::kill(pid, libc::SIGTERM) };
+    }
+    let st = child.wait().unwrap();
+    assert!(st.success(), "gui stops cleanly on SIGTERM: {st}");
+}
+
+#[test]
+fn gui_without_a_terminal_refuses_with_gui_no_tty() {
+    let e = Env::new();
+    let o = e
+        .cmd(&["gui"])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(code(&o), 2);
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("gui needs a terminal"), "{err}");
+    assert!(err.contains("freespace ls / --json"), "{err}");
+}
+
+#[test]
+fn serve_prints_a_tokened_url_and_stops_cleanly() {
+    let e = Env::new();
+    e.fixture();
+    e.scan();
+    let mut child = e
+        .cmd(&["serve", "--port", "0"])
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let rx = lines_of(child.stderr.take().unwrap());
+    let line = wait_for(&rx, "freespace serve: http://127.0.0.1:");
+    let (port, token) = url_parts(&line);
+    let r = http_get(port, "/api/status", &token);
+    assert!(r.starts_with("HTTP/1.1 200"), "{r}");
+    assert!(r.contains("\"generation\":1"), "{r}");
+    assert!(http_get(port, "/api/status", "nope").starts_with("HTTP/1.1 403"));
+    signal(&child, libc::SIGTERM);
+    assert!(
+        child.wait().unwrap().success(),
+        "SIGTERM is a clean stop (D8)"
+    );
+}
+
+/// `script` gives `gui` the terminal it insists on; None when it is missing.
+fn under_tty(e: &Env, args: &str, env: &[(&str, &str)]) -> Option<std::process::Child> {
+    if Command::new("script").arg("--version").output().is_err() {
+        eprintln!("skipped: no script(1) for a pseudo-terminal");
+        return None;
+    }
+    let bin = env!("CARGO_BIN_EXE_freespace");
+    let mut c = Command::new("script");
+    c.args(["-qec", &format!("exec {bin} {args}"), "/dev/null"])
+        .env_clear()
+        .env("FREESPACE_CONFIG", e.tmp.path().join("none.toml"))
+        .env("FREESPACE_SNAPSHOT_DIR", e.tmp.path().join("snap"))
+        .env("HOME", e.tmp.path())
+        .env("SHELL", "/bin/sh")
+        .env("PATH", "/usr/bin:/bin");
+    for (k, v) in env {
+        c.env(k, v);
+    }
+    Some(
+        c.stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap(),
+    )
+}
+
+#[test]
+fn gui_hands_the_token_through_a_private_file_it_then_removes() {
+    let e = Env::new();
+    e.fixture();
+    e.scan();
+    let run = e.tmp.path().join("run");
+    let bin = e.tmp.path().join("bin");
+    fs::create_dir_all(&run).unwrap();
+    fs::create_dir_all(&bin).unwrap();
+    let log = e.tmp.path().join("opened");
+    // a stand-in browser: records what it was asked to open
+    let fake = bin.join("xdg-open");
+    fs::write(
+        &fake,
+        format!(
+            "#!/bin/sh\nstat -c %a \"$1\" > {log}.mode\ncp \"$1\" {log}.html\necho \"$1\" > {log}.path\n",
+            log = log.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let path = format!("{}:/usr/bin:/bin", bin.display());
+    let Some(mut child) = under_tty(
+        &e,
+        &format!("gui {} --port 0", s(&e.root().join("sub"))),
+        &[
+            ("XDG_RUNTIME_DIR", s(&run)),
+            ("PATH", &path),
+            ("DISPLAY", ":99"),
+        ],
+    ) else {
+        return;
+    };
+    let rx = lines_of(child.stdout.take().unwrap());
+    wait_for(&rx, "freespace gui on http://127.0.0.1:");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !log.with_extension("path").exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let opened = fs::read_to_string(log.with_extension("path")).unwrap();
+    let file = PathBuf::from(opened.trim());
+    assert!(file.starts_with(&run), "{}", file.display());
+    assert_eq!(
+        fs::read_to_string(log.with_extension("mode"))
+            .unwrap()
+            .trim(),
+        "600"
+    );
+    let html = fs::read_to_string(log.with_extension("html")).unwrap();
+    let (port, token) = url_parts(&html);
+    assert!(
+        html.contains("/sub?t="),
+        "the folder rides in the fragment: {html}"
+    );
+    assert!(file.exists(), "kept until the page calls the API");
+    assert!(http_get(port, "/api/status", &token).starts_with("HTTP/1.1 200"));
+    assert!(!file.exists(), "removed on the first authorized request");
+    stop_under_tty(child);
+}
+
+#[test]
+fn gui_exits_on_ctrl_c_while_the_browser_holds_xdg_open() {
+    let e = Env::new();
+    e.fixture();
+    e.scan();
+    let run = e.tmp.path().join("run");
+    let bin = e.tmp.path().join("bin");
+    fs::create_dir_all(&run).unwrap();
+    fs::create_dir_all(&bin).unwrap();
+    let pidfile = e.tmp.path().join("xdg.pid");
+    // like a first browser window: xdg-open stays in the foreground
+    let fake = bin.join("xdg-open");
+    fs::write(
+        &fake,
+        format!(
+            "#!/bin/sh
+echo $$ > {}
+exec sleep 60
+",
+            pidfile.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let path = format!("{}:/usr/bin:/bin", bin.display());
+    let Some(mut child) = under_tty(
+        &e,
+        "gui --port 0",
+        &[
+            ("XDG_RUNTIME_DIR", s(&run)),
+            ("PATH", &path),
+            ("DISPLAY", ":99"),
+        ],
+    ) else {
+        return;
+    };
+    let rx = lines_of(child.stdout.take().unwrap());
+    wait_for(&rx, "freespace gui on http://127.0.0.1:");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !pidfile.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let t = std::time::Instant::now();
+    stop_under_tty(child);
+    let took = t.elapsed();
+    if let Some(pid) = fs::read_to_string(&pidfile)
+        .ok()
+        .and_then(|p| p.trim().parse::<i32>().ok())
+    {
+        // SAFETY: kill(2) on the stand-in browser this test started
+        unsafe { libc::kill(pid, libc::SIGKILL) };
+    }
+    assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+    let left: Vec<_> = fs::read_dir(&run).unwrap().flatten().collect();
+    assert!(left.is_empty(), "redirect file left behind: {left:?}");
+}
+
+#[test]
+fn gui_over_ssh_prints_the_tunnel_instead_of_opening_a_browser() {
+    let e = Env::new();
+    e.fixture();
+    e.scan();
+    let Some(mut child) = under_tty(
+        &e,
+        "gui --port 0",
+        &[("SSH_CONNECTION", "10.0.0.2 5000 10.0.0.1 22")],
+    ) else {
+        return;
+    };
+    let rx = lines_of(child.stdout.take().unwrap());
+    let tunnel = wait_for(&rx, "ssh -N -L");
+    let url = wait_for(&rx, "http://127.0.0.1:");
+    let (port, _) = url_parts(&url);
+    assert!(
+        tunnel.contains(&format!("{port}:127.0.0.1:{port}")),
+        "{tunnel}"
+    );
+    stop_under_tty(child);
+}

@@ -61,4 +61,6 @@ On failure, stdout carries `{"error": {"code", "exit", "message", "fix", "recove
 - `LOCK` (6): a scan or refresh is running. Wait and retry.
 - Anything else: run `freespace doctor --json` and show the user the failing check and its `fix`.
 
-Never run `freespace gui` (it opens a browser for a human). Never run `sudo` yourself without asking.
+- `GUI_NO_TTY` (2): you ran `freespace gui`. Use the `--json` commands above instead.
+
+Never run `freespace gui` or `freespace serve`: they are the human's browser view and run until stopped. When the user wants to look for themselves, tell them to run `freespace gui` in their own terminal (over ssh: `ssh -t -L 8710:127.0.0.1:8710 <host> freespace gui --port 8710`). Never run `sudo` yourself without asking.
