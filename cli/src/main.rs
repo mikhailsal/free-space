@@ -14,6 +14,13 @@ mod status;
 
 use std::process::ExitCode;
 
+// The release archives are static musl builds; musl's allocator takes a lock
+// per call, which made 8 walker threads slower than one (docs/benchmarks.md).
+// The `override` feature replaces malloc for C code (opendir, SQLite) too.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 
 const HELP_TEMPLATE: &str = "\

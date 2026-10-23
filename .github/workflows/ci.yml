@@ -64,6 +64,22 @@ jobs:
           bun-version: 1.4.2
       - run: cargo check --workspace --all-targets
 
+  # The release archives are static musl builds with mimalloc replacing
+  # malloc: the whole suite runs against that binary too.
+  musl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: sudo apt-get install -y musl-tools
+      - run: cargo test --workspace --target x86_64-unknown-linux-musl
+
   # Building without bun must stop with the install hint, not a cryptic error.
   no-bun:
     runs-on: ubuntu-latest
@@ -101,11 +117,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - run: cargo build --release
+      # the same static build the release archive carries
+      - run: sudo apt-get install -y musl-tools
+      - run: cargo build --release --target x86_64-unknown-linux-musl
       # Hosted runners leave /usr/local/bin writable by the runner user, which
       # install-timer rightly refuses (D22); give it the stock ownership.
       - name: root-only /usr/local
@@ -117,7 +137,7 @@ jobs:
           a=freespace-x86_64-unknown-linux-musl.tar.gz
           d=/tmp/releases
           mkdir -p "$d/latest/download" "$d/download/v0.1.0" /tmp/pkg/freespace-x86_64-unknown-linux-musl
-          cp target/release/freespace LICENSE README.md /tmp/pkg/freespace-x86_64-unknown-linux-musl/
+          cp target/x86_64-unknown-linux-musl/release/freespace LICENSE README.md /tmp/pkg/freespace-x86_64-unknown-linux-musl/
           tar -C /tmp/pkg -czf "$d/latest/download/$a" freespace-x86_64-unknown-linux-musl
           (cd "$d/latest/download" && sha256sum "$a" > "$a.sha256")
           cp "$d/latest/download/"* "$d/download/v0.1.0/"

@@ -26,6 +26,13 @@ include_dir = "0.7"
 serde_urlencoded = "0.7"
 libc.workspace = true
 
+# musl's malloc serializes the walker threads; the static release builds use
+# mimalloc, also for C callers (opendir, SQLite). 8-worker walk of a cached
+# 580k-entry /usr: musl malloc 6.9 s, mimalloc 2.6 s, + override 1.3 s,
+# glibc 1.0 s.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = { version = "0.1.52", features = ["override"] }
+
 [dev-dependencies]
 jsonschema = { version = "0.60.0", default-features = false }
 tempfile = "3"

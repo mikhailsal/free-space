@@ -11,7 +11,7 @@ unix-archive = ".tar.gz"
 checksum = "sha256"
 # build.rs bundles web/ with bun (eng D5)
 github-build-setup = "../build-setup.yml"
-pr-run-mode = "upload"
+pr-run-mode = "plan"
 
 [dist.github-custom-runners]
 x86_64-unknown-linux-musl = "ubuntu-22.04"
