@@ -8,6 +8,7 @@ use std::path::Path;
 
 use super::{RESERVE_BYTES, SnapshotDir, fsutil};
 use crate::error::{Error, ErrorCode, Result};
+use crate::fault;
 use crate::format;
 use crate::platform;
 
@@ -111,7 +112,13 @@ pub fn rotate_prev(dir: &SnapshotDir) -> Result<bool> {
     let tmp = dir.prev_tmp();
     let _ = std::fs::remove_file(&tmp);
     std::fs::hard_link(&cur, &tmp).map_err(|e| step_err("link", &cur, &tmp, e))?;
+    fault::point(dir, "linked");
     std::fs::rename(&tmp, dir.prev()).map_err(|e| step_err("rename-prev", &tmp, &dir.prev(), e))?;
+    // After a crash between rotate and publish, prev and current are one inode
+    // and rename(2) of two links to the same file does nothing: drop the link,
+    // or it would pin a whole old snapshot after the next rotation.
+    let _ = std::fs::remove_file(&tmp);
+    fault::point(dir, "rotated");
     Ok(true)
 }
 
@@ -120,6 +127,7 @@ pub fn publish_current(dir: &SnapshotDir, tmp: &Path) -> Result<()> {
     std::fs::rename(tmp, &cur).map_err(|e| step_err("rename", tmp, &cur, e))?;
     fsutil::fsync_dir(dir.as_path())
         .map_err(|e| step_err("fsync-dir", dir.as_path(), dir.as_path(), e))?;
+    fault::point(dir, "published");
     Ok(())
 }
 
@@ -173,6 +181,22 @@ mod tests {
         assert_eq!(std::fs::read(dir.prev()).unwrap(), b"gen1");
         assert!(!tmp.exists());
         assert!(!dir.prev_tmp().exists());
+    }
+
+    #[test]
+    fn rotating_twice_over_one_inode_leaves_no_link_behind() {
+        let d = tempfile::tempdir().unwrap();
+        let dir = SnapshotDir::new(d.path());
+        std::fs::write(dir.current(), b"gen2").unwrap();
+        // a crash after rotate: prev and current are links to one file
+        assert!(rotate_prev(&dir).unwrap());
+        // the retry rotates again: rename(2) between those links is a no-op
+        assert!(rotate_prev(&dir).unwrap());
+        assert!(
+            !dir.prev_tmp().exists(),
+            "would pin gen2 after the next publish"
+        );
+        assert_eq!(std::fs::metadata(dir.current()).unwrap().nlink(), 2);
     }
 
     #[test]

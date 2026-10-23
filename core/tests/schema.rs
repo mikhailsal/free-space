@@ -24,7 +24,7 @@ fn every_entry_requires_newest_mtime() {
     let doc = schema_document();
     let req = doc["$defs"]["EntryOut"]["required"].as_array().unwrap();
     assert!(req.iter().any(|v| v == "newest_mtime"));
-    for c in ["status", "ls", "top", "find", "diff", "error"] {
+    for c in ["status", "ls", "top", "find", "diff", "doctor", "error"] {
         let r = doc["commands"][c]["$ref"].as_str().unwrap();
         let name = r.trim_start_matches("#/$defs/");
         assert!(doc["$defs"].get(name).is_some(), "{c} → {name}");

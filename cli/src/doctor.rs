@@ -10,12 +10,12 @@ use clap::Args;
 use freespace_core::config;
 use freespace_core::format;
 use freespace_core::platform::{self, now_secs};
+use freespace_core::queries::types::{DoctorCheck, DoctorResponse};
 use freespace_core::snapshot::publish;
 use freespace_core::snapshot::reader::Snapshot;
 use freespace_core::snapshot::{SnapshotDir, lock, state};
 use freespace_core::systemd::{self, BIN_TARGET, SERVICE, TIMER};
 use freespace_core::{ErrorCode, VERSION};
-use serde::Serialize;
 
 use crate::install::check_root_only;
 use crate::output;
@@ -30,33 +30,20 @@ pub struct DoctorArgs {
     pub json: bool,
 }
 
-#[derive(Serialize)]
-pub struct Check {
-    pub id: &'static str,
-    pub ok: bool,
-    pub detail: String,
-    pub fix: Option<String>,
-}
+pub type Check = DoctorCheck;
 
-#[derive(Serialize)]
-struct Report {
-    ok: bool,
-    version: &'static str,
-    checks: Vec<Check>,
-}
-
-fn pass(id: &'static str, detail: impl Into<String>) -> Check {
+fn pass(id: &str, detail: impl Into<String>) -> Check {
     Check {
-        id,
+        id: id.into(),
         ok: true,
         detail: detail.into(),
         fix: None,
     }
 }
 
-fn fail(id: &'static str, detail: impl Into<String>, fix: impl Into<String>) -> Check {
+fn fail(id: &str, detail: impl Into<String>, fix: impl Into<String>) -> Check {
     Check {
-        id,
+        id: id.into(),
         ok: false,
         detail: detail.into(),
         fix: Some(fix.into()),
@@ -102,9 +89,9 @@ pub fn run(a: &DoctorArgs) -> bool {
 
     let ok = checks.iter().all(|c| c.ok);
     if a.json {
-        output::print_json(&Report {
+        output::print_json(&DoctorResponse {
             ok,
-            version: VERSION,
+            version: VERSION.into(),
             checks,
         });
         return ok;
