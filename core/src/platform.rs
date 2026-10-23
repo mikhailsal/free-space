@@ -201,6 +201,28 @@ pub fn mount_points_below(mounts: &[MountInfo], root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+/// Mounts of `dev` strictly below `root` that show another part of the
+/// filesystem (bind mounts of a subtree): the walk stops there so nothing is
+/// counted twice, and `st_dev` alone cannot see them. A directory mounted onto
+/// itself shows its own content and is walked like any directory: systemd's
+/// `ProtectSystem=strict` mounts /home, /root and every `ReadWritePaths` that
+/// way inside the unit.
+pub fn bind_mounts_below(mounts: &[MountInfo], root: &Path, dev: &str) -> Vec<PathBuf> {
+    let base = mount_for(mounts, root);
+    mounts
+        .iter()
+        .filter(|m| m.mount_point != root && m.mount_point.starts_with(root) && m.dev == dev)
+        .filter(|m| {
+            let own = base.as_ref().and_then(|b| {
+                let rel = m.mount_point.strip_prefix(&b.mount_point).ok()?;
+                Some(b.root.join(rel))
+            });
+            own.as_deref() != Some(m.root.as_path())
+        })
+        .map(|m| m.mount_point.clone())
+        .collect()
+}
+
 pub fn mount_for(mounts: &[MountInfo], path: &Path) -> Option<MountInfo> {
     mounts
         .iter()
@@ -233,6 +255,22 @@ mod tests {
 40 22 8:3 /home/x /mnt/bind rw,relatime shared:1 - ext4 /dev/sda3 rw
 41 22 8:5 / /mnt/my\\040disk rw - ext4 /dev/sda5 rw
 ";
+
+    #[test]
+    fn self_bind_mounts_are_walked_subtree_binds_are_not() {
+        // inside a unit with ProtectSystem=strict and ReadWritePaths=/var/lib/freespace
+        let unit = format!(
+            "{SAMPLE}50 22 8:3 /home /home rw,relatime shared:1 - ext4 /dev/sda3 rw\n\
+             51 22 8:3 /var/lib/freespace /var/lib/freespace rw shared:1 - ext4 /dev/sda3 rw\n"
+        );
+        let m = parse_mountinfo(&unit);
+        assert_eq!(
+            bind_mounts_below(&m, Path::new("/"), "8:3"),
+            [PathBuf::from("/mnt/bind")]
+        );
+        // a root inside the self-bind: the same rule from that mount
+        assert!(bind_mounts_below(&m, Path::new("/home/u"), "8:3").is_empty());
+    }
 
     #[test]
     fn parses_and_unescapes() {

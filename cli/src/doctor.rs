@@ -84,7 +84,12 @@ pub fn run(a: &DoctorArgs) -> bool {
     checks.push(binary());
     checks.push(path_shadow());
     checks.push(unit_paths(&cfg.snapshot_dir));
-    checks.extend(snapshot_checks(&dir, cfg.keep_previous));
+    let roots = if cfg.roots.is_empty() {
+        platform::default_roots(&platform::mountinfo())
+    } else {
+        cfg.roots.clone()
+    };
+    checks.extend(snapshot_checks(&dir, cfg.keep_previous, &roots));
     checks.push(skill_version());
 
     let ok = checks.iter().all(|c| c.ok);
@@ -251,7 +256,7 @@ fn unit_paths(snapshot_dir: &Path) -> Check {
     }
 }
 
-fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool) -> Vec<Check> {
+fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) -> Vec<Check> {
     let mut v = Vec::new();
     let snap = Snapshot::open_current(dir);
     match &snap {
@@ -332,8 +337,13 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool) -> Vec<Check> {
         )),
     }
 
-    // the next scan's precheck, computed the same way scan does it
-    let entries = snap.as_ref().ok().map(|s| s.meta.entries);
+    // the next scan's precheck, computed the same way scan does it; before the
+    // first snapshot, from the inodes in use on the roots (the fallback, 2 % of
+    // the used space, asked for 8.1 G per snapshot where the real one is 1 G)
+    let entries = match &snap {
+        Ok(s) => Some(s.meta.entries),
+        Err(_) => freespace_core::job::expected_entries(roots),
+    };
     let factor = if keep_previous { 3 } else { 2 };
     if dir.as_path().is_dir() {
         match publish::precheck(dir, entries, factor) {

@@ -175,10 +175,8 @@ pub fn walk_with_mounts(opts: &WalkOptions, mounts: &[MountInfo]) -> io::Result<
             }
         }
         let dev_s = dev_string(md.dev());
-        let bind_mounts = mounts
-            .iter()
-            .filter(|m| m.mount_point != *p && m.mount_point.starts_with(p) && m.dev == dev_s)
-            .map(|m| m.mount_point.clone())
+        let bind_mounts = platform::bind_mounts_below(mounts, p, &dev_s)
+            .into_iter()
             .collect();
         let fs_type = platform::mount_for(mounts, p)
             .map(|m| m.fs_type)

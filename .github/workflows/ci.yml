@@ -136,11 +136,13 @@ jobs:
         run: |
           a=freespace-x86_64-unknown-linux-musl.tar.gz
           d=/tmp/releases
-          mkdir -p "$d/latest/download" "$d/download/v0.1.0" /tmp/pkg/freespace-x86_64-unknown-linux-musl
+          V=$(target/x86_64-unknown-linux-musl/release/freespace --version | cut -d ' ' -f 2)
+          echo "V=$V" >> "$GITHUB_ENV"
+          mkdir -p "$d/latest/download" "$d/download/v$V" /tmp/pkg/freespace-x86_64-unknown-linux-musl
           cp target/x86_64-unknown-linux-musl/release/freespace LICENSE README.md /tmp/pkg/freespace-x86_64-unknown-linux-musl/
           tar -C /tmp/pkg -czf "$d/latest/download/$a" freespace-x86_64-unknown-linux-musl
           (cd "$d/latest/download" && sha256sum "$a" > "$a.sha256")
-          cp "$d/latest/download/"* "$d/download/v0.1.0/"
+          cp "$d/latest/download/"* "$d/download/v$V/"
           chmod -R a+rX "$d"
       - name: without a terminal and without sudo, install.sh hands over to a human
         run: |
@@ -156,7 +158,7 @@ jobs:
         run: |
           FREESPACE_RELEASES=/tmp/releases sh install.sh -- --roots "$PWD/core" --json > install.json 2> install.log
           cat install.log
-          grep -E "^freespace 0\.1\.0 installed in [0-9]+ s" install.log
+          grep -E "^freespace $V installed in [0-9]+ s" install.log
           test "$(jq -r .access install.json)" = acl
           test "$(jq -r .scan_started install.json)" = true
           test "$(stat -c '%U %a' /usr/local/bin/freespace)" = "root 755"
@@ -167,9 +169,9 @@ jobs:
           test "$(stat -c %U "$HOME/.claude/skills/freespace/SKILL.md")" = "$USER"
       - name: rerunning install.sh with --version reinstalls in place
         run: |
-          FREESPACE_RELEASES=/tmp/releases sh install.sh --version 0.1.0 --no-timer 2> rerun.log
+          FREESPACE_RELEASES=/tmp/releases sh install.sh --version "$V" --no-timer 2> rerun.log
           cat rerun.log
-          grep -F "replacing 0.1.0" rerun.log
+          grep -F "replacing $V" rerun.log
           code=0
           FREESPACE_RELEASES=/tmp/releases sh install.sh --version 9.9.9 2> missing.log || code=$?
           test "$code" = 1
@@ -199,6 +201,19 @@ jobs:
         run: |
           freespace doctor || true
           freespace doctor --json | jq -e '[.checks[] | select(.id != "path") | .ok] | all'
+      # The unit runs with ProtectSystem=strict, which mounts /home, /root and
+      # every ReadWritePaths onto itself inside it. The walk goes through such
+      # mounts like plain folders (v0.1.0's first scan of / skipped /home).
+      - name: a scan in the unit's sandbox walks folders mounted onto themselves
+        run: |
+          sudo mkdir -p /srv/fsroot/home/u /tmp/fs-sandbox
+          sudo dd if=/dev/zero of=/srv/fsroot/home/u/f bs=1M count=4 status=none
+          sudo systemd-run --wait --quiet -p ProtectSystem=strict \
+            -p ReadWritePaths=/srv/fsroot/home -p ReadWritePaths=/tmp/fs-sandbox \
+            -E FREESPACE_SNAPSHOT_DIR=/tmp/fs-sandbox -E FREESPACE_CONFIG=/nonexistent \
+            /usr/local/bin/freespace scan /srv/fsroot
+          sudo env FREESPACE_SNAPSHOT_DIR=/tmp/fs-sandbox FREESPACE_CONFIG=/nonexistent \
+            freespace ls /srv/fsroot/home/u --json | jq -e '.entries | length == 1'
       - name: uninstall leaves only the group
         run: |
           sudo freespace install-timer --uninstall
@@ -214,7 +229,7 @@ jobs:
         run: |
           sudo env FREESPACE_RELEASES=/tmp/releases sh install.sh --no-timer 2> sudo.log
           cat sudo.log
-          grep -E "^freespace 0\.1\.0 installed in [0-9]+ s" sudo.log
+          grep -E "^freespace $V installed in [0-9]+ s" sudo.log
           test "$(stat -c '%U %a' /usr/local/bin/freespace)" = "root 755"
           test "$(stat -c %U "$HOME/.claude/skills/freespace/SKILL.md")" = "$USER"
           test "$(stat -c %U "$HOME/.claude")" = "$USER"

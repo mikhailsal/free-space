@@ -4,6 +4,14 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-23
+
+### Fixed
+
+- The nightly scan skipped `/home` and `/root`. The unit's `ProtectSystem=strict` mounts them (and the snapshot folder) onto themselves inside the unit, and the walk stopped at every same-device mount. It now stops only at mounts that show another part of the filesystem, so nothing is counted twice and those folders are walked. After upgrading, run `sudo systemctl start freespace.service` for a full snapshot now.
+- `doctor` asked for 2 % of the used space per snapshot before the first one existed (25 G on a 408 G disk whose snapshot is 1 G). It now estimates from the inodes in use, as `scan` does.
+- The first scan showed no progress percent when one of the roots was a FAT partition such as `/boot/efi`.
+
 ## [0.1.0] - 2026-10-23
 
 First public release.
@@ -20,5 +28,6 @@ First public release.
 - Error contract: every error has a stable code, exit number, `fix`, `recovery` hint and a `docs` link into the README.
 - `install.sh`: one-line install, upgrade and rollback (`--version X`) from GitHub Releases with sha256 checks; static musl builds for x86_64 and aarch64.
 
-[Unreleased]: https://github.com/mikhailsal/free-space/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mikhailsal/free-space/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mikhailsal/free-space/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mikhailsal/free-space/releases/tag/v0.1.0
