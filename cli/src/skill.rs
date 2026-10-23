@@ -69,7 +69,7 @@ fn target(dir: Option<PathBuf>) -> Result<(PathBuf, Option<UserInfo>)> {
         return Ok((d, user.filter(|_| fsutil::is_root())));
     }
     match user {
-        Some(u) => Ok((default_dir_for(&u), Some(u).filter(|_| fsutil::is_root()))),
+        Some(u) => Ok((default_dir_for(&u), fsutil::is_root().then_some(u))),
         None => {
             let home = std::env::var_os("HOME")
                 .ok_or_else(|| Error::usage("HOME is not set: pass --dir"))?;

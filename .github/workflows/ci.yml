@@ -44,6 +44,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
+      # Hosted runners leave /usr/local/bin writable by the runner user, which
+      # install-timer rightly refuses (D22); give it the stock ownership.
+      - name: root-only /usr/local
+        run: |
+          sudo chown root:root /usr/local /usr/local/bin
+          sudo chmod go-w /usr/local /usr/local/bin
       - name: install-timer
         run: |
           sudo ./target/release/freespace install-timer --roots "$PWD/core" --json | tee install.json
