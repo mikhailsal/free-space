@@ -1,0 +1,2985 @@
+# freespace — снимок диска, который всегда готов
+
+**Status:** APPROVED (office-hours) · CEO review complete 2026-10-22 · **Дата:** 2026-10-22 · **Режим:** builder (для себя / open source) · **Автор сессии:** tass · **Решение:** `1f13934d` (архитектура A′)
+
+## Problem Statement
+
+На этой машине (Linux Mint 21.3, ext4, VMware-диск 442G, 97% занято, ~7M inode, `rotational=1`) диск забивается постоянно, а штатные способы понять «куда ушло место» (`du`, baobab) на холодном кэше работают минуты. Каждый раз, когда появляется желание почистить, приходится сначала ждать. В результате чистка откладывается, диск забивается до упора.
+
+Нужна утилита, которая:
+
+1. Сканирует диск быстрее `du` (sudo допустим).
+2. Хранит кэш (снимок), чтобы каждый просмотр не ждал сканирования.
+3. Обновляет снимок по расписанию, чтобы к моменту «хочу почистить» он уже лежал готовый.
+4. Даёт три интерфейса над одним снимком: GUI (в браузере), TUI, CLI с `--json` для AI-агентов плюс skill. *(CEO review D3: TUI перенесён в v1.1, v1 = CLI + web + skill.)*
+
+Ключевая мотивация пользователя, прозвучавшая в сессии: **один skill для управления всеми своими машинами и чисткой** (Linux-десктоп, Mac, Windows, Android через Termux). Поэтому ядро кроссплатформенное с первого дня, а Android — v2, но с заложенными крючками.
+
+## What Makes This Cool
+
+- **Открыл и сразу видишь.** Снимок лежит на диске, UI показывает дерево мгновенно, с подписью «снимок 7 часов назад». Никакого «подождите, сканирую».
+- **«Обновить эту папку».** Если сомневаешься в свежести, пересканируешь только поддерево, а не весь диск. Это «самое крутое» и по мнению Codex.
+- **Одна команда с любой машины.** `ssh mac freespace top / --json`, `ssh phone freespace ls /sdcard --json`. Агент с одним skill смотрит на все машины одинаково, а решение «что удалять» остаётся за человеком.
+- **Тот же экран в браузере, терминале и у агента.** GUI, JSON и (с v1.1) TUI отвечают на одни и те же запросы к одному снимку, поэтому они не расходятся.
+
+## Constraints
+
+- Нет git-истории проекта, пустая папка. Это чистый старт.
+- Первичная цель: эта VM. Диск виртуальный и «вращающийся» по мнению ядра; бенчмарки из README gdu (SSD, 400k файлов) здесь не переносятся. Нужны свои замеры.
+- 7M inode при 15 GB RAM: снимок в памяти должен укладываться с большим запасом; точный расход меряется, не угадывается.
+- Инструменты на машине: cargo, go, python3, node 22, bun. Не установлены ncdu/gdu/dust/duc (для бенчмарка поставить).
+- Снимок делается от root и содержит полный список путей на машине. Доступ к файлу снимка ограничен.
+- Удаление файлов в v1 не делаем. Утилита только показывает; удаляет человек или агент своими руками.
+- Диск на 97%: сама утилита не имеет права его добить. Запись снимка проверяет свободное место заранее и при нехватке оставляет старый снимок.
+- Снимок содержит все пути машины, поэтому HTTP-сервер для GUI слушает только loopback, требует токен сессии и проверяет Host/Origin. Чужая веб-страница не должна читать инвентарь; другой локальный пользователь — не должен в рамках принятого остаточного риска (см. «Сервер для GUI»).
+
+## Premises (согласованы с пользователем и уточнены после Codex)
+
+1. **Боль = холодный старт.** Один снимок по расписанию закрывает её. Ускорение самого сканирования вторично.
+2. **Сканировать в память параллельно, записывать снимок один раз после скана, никогда не по записи на каждый файл.** Инструменты, которые пишут в БД во время скана, медленнее в 6–10 раз (gdu --db против gdu в памяти). Формат снимка открыт: SQLite в одной транзакции, mmap-файл или гибрид. Требования к формату: читается частично через индекс (не грузится целиком в RAM для одного `ls`), память и параллелизм измерены на этой VM до фиксации.
+3. **Одно ядро владеет снимком; GUI, TUI и CLI — тонкие просмотрщики.** Никакой логики размеров в UI.
+4. **systemd-таймер от root, полный рескан.** fanotify-инкремент — ускоритель на потом, не v1.
+5. **CLI для агента = индексированные запросы к снимку с `--json`.** Задержка меряется, не обещается. Skill = SKILL.md над CLI. Удаления в v1 нет, но JSON отдаёт всё, что нужно для ручного `rm`.
+6. **Статический бинарник, GitHub Releases, одна команда установки ставит таймер.**
+
+## Cross-Model Perspective (Codex, gpt-6.1-sol)
+
+Согласился с формой «снимок + просмотрщики». Назвал самым крутым «мгновенный просмотр + обновить эту папку с показом возраста». Рекомендовал Go на базе gdu и SQLite-снимок; мы выбрали Rust по причинам ниже (кроссплатформа, Tauri, память), SQLite принят как кандидат по умолчанию. Его опасения вошли в док как требования:
+
+| Опасение | Серьёзность | Что делаем |
+|---|---|---|
+| SSD-бенчмарки не про VMware-диск | High | Первый шаг — локальный бенчмарк |
+| «Закэшировано» ≠ «мгновенно» | High | Частичное чтение по индексу; задержки `ls`/`top` меряются, цель держится на числах |
+| 7M записей в памяти | Medium | Мерить peak RSS в бенчмарке; компактная структура (интернирование имён, u64-размеры) |
+| Контракт учёта: allocated vs apparent, hardlinks, mounts, ошибки | High | Отдельный раздел «Accounting contract» ниже |
+| Права на снимок | Medium | `0640 root:freespace`, пользователь в группу при установке |
+| Упаковка | Low | cargo-dist, статический musl-бинарник |
+
+## Approaches Considered
+
+| | A. Web-GUI внутри бинарника (встроенная страница) | B. Tauri 2 desktop app | C. Flutter + flutter_rust_bridge | D. egui / GTK4 нативно |
+|---|---|---|---|---|
+| Linux/Mac/Win | да (любой браузер) | да (webkit2gtk-4.1 / WKWebView / WebView2) | да | да / только Linux-first |
+| Android | через Termux + Chrome на телефоне | да (поддерживается) | да | нет / нет |
+| Установка | один бинарник | системные пакеты webview | отдельный тулчейн | один бинарник |
+| Переиспользование UI | страница = та же для B | та же страница | нет, Dart UI с нуля | нет |
+| Усилие v1 | L | L + упаковка на 3 ОС | XL | L–XL |
+| Риск | «ещё одна вкладка» вместо окна | зависимости webview в Mint 21.3 | второй язык, второй тулчейн | ограниченная доступность/скорость разработки |
+
+Flutter отклонён: второй язык ради UI, который прекрасно живёт в веб-странице. Нативные тулкиты отклонены: нет пути на Android и Mac без переписывания. Tauri отложен как апгрейд: одна и та же страница, которую v1 отдаёт по `127.0.0.1`, в v2 заворачивается в окно без переписывания.
+
+## Recommended Approach: A′ (A с явным путём на Tauri)
+
+**Rust workspace: в v1 два крейта (`core`, `cli`) плюс каталоги `web/` и `skill/`; `tui/` добавляется в v1.1.**
+
+```
+freespace/
+  core/    scanner (jwalk, параллельный обход), snapshot (запись одним куском), queries,
+           platform traits, accounting contract
+  cli/     clap; каждая команда умеет --json; подкоманды serve и gui
+  tui/     v1.1 (D3): ratatui, тот же набор запросов, что и web; в v1 крейт не создаётся
+  web/     одна страница (vanilla TS или Svelte), вшита через include_dir,
+           отдаётся на 127.0.0.1:<port>, открывается xdg-open / open / start
+  skill/   SKILL.md для агентов
+```
+
+**Поток данных.** Таймер запускает `freespace scan / --one-file-system`. Скан идёт в память параллельно, после чего ядро пишет снимок во временный файл и публикует его атомарным rename. Все UI (web, CLI, с v1.1 TUI) читают опубликованный снимок через ядро только для чтения (`?immutable=1`, никаких `-wal`/`-shm` файлов: снимок пишется в режиме `journal_mode=OFF` одной транзакцией в tmp-файл); UI никогда не сканирует сам, кроме явного `refresh <path>`.
+
+**CLI (черновик контракта).**
+
+```
+sudo freespace scan / [--one-file-system] [--workers N]
+sudo freespace refresh /home/tass/.cache        # пересканировать поддерево, опубликовать новый снимок (только CLI в v1)
+freespace status --json                          # host, os, generation, prev_generation, scanned_at, age, refreshed[], roots[], fs[], entries, last_error (из state.json)
+freespace ls /home --sort allocated --limit 30 --json
+freespace top / --kind file --min-size 100M --limit 50 --json
+freespace top / --older-than 180d --sort mtime --limit 50 --json   # D9: большое и давно не тронутое
+freespace diff [/path] [--depth N] [--kind dir|file|any] [--limit 30] --json   # D6: что выросло с прошлой генерации
+freespace find [/path] [--name GLOB] [--older-than DATE|Ndur] [--newer-than DATE|Ndur] [--min-size S] [--kind file|dir|any] [--sort allocated|mtime] [--limit 30] --json   # D15: сколько весит всё, что подходит под фильтр
+freespace gui [/path]                            # поднимает serve и открывает браузер
+# freespace tui [/path]                          # v1.1 (D3)
+freespace serve [--port N]                       # только 127.0.0.1, случайный порт и токен по умолчанию
+freespace install-timer [--interval daily] [--at 02:00] [--roots / /home]
+```
+
+**Корни сканирования (root set).** Конфиг `roots`, по умолчанию `install-timer` заполняет его реальными файловыми системами из `/proc/mounts` (ext4/xfs/btrfs/ntfs/exfat/vfat), исключая pseudo-fs, snap loop-монтирования и повторы по устройству (bind mount того же устройства пропускается). Каждый корень обходится с `--one-file-system`. Узел точки монтирования под корнем не обходится, но отдаёт `used`/`total` из statvfs и ссылку на соответствующий корень, если он в наборе. Все корни пишутся в один снимок и получают одну `generation`. btrfs-подтома: в v1 считаются отдельными корнями, если есть в `/proc/mounts`; проверить на реальной btrfs в v2. Android `/sdcard` в v2: отдельный корень; как считать allocated на FUSE решается в v2 (флаг `--apparent-only` убран из v1, D5).
+
+**Свежесть после `refresh`.** Каждый узел-директория хранит `scanned_at`. `refresh <path>` ставит новое время всему поддереву и увеличивает `generation` так же, как полный скан. `status` отдаёт `scanned_at` последнего полного скана и список `refreshed: [{path, scanned_at}]`. `ls` отдаёт `scanned_at` каждой записи; UI показывает возраст у строки, когда он отличается от возраста снимка. `age_seconds` в ответе = возраст самой старой части запрошенного поддерева.
+
+**Привилегии и запись `refresh`.** В v1 `refresh` только из CLI под root. Кнопка «Refresh this folder» в GUI (и в TUI с v1.1) показывает готовую команду и копирует её; root-помощник (pkexec или сокет-демон) отложен в v2. Путь записи: `refresh` не копирует файл и не вставляет строки «на место» (плотные DFS-preorder `id`/`subtree_end` этого не допускают, OV-1): новый снимок собирается заново одной транзакцией потоковым проходом по старому `entries` в порядке `id`, где поддерево `/path` заменяется свежесканированным, а `id`, `subtree_end`, `parent_id` перенумеровываются на лету (одна линейная проходка, ~7M строк); затем публикуется тем же протоколом, что и полный скан (см. «Протокол публикации»). Стоимость `refresh` = запись полного снимка + скан поддерева, это и измеряет Open Question 5. `refresh` **не** ротирует `snapshot.prev.db`: предыдущая генерация остаётся ночным baseline, а `diff` помечает ответ `partial: true` и перечисляет `refreshed[]`, если текущая генерация содержит поддеревья, пересканированные после `prev`. `scan` и `refresh` держат один lock-файл `.lock` в каталоге снимка (flock); второй процесс завершается с ошибкой `another scan is running` (exit 6), а не ждёт. `refresh` проходит тот же precheck, что и `scan`, с `N = 2` (prev не ротируется: current + tmp). Hardlinks при `refresh` (по таблице `hardlinks` старого снимка): ссылки, у которых хотя бы одна запись лежит вне пересканированного поддерева, сохраняют прежнюю атрибуцию; если атрибутированная запись лежала внутри поддерева и исчезла, размер переходит к наименьшему оставшемуся пути; внутри поддерева правило «наименьший путь» применяется заново. Ссылка внутри поддерева с `nlink > 1`, чей inode отсутствует в `hardlinks`, атрибутируется обычным правилом (наименьший путь), если обход поддерева увидел ровно `nlink` её ссылок (все ссылки новые и внутренние, OV-11); иначе хотя бы одна ссылка лежит вне поддерева (на момент полного скана у inode была одна ссылка вне поддерева, OV-2), и запись получает `allocated = 0`: внешняя ссылка уже посчитана и не пересканируется; если её тем временем удалили, размер недосчитывается до ночного `scan` (ответ помечен `partial`), но никогда не считается дважды. Агрегаты предков пересчитываются по цепочке `parent_id` до корня в той же транзакции: аддитивные (`allocated`, `items`, `errors`) по дельте, неаддитивные (`min_scanned_at`, `newest_mtime`) повторной свёрткой по прямым детям предка (`SELECT min(min_scanned_at), max(newest_mtime) FROM entries WHERE parent_id = ?`, один индексный запрос на предка; eng review run 2, F2: дельта не умеет понижать максимум, когда самый новый файл поддерева удалён).
+
+**Изменяемое состояние (`state.json`).** Снимки неизменяемы, поэтому всё, что меняется между сканами, живёт в `snapshot_dir/state.json` (`0640 root:freespace`, запись через tmp + rename под тем же lock-файлом): `last_error {ts, op, message}`, `last_success_ts`, `prev_generation`, `current_generation`. Список обновлённых поддеревьев живёт не здесь, а в самом снимке: таблица `refreshes(path, scanned_at, generation)`, которую полный `scan` пишет пустой, а `refresh` дополняет (OV-5). `status` читает `meta` текущего снимка и `state.json`; при расхождении `meta` главнее: `prev_generation` берётся из `prev.db`, `partial` в `diff` = «таблица `refreshes` текущего снимка непуста» (сравнение по `scanned_at` не годится: после любого полного скана все каталоги новее `prev`, OV-5); `refreshed[]` в ответах `diff`/`status` берётся из этой таблицы. Если `state.json` отсутствует, его поля `null`; если он есть, но не читается или повреждён, `status` отдаёт `state_error: "<причина>"` и остальные поля из `meta` (CEO review, Section 1). Провалившийся precheck пишет `last_error` и не трогает снимки (exit 1, как и любая другая непредвиденная ошибка). Запросы без снимка: `error: no snapshot yet, run: sudo freespace scan` (exit 8).
+
+**Место под снимок.** Ожидаемый размер: 50–100 байт на запись, то есть 0.4–0.7 GB на 7M записей в SQLite с индексами; точная цифра из бенчмарка. После публикации предыдущая генерация сохраняется как `snapshot.prev.db` (для `diff`, D6), более старые удаляются, поэтому на диске постоянно живут два снимка, а в момент записи три (prev, current, tmp). Перед записью ядро проверяет `free ≥ N × size(current) + 512 MB`, где `current` — текущий опубликованный снимок (он станет `prev`), `N = 3` при `keep_previous = true` (prev + current + tmp) и `N = 2` при `false`; precheck выполняется после обхода, когда число записей известно точно, поэтому `size(current)` заменяется на `max(size(current), 100 B × entries_scanned)` (OV-4); на первом скане `size(current) = 0` и остаётся вторая оценка, а если число записей по какой-то причине неизвестно (btrfs без statvfs-инодов на этапе оценки) — `max(1 GB, 2% от used)`. Во время записи tmp-файла ядро каждые 64 MB проверяет statvfs и прерывает запись (удаляя tmp, `last_error.op = "reserve"`), как только `free < 512 MB`: диск не доводится до ENOSPC, а соседние процессы не теряют место (OV-4). `N×` — намеренный запас, а не подсчёт файлов: реально нужен один tmp-файл, запас защищает диск на 97%. Иначе скан не пишется, старый снимок остаётся, в `status.last_error` появляется запись. При `keep_previous = false` существующий `prev` удаляется при следующем успешном скане, а `diff` отвечает ошибкой `no previous generation` (exit 3).
+
+**Протокол публикации (один для `scan` и `refresh`).** 1) tmp-файл `snapshot.<gen>.tmp` в каталоге снимка, запись одной транзакцией, `fsync`. 2) Только для `scan` при `keep_previous`: `link(snapshot.db, snapshot.prev.tmp)` → `rename(snapshot.prev.tmp, snapshot.prev.db)` (hardlink, не копия: старый inode остаётся открытым у читателей). 3) `rename(snapshot.<gen>.tmp, snapshot.db)`. Файл `snapshot.db` существует в каждый момент; читатель, открывший старый inode, дочитывает его целиком. После шага 3 — `fsync` каталога снимка, затем обновление `state.json`. `scan` перед публикацией записывает в `meta` нового снимка `prev_generation` (генерацию файла, который станет `prev`). `diff` открывает сначала `snapshot.db`, затем `snapshot.prev.db`, оба `immutable=1`, и требует `prev.schema_version == current.schema_version` (иначе `schema mismatch, rescan`, exit 5) и `prev.generation == current.meta.prev_generation`; равенство `prev.generation == current.generation` (окно падения между шагами 2 и 3, когда `prev` и `snapshot.db` — один inode) трактуется как `no previous generation` (exit 3), любое другое несовпадение — `snapshot rotated, retry` (exit 4). (Уточнение CEO review, Section 4: проверка `<` пропускала пару «prev на две генерации старше».) При старте `scan` обнаруживает равные генерации prev/current и просто перезаписывает prev. Оба файла `0640 root:freespace`.
+
+**Конфиг.** `/etc/freespace/config.toml` (Linux; на Termux `$PREFIX/etc/freespace/`, на Mac/Win в пользовательском каталоге конфигов). Ключи v1: `roots = [...]`, `snapshot_dir`, `keep_previous = true`, `workers`, `port` (0 = случайный), `interval = "daily"`, `at = "02:00"`. `install-timer` записывает в этот файл `roots`, `interval`, `at` из своих флагов (флаги всегда побеждают и сохраняются); systemd-unit не содержит параметров, таймер и `scan` читают `config.toml`. При ENOSPC во время записи временный файл удаляется, старый снимок цел. При старте `scan` и `refresh`, уже под lock-файлом, удаляют оставшиеся `*.tmp`. Каталог снимка настраивается и может лежать на другой файловой системе.
+
+**Сервер для GUI.** Одноразовый bootstrap-файл живёт не дольше 60 с и удаляется при первом API-запросе или по таймеру; `serve` без `gui` печатает URL с токеном только в свой stderr (терминал пользователя), argv чист. `serve` запускается от имени вызвавшего пользователя (состоит в группе снимка), слушает только `127.0.0.1`, порт случайный, если не задан. Два класса запросов: статика (страница и её ассеты) отдаётся без токена, но с проверкой `Host` (только `127.0.0.1`/`localhost`); API (`/api/*`) требует заголовок `X-Freespace-Token` и отклоняет посторонний `Origin`. Токен сессии генерируется при старте `serve`. Передача токена в браузер: `gui` пишет одноразовый HTML-файл с правами `0600` в `$XDG_RUNTIME_DIR` (на Mac/Win в приватный каталог пользователя), который делает redirect на `http://127.0.0.1:<port>/#t=<token>`, и открывает через xdg-open только путь к этому файлу. Токен не попадает в argv ни одного процесса; файл удаляется после первого запроса к API с этим токеном. Страница читает фрагмент и хранит токен в памяти вкладки и в `sessionStorage`; фрагмент `#t=` из URL не стирается (фрагменты не уходят на сервер, `Referrer-Policy: no-referrer` задан), поэтому перезагрузка по баннеру «snapshot updated» сохраняет сессию (OV-14). Остаточный риск: другой локальный пользователь с правами читать память или `/proc` чужих процессов; для single-user хостов этого достаточно, на многопользовательских машинах альтернатива v2 — Unix-сокет с проверкой uid.
+
+Каждый JSON-ответ содержит `host`, `os`, `generation`, `prev_generation`, `scanned_at`, `age_seconds`, `schema_version` и для каждой записи: `path`, `kind`, `allocated`, `apparent`, `mtime`, `nlink`, `items`, `errors`. Этого достаточно, чтобы агент сам принял решение и выполнил `rm` руками. Имена хранятся как байты (`OsStr`); в JSON `name`/`path` отдаются как UTF-8 с заменой недопустимых байт, и только в этом случае добавляется `path_raw` (hex полного пути в байтах, без потерь); все входы, принимающие путь (`ls`, `top`, `diff`, `refresh`, `?path=` в HTTP API), принимают также `--path-raw <hex>` / `?path_raw=`, так что агент может адресовать ровно ту запись, которую увидел (CEO review, Section 4; OV-7). `mtime` — i64 секунд UNIX; `0` показывается как «unknown». Прогресс сканирования идёт в stderr, JSON только в stdout.
+
+**Accounting contract (ответ на главное опасение Codex).**
+
+- Размер по умолчанию: `allocated` (st_blocks × 512). `apparent` пишется в каждую запись; `ls`/`top` принимают `--sort allocated|apparent|mtime`, UI переключает колонку клавишей `a`.
+- Hardlinks: учитываются один раз по (dev, ino). После параллельного обхода, до записи снимка, размер приписывается лексикографически наименьшему пути среди ссылок (детерминированно, не зависит от порядка потоков); остальные записи получают `allocated = 0`, `nlink > 1`. Так атрибуция детерминирована внутри снимка; при добавлении или удалении ссылки `delta` может сместиться между каталогами, это видно по `nlink`.
+- Границы монтирования: `--one-file-system` по умолчанию; другие ФС показываются как узел с пометкой `mount`, без обхода.
+- Ошибки доступа: считаются и показываются в поле `errors` у поддерева, никогда не обнуляют размер молча.
+- Sparse-файлы: разница allocated/apparent видна в деталях.
+- Оба размера пишутся всегда; отдельного режима «только apparent» в v1 нет (D5). Переключатель `a` в UI читает сохранённый `apparent`.
+
+**Снимок.** Кандидат по умолчанию: SQLite (rusqlite bundled). Таблица `entries(id, parent_id, name, path_hash, kind, flags, allocated, apparent, mtime, nlink, items, errors, scanned_at, subtree_end, min_scanned_at)`: `id` присваивается в порядке DFS-preorder, `subtree_end` — последний id поддерева, так что «всё под /path» = диапазон `id BETWEEN x AND subtree_end` (один индексный range), `min_scanned_at` — минимум по поддереву для `age_seconds`; `path_hash` — xxh3-64 полного пути; индексы по `parent_id`, `allocated`, `mtime`, `path_hash`. Таблица `hardlinks(dev, ino, entry_id)` только для записей с `nlink > 1` (индекс по `(dev, ino)`), чтобы `refresh` находил остальные ссылки inode в старом снимке. Таблица `meta(schema_version, generation, prev_generation, scanned_at, host, os)`, таблица `refreshes(path, scanned_at, generation)` (пустая после полного скана) и таблица `roots(path, fs_type, fs_used, fs_total)` со statvfs на момент скана (их же отдаёт `status.fs[]` и узлы точек монтирования). `diff` соединяет генерации по `path_hash` в SQL; для отданных строк (после `--limit`) ядро на стороне Rust сверяет `name` и `path_hash` родителя в обеих генерациях и при несовпадении завершает команду ошибкой `path hash collision` (exit 7); при 7M записей ожидаемое число коллизий ≪ 1. Запись одной транзакцией после скана; `PRAGMA temp_store=MEMORY` и `temp_store_directory` = каталог снимка на всех запросах, чтобы временные файлы SQLite никогда не ложились на корневую ФС. Альтернатива после бенчмарка: mmap-файл с собственным индексом или гибрид (дерево директорий + список крупных файлов). Критерии выбора: `ls` и `top` на 7M записей укладываются в заданную задержку без загрузки всего файла; запись снимка не удваивает время скана. Права файла `0640 root:freespace`, путь настраивается (`/var/lib/freespace` на Linux, там же `snapshot.prev.db`, `$PREFIX/var/lib/freespace` на Termux, пользовательские каталоги на Mac/Win).
+
+**Платформенные крючки (четыре, заложены в v1).**
+
+1. Три trait-а в ядре: `allocated_size`, `file_identity`, `is_mount_boundary`. Реализации для Linux, macOS, Windows (Android = Linux-ветка).
+2. Trait расписания; в v1 единственная реализация — systemd timer (`Persistent=true`). Бэкенды launchd, Task Scheduler, Termux добавляются отдельным файлом каждый при появлении первой такой машины (D4, TODOS.md). На не-Linux `install-timer` завершается ошибкой `scheduler not supported on <os>` из самого trait-диспетчера, без файлов-заглушек.
+3. Настраиваемые пути снимка и порта, а также `roots`, `workers`, расписание — всё через `config.toml` (см. «Конфиг»).
+4. Идентичность хоста в каждом JSON (hostname, os, generation, age), чтобы мульти-хостовый skill не путал машины.
+
+**Мульти-хостовый skill.** v1: SKILL.md описывает команды и JSON-контракт; агент вызывает `freespace ... --json` локально или через `ssh <host> freespace ... --json` (форма задокументирована в SKILL.md дословно). Обёртка `--host <ssh-alias>` и `status --hosts` отложены до появления бинаря на 2+ машинах (D10, TODOS.md). Порог свободного места с `alerts[]` и уведомлением отложен до недели ночных сканов (D8, TODOS.md). `explain <path>` с таблицей кэшей отклонён (D7): знания о чистке остаются в skill-промпте, утилита только измеряет.
+
+**Diff между генерациями (D6).** `diff [/path] [--depth N] [--kind dir|file|any] [--limit N] --json` открывает текущий снимок, делает `ATTACH` к `snapshot.prev.db` и отдаёт записи, отсортированные по `|delta|` (убывание, `delta = allocated − allocated_prev`), при равенстве положительные раньше отрицательных, с полями `path`, `kind`, `allocated`, `allocated_prev`, `delta`, `items`, `items_prev`. По умолчанию `--kind dir --depth 1`: прямые дети `/path` (как `ls`), поэтому родитель и ребёнок не попадают в один список; `--depth N` углубляет. Появившиеся записи: `allocated_prev = 0`; исчезнувшие включены с `delta < 0` и участвуют в `--limit` наравне с остальными, **но только если их ближайший сохранившийся предок в текущем снимке прочитан полностью** (`flags & DENIED == 0`): записи под каталогом, чей `readdir` в текущей генерации не удался, не «исчезли», а не наблюдались; они исключаются из списка, а их верхние пути попадают в `unknown_subtrees[]` ответа (OV-3). Так как `scan` всегда идёт от root, любой `DENIED` — авария (D13): `status` хранит `warnings[]`, каждый ответ (`status`, `ls`, `top`, `diff`, `find`) получает верхнеуровневый `incomplete: true` + `unknown_subtrees[]`, CLI печатает предупреждение в stderr, web показывает красный баннер, SKILL.md велит агенту сообщать об этом раньше любых цифр. Столбец `flags` (бит `DENIED` — `readdir`/`opendir` этого каталога не удался; `errors` остаётся агрегатом по поддереву) входит в схему v1. Дети исчезнувших каталогов при `--depth N` берутся из `prev` рекурсивным CTE по `prev.parent_id`. `roots_changed = true`, если таблицы `roots` двух генераций различаются по `path`. `--kind any` включает файлы прямо под `/path`; SKILL.md рекомендует `--kind any` для `diff /home/<user>`. Записи под новым корнем выглядят как появившиеся, под удалённым — как исчезнувшие. Сопоставление по `path_hash`. Ответ содержит `prev_generation`, `prev_scanned_at`, `partial` (см. `refresh`). Сравнение только с одной сохранённой генерацией (`prev`); флага `--since` нет. Web показывает колонку «Δ since prev» переключателем (та же выдача через `/api/diff`). Схема v1 уже содержит `path_hash`, ничего не мигрируется.
+
+**Stale-фильтр (D9).** `top --older-than <dur>` принимает `Nd`, `Nw`, `Nmo`; применяется к `mtime` файлов (`--kind file`, по умолчанию) и к `newest_mtime` каталогов (`--kind dir`, D18 design review: «самый новый файл внутри»; дата самого каталога ничего не говорит о давности содержимого). `--sort mtime` сортирует по возрастанию (старые сверху), `--sort allocated|apparent` по убыванию; `ls` принимает те же `--sort`. Индекс по `mtime` есть в схеме; на 7M записей запрос индексный. В web колонка `modified` сортируемая. `Nmo` = 30 дней; неверная длительность — usage error (exit 2). SKILL.md перечисляет четыре стандартных вопроса агента по порядку: `diff` (что выросло), `top --older-than` (что забыто), `ls` (что внутри), `find` (сколько занимает X, D15).
+
+**Поиск с итогом (D15, EXP-6).** `find [/path] --name GLOB --older-than DATE|Ndur --newer-than DATE|Ndur --min-size S --kind file|dir|any --sort allocated|mtime --limit N --json` отвечает на вопрос «сколько весит всё, что подходит под фильтр»: ответ содержит `total {allocated, apparent, count}` по **всем** совпадениям и `entries[]` с топ-`limit` по `--sort` (по умолчанию `allocated` убыв.). Фильтры объединяются по И. `--min-size S` — неотрицательное целое с необязательным суффиксом `K|M|G|T` (двоичные, 1024, регистр не важен); тот же парсер используется в `top`; неверное значение — usage error (exit 2). `--name` — glob по **имени** записи (`daily*.mp4`, `*.iso`, регистр учитывается; `--iname` без учёта), выполняется зарегистрированной скалярной функцией `fs_glob(name, pattern, icase)` поверх `globset` (Unicode-регистр для `--iname`, экранирование `\`; eng review D9) по диапазону `id BETWEEN x AND subtree_end` корня `/path` (по умолчанию `/`); шаблон по полному пути (`**/node_modules/**`) в v1 не входит, так как в снимке нет колонки полного пути. Даты: `--older-than`/`--newer-than` принимают абсолютную дату `YYYY-MM-DD` (локальная полночь) или длительность `Nd|Nw|Nmo|Ny` (`Nmo` = 30 д, `Ny` = 365 д); применяются к `mtime` и по умолчанию подразумевают `--kind file` (как в `top --older-than`), `--kind any` разрешает и каталоги (их `mtime` — изменение списка, не содержимого; предупреждение в SKILL.md). Вложенные совпадения дедуплицируются для любого `--kind` (D12, OV): совпадения обрабатываются в порядке `id`; совпадение, чей `id` лежит внутри `[id, subtree_end]` уже принятого каталога-совпадения, даёт 0 в `total.allocated`/`total.apparent`, помечается `nested: true` и не входит в `total.counted`; `total.count` считает все совпадения; дедупликация выполняется до `--sort`/`--limit`. Так `--kind dir --name node_modules` даёт «сколько весят все каталоги с таким именем» без двойного счёта `node_modules` внутри `node_modules`, а `--kind any` не складывает каталог с его же содержимым. Hardlinks считаются по атрибуции снимка (`allocated = 0` у неатрибутированных ссылок), поэтому `total` не превышает реально занятое место. Стоимость: фильтр по дате/размеру сужает диапазон индексом (`mtime`, `allocated`), но `total` всегда агрегирует все совпадения, поэтому задержка пропорциональна их числу и не входит в 300-мс класс (OV-12); `--name` — последовательный проход по диапазону (на 7M строк ориентир 1–3 с warm, цель ≤ 5 с cold; не входит в 300-мс класс). Web: отдельный режим Find (D9 design review): форма с подписанными полями над таблицей, запрос по Enter/Find, строки с относительным путём, двухстрочный итог «N matches · X G total · showing M» из `total_count`/`total_allocated` ответа `/api/find`. SKILL.md добавляет четвёртый стандартный вопрос: «сколько занимает X» → `find`. Для строк-каталогов (`--kind dir|any`) `--older-than`/`--newer-than` сравнивают `newest_mtime` (самый новый файл внутри), как `top --kind dir` (eng review run 2, D2); для файлов `mtime`.
+
+**HTTP API для страницы.** Маршруты v1: `GET /api/status`, `GET /api/ls?path&sort&limit`, `GET /api/top?path&kind&min_size&older_than&sort&limit`, `GET /api/diff?path&depth&kind&limit`, `GET /api/find?path&name&iname&older_than&newer_than&min_size&kind&sort&limit`. Параметры и JSON совпадают с CLI один в один; одна функция в `core` обслуживает обе стороны.
+
+**Путь на Tauri (требование пользователя).** Веб-страница общается с ядром только по HTTP JSON API, которое идентично CLI-запросам. В v2 эта же страница открывается в окне Tauri 2, где вместо `fetch` на `127.0.0.1` вызываются команды Tauri над тем же ядром. Ни один экран не переписывается. Проверка требования: в v1 в `web/` нет кода, который знает про порт или про браузер, кроме одного файла-адаптера `api.ts`.
+
+**Удаление.** v1 не удаляет. v2: `freespace rm <path>` с защитами (только внутри снимка, пересчёт перед удалением, dry-run по умолчанию, запрет на системные каталоги).
+
+**Задержки (цель до бенчмарка, фиксируются после).** `ls`, `top`, `diff --depth 1` с `--limit ≤ 100` на снимке 7M записей: ≤ 300 мс warm (`diff --depth N>1 --kind any` меряется отдельно в бенчмарке, цели нет), ≤ 2 с cold на этой VM; `status` ≤ 50 мс; `find` с `--name` на всём снимке ≤ 3 с warm / ≤ 5 с cold, без `--name` — класс 300 мс. Числа из `docs/benchmarks.md` заменяют эти цели.
+
+**Усилие.** Human ~2.5 недели / CC ~1–1.5 дня [estimated]. После CEO review: −TUI (−2 д / −5 ч), −заглушки (−0.5 д), +diff (+1 д / +1 ч), +top flags (+0.5 д / +30 мин), +find с web-фильтром (+2 д / +2 ч, D15) ≈ human ~2.7 недели / CC ~1.25 дня [estimated].
+
+## Visual Sketch
+
+`docs/designs/free-space-disk-analyzer-sketch.png` (1280px). Один экран: хлебные крошки, пилюля со снимком («tass-vm · 02:00 · 7h ago · 6.99M entries»), предупреждение «disk 97%», кнопки «Refresh this folder» и «Top files», таблица детей с allocated/share/items/modified, правая панель с деталями выбранного (allocated vs apparent, hardlinks, errors, generation) и подсказка команды для агента. Футер с горячими клавишами, одинаковыми для web и (с v1.1) TUI.
+
+## Open Questions
+
+1. **Формат снимка.** SQLite по умолчанию или mmap/гибрид. Решает бенчмарк: задержка `ls`/`top` на 7M записей и время записи снимка.
+2. **Фронтенд страницы.** Решено (eng review D5): vanilla TypeScript, собирается `bun build` из `cli/build.rs`, бандл вшивается через `include_dir!` из `OUT_DIR`; `bun` — требование сборки (CI и раннеры cargo-dist ставят его через `oven-sh/setup-bun`).
+3. **Число воркеров на «вращающемся» виртуальном диске.** Codex предлагает `--workers 2`; бенчмарк 1 vs 8 потоков даст ответ.
+4. **Группа доступа к снимку.** Решено: группа `freespace` (создаётся `install-timer`, пользователь добавляется в неё); `adm` отклонена, чтобы не раздавать инвентарь всем, кто читает логи.
+5. **Скорость `refresh <path>`** при схеме «скопировать старый файл, заменить поддерево одной транзакцией, обновить агрегаты предков, rename». Проверить на поддереве в 2M записей (шаг 3 бенчмарка); шаг 8 условен: если копирование снимка в 0.5 GB на этом диске дольше 60 с, `refresh` уходит в v1.1 и там рассматривается запись в тот же файл (это нарушит инвариант `immutable=1`, поэтому только как отдельное решение).
+
+## Success Criteria
+
+- `freespace gui` на этой VM показывает корень снимка быстрее, чем пользователь успевает перевести взгляд (целевая цифра фиксируется после бенчмарка, проверяется `freespace status --json` с замером).
+- Скан при свободных 14 GB не падает и не добивает диск: при нехватке места старый снимок цел, ошибка видна в `status.last_error` (из `state.json`).
+- Полный скан `/` по таймеру укладывается в ночь и не мешает работе днём (peak RSS измерен и записан).
+- Агент по SKILL.md без подсказок отвечает на «что занимает место в /home» одной командой и получает пути, пригодные для `rm`.
+- Тот же вопрос через `ssh` на вторую машину работает без изменений skill.
+- `freespace diff / --json` после двух ночных сканов показывает топ прироста; разница между суммой `delta` по прямым детям корня и разницей `fs_used` между генерациями записывается в `docs/benchmarks.md` как измеренная погрешность (ожидание ≤ 5% при `errors = 0`, без `refresh` между сканами); это калибровка, не gate.
+- Синтетический тест на двух снимках: после `refresh` `diff` отдаёт `partial: true`; смена корней даёт `roots_changed: true`; исчезнувший каталог попадает в `--limit` по `|delta|`; коды 4/5/6/7 воспроизводятся подменой файлов.
+- Без `snapshot.prev.db` `diff` завершается с exit 3 и `error: no previous generation`; `status` показывает `prev_generation: null`.
+- Precheck: на диске с `free < 3×size(current)+512MB` скан не пишет tmp-файл и оставляет оба снимка; с `keep_previous = false` порог 2×.
+- Другой локальный пользователь не читает инвентарь через `serve` (остаточный риск с доступом к памяти/`/proc` задокументирован выше и принят для single-user хостов).
+- `freespace top / --older-than 180d --json` возвращает только записи с `mtime` старше порога.
+- Страница в `web/` не содержит знаний о транспорте вне одного адаптера.
+
+## Distribution Plan
+
+- GitHub Releases через cargo-dist: статический musl-бинарник для Linux x86_64/aarch64, позже macOS и Windows.
+- `curl | sh` установщик или ручной `install-timer`.
+- README с двумя скриншотами в v1: GUI и JSON для агента (TUI добавится в v1.1). Skill публикуется в том же репозитории.
+- Termux: сборка под aarch64-linux-android в v2.
+
+## Next Steps
+
+1. **Бенчмарк на этой VM** (до единой строки сканера): поставить gdu, duc, ncdu; замерить `du`, `gdu`, `duc index` cold/warm, 1 vs 8 потоков, peak RSS (`/usr/bin/time -v`). Записать таблицу в `docs/benchmarks.md`.
+2. Прототип сканера в `core/` на jwalk с контрактом учёта; сравнить с цифрами из п.1.
+3. Запись снимка SQLite одной транзакцией; замерить `ls`/`top`; при провале — mmap.
+4. `cli/` с `status`, `ls`, `top` (включая `--older-than`/`--sort mtime`) и `--json`; SKILL.md; проверить агентом.
+5. systemd timer + `install-timer`, `config.toml`, lock-файл, `state.json`, права `0640`; хранение `snapshot.prev.db` и precheck 3×.
+6. `diff` поверх двух генераций; тест на синтетических снапшотах; обновить SKILL.md (порядок diff → top --older-than → ls).
+7. `web/` страница по наброску (колонки Δ и modified); маршруты `/api/*`; общий список запросов в `core`.
+8. `refresh <path>` (условно, см. Open Question 5).
+9. v1.1: `tui/` на ratatui над тем же query-слоем.
+10. v2: launchd/Task Scheduler/Termux, `--host`/`hosts.toml`, alerts, `rm` с защитами, обёртка Tauri.
+
+## What I noticed about how you think
+
+Ты не принимаешь посылки на веру: на «БД плохо, файл хорошо» ответил «ты уверен?», и посылка стала точнее («не писать в БД во время скана», формат открыт). Когда вариант показался урезанным, потребовал честное сравнение с деталями, а не вердикт. Ты думаешь от собственного сценария (все машины, телефон через Termux, один skill), и это дало продукту позвоночник, которого не было в исходном запросе. Слабое место той же привычки: заложить крючки на будущее легко превратить в «делаем всё сразу». Четыре крючка в v1 — потолок, остальное режем. *(CEO review подтвердил: заглушки планировщика и TUI вырезаны из v1, добавлены только diff и stale-фильтр, оба без изменения схемы.)*
+
+## Assignment
+
+Сегодня или завтра, до написания сканера: поставить gdu и duc, прогнать бенчмарк из шага 1 на `/` этой VM (cold после `echo 3 > /proc/sys/vm/drop_caches`, warm сразу после), записать время и peak RSS в таблицу. Эта таблица решает открытый вопрос 3 и даёт входные числа для вопроса 1 (его закрывает шаг 3 Next Steps).
+
+<!-- gstack:office-hours:concerns:start -->
+## Reviewer Concerns (office-hours, до CEO review)
+
+*Блок ниже зафиксирован спец-ревью office-hours до решений D3–D10. Пункты R3-3 (число крейтов), R3-6 (TUI/заглушки/`--apparent-only`), R3-7 (путь наброска), R3-8 (precheck 2×) и R3-4 (hardlinks) закрыты правками CEO review выше; R3-10 (остаточный риск `serve`) принят и отражён в Success Criteria.*
+
+Disposition: COMPLETED
+
+Stop: PASS
+
+No blocking findings remain. The 10 open minor finding(s) below are recorded for the user, not fixed.
+
+### R3-1 — consistency (minor)
+
+**Problem**
+
+> Persisting R2-3: snapshot group is stated as decided (0640 root:freespace) in the Codex table, Snapshot section and serve section, while Open Question 4 says freespace vs adm is undecided; permission scheme on macOS/Windows is not mapped.
+
+**Remedy**
+
+> Pick one group for v1 or mark the table entry as provisional, and note other OS permission schemes are v2.
+
+### R3-2 — consistency (minor)
+
+**Problem**
+
+> Persisting R2-4: the Assignment says the gdu/duc benchmark table decides open questions 1 and 3, but question 1 (snapshot format) depends on SQLite/mmap write time and ls/top latency measured only in Next Step 3.
+
+**Remedy**
+
+> State the benchmark decides question 3 and the scan baseline, and question 1 is decided by the step 3 prototype.
+
+### R3-3 — consistency (minor)
+
+**Problem**
+
+> Persisting R2-5: 'Rust workspace, четыре крейта и одна веб-страница' does not match the layout (core, cli, tui are three crates; web and skill are not crates).
+
+**Remedy**
+
+> Fix the count or label web/ and skill/ as non-crate directories.
+
+### R3-4 — clarity (minor)
+
+**Problem**
+
+> Persisting R2-6: hardlinks are counted once by (dev, ino) but the design does not say to which path the size is attributed, so totals may be nondeterministic under parallel traversal.
+
+**Remedy**
+
+> Define a deterministic attribution rule (e.g. lexicographically first path) and how nlink>1 is flagged in directory totals.
+
+### R3-5 — clarity (minor)
+
+**Problem**
+
+> Persisting R2-7: Rust is justified by 'кроссплатформа, Tauri, память' without evidence and the effort estimate (2.5 weeks / 1-1.5 days CC) is unsupported.
+
+**Remedy**
+
+> Soften the rationale to Tauri path and single-language core, mark memory as to-be-measured, label the estimate a rough guess.
+
+### R3-6 — scope (minor)
+
+**Problem**
+
+> Persisting R2-8: v1 still includes four platform hooks (three platform traits, scheduler trait with three stubs, --apparent-only for Android) plus CLI, TUI and web, in tension with the author's own coaching note.
+
+**Remedy**
+
+> Keep only Linux-needed traits in v1 (or state interface-only) and consider shipping TUI after CLI/web.
+
+### R3-7 — clarity (minor)
+
+**Problem**
+
+> Persisting R2-9: Visual Sketch references the ephemeral path /tmp/gstack-sketch.g5jflb/sketch.png, and GUI speed and scan duration criteria have no placeholder numeric thresholds.
+
+**Remedy**
+
+> Copy the sketch into the project or embed a description, and add placeholder thresholds (e.g. ls p95 < 200 ms, scan < 2 h).
+
+### R3-8 — completeness (minor)
+
+**Problem**
+
+> Persisting R2-10: the free-space precheck is relative to the previous snapshot size, so it is undefined for the first scan and ignores snapshot growth; a low-space skip discards a completed in-memory scan.
+
+**Remedy**
+
+> Define the first-scan estimate (entries counted times bytes per entry) and use max(previous size, estimate); note skipped scans are visible in status.
+
+### R3-9 — completeness (minor)
+
+**Problem**
+
+> Token bootstrap is specified only for gui. For standalone `freespace serve` the user has no stated way to obtain the token, and the one-time bootstrap file has no expiry if the browser never makes an API request, leaving the token on disk (0600) indefinitely.
+
+**Remedy**
+
+> State how serve alone delivers the token (e.g. prints a bootstrap file path to stderr) and add a short TTL or cleanup of the bootstrap file on serve exit.
+
+### R3-10 — consistency (minor)
+
+**Problem**
+
+> Constraints and Success Criteria state unconditionally that another local user gets no data from serve, while the serve section now documents a residual risk and limits the guarantee to single-user hosts.
+
+**Remedy**
+
+> Qualify the Constraints and Success Criteria wording with the single-user-host scope.
+
+### Prior finding evidence
+
+**R2-3 → R3-1 (persisting)**
+
+> 0640 root:freespace still stated as decided while Open Question 4 leaves the group undecided.
+
+**R2-4 → R3-2 (persisting)**
+
+> Assignment still says the benchmark table decides open questions 1 and 3.
+
+**R2-5 → R3-3 (persisting)**
+
+> Recommended Approach still says four crates against a layout with three crates.
+
+**R2-6 → R3-4 (persisting)**
+
+> Accounting contract still has no hardlink attribution rule.
+
+**R2-7 → R3-5 (persisting)**
+
+> Rust rationale and Усилие estimate unchanged and unsupported.
+
+**R2-8 → R3-6 (persisting)**
+
+> Platform hooks section still keeps four hooks with stub schedulers in v1.
+
+**R2-9 → R3-7 (persisting)**
+
+> Visual Sketch still points to the /tmp path and success criteria lack numeric placeholders.
+
+**R2-10 → R3-8 (persisting)**
+
+> Precheck still defined only as 2x previous snapshot size plus 512 MB with no first-scan estimate.
+<!-- gstack:office-hours:concerns:end -->
+
+## Step 0G — Expansion scan (SELECTIVE EXPANSION)
+
+**HOLD results:** complexity (>8 files, >2 services): the plan is ~25–35 files across core/cli/web/skill plus a systemd unit; two deferrals (TUI, scheduler stubs) trim it to 2 crates (`core`, `cli`) plus `web/` and `skill/` in v1. Minimum changes: `--apparent-only` removed. Invariants held: accounting contract (both sizes always stored), snapshot written once + atomic rename, loopback-only server, Tauri path kept via single `api.ts`.
+
+**10x ambition:** the product is not "faster du". It is "any of my machines can answer 'what to delete' in one command, and the answer is already computed". The skill is the real interface; CLI JSON is the API; web/TUI are views.
+
+**Delight scan (≥5):**
+1. `freespace diff` — what grew since the previous snapshot, top N growers (the question behind every "disk is full again").
+2. `freespace explain <path>` — classify known caches (pip, uv, huggingface, cargo, npm, docker, snap, journal) and print the safe cleanup command per entry, so an agent can act, not just report.
+3. Threshold alert — scheduled scan checks free space, writes `status.alerts[]`, optional desktop notification; the agent sees it in `status --json`.
+4. Stale sort — `top --older-than 180d` / sort by mtime: big files nobody touched.
+5. Multi-host in the skill — `freespace --host <ssh-alias>` wrapper so one skill drives every machine (user's stated motivation).
+6. First line of `status` reads like a sentence: "14 G free · 121 G in .cache · +9 G since yesterday in Downloads".
+
+**Platform potential:** the snapshot + JSON contract is a substrate: diff, alerts, explain and multi-host all read the same table. None needs a schema change except diff (keep previous generation on disk).
+
+## Step 0I — Temporal interrogation (implementer's clock)
+
+| Hour | What the implementer hits | Answer in this plan | Effort (human / CC) |
+|---|---|---|---|
+| 1 (foundations) | Workspace layout, schema, what "allocated" means, where the snapshot lives | «Recommended Approach», «Снимок», «Accounting contract», «Конфиг» | 0.5 d / 20 min |
+| 2–3 (core logic) | Parallel scan → in-memory tree → DFS-preorder ids → one transaction; hardlink attribution ordering; precheck arithmetic | «Протокол публикации», hardlinks rule, precheck formula with first-scan fallback | 3 d / 3 h |
+| 4–5 (integration) | Two readers of one immutable file + `state.json`; `diff` ATTACH + `path_hash` join + collision check; HTTP routes mirror CLI; token bootstrap file | «Изменяемое состояние», «Diff между генерациями», «HTTP API», «Сервер для GUI» | 3 d / 3 h |
+| 6+ (polish/tests) | Synthetic two-snapshot fixtures for diff/partial/roots_changed; exit codes 1–8; ENOSPC injection; benchmark table in `docs/benchmarks.md` | Success Criteria (synthetic test line, precheck line), Next Steps 1 | 2 d / 2 h |
+
+**Feasibility blockers resolved now:** none open at scope level. `refresh` is conditional on the benchmark (Open Question 5) and is not a v1 gate; `diff --depth>1` latency is a benchmark measurement, not a target.
+
+**Pending design choices (not implementation planning, left to /plan-eng-review or the benchmark):** snapshot format fallback (SQLite vs mmap, Open Question 1), vanilla TS vs Svelte (Open Question 2), worker count (Open Question 3).
+
+**Sequence:** Next Steps 1→8 as listed; items 1–3 (benchmark, scanner, snapshot write) gate everything else.
+
+## CEO Review Sections (plan-ceo-review, 2026-10-22, strategy/spec depth: no code exists yet)
+
+Depth note: the repository has no code, so every registry row is a capability row; "owner must verify" marks what the implementer proves before the row becomes a method contract. Findings reference sections of this document, not source lines.
+
+### Section 1: Architecture Review
+
+**Dependency graph (v1 after D3/D4):**
+
+```
+            +-----------+        +-----------+        +-----------+
+            |  skill/   |        |   web/    |        | systemd   |
+            | SKILL.md  |        | page (TS) |        | timer     |
+            +-----+-----+        +-----+-----+        +-----+-----+
+                  | shells out         | fetch /api/*       | exec
+                  v                    v                    v
+            +-----------------------------------------------------+
+            |                     cli/ (clap)                     |
+            |  scan refresh status ls top diff gui serve          |
+            |  install-timer                                      |
+            +---------------------------+-------------------------+
+                                        | library calls
+                                        v
+            +-----------------------------------------------------+
+            |                     core/                           |
+            |  scanner(jwalk) -> tree -> writer(sqlite, 1 txn)    |
+            |  queries(ls/top/diff/status) <- reader(immutable)   |
+            |  publish(link/rename/fsync)  state.json  lock       |
+            |  platform traits: allocated_size, file_identity,    |
+            |  is_mount_boundary, Scheduler(systemd)              |
+            +---------------------------+-------------------------+
+                                        v
+            /var/lib/freespace/{snapshot.db, snapshot.prev.db, state.json, .lock}
+```
+
+Only `core` touches files; `cli` is argument parsing plus JSON printing; `web` and `skill` are clients of `cli`. The Tauri path (v2) replaces the `fetch` arrow with Tauri commands calling the same `core` functions. **OK**: the single `api.ts` adapter rule in the plan is the only coupling point to keep honest.
+
+**Data flows (four paths each):**
+
+1. *Scheduled scan.* Happy: timer → `scan` → precheck → in-memory tree → tmp write → hardlink prev → rename → fsync → `state.json`. Nil (no `config.toml`): `scan` uses `/proc/mounts` roots and defaults, logs that no config was found. Empty (`roots = []`): usage error exit 2, `last_error` written, old snapshots untouched. Error (ENOSPC mid-write): tmp deleted, old snapshot intact, `last_error`, exit 1.
+2. *Query (`ls`/`top`/`diff`).* Happy: open `immutable=1` → indexed query → JSON. Nil (no snapshot): exit 8 with the `scan` hint. Empty (path exists in snapshot but has no children): `entries: []` with the parent's own totals. Error (prev rotated between opening files): exit 4, retry hint.
+3. *`gui`.* Happy: `serve` on random port → 0600 redirect file → `xdg-open` → page fetches `/api/status` with token. Nil (`$XDG_RUNTIME_DIR` unset): fall back to `$TMPDIR` private dir with `0700`, documented. Empty (no browser found by `xdg-open`): print URL to stderr, leave `serve` running. Error (port bind fails): retry 3 random ports, then exit 1.
+4. *`refresh <path>`.* Happy: lock → precheck N=2 → copy current to tmp → replace subtree → recompute ancestors → publish without rotating prev → `state.json.refreshed[]`. Nil (path not in snapshot): exit 2 with suggestion to `scan`. Empty (subtree now empty on disk): subtree replaced by the directory node alone, `items = 0`. Error (lock held): exit 6.
+
+**State machine: snapshot directory.**
+
+```
+  [NO_SNAPSHOT] --scan ok--> [CURRENT] --scan ok (keep_previous)--> [CURRENT+PREV]
+       ^                        |  ^                                   |   ^
+       |                        |  |                                   |   |
+   (never: scan failures   refresh|  |refresh                      refresh (prev stays)
+    leave state as is)          v  |                                   v   |
+                             [CURRENT] <--------- keep_previous=false ---+
+  Transient: [TMP_PRESENT] during write; cleaned under lock at next scan/refresh start.
+  Crash window between link and final rename: prev == current inode -> read as [CURRENT]
+  (diff reports no previous generation, exit 3); next scan repairs it.
+  Invalid: [PREV only] - impossible because prev is created by hardlinking an existing current.
+  Invalid: two writers - prevented by flock on .lock (exit 6 for the loser).
+```
+
+**Coupling.** New coupling introduced by accepted cherry-picks: `diff` couples the reader to two files (current, prev) and to `path_hash` stability across generations, which means the hashing function and path normalization are now part of the schema contract (`schema_version` bump if either changes). Justified: the alternative (recursive reconstruction) was rejected by the spec reviewer as infeasible at 7M rows. `top --older-than` adds no coupling (one index).
+
+**Scaling.** 10× (70M entries): in-memory tree ≈ 14 GB at 200 B/entry, exceeds this VM's RAM; the design has no streaming mode. Breaks first: RAM during scan. 100×: SQLite single file ~7 GB, `diff` join becomes minutes. **WARNING**, bounded: this is a personal-machine tool; the plan's own target is 7M. Recorded as a known ceiling in Section 10, no change requested.
+
+**Single points of failure.** The snapshot directory on the same 97%-full disk (mitigated by precheck and the configurable `snapshot_dir`); the systemd timer (mitigated by `Persistent=true`); the `.lock` file left behind by a crash (flock is released by the kernel on process death: **OK**).
+
+**Security architecture.** Endpoints: `/api/status`, `/api/ls`, `/api/top`, `/api/diff`, all GET, all read-only, all require `X-Freespace-Token` + Origin check, bound to 127.0.0.1. Caller: the browser tab that received the one-time redirect. They get: the full path inventory of the machine. They can change: nothing (no mutating endpoint in v1). CLI commands run as the invoking user; `scan`/`refresh`/`install-timer` require root and write only under `snapshot_dir`, `/etc/freespace`, and the systemd unit directory.
+
+**Production failure scenarios.** (a) Timer fires while the user runs `refresh`: loser exits 6, timer unit shows failed, `Persistent=true` does not re-run until next schedule → a night without a fresh snapshot, visible as `age_seconds` in `status`. Handled, but see Section 8 for making it visible. (b) Disk fills between precheck and write: ENOSPC path handles it. (c) Snapshot directory on a different filesystem that is unmounted: `scan` fails at tmp creation, exit 1, `last_error` cannot be written either → only stderr/journal shows it. **WARNING**: `status` must then say `state.json unreadable` rather than `null` silently. Resolved under existing row EXP-1 mechanics (factual completion, no new behavior): `status` prints `state_error` when `state.json` is unreadable.
+
+**Rollback posture.** Uninstall = `systemctl disable --now freespace.timer`, remove the binary; snapshots are inert files. Time: under a minute. A new binary refusing an old snapshot (exit 5) is rolled back by rerunning `scan`.
+
+**Value test (artifacts about the work).** `docs/benchmarks.md`: consumed by Open Questions 1, 3 and 5 and by the latency targets; smallest version is one table; retires when the numbers are folded into README. `state.json`, `status`: product observability, not process artifacts.
+
+**Elegant to a new engineer.** One sentence explains it: "a scan writes an immutable file; everything else reads it". The three accepted cherry-picks keep that sentence true. **Platform infrastructure.** The `path_hash`-keyed immutable snapshot plus `state.json` is what later alerts (EXP-3), multi-host (EXP-5) and Tauri (v2) read; none needs a schema change.
+
+**Cherry-pick fit (SELECTIVE EXPANSION).** `diff`: clean, but it raises the disk footprint on the very disk that is full; the `keep_previous` escape covers it. `top --older-than`: clean. No revisit needed.
+
+**Decision gate.** Analyze: claims checked against the ledger; the only correction is the `state_error` visibility above, which completes an accepted mechanism (EXP-1) rather than adding behavior. Resolve: no new choice. Apply: plan text already consistent after the three spec rounds; the `state_error` field is added to the CLI contract line in this section's task T2.
+
+Findings: 2 WARNING (scaling ceiling, state.json unreadable visibility), 0 CRITICAL GAP.
+
+### Section 2: Error & Rescue Map
+
+Capability rows (strategy depth). Exception classes are the Rust error enum variants the implementer must create; the owner for every "verify" is the implementer of `core`.
+
+```
+  CAPABILITY / CODEPATH      | WHAT CAN GO WRONG                     | ERROR VARIANT
+  ---------------------------|---------------------------------------|------------------
+  core::scan                 | EACCES on a directory                 | Walk::Denied (counted)
+                             | ELOOP / symlink cycle                 | Walk::Symlink (not followed)
+                             | too many open fds (jwalk parallel)    | Walk::Io(EMFILE)
+                             | OOM building the tree                 | Alloc failure (abort)
+                             | roots empty / config unparsable       | Config::Invalid
+  core::precheck             | statvfs fails on snapshot_dir         | Space::Statvfs
+                             | not enough space                      | Space::Insufficient
+  core::write                | ENOSPC mid-transaction                | Write::Enospc
+                             | SQLite busy/locked (should not occur) | Write::Sqlite
+  core::publish              | link() fails (cross-device, EEXIST)   | Publish::Link
+                             | rename() fails                        | Publish::Rename
+                             | fsync dir fails                       | Publish::Fsync
+  core::state                | state.json unreadable / corrupt       | State::Unreadable
+  core::lock                 | lock held                             | Lock::Busy
+  core::reader               | snapshot missing                      | Read::NoSnapshot
+                             | schema_version mismatch               | Read::Schema
+                             | prev.generation >= current.generation | Read::NoPrev / Read::Rotated
+                             | path_hash collision in top-N          | Read::HashCollision
+  core::queries::older_than  | unparsable duration / on a directory  | Args::Usage
+  cli::gui                   | XDG_RUNTIME_DIR missing               | Gui::NoRuntimeDir
+                             | xdg-open missing / fails              | Gui::NoBrowser
+                             | port bind fails                       | Serve::Bind
+  cli::serve                 | bad/missing token or Origin           | Http::Forbidden (403)
+                             | unknown route / bad params            | Http::NotFound / 400
+  cli::install-timer         | not root; systemd absent; unit exists | Install::NotRoot / NoSystemd / Exists
+  cli::refresh               | path not in snapshot                  | Args::Usage
+  ---------------------------|---------------------------------------|------------------
+
+  ERROR VARIANT         | RESCUED? | RESCUE ACTION                                   | USER SEES
+  ----------------------|----------|-------------------------------------------------|---------------------------
+  Walk::Denied          | Y        | count in `errors`, continue                     | errors>0 on the subtree
+  Walk::Symlink         | Y        | record as kind=symlink, size of the link itself | symlink row, not followed
+  Walk::Io(EMFILE)      | N ← GAP  | —                                               | scan aborts, exit 1
+  Alloc failure         | N        | cannot rescue; benchmark bounds RSS             | abort; journal shows OOM
+  Config::Invalid       | Y        | exit 2, last_error                              | message names the key
+  Space::Insufficient   | Y        | skip write, last_error, exit 1                  | status.last_error
+  Write::Enospc         | Y        | delete tmp, last_error, exit 1                  | status.last_error
+  Publish::Link/Rename  | Y        | abort publish, keep tmp for inspection, exit 1  | last_error names the step
+  State::Unreadable     | Y        | status.state_error, other fields from meta      | visible, not silent
+  Lock::Busy            | Y        | exit 6 immediately                              | "another scan is running"
+  Read::NoSnapshot      | Y        | exit 8 with the scan command                    | actionable hint
+  Read::Schema          | Y        | exit 5 "rescan"                                 | actionable hint
+  Read::NoPrev/Rotated  | Y        | exit 3 / exit 4 "retry"                         | actionable hint
+  Read::HashCollision   | Y        | exit 7, names both paths                        | rare, loud
+  Args::Usage           | Y        | exit 2, clap message                            | usage text
+  Gui::NoRuntimeDir     | Y        | private 0700 dir under $TMPDIR                  | transparent
+  Gui::NoBrowser        | Y        | print URL + token file path to stderr           | manual open
+  Serve::Bind           | Y        | retry 3 random ports then exit 1                | transparent / error
+  Http::Forbidden       | Y        | 403, no body details                            | page shows "session expired, rerun gui"
+  Install::*            | Y        | exit 1 with the exact fix                       | actionable
+```
+
+**GAP (EMFILE):** jwalk with 8 workers on a directory with very wide fan-out can exceed the soft fd limit. Rescue: raise `RLIMIT_NOFILE` soft limit to the hard limit at `scan` start and cap parallel open directories; user sees nothing. This is an implementation safeguard within ARCH-1 "parallel scan", not new behavior; recorded as task T3.
+
+Rules check: no catch-all; every rescue either degrades with a visible message or re-raises with context; logging requirement (what/args) lands in Section 8. No LLM calls in this plan.
+
+**Decision gate.** No new choice; one GAP converted to a task under ARCH-1. Findings: 21 error paths mapped, 1 GAP (rescued by T3), 1 unrescuable (OOM, bounded by benchmark).
+
+### Section 3: Security & Threat Model
+
+| # | Threat | Likelihood | Impact | Mitigated by plan? |
+|---|---|---|---|---|
+| 1 | Another local user reads the full path inventory via `snapshot.db` | Low (single-user hosts) | High | Yes: `0640 root:freespace`, group membership on install |
+| 2 | Another local user reads it via `serve` | Low | High | Partially: loopback + token + Origin; residual `/proc`/memory access accepted (R3-10), Unix socket noted as v2 |
+| 3 | A web page in the user's browser calls `/api/*` (CSRF-style) | Med | High | Yes: token header required, Origin checked; **add** `Content-Security-Policy: default-src 'self'` and `Referrer-Policy: no-referrer` on the static page so the `#t=` fragment never leaks via referrer (completion of the accepted serve-security approach) |
+| 4 | Token leaks through argv / shell history | Med | High | Yes: 0600 redirect file, never in argv; TTL 60 s |
+| 5 | `scan` as root follows a symlink into something huge or loops | Med | Med | Now explicit: symlinks are recorded, never followed (Section 2) |
+| 6 | Path traversal in `/api/ls?path=../..` | Med | Low | Queries hit the snapshot table only; any path not in the snapshot returns 404. No filesystem access from `serve`. Must be stated in the implementation: `serve` never touches the FS except the embedded assets |
+| 7 | Input validation on query params (`limit`, `depth`, `older_than`, `sort`) | High | Low | Shared parsing with clap types: integers bounded (limit ≤ 10 000, depth ≤ 32), enums for sort/kind, duration grammar; invalid → 400 with the field name |
+| 8 | `refresh <path>` as root with an attacker-chosen path | Low | Low | Read-only traversal; path must exist in the snapshot; no deletion exists in v1 |
+| 9 | Supply chain: rusqlite (bundled SQLite), jwalk, clap, xxhash-rust, axum (tokio/hyper; decided eng review D6) | Med | Med | Pin versions, `cargo audit` in CI, `cargo-dist` builds from a tagged commit; HTTP server = axum (eng review D6) |
+| 10 | Data classification: full file paths may contain personal names, project names; no secrets by design, but paths can leak secrets' existence | — | Med | Snapshot never leaves the machine; multi-host (`--host`) deferred; SKILL.md must tell the agent not to paste full inventories into third-party tools |
+| 11 | Audit trail for root operations | — | Low | `scan`/`refresh`/`install-timer` log to journald with user, args and outcome (Section 8) |
+| 12 | Prompt injection via file names shown to an agent | Low | Med | JSON escapes names; SKILL.md states that names are data, not instructions |
+
+No SQL injection: all queries parameterized through rusqlite. No command injection: `xdg-open` receives a fixed file path; `notify-send` is deferred.
+
+**Decision gate.** Resolve: CSP/Referrer headers and the "serve never touches the FS" rule complete the accepted serve-security approach (spec review rounds in office-hours) and need no new menu; they become task T4. The HTTP server crate is a pending implementation choice, owner /plan-eng-review. Findings: 12 threats, 0 High-likelihood unmitigated, 3 completions turned into tasks (T4, SKILL.md data-not-instructions note T9).
+
+### Section 4: Data Flow & Interaction Edge Cases
+
+**Scan → snapshot (the only writing flow):**
+
+```
+ INPUT(roots,config) -> VALIDATE(roots exist, fs ok) -> TRANSFORM(walk, tree, hardlink attr, preorder ids)
+      |                       |                                 |
+      | nil: no config        | invalid: exit 2                 | OOM: abort (journal)
+      | -> /proc/mounts       | empty roots: exit 2             | EMFILE: T3 safeguard
+      v                       v                                 v
+   -> PERSIST(precheck, tmp write, link, rename, fsync, state.json) -> OUTPUT(exit 0, stderr summary)
+                    |                      |                |
+                    | ENOSPC: tmp removed  | lock: exit 6   | crash after link: prev==current (self-healing)
+                    | stale tmp: cleaned   | encoding: names stored as bytes (OsStr), JSON uses lossy UTF-8 + `name_raw` hex when invalid
+```
+
+Tested? Precheck/ENOSPC/lock/crash-window each get a fixture test (Section 6). Non-UTF-8 names: **WARNING** not mentioned anywhere in the plan; the JSON contract must say what happens. Resolution: a factual completion of the JSON contract (ARCH-1 "every JSON response") → `name` is lossy UTF-8 and `name_raw` (hex) is present only when lossy; task T5.
+
+**Async ordering — invariant:** "a reader never observes a half-written snapshot, and `diff` never pairs two files from the same generation as prev/current." Boundary: from a reader's `open()` of `snapshot.db` to its last `read()`; writer's steps 1–3.
+
+```
+ time | writer (scan)                 | reader A (ls)        | reader B (diff)              | shared state
+ -----|-------------------------------|----------------------|------------------------------|-----------------------------
+  t0  | write tmp (gen 42)            | open snapshot.db(41) |                              | cur=41 prev=40
+  t1  | link cur -> prev.tmp          | read ... (inode 41)  | open prev.db (40)            | cur=41 prev=40 prev.tmp=41
+  t2  | rename prev.tmp -> prev.db    |                      |                              | cur=41 prev=41
+  t3  |                               |                      | open snapshot.db (41)        | B holds prev=41 cur=41
+  t4  | rename tmp -> snapshot.db     | still inode 41       |                              | cur=42 prev=41
+  t5  |                               | finishes (41) OK     | checks gen: 41 !< 41 -> exit 3 (NoPrev) ✓ not a wrong diff
+ Order 2: B opens snapshot.db at t5 (42) and prev.db at t1 (40): 40 < 42 passes the check but prev is two generations back.
+          -> B must open current FIRST, then prev, and require prev.generation == current.generation - 1 … generation
+             is a counter incremented by scan AND refresh, so instead: require prev.scanned_at < current.scanned_at and
+             prev.generation == meta.prev_generation stored in current's meta at publish time.
+```
+
+**CRITICAL finding resolved in place:** the plan's check `prev.generation < current.generation` admits "prev is older than the real prev" (order 2). Fix: `scan` writes `prev_generation` into the new snapshot's `meta` before publishing; `diff` opens current first, then prev, and requires `prev.generation == current.meta.prev_generation` (exit 4 otherwise). This is a correction of an accepted mechanism's contract (EXP-1), not a behavior change; applied to the plan text (Protocol paragraph) and the CEO summary. Regression proof: a test with controlled pause points between opening current and prev while a publish runs (T6).
+
+Second pair: `refresh` vs scheduled `scan` share `state.json` and the lock; both take the lock before reading `state.json`, so no interleaving → mechanism named (flock).
+
+**Interaction edge cases (web page):**
+
+| INTERACTION | EDGE CASE | HANDLED? | HOW |
+|---|---|---|---|
+| Open page | token file already consumed (double-click on `gui`) | Y | second redirect gets 403 → page shows "session expired, run `freespace gui` again" |
+| Navigate into dir | 7M-entry parent with 200k children | Y | `limit` default 200, "… N more" row, server-side sort |
+| Toggle Δ column | no prev generation | Y | column shows "no previous snapshot" state, not zeros |
+| Refresh button | user is not root | Y (by design) | shows the sudo command, copies it |
+| Page left open overnight | snapshot rotated under it | Y | every response carries `generation`; page shows "snapshot updated, reload" banner when it changes; `serve` re-opens the new inode per request (OV-6), so the old file's space is freed within seconds |
+| Sort by modified | entries with `mtime = 0` / future | Partial | render "unknown"/"future"; **gap** closed by T5 (contract note) |
+| Browser back/forward | state in URL hash conflicts with token in hash | **GAP** | token in `#t=` and path state cannot share the fragment naively; fix: page moves token to memory, then rewrites the hash to `#/path` once (T7) |
+
+**Decision gate.** Two corrections of accepted contracts applied (prev_generation in meta; hash handling), no new choice. Findings: 6 shadow paths mapped, 1 ordering defect fixed, 1 UI gap (T7).
+
+### Section 5: Code Quality Review
+
+Greenfield; the review targets the plan's structure.
+
+* **Organization.** Workspace of two crates is right-sized; `web/` as a plain directory embedded by `include_dir`. Keep query functions in `core::queries` returning typed structs; `cli` serializes with serde; `serve` reuses the same structs. **OK**.
+* **Duplication risk.** The CLI contract and the HTTP routes share parameters; the plan already demands one function per query. The risk is two parsers (clap vs query-string). Fix: one `QueryParams` struct with `FromStr`/clap derive used by both (T8). Not an abstraction for a future problem; it is the same problem twice today.
+* **Naming.** `allocated`/`apparent` (not `size`/`disk`), `generation` (not `version`), `snapshot.prev.db`. **OK**. `install-timer` is Linux-specific naming for a cross-platform trait; acceptable in v1 since only systemd exists; the trait is `Scheduler`.
+* **Error handling patterns.** One `enum Error` per module with `thiserror`; exit-code mapping in one `cli::exit_code()` function so the documented codes 1–8 live in one place. **OK**.
+* **Missing edge cases.** Non-UTF-8 names (Section 4), `mtime` outside i64 seconds range, `nlink` overflow: all representable as i64 in SQLite; note in T5.
+* **Over-engineering watch.** Three platform traits with one implementation each in v1. Justified by the approved cross-platform invariant (ARCH-1), but keep them as plain functions behind `cfg(target_os)` until a second implementation exists, not trait objects. Recorded as guidance, no decision.
+* **Under-engineering watch.** `refresh` copying a 0.5 GB file is the fragile path; it is explicitly conditional (Open Question 5). **OK** as planned.
+* **Complexity.** The publish protocol function will branch on keep_previous, first-scan, crash-window repair: ~6 branches. Split into `precheck()`, `rotate_prev()`, `publish_current()`; each testable alone (T8 note).
+
+**Decision gate.** No new choice. Findings: 2 (shared params struct; publish split), both tasks.
+
+### Section 6: Test Review
+
+Diagram of everything new (with test type):
+
+```
+ scan ──► tree ──► write ──► publish ──► state.json       [unit: tree/attr; integration: tmp dir fixture]
+   │                 │          │
+   │ hardlinks       │ ENOSPC   │ crash window (kill between link and rename)   [integration, fault injection]
+   ▼                 ▼          ▼
+ queries: ls / top(--older-than,--sort) / diff / status   [unit on a 3-generation synthetic snapshot]
+ serve: routes, token, Origin, CSP, 404 on unknown path   [integration: in-process server + reqwest]
+ gui: redirect file 0600, TTL, consumed-once              [integration, tmp runtime dir]
+ install-timer: idempotent, config.toml written, not-root [system: container with systemd, or mocked paths]
+ skill: SKILL.md examples executed verbatim               [E2E: run each documented command, compare JSON schema]
+ benchmark: docs/benchmarks.md numbers                    [manual, recorded]
+```
+
+Assertion check (requirement → assertion → rejects → no_claim):
+
+1. *Snapshot written once, readers never see partial* → after a publish under concurrent readers, every reader's `PRAGMA integrity_check` is `ok` and `generation` is one of {old, new}; rejects a torn read; `no_claim=durability across power loss (fsync observed by call, not by pulling power)`.
+2. *Precheck keeps the old snapshot on a full disk* → with a tmpfs of size `2×current`, `scan` exits 1, both files unchanged byte-for-byte, `state.json.last_error.op == "precheck"`; rejects a scan that deletes prev to make room; `no_claim=none beyond protects`.
+3. *`diff` pairs the right generations* → with controlled pauses (T6), `diff` either returns deltas for (41→42) or exit 4, never deltas for (40→42); rejects the order-2 defect from Section 4; `no_claim=behavior on NFS or non-POSIX rename (local ext4 fixture only)`.
+4. *Hardlinks counted once, deterministically* → two scans of the same tree give identical `allocated` per path regardless of worker count 1 vs 8; rejects nondeterministic attribution; `no_claim=none beyond protects`.
+5. *`top --older-than 180d` returns only files with mtime older* → exact set equality against a fixture with mtimes at 179, 180, 181 days; rejects off-by-one and directory rows; `no_claim=timezone/DST effects (fixture uses UTC epoch seconds)`.
+6. *`refresh` does not rotate prev* → after scan(41), scan(42), refresh(43): prev.generation == 41... correction: prev == 41's successor? Sequence gives prev=41, current=43, `diff.partial == true`; rejects a refresh that rotates; `no_claim=none beyond protects`.
+7. *serve rejects foreign origin and missing token* → 403 for both; 200 with correct header; static page served without token; rejects an open API; `no_claim=browser-side enforcement (tested with raw HTTP, not a browser)`.
+8. *Agent can answer "what takes space in /home" from SKILL.md alone* → E2E runs the three documented commands and validates against a JSON schema; rejects a drifted contract; `no_claim=agent reasoning quality (checks the contract, not the agent)`.
+9. *Exit codes 1–8* → table-driven test mapping each error variant to its code; rejects a collapsed "always 1"; `no_claim=none beyond protects`.
+
+Ambition checks: *2 a.m. Friday test* = #1 + #2 together on a tmpfs sized to fail precheck; *hostile QA* = a directory named `..\n` with a 300-byte non-UTF-8 name, a 2M-hardlink farm, and `kill -9` at every publish step; *chaos* = fill the disk during the write with `fallocate` in parallel.
+
+Pyramid: many unit (queries, parsing, attribution), fewer integration (publish, serve), two E2E (skill, gui bootstrap). Flakiness: #3 and the crash-window test depend on timing → use explicit pause points, not sleeps; the benchmark is manual by design. Load test: scan of a synthetic 7M-entry tree (generated once, cached) measures RSS and time; part of the benchmark step.
+
+No LLM/prompt patterns in CLAUDE.md (none exists).
+
+**Decision gate.** Coverage above is determined by accepted requirements; no unresolved test-method choice. Findings: 9 assertions, 0 gaps needing a decision; tests become T10.
+
+### Section 7: Performance Review
+
+* **N+1.** `ls` is one query by `parent_id`; `top` one indexed range (`id BETWEEN` + `mtime`/`allocated` order); `diff` one join on `path_hash`. Ancestor aggregates are stored, not recomputed. **OK**.
+* **Memory.** Scan tree: 7M entries × (name ~24 B interned + 8 fields × 8 B ≈ 90 B) ≈ 0.6–1.0 GB; jwalk's own buffers add; target ≤ 3 GB peak on 15 GB RAM [estimated, benchmark owner]. The sort for preorder ids is in memory (one Vec). **WARNING**: `diff` with `--kind any --depth 32` materializes a large join; bounded by `limit` only after the sort → SQLite may spill; mitigated by `temp_store` directory choice and the depth-1 default. Documented, measured in the benchmark.
+* **Indexes.** `parent_id`, `allocated`, `mtime`, `path_hash`, `(dev, ino)` on `hardlinks`. Missing: a composite `(parent_id, allocated DESC)` so `ls --sort allocated --limit 30` on a 200k-child directory does not sort 200k rows. Add (T11, within accepted schema).
+* **Caching.** Nothing to cache beyond the snapshot itself; `status` reads `meta` + `state.json` (tiny).
+* **Background job sizing.** Nightly scan: worst case 7M stats on a rotational virtual disk; the plan's own premise is that cold `du` takes minutes; expected 5–20 min [estimated]; retry: none (next night), visible via `age_seconds`.
+* **Slow paths (p99 estimates, to be replaced by the benchmark):** 1) full scan cold: minutes; 2) `refresh` of a 2M subtree: copy 0.5 GB + rescan: tens of seconds; 3) `diff --depth>1 --kind any`: seconds. Everything the user touches interactively (`ls`, `top`, `diff --depth 1`) has a ≤ 300 ms target.
+* **Connection pressure.** One SQLite connection per CLI invocation; `serve` uses a small pool (4) of read-only connections keyed by the `snapshot.db` inode: every request stats the file first, a changed inode drops the pool, and idle connections close after 5 s, so an unlinked generation is retained for at most one in-flight request (seconds), never for the server's lifetime (OV-6). No network DB.
+
+**Decision gate.** No new choice; one index added as a task. Findings: 2 (composite index; diff spill warning).
+
+### Section 8: Observability & Debuggability Review
+
+* **Logging.** `scan`/`refresh`: structured lines (JSON when stderr is not a TTY) at start (roots, workers, config path), per-root completion (entries, errors, seconds), precheck result (need/free), publish steps, end (generation, duration, peak RSS from `/proc/self/status`). Under the timer this lands in journald. `serve`: one line per request with route, status, duration, never the token.
+* **Metrics that say it works/broke.** `status --json`: `age_seconds` (should be < 26 h), `last_error == null`, `entries` roughly stable, `fs[].free`. Broken = `age_seconds` growing or `last_error` set.
+* **Tracing.** Single process; `generation` is the correlation id across scan log, snapshot and `status`.
+* **Alerting.** Deferred by D8 (EXP-3). Until then, the systemd unit's failure is visible via `systemctl status freespace.timer` and `status.last_error`. **WARNING** recorded: no push signal exists in v1; accepted by D8.
+* **Dashboards.** None in v1; the web page header already shows snapshot age and disk fill (the plan's sketch).
+* **Debuggability.** Three weeks later: journald has every scan with generation and timings; `state.json` has the last error; the prev snapshot allows reproducing a `diff`. Sufficient.
+* **Admin tooling.** `freespace status`, `freespace install-timer --uninstall` (needs to exist: **gap**, T12 under ARCH-1 "one install command" which implies removal), `journalctl -u freespace`.
+* **Runbooks (one line each).** Snapshot stale: `systemctl list-timers`, `journalctl -u freespace -n 50`. Precheck failing: lower `keep_previous` or move `snapshot_dir`. Exit 5 after upgrade: `sudo freespace scan`. Lock stuck: it cannot be (flock), but `fuser snapshot_dir/.lock` confirms.
+* **Joy to operate (SELECTIVE EXPANSION).** `freespace status` first line as a sentence ("14 G free · snapshot 7 h old · +9 G since prev in Downloads"): zero cost, it is a formatter over fields already present (`diff --depth 1 --limit 1`). Included as a polish task (T13) under D6's accepted `diff` output; no new data.
+
+**Decision gate.** No new choice. Findings: 2 gaps (uninstall path; no push alert, accepted by D8).
+
+### Section 9: Deployment & Rollout Review
+
+* **Migrations.** No database to migrate: `schema_version` in `meta`; a newer binary refuses an older snapshot (exit 5) and the fix is a rescan. Backward-compatible by construction; zero downtime (file replacement is atomic).
+* **Feature flags.** `keep_previous` is the only switch; no flags for diff/top features (they are read-only queries).
+* **Rollout order.** Install binary → `install-timer` (writes config, unit, group, adds user to group) → first `scan` (manual, so the user sees timing) → `gui`. Group membership needs a re-login; `install-timer` must print that (T12).
+* **Rollback.** `systemctl disable --now freespace.timer && rm /usr/local/bin/freespace`; snapshots can stay or be deleted; `userdel`-free (group stays, harmless). Under a minute.
+* **Deploy-time risk window.** Old binary (timer) and new binary (user) coexisting: new reader + old snapshot → exit 5 until the next scan; old reader + new snapshot → also exit 5 by `schema_version` check. Acceptable for a personal tool; documented.
+* **Environment parity.** No staging; the VM is production. The synthetic 7M-entry fixture is the stand-in.
+* **Post-deploy checks.** First 5 min: `freespace status --json` exit 0, `gui` opens, `ls /` returns. First hour/night: timer fired (`list-timers`), `age_seconds` reset.
+* **Smoke tests.** `freespace --version`, `status`, `ls / --limit 1`, run by the installer at the end.
+* **Routine shipping (SELECTIVE EXPANSION).** cargo-dist + a tagged release gives a one-line installer; the accepted cherry-picks do not change the risk profile (no new daemon, no new files outside `snapshot_dir`); `diff` adds a second file to clean up on uninstall (T12).
+
+**Decision gate.** No new choice. Findings: 2 risks (re-login after group add; version skew), both documented with handling.
+
+### Section 10: Long-Term Trajectory Review
+
+* **Debt introduced.** Code: platform traits with one impl (kept as functions, Section 5). Operational: a nightly root job and a 0.5–1 GB of snapshots on a full disk. Testing: fault-injection harness for publish. Documentation: SKILL.md must stay in sync with the CLI contract (the E2E test enforces it).
+* **Path dependency.** `path_hash` and the preorder-id layout are now schema contracts; changing them costs a rescan (cheap) not a migration. The Tauri path depends on the `api.ts` isolation rule; nothing else constrains v2.
+* **Knowledge concentration.** The design doc plus `docs/benchmarks.md` explain every number; a new engineer needs the one-sentence model from Section 1.
+* **Reversibility: 4/5.** Everything is a file under one directory plus one unit; the only one-way element is the decision to store full paths of the machine in a root-owned file, which is the product.
+* **Ecosystem fit.** Standard Rust workspace, clap, serde, cargo-dist. No framework conventions to violate (empty repo).
+* **1-year question.** Yes: "scan writes a file, everything reads it" stays obvious.
+* **What comes after (SELECTIVE EXPANSION).** v1.1: TUI (D3). v2: `--host`/`hosts.toml` (D10), alerts (D8), Tauri window, Termux build, `rm` with safeguards, fanotify increments, Unix-socket API for multi-user hosts. The architecture supports each without schema change except fanotify (needs per-entry change tracking).
+* **Platform potential.** The immutable snapshot + JSON contract is the platform: every v2 item is a new reader.
+* **Retrospective on cherry-picks.** `diff` and `top --older-than` were the right picks: both are pure readers. Rejecting `explain` (D7) did not undermine them. Deferring `--host` (D10) leaves the "one skill for all machines" motivation on the manual `ssh` form; that form is documented, so nothing accepted depends on it. Deferring alerts (D8) removes the only push signal; `status` and journald cover the pull path. No rejected item turned out load-bearing.
+
+**Decision gate.** No new choice. Findings: reversibility 4/5, 4 debt items.
+
+### Section 11: Design & UX Review (UI scope present: embedded web page)
+
+* **Information architecture.** First: the header pill "snapshot: host · age · entries" and the disk-fill warning; second: the sorted table of children; third: the right panel for the selected row. The sketch already orders it this way. **OK**.
+* **Interaction state coverage map:**
+
+| FEATURE | LOADING | EMPTY | ERROR | SUCCESS | PARTIAL |
+|---|---|---|---|---|---|
+| Directory table | skeleton rows (≤ 300 ms, usually unseen) | "empty directory" row | banner with exit-code text from the API | table | "… N more" row when `limit` hit |
+| Δ since prev column | — | "no previous snapshot" | same banner | deltas, sign-colored | `partial` badge when a refresh happened after prev |
+| Modified sort | — | "unknown" for mtime 0 | — | sorted | — |
+| Refresh button | — | — | not root → shows command | copies command | — |
+| Session (token) | redirect page (one blink) | — | 403 → "session expired, run freespace gui" | page | generation changed → "reload" banner |
+| Find filter (D15) | spinner on the total row (name search may take seconds) | "no matches" row, total 0 | 400 → field name highlighted (bad glob/date) | total row "N files · X G" + table | "… N more" row when `limit` hit; total still covers all |
+
+* **User journey.** Opens `gui` → header shows host, snapshot age and the fill bar; one notice slot carries the most important condition (D5) → clicks the biggest row twice → sees `.cache/huggingface/hub 61 G` in the table and the inspector → copies the path or the CLI command, or presses `h` "Hide until next scan" after deleting by hand (D11). Top files | Folders with the "Untouched for N months" filter is the second path to the same answer (D17, D18). Storyboard and the twelve interaction states: design-review Pass 2–3 (D7–D12).
+* **AI slop risk.** The sketch is a dense data table with one accent, not a generic card grid. Keep the native-looking table; avoid gradients and hero copy. Component vocabulary and forbidden patterns are fixed in the Pass 5 token sheet → `web/DESIGN.md` (D15).
+* **DESIGN.md.** Written by T32 from the design-review token sheet (D15): IBM Plex Sans + Plex Mono bundled (D13), light theme only (D14, `color-scheme: light`), accent `#0a6b4f`, type scale 18/16/14/13, 4-px spacing steps, 4-px control radius, tabular numerals.
+* **Responsive intention.** Mobile is an explicit v2 target (Termux + phone browser); the single-column phone layout is specified in design-review Pass 6 and deferred to TODOS.md (D16). v1 rule: no breakage down to 360 px — sticky name column, horizontal scroll inside the table only, inspector becomes a bottom sheet under 700 px, 44-px targets.
+* **Accessibility basics.** Keyboard-first: ↑↓ → ← Enter Backspace Home End PgUp PgDn, `t d / h r ?`, Esc; shortcuts suppressed inside inputs; roving tabindex with `aria-selected` and `aria-sort`; landmarks; `role=alert|status` for notices; focus trap + restore for the sheet and help overlay; `prefers-reduced-motion`; every fg/bg pair in `tokens.css` ≥ 4.5:1, verified by a test (T32, T35). Full contract: design-review Pass 6.
+* **Inevitable UI.** The share bar in every row and the sentence-style status line (Section 8) make the screen read like the answer, not like a tool.
+* **30-minute touches.** `?` overlay listing keys and recent messages; remembering the last path and mode in the hash; `nlink > 1` link icon with the hardlink line in the inspector ("counted once, under <owner path>; rm here frees nothing"), using `hardlink_owner` from `/api/ls`. Copy path, Δ view and column behaviour moved to T27/T30/T35 (design review).
+
+```
+ [gui] -> (redirect, 0600 file) -> [Page: / root]
+            |403                      |  enter row (→)        back (←)
+            v                         v                        ^
+     [Session expired] ----- [Page: /path] <--------------------+
+                               |  t                 |  a               | Δ toggle
+                               v                    v                  v
+                          [Top files view]   [apparent column]   [Δ since prev column]
+                               ^ any state: generation changed -> [Reload banner]
+```
+
+Recommendation: consider running /plan-design-review before implementing `web/`; and `/design-review` on the live page after implementation.
+
+**Decision gate.** No new choice; polish items are within the accepted page scope. Findings: 5 states mapped, 1 responsive rule recorded.
+
+<!-- ceo-review:begin -->
+## CEO Review (plan-ceo-review, SELECTIVE EXPANSION)
+
+### Decision ledger
+
+| ID and owner | Contract and evidence | Current | Proposed | Status | Exact approval and scope |
+|---|---|---|---|---|---|
+| ARCH-1 (tass) | A′: Rust core + cli + embedded web + skill, SQLite snapshot; decision 1f13934d; section «Recommended Approach»; hook 3 = configurable paths/port → config.toml keys roots/snapshot_dir/workers/port/interval/at | A′ (tui/ moved to v1.1 by D3) | — | approved | office-hours D10 final answer + D11 Approve; scope: whole architecture incl. config file (hook 3) |
+| MODE-1 (tass) | Review mode; plan ~25–35 files (estimate), greenfield | SELECTIVE EXPANSION | — | approved | plan-ceo-review D2 answer A; scope: review posture only |
+| HOLD-1 (tass) | TUI crate in v1; CLI contract section; user request 3 UIs | in v1 | defer to v1.1 (TODOS.md) | approved | D3 answer A: TUI deferred to v1.1; scope: tui/ crate only; CLI+web+skill stay in v1 |
+| HOLD-2 (tass) | Scheduler stub backends launchd/TaskScheduler/Termux; section «Платформенные крючки» p.2; command install-timer | stubs in v1 | trait+systemd only; stubs to TODOS.md | approved | D4 answer A: stubs deferred; scope: stub files only; trait + systemd backend stay |
+| HOLD-3 (tass) | --apparent-only flag; CLI contract; accounting contract | in v1 | remove from v1 (TODOS.md) | approved | D5 answer A: flag removed from v1 CLI contract; scope: flag only; both sizes still stored |
+| EXP-1 (tass) | diff command + previous generation; new; sections «Diff между генерациями», «Место под снимок», «Протокол публикации», «state.json» | absent | add diff + snapshot.prev.db; precheck 3×prev | approved | D6 answer A: diff in v1; scope: diff command, keep one previous generation, precheck 3×prev+512MB. Mechanics fixed in spec review under the same decision (no new approval): keep_previous key, hardlink rotation + fsync, path_hash join with collision check, --depth/--kind defaults, web Δ column via /api/diff, state.json for mutable status, lock file, exit codes 2–7, deterministic hardlink attribution, roots table with statvfs |
+| EXP-2 (tass) | explain command + rules table; new | absent | add explain + rules | skipped | D7 answer C: skipped; cleanup knowledge stays in the skill prompt, tool stays a measurer |
+| EXP-3 (tass) | low-free alerts in status + notify after scheduled scan; new | absent | alerts[] + config key + notify-send | deferred | D8 answer B: deferred to TODOS.md; trigger: after a week of nightly scans |
+| EXP-4 (tass) | top --older-than / --sort mtime; new; section «Stale-фильтр» | absent | two flags on top; skill step | approved | D9 answer A: in v1; scope: top --older-than (Nd/Nw/Nmo, files only, mtime index) + --sort mtime|allocated|apparent shared by ls/top (same query function) + sortable modified column in web + SKILL.md step |
+| EXP-5 (tass) | --host ssh wrapper + status --hosts; new; motivation line 16 | local only | --host wrapper, --hosts fan-out | deferred | D10 answer B: deferred to TODOS.md; trigger: binary installed on 2+ hosts |
+| SPEC-1 (tass) | 0H spec review loop; 3 launches (6, 7, 6.5); cap reached | round-3 fixes applied, not re-reviewed | — | noted | spec not re-verified: 17 round-3 edits author-verified against plan text; 2 items left as documented risk |
+| DOCS-1 (tass) | 0H document approval; working plan + CEO summary | draft | approve | approved | D11 answer A: these document versions approved; implementation not approved |
+| OV-1 (codex gpt-6-astra) | refresh write path (ARCH-1 refresh; «Привилегии и запись refresh») | copy old file + replace subtree in place | stream re-emit in preorder with renumbering; cost = full write + subtree scan (Open Question 5 gate unchanged) | corrected | factual correction, no new behavior |
+| OV-2 (codex gpt-6-astra) | hardlink attribution during refresh (R3-4) | hardlinks table only for nlink>1; link appearing later inside subtree double-counted | inode absent from hardlinks → allocated=0 inside subtree; undercount until nightly scan, flagged partial | corrected | factual correction |
+| OV-3 (codex gpt-6-astra) | diff removed entries (EXP-1) | unobserved subtrees (readdir failed) reported as removed | flags.DENIED column; entries under denied dirs excluded, listed in unknown_subtrees[] | corrected | factual correction within EXP-1 mechanics |
+| OV-4 (codex gpt-6-astra) | precheck (R2-10) | free ≥ N×size(current)+512MB | size bound = max(size(current), 100B×entries_scanned); reserve-aware abort every 64 MB at free<512MB | corrected | factual correction |
+| OV-5 (codex gpt-6-astra) | partial rule (EXP-1) | partial = any dir scanned_at > prev.scanned_at (true after every full scan) | refreshes table in the immutable snapshot; partial = non-empty | corrected | factual correction |
+| OV-6 (codex gpt-6-astra) | serve reader lifetimes (serve security/perf) | pool of 4 connections, lifetime unspecified | pool keyed by inode, re-stat per request, idle close 5 s | corrected | factual correction |
+| OV-7 (codex gpt-6-astra) | JSON path contract (T5) | lossy name + name_raw per entry; no raw input | path_raw hex output + --path-raw/?path_raw= input on every path-taking command | corrected | factual correction |
+| OV-8 (codex gpt-6-astra) | v1 scope: web page in v1 (ARCH-1), refresh conditional (Open Q5) | web in v1 after benchmark step; refresh gated by Open Q5 | narrow v1 to full scan + read-only queries; web and refresh after measured prototype | kept | D12 answer A: Include; web stays in v1 behind the benchmark step, refresh stays gated by Open Question 5 |
+| EXP-6 (tass) | find/filter with aggregated size; new; user request after review close (2026-10-22 21:58) | absent (only `top --older-than Nd`, files, no name pattern, no totals) | `find [/path] --name GLOB --older-than DATE\|Nd --newer-than --min-size --kind` → matches + total allocated/apparent/count; `/api/find`; web filter box | approved | D15 answer A: Add CLI `find` + `/api/find` + web filter box; scope: name glob, date/duration bounds, min-size, kind, total over all matches; path-glob excluded from v1 |
+
+### Answered decisions
+
+D15 — EXP-6: добавить `find` (фильтр по имени/дате/размеру с итоговой суммой) в v1?
+Governing row: EXP-6 (tass). Fixed: ARCH-1, EXP-1 (diff), EXP-4 (top --older-than), OV-1…OV-8, D12. Answer: A (2026-10-22 22:05).
+Menu: A) Add: CLI `find` + `/api/find` + поле фильтра в web (recommended, 10/10); B) Add CLI + skill only, web-фильтр в v1.1 (7/10); C) Defer to TODOS.md; D) Skip.
+Recommendation: A because the snapshot already holds name, mtime, allocated and the id range per subtree, so the query is one indexed or sequential pass with no schema change; «сколько весят все daily*.mp4» is exactly the agent's and the page's job.
+
+## currentDecision (HOLD-1)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Defer) | B (Keep)
+--- | --- | --- | --- | ---
+TUI crate (`tui/` on ratatui) in v1 | user request "3 interfaces" (office-hours), ARCH-1 | in v1 | moved to v1.1 after CLI+web; TODOS.md entry | in v1
+CLI --json + SKILL.md | ARCH-1 | in v1 | unchanged | unchanged
+Web GUI (embedded page) | ARCH-1 | in v1 | unchanged | unchanged
+Shared query layer in core (same queries for all UIs) | ARCH-1 | in v1 | unchanged | unchanged
+
+Question: D3 — HOLD-1: Отложить TUI до v1.1 (после CLI и web)?
+Project/branch/task: free-space, master, HOLD-проверка сложности плана freespace.
+ELI10: В v1 три интерфейса (CLI, web, TUI) над одним ядром. Web-страница нужна для Tauri-пути и телефона, CLI нужен агенту. TUI повторяет тот же экран в терминале. Если его отложить, v1 выходит на один крейт раньше, а экран TUI добавляется поверх готового query-слоя без переделок.
+Stakes if we pick wrong: Оставим — v1 дольше на ~4–6 ч CC (ratatui-экран, клавиши, тесты); отложим — на сервере без браузера придётся смотреть через `ls --json`/`top` или через ssh-туннель к web.
+Recommendation: B (Keep) because TUI был явным пунктом твоего запроса, а над общим query-слоем это один экран; но если хочешь v1 быстрее, A честный вариант.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Defer this item to TODOS.md
+  ✅ v1 = core + cli + web: меньше поверхности, быстрее бенчмарк и первый релиз
+  ✅ TUI потом ложится на тот же query-слой, ничего не переписывается
+  ❌ На headless-машинах по ssh нет интерактивного просмотра до v1.1
+B) Keep it in scope (recommended)
+  ✅ Выполняет исходное требование «3 интерфейса» без оговорок
+  ✅ Одна таблица/один футер клавиш, общий с web, как в наброске
+  ❌ Плюс крейт, плюс клавиатурная модель и её тесты в первом релизе (human: ~2 д / CC: ~4–6 ч)
+Net: скорость первого релиза против полноты исходного требования.
+Header: HOLD-1 TUI
+A) Defer this item to TODOS.md
+Эффорт S (zero implementation work now), риск low. TUI уходит в TODOS.md с контекстом; v1 = core+cli+web. ✅ меньше поверхности v1 ✅ ничего не переписывать потом ❌ нет интерактива по ssh до v1.1.
+B) Keep it in scope (recommended)
+Эффорт M, риск low, переиспользует query-слой ядра; верификация: snapshot-тест экрана + тесты клавиш. ✅ закрывает требование «3 интерфейса» ✅ общий экран с web ❌ ещё один крейт в первом релизе.
+
+## currentDecision (HOLD-2)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Defer) | B (Keep)
+--- | --- | --- | --- | ---
+Platform traits in core (`allocated_size`, `file_identity`, `is_mount_boundary`) | ARCH-1 (Tauri/cross-platform path) | in v1, Linux impl only | unchanged | unchanged
+Scheduler trait + stub backends for launchd / Task Scheduler / Termux cron | doc line 128 | in v1 as stubs (`unimplemented`) | trait + Linux systemd backend only; stubs go to TODOS.md | stubs in v1
+systemd timer backend (`freespace schedule install`) | ARCH-1 | in v1 | unchanged | unchanged
+
+Question: D4 — HOLD-2: Убрать из v1 заглушки планировщика для macOS/Windows/Termux?
+Project/branch/task: free-space, master, HOLD-проверка минимальных изменений (invariant: кросс-платформенный путь остаётся открыт).
+ELI10: План v1 содержит trait планировщика и три пустых бэкенда (launchd, Task Scheduler, Termux cron) кроме рабочего systemd. Пустые бэкенды ничего не делают, но их надо компилировать, тестировать на «вернул ошибку» и держать в CI. Trait сам по себе сохраняет путь на другие ОС; заглушки можно добавить в тот день, когда появится первая не-Linux машина.
+Stakes if we pick wrong: Оставим — мёртвый код и три файла в v1 без пользователя; уберём — при первом Mac нужно будет написать бэкенд с нуля (trait уже есть, это ~1 файл).
+Recommendation: A (Defer) because trait закрывает инвариант, а заглушки это код без потребителя.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Defer this item to TODOS.md (recommended)
+  ✅ v1 без мёртвого кода: один trait и один рабочий бэкенд (systemd)
+  ✅ Инвариант «можно добавить ОС» сохранён самим trait и `cfg(target_os)` в core
+  ❌ Первая не-Linux машина потребует отдельного PR с бэкендом (human: ~1 д / CC: ~1 ч)
+B) Keep it in scope
+  ✅ Структура файлов на все ОС видна сразу, агент видит, куда дописывать
+  ✅ `schedule install` на Mac даёт понятную ошибку «not implemented» вместо паники
+  ❌ Три файла-заглушки и их тесты в v1 без реального пользователя
+Net: чистота v1 против готовой «рамки» для будущих ОС.
+Header: HOLD-2 stubs
+A) Defer this item to TODOS.md (recommended)
+Эффорт S (zero work now), риск low. Trait + systemd остаются; launchd/Task Scheduler/Termux уходят в TODOS.md. ✅ нет мёртвого кода ✅ инвариант сохранён trait-ом ❌ первая не-Linux машина = отдельный PR (CC ~1 ч).
+B) Keep it in scope
+Эффорт S (human: ~0.5 д / CC: ~30 мин), риск low; верификация: тест «stub returns NotImplemented». ✅ рамка на все ОС видна ✅ понятная ошибка на Mac ❌ три файла без пользователя в v1.
+
+## currentDecision (HOLD-3)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Defer) | B (Keep)
+--- | --- | --- | --- | ---
+Accounting contract: allocated (st_blocks*512) as primary number | ARCH-1, doc line 117 | in v1 | unchanged | unchanged
+Apparent size stored per entry (st_size) | ARCH-1 | in v1 | unchanged | unchanged
+`--apparent-only` CLI flag (skip st_blocks, scan faster on some FS) | doc line 91–99 CLI draft | in v1 | removed from v1; TODOS.md | in v1
+`a` key / toggle allocated↔apparent in UI | sketch footer | in v1 | unchanged (reads stored st_size) | unchanged
+
+Question: D5 — HOLD-3: Убрать флаг `--apparent-only` из v1?
+Project/branch/task: free-space, master, HOLD-проверка инвариантов (контракт учёта: allocated и apparent всегда оба записаны).
+ELI10: Снапшот хранит оба размера: сколько файл занимает на диске (allocated) и сколько в нём байт (apparent). Один stat даёт оба числа, разницы в скорости нет. Флаг `--apparent-only` обещал «быстрее», но это ошибочное обещание, а снапшот без allocated ломает инвариант «любой UI показывает честный размер на диске».
+Stakes if we pick wrong: Оставим — агент может сделать снапшот без allocated, и web/TUI покажут неверные проценты; уберём — ничего не теряем, переключатель `a` в UI работает по сохранённому st_size.
+Recommendation: A (Defer) because флаг не даёт скорости и нарушает контракт учёта.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Defer this item to TODOS.md (recommended)
+  ✅ Один тип снапшота: все UI и skill всегда видят оба размера
+  ✅ Меньше один флаг в CLI-контракте и один путь в тестах
+  ❌ Если на какой-то FS st_blocks окажется дорогим, флаг придётся вернуть
+B) Keep it in scope
+  ✅ Явный выбор пользователя: «мне нужны только логические байты»
+  ✅ Совпадает с `du --apparent-size`, знакомо
+  ❌ Снапшот без allocated ломает проценты/бар в UI и ответы skill (human: ~0.5 д / CC: ~20 мин на обработку обоих режимов)
+Net: простота контракта против привычного du-флага без реальной пользы.
+Header: HOLD-3 flag
+A) Defer this item to TODOS.md (recommended)
+Эффорт S (zero work now), риск low. Флаг уходит в TODOS.md с триггером «st_blocks дорогой на FS X». ✅ один тип снапшота ✅ меньше флагов ❌ вернуть при реальной нужде.
+B) Keep it in scope
+Эффорт S (human: ~0.5 д / CC: ~20 мин), риск medium: два режима снапшота, UI должен уметь «allocated unknown». ✅ явный выбор ✅ как du ❌ ломает проценты и ответы skill.
+
+## currentDecision (EXP-1)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Add) | B (Defer) | C (Skip)
+--- | --- | --- | --- | --- | ---
+Snapshot kept as a single SQLite file, replaced atomically | ARCH-1 | one generation on disk | keep previous generation (`snapshot.prev.db`, +0.4–0.7 GB [estimated]) | unchanged | unchanged
+CLI contract (`ls`, `top`, `status`, `refresh`, `scan`, `serve`, `schedule`) | ARCH-1, lines 91–99 | 7 commands | + `diff [--since prev|<gen>] [--json]` | unchanged; TODOS.md | unchanged
+Skill: "what to delete" workflow | ARCH-1 | ls/top only | diff first, then top | unchanged | unchanged
+Disk precheck for snapshot write | line 108 | free ≥ 2×prev + 512MB | free ≥ 3×prev + 512MB (two generations + tmp) | unchanged | unchanged
+
+Question: D6 — EXP-1: Добавить `freespace diff` (что выросло с прошлого снапшота)?
+Project/branch/task: free-space, master, expansion cherry-pick 1 of 5.
+ELI10: Сейчас снапшот один, и утилита отвечает «что большое». Если хранить предыдущую генерацию, появляется ответ «что выросло со вчера»: топ-N папок по приросту. Это ровно тот вопрос, который возникает когда диск снова на 97%. Цена: второй файл снапшота на диске (0.4–0.7 ГБ по оценке) и одна команда с одним SQL-запросом по двум таблицам.
+Stakes if we pick wrong: Добавим зря — лишние 0.5 ГБ на и так полном диске; не добавим — каждый раз искать «что выросло» глазами или через агента по двум JSON-ам.
+Recommendation: A (Add) because это самый частый вопрос при полном диске, а схема не меняется.
+Completeness: A=10/10, B=7/10 (diff later means CLI/skill ship without the growth answer), C=7/10
+Pros / cons:
+A) Add to this plan's scope (recommended)
+  ✅ Отвечает на «почему опять полно» за одну команду, агент видит прирост в JSON
+  ✅ Схема не меняется: тот же файл, `ATTACH` предыдущей генерации, один запрос
+  ❌ Второй снапшот на диске (0.4–0.7 ГБ [estimated]) и precheck 3×prev (human: ~1 д / CC: ~1 ч)
+B) Defer to TODOS.md
+  ✅ v1 меньше на одну команду и одну таблицу в skill
+  ✅ Можно добавить после первого бенчмарка, когда известен реальный размер снапшота
+  ❌ Первые релизы не отвечают на главный вопрос «что выросло»
+C) Skip
+  ✅ Ничего не хранить лишнего на диске
+  ❌ Теряется единственная возможность видеть динамику, не только состояние
+Net: 0.5 ГБ места и одна команда против ответа «что выросло» в один вызов.
+Header: EXP-1 diff
+A) Add to this plan's scope (recommended)
+Эффорт M (human: ~1 д / CC: ~1 ч), риск low; верификация: тест на двух синтетических генерациях. Keeps `snapshot.prev.db`, adds `diff`, raises precheck to 3×prev. ✅ главный вопрос в одну команду ✅ без изменения схемы ❌ +0.5 ГБ на диске.
+B) Defer to TODOS.md
+Эффорт S сейчас, риск low. Запись в TODOS.md с триггером «после первого бенчмарка». ✅ v1 проще ✅ решение по реальному размеру снапшота ❌ нет ответа «что выросло» в v1.
+C) Skip
+Эффорт 0, риск low. ✅ минимум места на диске ❌ динамика недоступна совсем.
+
+## currentDecision (EXP-2)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Add) | B (Defer) | C (Skip)
+--- | --- | --- | --- | --- | ---
+Skill answers "what to delete" from `ls`/`top`/`diff` JSON | ARCH-1 + EXP-1 | agent reasons by itself | + `explain <path> --json`: classifier of known cache/artifact dirs with `safe_cleanup` command and `risk` | unchanged; TODOS.md | unchanged
+Rules source | — | none | built-in rules table (pip, uv, huggingface, cargo, npm/pnpm, go, docker, snap, journald, apt, trash, node_modules, target/) in `core/rules.rs`, user overrides in `~/.config/freespace/rules.toml` | — | —
+Deletion | ARCH-1 (tool never deletes) | read-only | still read-only; prints the command, never runs it | unchanged | unchanged
+
+Question: D7 — EXP-2: Добавить `freespace explain <path>` (что это за папка и как её безопасно чистить)?
+Project/branch/task: free-space, master, expansion cherry-pick 2 of 5.
+ELI10: Сейчас утилита показывает размеры, а решение «что удалять» агент принимает из своих знаний. `explain` сопоставляет путь со встроенной таблицей известных кэшей (pip, uv, huggingface, cargo, docker, snap, journald, node_modules, target/) и печатает: что это, безопасно ли, какой командой чистить (`pip cache purge`, `docker system prune`, `cargo clean`). Утилита по-прежнему ничего не удаляет, только печатает. Один файл правил + одна команда.
+Stakes if we pick wrong: Добавим — рискуем дать устаревший совет по чистке на какой-то экзотической папке (в выводе есть `risk`); не добавим — skill каждый раз переизобретает список кэшей на каждой машине.
+Recommendation: A (Add) because это и есть «один скилл для чистки всех машин»: знания о кэшах живут в утилите, а не в промпте.
+Completeness: A=10/10, B=7/10, C=5/10
+Pros / cons:
+A) Add to this plan's scope (recommended)
+  ✅ Агент на любой машине получает одинаковый, проверяемый совет по чистке в JSON
+  ✅ Правила переопределяются в `rules.toml`, утилита так и не удаляет ничего сама
+  ❌ Таблица правил требует поддержки; ошибка в правиле = плохой совет (human: ~1.5 д / CC: ~1.5 ч)
+B) Defer to TODOS.md
+  ✅ v1 остаётся чистым измерителем, skill опирается на знания модели
+  ✅ Правила можно собрать позже из реальных ответов skill
+  ❌ Главная мотивация (единый скилл чистки) в v1 реализована наполовину
+C) Skip
+  ✅ Никакой ответственности за советы по удалению
+  ✅ Меньше кода и ни одного файла правил
+  ❌ Каждая машина чистится по-разному, по памяти агента, без аудита
+Net: таблица правил на поддержке против единообразной чистки всех машин одним скиллом.
+Header: EXP-2 explain
+A) Add to this plan's scope (recommended)
+Эффорт M (human: ~1.5 д / CC: ~1.5 ч), риск medium (стареющие правила, помечены `risk`); верификация: тест правил на фикстуре путей. ✅ единый совет на всех машинах ✅ правила в rules.toml, без удаления ❌ таблицу надо поддерживать.
+B) Defer to TODOS.md
+Эффорт S сейчас, риск low. TODOS с триггером «после первых 3 чисток через skill». ✅ v1 чистый измеритель ✅ правила из практики ❌ мотивация реализована наполовину.
+C) Skip
+Эффорт 0, риск low. ✅ нет ответственности за советы ✅ меньше кода ❌ чистка каждой машины по памяти агента.
+
+## currentDecision (EXP-3)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Add) | B (Defer) | C (Skip)
+--- | --- | --- | --- | --- | ---
+`status --json` fields (snapshot age, refreshed[], last_error, disk free) | ARCH-1 + spec review fixes | present | + `alerts[]` (`{kind:"low_free", mount, free_pct, threshold}`) computed at scan end | unchanged | unchanged
+Scheduled scan (systemd timer) | ARCH-1 | scan + write snapshot | + after write: if free% < threshold, run `notify-send` when a session bus is reachable; always record in `alerts[]` | unchanged | unchanged
+Config | — | none | `~/.config/freespace/config.toml`: `low_free_pct = 10` | — | —
+Skill | ARCH-1 | reads status | first checks `alerts[]` | unchanged | unchanged
+
+Question: D8 — EXP-3: Добавить порог свободного места с alerts[] в status и уведомлением после ночного скана?
+Project/branch/task: free-space, master, expansion cherry-pick 3 of 5.
+ELI10: Сегодня ты узнаёшь о 97% когда что-то падает. Если ночной скан после записи снапшота сравнит свободное место с порогом (по умолчанию 10%), он запишет alert в `status --json` и, если есть графическая сессия, покажет уведомление на рабочем столе. Агент, вызвав `status`, сразу видит, что на машине X пора чистить, и снапшот для этого уже готов. Это 1 поле в JSON, 1 ключ конфига и 1 вызов notify-send.
+Stakes if we pick wrong: Добавим — лишнее уведомление, если порог выбран плохо (поправимо одним ключом); не добавим — опять узнаёшь о полном диске от упавшей сборки.
+Recommendation: A (Add) because это замыкает цикл «кэш готов заранее»: снапшот есть, и сигнал «пора» есть.
+Completeness: A=10/10, B=7/10, C=7/10
+Pros / cons:
+A) Add to this plan's scope (recommended)
+  ✅ Узнаёшь о заполнении до аварии, а не после; snapshot уже готов для решения
+  ✅ Агент по `status --json` видит все машины, где `alerts[]` не пуст, и начинает с них
+  ❌ Ещё один конфиг-ключ и зависимость от notify-send/сессионной шины (human: ~0.5 д / CC: ~40 мин)
+B) Defer to TODOS.md
+  ✅ v1 без десктоп-интеграции, меньше поверхностей для багов
+  ✅ Порог можно выбрать после недели наблюдений за реальным графиком
+  ❌ Первые релизы не предупреждают, цикл «пора чистить» остаётся ручным
+C) Skip
+  ✅ Утилита остаётся только измерителем без побочных эффектов
+  ✅ Нет конфига и нет уведомлений, которые кто-то захочет отключать
+  ❌ Теряется единственный проактивный сигнал, ради которого есть расписание
+Net: один конфиг-ключ и notify-send против узнавания о полном диске от падений.
+Header: EXP-3 alerts
+A) Add to this plan's scope (recommended)
+Эффорт S (human: ~0.5 д / CC: ~40 мин), риск low; верификация: тест на статусе с free_pct < порога + ручная проверка notify-send. ✅ сигнал до аварии ✅ агент видит alerts[] по всем машинам ❌ ещё один ключ конфига и notify-send.
+B) Defer to TODOS.md
+Эффорт S сейчас, риск low. TODOS с триггером «после недели ночных сканов». ✅ меньше поверхности ✅ порог по реальным данным ❌ цикл остаётся ручным.
+C) Skip
+Эффорт 0, риск low. ✅ чистый измеритель ✅ без уведомлений ❌ нет проактивного сигнала.
+
+## currentDecision (EXP-4)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Add) | B (Defer) | C (Skip)
+--- | --- | --- | --- | --- | ---
+`top` command (largest files/dirs under a path) | ARCH-1, lines 91–99 | sort by allocated only | + `--older-than <dur>` filter and `--sort mtime` (mtime already stored per entry) | unchanged | unchanged
+Snapshot schema | ARCH-1 | mtime stored | unchanged (query only) | unchanged | unchanged
+Skill "stale big files" step | — | none | `top / --older-than 180d --json` listed as the second question in SKILL.md | — | —
+
+Question: D9 — EXP-4: Добавить в `top` фильтр `--older-than` и сортировку по mtime (большие файлы, которых давно не трогали)?
+Project/branch/task: free-space, master, expansion cherry-pick 4 of 5.
+ELI10: mtime уже лежит в снапшоте для каждого файла. Фильтр «старше N дней» на команде `top` даёт список «большое и забытое»: старые дампы, архивы, образы. Это чисто SQL-условие, без изменения схемы и скана. Для агента это вторая по частоте подсказка после «что выросло».
+Stakes if we pick wrong: Добавим — почти ничего не стоит, но ещё два флага в контракте; не добавим — агент будет перебирать `ls --json` по папкам, чтобы найти то же самое.
+Recommendation: A (Add) because данные уже есть, цена одно WHERE, а польза для чистки прямая.
+Completeness: A=10/10, B=8/10, C=8/10
+Pros / cons:
+A) Add to this plan's scope (recommended)
+  ✅ «Большое и забытое» за один вызов, mtime уже в снапшоте, скан не меняется
+  ✅ Для skill это второй стандартный вопрос после diff, в JSON без доп. логики
+  ❌ Два флага в контракте CLI и колонка mtime в выводе web (human: ~0.5 д / CC: ~30 мин)
+B) Defer to TODOS.md
+  ✅ Контракт v1 короче, можно добавить после первых реальных чисток
+  ✅ Ноль риска для бенчмарка и схемы
+  ❌ Агент ищет старые файлы вручную через несколько вызовов ls
+C) Skip
+  ✅ Минимальный `top`, ровно как в наброске
+  ✅ Ни одной лишней опции в SKILL.md
+  ❌ Данные о времени лежат в снапшоте, но ни одна команда их не использует
+Net: два флага против готового ответа «что давно не трогали».
+Header: EXP-4 stale
+A) Add to this plan's scope (recommended)
+Эффорт S (human: ~0.5 д / CC: ~30 мин), риск low; верификация: тест фильтра на фикстуре с разными mtime. ✅ «большое и забытое» одним вызовом ✅ стандартный шаг skill ❌ два флага и колонка в web.
+B) Defer to TODOS.md
+Эффорт S сейчас, риск low. TODOS с триггером «после первых чисток». ✅ короче контракт ✅ ноль риска ❌ ручной поиск старых файлов.
+C) Skip
+Эффорт 0, риск low. ✅ минимальный top ✅ ничего лишнего в SKILL.md ❌ mtime хранится, но не используется.
+
+## currentDecision (EXP-5)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Add) | B (Defer) | C (Skip)
+--- | --- | --- | --- | --- | ---
+SKILL.md drives the local binary only | ARCH-1; doc line 16 names multi-host as the motivation, line 22 "use over ssh" | local only; remote = user runs ssh by hand | SKILL.md documents `freespace --host <ssh-alias> <cmd> --json` = `ssh <alias> freespace <cmd> --json` (thin wrapper in cli, no daemon, no new ports) | unchanged; TODOS.md | unchanged
+Multi-host overview | — | none | `freespace status --hosts a,b,c --json` fan-out over ssh, one JSON array | — | —
+Install on remote | cargo-dist | manual | unchanged (skill prints the install one-liner when binary missing) | — | —
+
+Question: D10 — EXP-5: Добавить в CLI и skill обёртку `--host <ssh-alias>` (одна команда на все машины)?
+Project/branch/task: free-space, master, expansion cherry-pick 5 of 5.
+ELI10: Ты сказал, что главная цель — один скилл для всех машин. Сегодня skill работает с локальным бинарём, а для другой машины агент сам сочиняет ssh-команду. Обёртка `--host` просто запускает `ssh alias freespace ... --json` и возвращает тот же JSON. Никаких демонов, портов и агентов на удалённой стороне: нужен только ssh-доступ и установленный бинарь. `status --hosts` собирает одну таблицу по всем машинам.
+Stakes if we pick wrong: Добавим — ssh-обёртка может плохо передавать ошибки (нет бинаря, нет снапшота), это надо прописать; не добавим — главная мотивация остаётся на совести промпта и каждый агент делает это по-своему.
+Recommendation: A (Add) because это самая дешёвая реализация твоей главной цели: 1 флаг, 0 инфраструктуры, тот же JSON-контракт.
+Completeness: A=10/10, B=6/10, C=6/10
+Pros / cons:
+A) Add to this plan's scope (recommended)
+  ✅ «Все машины одним скиллом» становится фактом v1, не обещанием: тот же JSON с любого хоста
+  ✅ Нулевая инфраструктура: только ssh и установленный бинарь, ничего не слушает в сети
+  ❌ Нужно прописать коды ошибок для «нет бинаря / нет снапшота / ssh не отвечает» (human: ~1 д / CC: ~1 ч)
+B) Defer to TODOS.md
+  ✅ v1 строго локальный, проще тестировать
+  ✅ Можно добавить после того, как бинарь поживёт на 2–3 машинах
+  ❌ Мотивация «один скилл на все машины» в v1 не реализована, агент пишет ssh сам
+C) Skip
+  ✅ Контракт CLI без сетевого слоя вообще
+  ✅ Нет ответственности за ssh-ошибки в утилите
+  ❌ Каждый агент изобретает свой способ ходить по машинам, без общего формата
+Net: один флаг и таблица ошибок против главной цели проекта, оставленной промпту.
+Header: EXP-5 hosts
+A) Add to this plan's scope (recommended)
+Эффорт M (human: ~1 д / CC: ~1 ч), риск low (ssh уже есть); верификация: тест с фейковым `ssh` в PATH + ручной прогон на второй машине. ✅ главная цель в v1 ✅ ноль инфраструктуры ❌ таблица ошибок ssh/бинарь/снапшот.
+B) Defer to TODOS.md
+Эффорт S сейчас, риск low. TODOS с триггером «бинарь стоит на 2+ машинах». ✅ строго локальный v1 ✅ проще тесты ❌ мотивация не реализована.
+C) Skip
+Эффорт 0, риск low. ✅ без сетевого слоя ✅ нет ssh-ошибок в утилите ❌ агенты ходят по машинам каждый по-своему.
+
+## currentDecision (DOCS-1)
+Commitment comparison:
+
+Commitment | Source/approval or pending | Current | A (Approve) | B (Revise) | C (Pause)
+--- | --- | --- | --- | --- | ---
+Working plan docs/designs/free-space-disk-analyzer.md (amended, D3–D10 + 3 spec rounds) | pending D11 | draft | approved as this version | reopened via 0D | review stops
+CEO summary ~/.gstack/projects/tass/ceo-plans/2026-10-22-freespace.md | pending D11 | draft | approved as this version | reopened | review stops
+Round-3 fixes (hardlinks table, |delta| sort, preorder ids, exit codes 1/8) | author-verified, not re-reviewed (SPEC-1) | in plan | accepted with the `spec not re-verified` note | re-reviewed on request | —
+
+Question: D11 — Утвердить рабочий план и CEO summary и перейти к 0I?
+
+D12 — OV-8: оставить web-страницу в v1 или сузить v1 до scan + read-only CLI до измеренного прототипа?
+Governing row: OV-8 (codex gpt-6-astra). Fixed: ARCH-1 (A′, web в v1), OV-1…OV-7 (исправления применены), Open Question 5 (refresh условен). Pending: только этот ряд.
+Menu (whole-candidate scope): A) Include — web остаётся в v1, порядок Next Steps неизменен: core → CLI → бенчмарк (шаг 1–4) → web (шаг 6+) (recommended); B) Defer — web уходит в v1.1, v1 = scan + CLI + skill; C) Cut; D) Hold.
+Recommendation: A because the plan already sequences a measured core/CLI prototype (benchmark, Next Steps 1–4) before `web/`, and the invariants Codex named (OV-1…OV-6) are now corrected in the text; the remaining risk is schedule, not correctness.
+
+
+<!-- ceo-review:end -->
+Approval readiness: PASS — ARCH-1 (1f13934d, A′), MODE-1 (D2 SELECTIVE EXPANSION), HOLD-1 (D3 A), HOLD-2 (D4 A), HOLD-3 (D5 A), EXP-1 (D6 A), EXP-2 (D7 C), EXP-3 (D8 B), EXP-4 (D9 A), EXP-5 (D10 B), SPEC-1 (noted), DOCS-1 (D11 A), OV-1…OV-7 (factual corrections under EXP-1/ARCH-1/R3-4/R2-10/T5, no new behavior), OV-8 (D12 A), EXP-6 (D15 A: find + /api/find + web filter). Nothing declined or deferred is in accepted work.
+
+## CEO Review — Required Outputs (plan-ceo-review, 2026-10-22)
+
+### Reality rows (0A/0B, phase ceo)
+
+REALITY: premise-table finding 2 claims unverified: "`du`, baobab … на холодном кэше работают минуты" and "copy of a 0.5 GB snapshot in under 60 s" are not re-measured in this session; "97% занято, ~7M inode" [measured: df/inode count in office-hours] docs/designs/free-space-disk-analyzer.md:7
+REALITY: already-done pass no commits, no remote, nothing shipped docs/designs/free-space-disk-analyzer.md:27
+REALITY: surface-check finding CLI commands and HTTP routes exist only as a draft contract, no registry or --help yet; verify at implementation docs/designs/free-space-disk-analyzer.md:88-99
+REALITY: binding-decisions pass decision 1f13934d (A′) honored, D3–D12 recorded, no overruled default reintroduced docs/designs/free-space-disk-analyzer.md:3
+REALITY: numbers finding snapshot size, RSS, scan time and effort are [estimated]; the benchmark in Next Steps 1 is the receipt owner docs/designs/free-space-disk-analyzer.md:154
+REALITY: deferred-asks pass no linked issue docs/designs/free-space-disk-analyzer.md:1
+REALITY: pr-count pass no ship-policy.json, default one PR per wave; greenfield single repo docs/designs/free-space-disk-analyzer.md:190
+PLAN_REALITY: phase=ceo rows=7/7 missing=none verdict=complete
+
+### NOT in scope
+
+Deferred (in TODOS.md, each with its answer):
+* TUI (`tui/` crate) → v1.1 — D3 A: web page covers the "look with eyes" need; same `core` queries.
+* Scheduler stubs for launchd/Task Scheduler/Termux cron → v2 — D4 A: no second platform exists to test them.
+* `--apparent-only` for FUSE/Android → v2 — D5 A: no Android target in v1.
+* Low-free-space alerts (`notify-send`/journal push) → v1.1 — D8 B: pull path (`status`, journald) suffices for one machine.
+* `--host`/`hosts.toml` multi-host wrapper → v2 — D10 B: the documented `ssh host freespace … --json` form is enough for the skill today.
+
+Rejected (not in TODOS.md):
+* `explain <path>` (why a directory is big, in prose) — D7 C: the agent already does this from `ls`/`top` JSON; a built-in heuristic would duplicate it.
+* Narrowing v1 to scan + read-only CLI (Codex OV-8) — D12 A: the plan already sequences the measured core/CLI prototype before `web/`; refresh stays gated by Open Question 5.
+
+### What already exists
+
+The repository is empty: no code, no CI, no CLAUDE.md. Reused external pieces: `jwalk` (parallel walk), `rusqlite` bundled SQLite, `clap`, `serde`, `xxhash-rust`, `include_dir`, `cargo-dist`, systemd timers. Existing tools the plan replaces for this use case: `du`, `ncdu`, `baobab` (cold-cache minutes, no cached snapshot, no JSON for agents). The office-hours sketch (`docs/designs/free-space-disk-analyzer-sketch.png`) is reused as the v1 page design.
+
+### Dream state delta
+
+12-month ideal: one agent skill answers "what is eating space on any of my machines" and cleans it with safeguards, on Linux, macOS, Windows and Android, with a native window (Tauri) and push alerts before the disk fills. This plan delivers the Linux half with the contract the rest reads: an immutable snapshot with `path_hash`, `prev` generation and lossless paths, a JSON CLI, a loopback web page, and SKILL.md. Missing after v1: TUI (v1.1), alerts (v1.1), multi-host (v2), the other three OSes (v2), `rm` with safeguards (v2), Tauri (v2). None of those needs a schema change except fanotify-based increments.
+
+### Error & Rescue Registry
+
+Capability rows at strategy depth; the full two-table map with error variants, rescue actions and user-visible text is Section 2 above (21 error paths; 1 GAP rescued by T3; 1 unrescuable: OOM, bounded by the benchmark). Owner who must verify each unknown before implementation: the `core` implementer (Next Steps 2–4), with the benchmark as receipt for RSS and timing.
+
+### Failure Modes Registry
+
+```
+  CODEPATH / CAPABILITY     | FAILURE MODE                          | RESCUED? | TEST?        | USER SEES?                       | LOGGED?
+  --------------------------|---------------------------------------|----------|--------------|----------------------------------|--------
+  core::scan walk           | EACCES on a directory                 | Y        | Y (unit)     | errors>0, flags.DENIED           | Y
+  core::scan walk           | symlink / loop                        | Y        | Y (unit)     | symlink row, not followed        | Y
+  core::scan walk           | EMFILE under 8 workers                | Y (T3)   | Y (fixture)  | nothing (rlimit raised)          | Y
+  core::scan tree           | OOM on 7M+ entries                    | N        | benchmark    | journal OOM, exit 137            | Y (journal)
+  core::precheck            | insufficient space / statvfs error    | Y        | Y (tmpfs)    | status.last_error                | Y
+  core::write               | ENOSPC or reserve < 512 MB mid-write  | Y        | Y (fallocate)| status.last_error.op=reserve     | Y
+  core::publish             | link/rename/fsync failure             | Y        | Y (fault inj)| last_error names the step        | Y
+  core::publish             | crash between link and rename         | Y        | Y (kill -9)  | diff exit 3 until next scan      | Y
+  core::state               | state.json unreadable                 | Y        | Y            | status.state_error               | Y
+  core::lock                | second writer                         | Y        | Y            | exit 6 "another scan is running" | Y
+  core::reader              | no snapshot / schema mismatch         | Y        | Y            | exit 8 / exit 5 with hint        | n/a
+  core::reader diff         | wrong prev pairing / rotated          | Y        | Y (T6)       | exit 3 / exit 4 "retry"          | n/a
+  core::reader diff         | path_hash collision                   | Y        | Y (synthetic)| exit 7 names both paths          | n/a
+  core::reader diff         | unobserved subtree reported as freed  | Y (OV-3) | Y            | unknown_subtrees[]               | n/a
+  core::refresh             | double-counted hardlink               | Y (OV-2) | Y            | partial badge                    | Y
+  core::refresh             | full re-emit slower than 60 s         | gate     | benchmark    | refresh moves to v1.1 (Open Q5)  | Y
+  cli::gui                  | no XDG_RUNTIME_DIR / no browser       | Y        | Y            | URL printed to stderr            | Y
+  cli::serve                | bad token / Origin / unknown path     | Y        | Y (reqwest)  | 403 / 404, "session expired"     | Y
+  cli::serve                | stale generation held by pool         | Y (OV-6) | Y            | reload banner                    | Y
+  cli::install-timer        | not root / no systemd / exists        | Y        | system       | exact fix printed                | Y
+  systemd timer             | scan failed overnight                 | partial  | manual       | age_seconds grows (no push, D8)  | Y
+  json contract             | non-UTF-8 path round trip             | Y (OV-7) | Y (hostile)  | path_raw present                 | n/a
+```
+
+No row is RESCUED=N with TEST=N and USER SEES=Silent: **0 CRITICAL GAPS**. 22 capability rows.
+
+### Scope Expansion Decisions (SELECTIVE EXPANSION; full 0G record in the CEO plan `~/.gstack/projects/tass/ceo-plans/2026-10-22-freespace.md`)
+
+* Accepted: `diff` + one previous generation (EXP-1, D6 A); `top --older-than` + `--sort` (EXP-4, D9 A); `find` with total over matches + web filter (EXP-6, D15 A, raised by the user after the report was first written).
+* Deferred: low-free alerts (EXP-3, D8 B); `--host` wrapper (EXP-5, D10 B); plus HOLD items TUI (D3), scheduler stubs (D4), `--apparent-only` (D5).
+* Skipped: `explain` (EXP-2, D7 C); v1 narrowing (OV-8, D12 A kept the approved scope).
+
+### Diagrams
+
+1. System architecture — Section 1 (dependency graph).
+2. Data flow with shadow paths — Section 4 (scan → snapshot with nil/invalid/OOM/ENOSPC branches) and Section 1 data flows 1–4.
+3. State machine — Section 1 (snapshot directory states, invalid states).
+4. Error flow — Section 2 (codepath → variant → rescue → user) and the interleaving table in Section 4.
+5. Deployment sequence:
+
+```
+  cargo-dist tag ──► installer ──► /usr/local/bin/freespace
+        │
+        ▼
+  sudo freespace install-timer [--roots … --at 02:00 --keep-previous]
+        │  writes /etc/freespace/config.toml, group freespace, adds $SUDO_USER, unit + timer, Persistent=true
+        │  prints: "re-login for group membership"
+        ▼
+  sudo freespace scan        (manual first run, shows timing, creates snapshot.db, state.json)
+        ▼
+  freespace status --json  → exit 0, age_seconds small      (smoke)
+  freespace gui            → browser opens 127.0.0.1:<port>  (smoke)
+        ▼
+  next night: timer → scan → snapshot.prev.db appears → diff works
+```
+
+6. Rollback flowchart:
+
+```
+  problem after upgrade?
+     │
+     ├─ exit 5 (schema) ──► sudo freespace scan ──► fixed (old snapshot discarded)
+     │
+     ├─ scan too slow / RSS too high ──► systemctl disable --now freespace.timer
+     │                                   keep CLI reads on the last good snapshot ──► fix, re-enable
+     │
+     └─ remove entirely ──► systemctl disable --now freespace.timer
+                            rm /usr/local/bin/freespace /etc/systemd/system/freespace.{service,timer}
+                            rm -r /var/lib/freespace /etc/freespace   (optional; inert files)
+                            group freespace may stay (harmless)        ──► under 1 minute
+```
+
+### Stale Diagram Audit
+
+ASCII diagrams in files this plan touches: the architecture block in «Recommended Approach: A′» (updated for `tui/` → v1.1 in D3, still accurate), the Section 1/2/4/6/11 diagrams written today, the two above. The sketch PNG matches Section 11 (no Δ column drawn yet: add the toggle when `web/` is built, noted in T14). None stale.
+
+## Implementation Tasks
+Synthesized from this review's findings. Each task derives from a specific
+finding above. Run with Claude Code or Codex; checkbox as you ship.
+
+- [ ] **T1 (P1, human: ~3d / CC: ~3h)** — core — Benchmark the scan + SQLite write on this machine before any UI work (RSS, scan time, snapshot size, `ls`/`top`/`diff` latency, refresh re-emit time)
+  - Surfaced by: Reality rows (numbers), Section 7, Open Questions 1/3/5, OV-1
+  - Files: to be determined (`docs/benchmarks.md`, `core/`)
+  - Verify: `docs/benchmarks.md` has one table with [measured] values replacing every [estimated] number in the plan
+- [ ] **T2 (P1, human: ~1h / CC: ~10min)** — cli — Add `state_error` to `status` and the `prev_generation` meta rule to the CLI/HTTP contract text and SKILL.md
+  - Surfaced by: Section 1 (state.json unreadable), Section 4 (prev pairing)
+  - Files: to be determined (`skill/SKILL.md`, `cli/`)
+  - Verify: `freespace status --json` on a corrupt `state.json` prints `state_error`, exit 0
+- [ ] **T3 (P1, human: ~2h / CC: ~15min)** — core — Raise `RLIMIT_NOFILE` soft→hard at `scan` start and cap concurrently open directories
+  - Surfaced by: Section 2 GAP (EMFILE)
+  - Files: to be determined (`core/scanner`)
+  - Verify: fixture with 20k-wide fan-out and `ulimit -n 256` completes without `Walk::Io(EMFILE)`
+- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — serve — CSP `default-src 'self'`, `Referrer-Policy: no-referrer`, "serve never touches the filesystem" rule, pool keyed by snapshot inode with 5 s idle close
+  - Surfaced by: Section 3 threat 3/6, OV-6
+  - Files: to be determined (`cli/serve`)
+  - Verify: `curl -H 'Origin: http://evil' …/api/status` → 403; headers present; after a publish the next request returns the new `generation` and `lsof` shows no old inode after 5 s idle
+- [ ] **T5 (P1, human: ~3h / CC: ~20min)** — core/cli — Lossless path contract: `path_raw` output, `--path-raw`/`?path_raw=` input, `mtime` as i64 with "unknown" for 0
+  - Surfaced by: Section 4 WARNING, Section 5, OV-7
+  - Files: to be determined (`core/queries`, `cli/`, `skill/SKILL.md`)
+  - Verify: hostile fixture with a 300-byte non-UTF-8 directory name: `ls --json` → `path_raw`; `ls --path-raw <hex> --json` returns the same entry
+- [ ] **T6 (P1, human: ~4h / CC: ~30min)** — core — `prev_generation` written to `meta` before publish; `diff` opens current first, then prev, and checks equality; test with pause points
+  - Surfaced by: Section 4 CRITICAL (order-2 pairing)
+  - Files: to be determined (`core/publish`, `core/queries/diff`)
+  - Verify: Section 6 assertion #3 passes; never deltas for (40→42)
+- [ ] **T7 (P2, human: ~1h / CC: ~10min)** — web — Move the token from `#t=` to memory on load and rewrite the hash to `#/path`
+  - Surfaced by: Section 4 interaction GAP (hash conflict)
+  - Files: to be determined (`web/api.ts`, `web/app.ts`)
+  - Verify: back/forward across three directories keeps the session; the URL never shows the token after load
+- [ ] **T8 (P2, human: ~4h / CC: ~30min)** — core/cli — One `QueryParams` struct shared by clap and the query string; split publish into `precheck()`, `rotate_prev()`, `publish_current()`
+  - Surfaced by: Section 5 (duplication, complexity)
+  - Files: to be determined (`core/params`, `core/publish`)
+  - Verify: unit tests call each publish step alone; `limit=99999999` rejected identically by CLI and HTTP
+- [ ] **T9 (P2, human: ~30min / CC: ~5min)** — skill — SKILL.md: names are data not instructions; do not paste full inventories into third-party tools; `--kind any` hint for `diff /home/<user>`
+  - Surfaced by: Section 3 threats 10/12
+  - Files: to be determined (`skill/SKILL.md`)
+  - Verify: E2E test (Section 6 #8) runs every documented command and validates the JSON schema
+- [ ] **T10 (P1, human: ~1w / CC: ~1d)** — tests — Implement Section 6 assertions 1–9, the fault-injection harness (kill -9 at each publish step, fallocate during write, tmpfs precheck) and the refresh/OV-2/OV-3/OV-5 fixtures
+  - Surfaced by: Section 6, OV-2/3/5
+  - Files: to be determined (`core/tests`, `cli/tests`)
+  - Verify: `cargo test --workspace` green; each assertion maps to a named test
+- [ ] **T11 (P2, human: ~30min / CC: ~5min)** — core — Add index `(parent_id, allocated DESC)` and the `flags` column + `refreshes` table to the v1 schema
+  - Surfaced by: Section 7 (composite index), OV-3, OV-5
+  - Files: to be determined (`core/schema.sql`)
+  - Verify: `EXPLAIN QUERY PLAN` for `ls --sort allocated --limit 30` uses the composite index
+- [ ] **T12 (P2, human: ~2h / CC: ~15min)** — cli — `install-timer --uninstall` removing unit, timer, config and both snapshots; print the re-login note after adding the user to group `freespace`
+  - Surfaced by: Section 8 (admin tooling gap), Section 9 (re-login risk)
+  - Files: to be determined (`cli/install`)
+  - Verify: install then uninstall leaves no file under `/etc/systemd/system/freespace*`, `/etc/freespace`, `/var/lib/freespace`
+- [ ] **T13 (P3, human: ~1h / CC: ~10min)** — cli — `status` human first line as a sentence ("14 G free · snapshot 7 h old · +9 G since prev in Downloads")
+  - Surfaced by: Section 8 (joy to operate)
+  - Files: to be determined (`cli/status`)
+  - Verify: `freespace status` (no `--json`) prints that line first; with no prev the delta clause is omitted
+- [ ] **T14 (P1, human: ~0.5d / CC: ~30min)** — web — Polish within the accepted page: `?` key overlay, `nlink > 1` link icon with tooltip, hash memory of the last path. *(Design review: raised to P1; Δ toggle → T27, copy path → T30, column collapse → T35, reload banner → T29.)*
+  - Surfaced by: Section 11
+  - Files: to be determined (`web/`)
+  - Verify: `/design-review` on the running page; keyboard-only walk through the user journey
+
+- [ ] **T15 (P1, human: ~2d / CC: ~2h)** — core/cli/web — `find` query (name glob, date bounds, min-size, kind, total over all matches, nested-dir dedup by id range), `/api/find`, web filter box with total row and hash state *(Design review: web filter box replaced by the Find mode form and two-line totals of T28; `/api/find` additionally returns `total_count`, `total_allocated`, `truncated`, `limit`.)*
+  - Surfaced by: D15 (EXP-6), section «Поиск с итогом»
+  - Files: to be determined (`core/queries/find`, `cli/`, `web/`, `skill/SKILL.md`)
+  - Verify: fixture with `daily1.mp4`…`daily3.mp4` and a nested `node_modules`: `find / --name 'daily*.mp4' --json` total equals the sum of the three; `find / --name node_modules --kind dir` counts the outer directory once; `--older-than 2023-01-01` excludes a file dated 2023-01-01 00:00 local
+
+- [ ] **T16 (P1, human: ~0.5d / CC: ~20min)** — cli/web — `cli/build.rs`: resolve `$CARGO_MANIFEST_DIR/../web`, check `bun --version`, run `bun build …/src/main.ts --outdir $OUT_DIR/web --minify`, emit `rerun-if-changed` for `../web/src` and `../web/index.html`, embed via `include_dir!(concat!(env!("OUT_DIR"), "/web"))`
+  - Surfaced by: Eng R3 (D5), OV-13
+  - Files: `cli/build.rs`, `web/src/main.ts`, `web/tsconfig.json`
+  - Verify: `cargo build` without bun fails with the install message; editing `web/src/app.ts` triggers a rebuild; the binary serves the new bundle
+- [ ] **T17 (P1, human: ~0.5d / CC: ~15min)** — core — `fs_glob(name, pattern, icase)` scalar: glob→regex translation compiled by `regex` with `(?iu)`; byte-wise fallback for invalid UTF-8; registered by the connection factory used by CLI and the pool
+  - Surfaced by: Eng R2 (D9), OV-9
+  - Files: `core/queries/glob.rs`, `core/db.rs`
+  - Verify: `--iname '*видео*'` matches `Видео.mkv`; literal `\[` matches `[x]`; a connection opened without the factory fails the registration test
+- [ ] **T18 (P1, human: ~0.5d / CC: ~20min)** — ci — `.github/workflows/ci.yml` (fmt, clippy -D warnings, `cargo test --workspace`, `cargo audit`, `tsc --noEmit`, negative job on a runner without bun) and cargo-dist `release.yml` with `oven-sh/setup-bun@v2`; musl x86_64 + aarch64
+  - Surfaced by: Eng R1 (D4), Scope Challenge finding 1
+  - Files: `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `Cargo.toml` (dist metadata)
+  - Verify: PR CI green; `cargo dist plan` lists both targets; the no-bun job fails with the expected message
+- [ ] **T19 (P1, human: ~2h / CC: ~15min)** — core — refresh hardlink rule OV-11: inode absent from old `hardlinks` with all `nlink` links observed inside the subtree is attributed normally; otherwise `allocated = 0` + `partial`
+  - Surfaced by: Outside Voice codex #4
+  - Files: `core/refresh.rs`
+  - Verify: fixture: new file with 2 internal links → counted once, non-zero; file with 1 internal + 1 external link → 0 inside, `partial: true`
+- [ ] **T20 (P1, human: ~2h / CC: ~15min)** — core/cli/web — `DENIED` as anomaly (D13): `warnings[]` in `state.json`/`status`; `incomplete: true` + `unknown_subtrees[]` on every response; stderr warning line; red banner in web; SKILL.md instruction
+  - Surfaced by: Outside Voice codex #5, R10
+  - Files: `core/queries/*.rs`, `cli/output.rs`, `web/src/app.ts`, `skill/SKILL.md`
+  - Verify: synthetic snapshot with one DENIED dir → all five commands print `"incomplete": true`; `freespace ls / --json 2>err` → `err` contains the warning
+- [ ] **T21 (P2, human: ~2h / CC: ~15min)** — cli — systemd unit rendering per D7/OV-10 (`Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir> /var/lib/freespace`, `NoNewPrivileges=true`, no `PrivateTmp`), `systemd-analyze verify` after write
+  - Surfaced by: Eng R5 (D7), Outside Voice codex #3
+  - Files: `cli/install.rs`, `cli/templates/freespace.service`
+  - Verify: unit test asserts each key present and `PrivateTmp` absent; on a systemd host `systemctl start freespace.service` writes a snapshot
+- [ ] **T22 (P1, human: ~0.5d / CC: ~20min)** — core/cli/skill — `schemars` derive on all response structs; `freespace schema --json`; `skill/schema.json` generated and committed; SKILL.md links it (no schema text in SKILL.md)
+  - Surfaced by: Eng R7 (D10)
+  - Files: `core/queries/types.rs`, `cli/schema.rs`, `skill/schema.json`, `skill/SKILL.md`
+  - Verify: test `schema_json_is_current` fails after renaming a field until `schema.json` is regenerated
+- [ ] **T23 (P1, human: ~1d / CC: ~30min)** — tests — contract harness: extract every `freespace …` fenced command from SKILL.md, run via `assert_cmd` on a synthetic snapshot, validate stdout against `skill/schema.json` with `jsonschema`
+  - Surfaced by: Eng R7 (D10), CEO test #8
+  - Files: `cli/tests/skill_contract.rs`, `core/tests/fixtures/`
+  - Verify: adding a bogus flag to a SKILL.md example fails CI; all documented commands exit 0
+- [ ] **T24 (P2, human: ~2h / CC: ~15min)** — benchmark — extend T1 with `find` rows: `--name '*.iso'`, `--name '*'`, `--older-than 1y`, `--kind dir --name node_modules`, cold and warm; decide the covering index by the 5 s cold rule (R8) *(Eng review run 2: also `top / --kind dir --older-than 180d` cold/warm, with and without `--min-size 100M`; the D11 trigger decides a `(kind, newest_mtime)` index.)*
+  - Surfaced by: Eng R8 (D11), OV-12
+  - Files: `docs/benchmarks.md`
+  - Verify: table has the four rows with [measured] values; index decision recorded as a line under the table
+
+**Amendments to earlier tasks (eng review):** T4 → axum + tower layers, `spawn_blocking` for SQLite, URL printed to stderr when `xdg-open` fails or the bootstrap file is not consumed in 10 s; T6 → add `find` dedup for all kinds (`nested`, `total.counted`), path reconstruction via one recursive CTE per response, O(n) sorted-sweep dedup; T7 → replaced by OV-14: keep `#t=` fragment and mirror into `sessionStorage` (do NOT strip); T9 → link `schema.json`, count/counted explanation, `incomplete` instruction; T12 → includes T21 unit keys; T15 → superseded in part by T17/T20/T24 and the D12 dedup rule.
+
+_No new tasks from Section 10._ Scaling ceiling (Section 1) is recorded, not tasked.
+
+### Completion Summary
+
+```
+  +====================================================================+
+  |            MEGA PLAN REVIEW — COMPLETION SUMMARY                   |
+  +====================================================================+
+  | Mode selected        | SELECTIVE EXPANSION                         |
+  | System Audit         | empty repo; plan at spec depth; 7 Codex     |
+  |                      | findings integrated (OV-1..7), 1 kept (OV-8)|
+  | Step 0               | SELECTIVE EXPANSION; D3-D5 defer TUI/stubs/ |
+  |                      | --apparent-only; D6 diff, D9 top flags add; |
+  |                      | D7 explain skip; D8 alerts, D10 --host defer|
+  | Section 1  (Arch)    | 2 issues found (scaling ceiling, state_err) |
+  | Section 2  (Errors)  | 21 error paths mapped, 1 GAP (rescued, T3)  |
+  | Section 3  (Security)| 12 threats, 0 High-likelihood unmitigated   |
+  | Section 4  (Data/UX) | 13 edge cases mapped, 0 unhandled (2 fixed) |
+  | Section 5  (Quality) | 2 issues found                              |
+  | Section 6  (Tests)   | Diagram produced, 0 gaps                    |
+  | Section 7  (Perf)    | 2 issues found                              |
+  | Section 8  (Observ)  | 2 gaps found (uninstall; no push, D8)       |
+  | Section 9  (Deploy)  | 2 risks flagged                             |
+  | Section 10 (Future)  | Reversibility: 4/5, debt items: 4           |
+  | Section 11 (Design)  | 1 issue (responsive rule) / 6 states mapped |
+  +--------------------------------------------------------------------+
+  | NOT in scope         | written (7 items: 5 deferred, 2 rejected)   |
+  | What already exists  | written                                     |
+  | Dream state delta    | written                                     |
+  | Error/rescue registry| 21 rows (Section 2), 0 CRITICAL GAPS        |
+  | Failure modes        | 22 total, 0 CRITICAL GAPS                   |
+  | TODOS.md updates     | 0 new items proposed (5 deferred earlier)   |
+  | Scope proposals      | 6 proposed, 3 accepted (EXP + SEL; EXP-6    |
+  |                      | added by the user after first report)       |
+  | CEO plan             | written (~/.gstack/projects/tass/ceo-plans/ |
+  |                      | 2026-10-22-freespace.md)                    |
+  | Outside voice        | codex gpt-6-astra: completed, 7 findings,   |
+  |                      | 7 resolved (6 corrected, 1 kept by D12)     |
+  | Lake Score           | N/A (no answered question offered a scored  |
+  |                      | 10/10 option; all were kind-only menus)     |
+  | Diagrams produced    | 6 (architecture, data flow, state machine,  |
+  |                      | error flow, deployment, rollback)           |
+  | Stale diagrams found | 0                                           |
+  | Unresolved decisions | 0                                           |
+  | Reality rows         | 7/7 rows (PLAN_REALITY), 2 unverified       |
+  +====================================================================+
+```
+
+### Unresolved Decisions
+
+None. D1–D12 and D15 answered (D13/D14 next-skill and promotion questions were withdrawn by the user for clarification and re-asked after D15).
+
+<!-- eng-review:begin -->
+## Eng Review (plan-eng-review, 2026-10-22)
+
+Target (fixed): `docs/designs/free-space-disk-analyzer.md` (reused from CEO review, D13 A). Report file: this plan. Context: CEO plan `docs/designs/freespace-ceo-scope.md` used by D2 A. Prior learnings applied: `snapshot-write-once` (8/10, 2026-10-22), `local-token-in-argv` (8/10, 2026-10-22), `outside-voice-before-sections` (7/10, 2026-10-22; the outside prompt below names `find` explicitly because the CEO-phase reviewer never saw it). Proactive suggestions kept on (D1 A). Aside unavailable; search check ran through host WebSearch.
+
+### Reality rows (phase eng)
+
+REALITY: premise-table finding unverified=3: cold-cache du/baobab minutes docs/designs/free-space-disk-analyzer.md:7; per-entry DB writes slower by 6-10x docs/designs/free-space-disk-analyzer.md:39 (cites gdu --db, not re-measured); snapshot copy under 60 s docs/designs/free-space-disk-analyzer.md:169; measured disk fill 97 percent and 7M inodes [measured: df/inode count in office-hours] docs/designs/free-space-disk-analyzer.md:7
+REALITY: already-done pass no commits on master, no origin remote, repo holds only docs/ and TODOS.md docs/designs/free-space-disk-analyzer.md:27
+REALITY: surface-check finding no binary or --help exists yet; every CLI command and HTTP route is a draft contract to verify at implementation; find and /api/find were added after the outside review docs/designs/free-space-disk-analyzer.md:88-102
+REALITY: binding-decisions pass gstack-decision-search --scope branch returned no rows; ledger rows ARCH-1..EXP-6 honored; no overruled default reintroduced docs/designs/free-space-disk-analyzer.md:360-382
+REALITY: numbers finding every size, latency and effort figure is [estimated] docs/designs/free-space-disk-analyzer.md:155-157; find warm latency of 1-3 s is unmeasured docs/designs/free-space-disk-analyzer.md:147; benchmark T1 is the receipt owner docs/designs/free-space-disk-analyzer.md:415
+REALITY: deferred-asks pass no linked issue; the user's late ask (find with totals) is recorded as EXP-6/D15 docs/designs/free-space-disk-analyzer.md:147
+REALITY: pr-count pass no .gstack/ship-policy.json; default one PR per wave; single greenfield repo docs/designs/free-space-disk-analyzer.md:186-191
+REALITY: transaction-semantics pass serve pool keyed by snapshot inode, readers immutable=1, no write transactions on pooled connections; writer uses one transaction with journal_mode=OFF on a tmp file docs/designs/free-space-disk-analyzer.md:272
+REALITY: units finding durations Nd|Nw|Nmo|Ny and dates YYYY-MM-DD both map to mtime (i64 s); Nmo is defined as 30 d but Ny is not docs/designs/free-space-disk-analyzer.md:145-147; the --min-size suffix grammar (K/M/G, binary or decimal) is undefined docs/designs/free-space-disk-analyzer.md:98
+REALITY: perf-table finding no table exists; docs/benchmarks.md is produced by T1 (cold/warm, 1 vs 8 workers, RSS, base = du/gdu/duc) docs/designs/free-space-disk-analyzer.md:195
+REALITY: recall finding find --name is a name-only glob; SQL GLOB over byte-stored names and ASCII-only LIKE folding for --iname give lower recall than the CLI promise on non-ASCII names; no bucket comparison planned docs/designs/free-space-disk-analyzer.md:147
+PLAN_REALITY: phase=eng rows=11/11 missing=none unverified=3: verdict=complete
+
+### Scope Challenge
+
+#### A. Assessment
+
+* **What already solves each sub-problem.** Scan: `jwalk` (directory-level parallelism; README: no help for one directory with many files) over `walkdir`; `gdu`/`duc`/`ncdu` are the benchmark baselines, not reusable code (Go/C). Snapshot: `rusqlite` bundled SQLite; `immutable=1` disables change detection, so a connection must be reopened after every rename (the plan's inode-keyed pool, OV-6, already does this). HTTP: `axum` is current standard practice; `tiny_http` is a dated low-level sync option. Glob: SQLite `GLOB` is case-sensitive, ASCII-only `LIKE` folding; Unicode folding needs ICU or a registered function. All proposed callers are plan requirements (lines 86–149), no first-party source exists.
+* **Minimum changes.** The CEO review already removed TUI, scheduler stubs and `--apparent-only`; `refresh` is benchmark-gated (Open Question 5). No further cut proposed by this review: every remaining component is a consumer of the accepted contract (`find` included).
+* **Complexity count [estimated].** Workspace `Cargo.toml`; `core/` ≈ 14 files (scanner, tree, writer, publish, state, lock, params, queries ×5, platform ×3, schema); `cli/` ≈ 8; `web/` 4; `skill/` 1; unit+timer 2 → ≈ 29 files, 2 crates, 1 HTTP service, 1 systemd timer. Gate tripped (≥ 8 files, ≥ 2 services) → structure question D3.
+* **Search check (host WebSearch; Aside unavailable).** [Layer 1] SQLite `immutable=1` + reopen-per-inode is the documented way to read a renamed snapshot. [Layer 2] `axum` on tokio/hyper for the loopback server. [Layer 2] `jwalk` with a capped pool (gitoxide caps at min(16, cores)). [Layer 3] name matching via a registered Rust scalar function instead of SQL `GLOB`/`LIKE` (see R2): SQLite's built-ins cannot fold Unicode without ICU and `GLOB` has no escape.
+* **TODOS cross-reference.** `TODOS.md` holds five deferred items (TUI, scheduler backends, `--apparent-only`, alerts, `--host`); none blocks this plan, none fits this wave without expanding scope.
+* **Completeness check.** Tests for `find` (totals, nested dedup, date boundary, Unicode `--iname`, hardlink zero) are required proof of D15 and are carried into Section 3 without a new question.
+* **Distribution check.** Artifacts: static musl binary (x86_64, aarch64) via cargo-dist + GitHub Releases (line 188); channel: `curl | sh` or manual `install-timer`. No CI workflow is named anywhere, although threat 9 (line 150) requires `cargo audit` in CI → R1.
+
+#### B. Scope record
+
+feature answers: none proposed (no cut/deferral questions asked); structure: A — Original arrangement (D3, 2026-10-22: workspace `core/` lib + `cli/` bin + `web/` + `skill/`, ≈ 29 files, 2 crates); accepted scope: unchanged — the CEO-approved scope (ARCH-1, EXP-1, EXP-4, EXP-6, OV-1…OV-8, D12) with the original file arrangement; pending remedies: none at this point (R1… below enter through C).
+
+Scope Challenge result: **scope accepted as-is** (MODE = FULL_REVIEW).
+
+#### C. Findings
+
+1. `[P2] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:186-191 — Distribution names cargo-dist + GitHub Releases ("GitHub Releases через cargo-dist: статический musl-бинарник…") and threat 9 (line 150: "`cargo audit` in CI") assumes a CI, but no workflow, test job or audit job is defined anywhere in the plan.` → R1.
+2. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:166 — Open Question 2 calls vanilla TS "ноль сборки", but TypeScript needs a transpile step (bun/esbuild/tsc) before `include_dir` can embed it (line 81); the build toolchain for `web/` is undecided and affects the cargo-dist release path.` → R3.
+3. Factual correction (no choice): `docs/designs/free-space-disk-analyzer.md:145-147,98 — `Ny` is undefined (fix: `Ny` = 365 d) and `--min-size S` has no grammar (fix: integer with optional `K|M|G|T` suffix, binary 1024, shared parser for `top` and `find`).` Applied to the plan text below the ledger (Accepted amendments).
+
+### Decision ledger
+
+### R1: CI pipeline for build, test, audit and release
+Finding: 1, P2, 7/10, docs/designs/free-space-disk-analyzer.md:186-191 and :150, reviewer: plan-eng-review (native)
+Plan baseline: Distribution Plan (lines 186–191): cargo-dist static musl binaries to GitHub Releases; threat 9 (line 150): "Pin versions, `cargo audit` in CI, `cargo-dist` builds from a tagged commit". No workflow files, no test job named. Original proposal, nothing approved about CI.
+Runtime evidence: repository has no `.github/`, no `Cargo.toml`, no CI config (`git ls-files` = 0 tracked files); unknown whether a GitHub remote will exist (no origin).
+Comparison grid:
+
+| Choice | Current | A) Add CI in v1 | B) Defer CI | C) No CI (local only) |
+|---|---|---|---|---|
+| R1 CI workflow (`.github/workflows/ci.yml`: fmt, clippy, `cargo test --workspace`, `cargo audit`) | absent, pending | added as task in v1 | NOT in scope + TODOS.md entry, trigger: first tagged release | never; local `cargo test` only |
+| R1 release workflow (cargo-dist generated `release.yml` on tag) | absent, pending | added as task in v1 | deferred with the CI | manual `cargo dist build` locally |
+| cargo-dist targets x86_64/aarch64 musl (line 188) | approved (ARCH-1 premise 6) | unchanged | unchanged | unchanged |
+| Web asset embedding at build time (R3) | pending | pending | pending | pending |
+
+Question D4:
+D4 — R1: Добавить CI (тесты + cargo audit) и release-workflow cargo-dist в v1?
+Project/branch/task: freespace, master, Scope Challenge C, finding 1 (Distribution check).
+ELI10: План обещает статические бинарники на GitHub Releases через cargo-dist и `cargo audit` в CI, но ни одного workflow в плане нет. cargo-dist сам генерирует `release.yml`, который собирает бинарники на тег; отдельный `ci.yml` гоняет `cargo test`, clippy и audit на каждый push. Без CI тесты и аудит зависимостей запускаются только руками.
+Stakes if we pick wrong: без CI первая поломка тестов или уязвимость в rusqlite/axum замечается после релиза; с CI на пустом репозитории без remote это пока мёртвые файлы, пока нет GitHub-репозитория.
+Recommendation: A because cargo-dist генерирует release-workflow одной командой, а `ci.yml` на 20 строк защищает контракт JSON (E2E-тест SKILL.md) при каждом изменении; стоимость CC ~10 минут.
+Completeness: A=10/10, B=7/10, C=3/10
+Pros / cons:
+A) Add CI + release workflow in v1 (recommended)
+  ✅ Каждый push гоняет `cargo test --workspace`, clippy и `cargo audit`; релиз на тег собирает musl-бинарники сам (human: ~0.5 д / CC: ~10 мин)
+  ✅ Угроза 9 (supply chain) закрывается тем самым CI, который план уже подразумевает
+  ❌ Нужен GitHub-репозиторий и remote; до его появления workflow-файлы лежат без дела
+B) Defer CI to the first tagged release
+  ✅ Ничего лишнего, пока код не стабилизировался и бенчмарк не пройден
+  ✅ cargo-dist можно инициализировать позже одной командой `cargo dist init`
+  ❌ Тесты и audit до релиза только вручную; контракт SKILL.md может разъехаться незаметно
+C) No CI, local builds only
+  ✅ Нулевая зависимость от GitHub Actions
+  ❌ Релизы и аудит зависят от памяти одного человека; Distribution Plan остаётся невыполнимым
+Net: 20 строк YAML и `cargo dist init` против ручных тестов и релизов.
+Header: R1 CI
+Options:
+A) Add CI + release workflow in v1 (recommended)
+Эффорт S (human: ~0.5 д / CC: ~10 мин), риск low, обслуживание: обновлять версию cargo-dist. Задача: `.github/workflows/ci.yml` (fmt, clippy, test, audit) + `cargo dist init` → `release.yml`. ✅ тесты и audit на каждый push ✅ релиз на тег сам ❌ нужен GitHub remote.
+B) Defer CI to the first tagged release
+Эффорт 0 сейчас, риск medium (контракт может разъехаться). NOT in scope + TODOS.md с триггером «первый тег». ✅ ничего лишнего ✅ `cargo dist init` позже ❌ только ручные проверки до релиза.
+C) No CI, local builds only
+Эффорт 0, риск high для Distribution Plan. ✅ нет зависимости от GitHub Actions ❌ релизы и аудит вручную.
+
+State: approved
+Actual answer: A) Add CI + release workflow in v1 (D4, 2026-10-22)
+Accepted scope: `.github/workflows/ci.yml` (fmt, clippy, `cargo test --workspace`, `cargo audit`) and cargo-dist generated `release.yml` on tag, both as v1 tasks; cargo-dist musl targets unchanged; R3 build step stays pending.
+History: none
+
+### R3: Web page build toolchain (Open Question 2)
+Finding: 2, P3, 7/10, docs/designs/free-space-disk-analyzer.md:166 (and :81, :151), reviewer: plan-eng-review (native)
+Plan baseline: Open Question 2: "Vanilla TS (ноль сборки, вшить проще) или Svelte … Склоняюсь к vanilla TS для v1"; line 81: page embedded via `include_dir`; line 151: only `api.ts` may know the transport. Nothing approved; explicitly left to eng review (line 387).
+Runtime evidence: no `web/` exists; `node 22` and `bun` are installed on this VM (Constraints, line 30); cargo-dist release builds run on GitHub runners where bun is not present by default.
+Comparison grid:
+
+| Choice | Current | A) TS + bun build | B) Svelte + Vite | C) Plain ES modules + JSDoc |
+|---|---|---|---|---|
+| R3 source language of `web/` | pending | TypeScript | Svelte (+TS) | JavaScript ES2022 modules with JSDoc types |
+| R3 build step before `include_dir` | pending | `bun build` from `build.rs`; bun required on every build host (dev, CI, release runners) | `vite build` from `build.rs`; node+npm required on every build host | none: files embedded as-is; `tsc --checkJs --noEmit` runs only in CI as a type check |
+| Single transport adapter `api.ts`/`api.js` (line 151) | approved (ARCH-1 Tauri path) | unchanged | unchanged | unchanged |
+| R1 CI jobs | per D4 answer | + bun install step | + node install step | + `tsc --noEmit` step (node only in CI) |
+
+Question D5:
+D5 — R3: Чем собирать web-страницу: TS через bun, Svelte через Vite или чистые ES-модули без сборки?
+Project/branch/task: freespace, master, Scope Challenge C, finding 2 (Open Question 2 оставлен eng review).
+ELI10: Страница вшивается в бинарник через `include_dir`. Если она на TypeScript, перед `cargo build` нужен транспилятор (bun/esbuild), и он должен стоять на каждой машине, где собирается релиз, включая GitHub-раннеры cargo-dist. Если писать обычные ES-модули с типами в JSDoc, cargo вшивает файлы как есть, а `tsc --noEmit` проверяет типы только в CI. Svelte даёт удобный UI-слой ценой полного node-тулчейна.
+Stakes if we pick wrong: сборка с bun/vite ломает «один `cargo build`» и усложняет release-workflow; чистый JS без типов на экране с таблицей, фильтром и хэш-состоянием быстро превращается в кашу, но JSDoc + tsc это закрывает.
+Recommendation: C because это буквально «ноль сборки» из Open Question 2: один экран, cargo вшивает файлы как есть, типы проверяются tsc в CI без влияния на релизную сборку.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Vanilla TypeScript built by bun in build.rs
+  ✅ Полноценные типы и импорты, bun уже стоит на этой VM
+  ✅ Один файл bundle в бинарнике, минификация бесплатно
+  ❌ bun нужен на каждом хосте сборки, включая раннеры cargo-dist; `cargo build` перестаёт быть самодостаточным (human: ~0.5 д / CC: ~20 мин на build.rs и CI)
+B) Svelte + Vite
+  ✅ Быстрее писать реактивный UI (таблица, фильтр, панель)
+  ✅ Готовый путь к Tauri (официальные шаблоны)
+  ❌ Полный node-тулчейн и package.json ради одного экрана; тот же минус с раннерами (human: ~1 д / CC: ~30 мин)
+C) Plain ES modules + JSDoc types, tsc --noEmit in CI (recommended)
+  ✅ Ноль сборки: `cargo build` вшивает файлы как есть, release-workflow не меняется
+  ✅ Типы проверяются `tsc --checkJs --noEmit` в CI; `api.js` остаётся единственным адаптером
+  ❌ Нет импорта npm-библиотек без ручного вендоринга; JSDoc многословнее TS
+Net: самодостаточный `cargo build` против удобства TS-синтаксиса на одном экране.
+Header: R3 web build
+Options:
+A) TypeScript + bun build in build.rs
+Эффорт S (human: ~0.5 д / CC: ~20 мин), риск medium (bun на раннерах), обслуживание: версия bun в CI. ✅ полноценный TS ✅ один bundle ❌ cargo build зависит от bun.
+B) Svelte + Vite
+Эффорт M (human: ~1 д / CC: ~30 мин), риск medium, обслуживание: node-тулчейн. ✅ быстрее UI ✅ Tauri-шаблоны ❌ полный тулчейн ради одного экрана.
+C) Plain ES modules + JSDoc, tsc --noEmit in CI (recommended)
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск low, обслуживание: только tsconfig в CI. ✅ ноль сборки ✅ типы в CI ❌ без npm-пакетов.
+
+State: approved
+Actual answer: A) TypeScript + bun build in build.rs (D5, 2026-10-22; user chose against recommendation C)
+Accepted scope: `web/` contains vanilla TypeScript sources; `cli/build.rs` resolves `web/` as `$CARGO_MANIFEST_DIR/../web`, runs `bun build <web>/src/main.ts --outdir $OUT_DIR/web --minify` and emits `cargo:rerun-if-changed` for `../web/src` and `../web/index.html` (OV-13) and the binary embeds the bundle via `include_dir!` from `OUT_DIR`; `bun` becomes a build-time requirement, documented in README and installed on CI/cargo-dist runners (`oven-sh/setup-bun@v2`); build fails fast with a clear message when `bun` is absent; `tsc --noEmit` runs in CI (R1) for type checking. Open Question 2 is closed.
+History: D5 asked with C recommended; answer A recorded.
+
+### Accepted amendments (applied to the plan text, no choice)
+
+- `Ny` defined: `Ny` = 365 days (line of D15 `find` contract, dates paragraph).
+- `--min-size S` grammar: non-negative integer with optional `K|M|G|T` suffix (binary, 1024-based, case-insensitive); the same parser serves `top` and `find`; invalid value is a usage error (exit 2).
+- Open Question 2 closed by D5 (TypeScript + bun in `build.rs`).
+
+### Eng Section 1: Architecture Review
+
+**Boundaries and data flow.** Three producers of the same `core::queries` structs (CLI `--json`, `serve` HTTP, future Tauri commands) and one consumer contract (SKILL.md). Scan → tmp SQLite → precheck → atomic rename → `state.json`; readers open `immutable=1` per inode (OV-6). The flow is linear, has one write path and one publish point; no shared mutable state between `scan` and readers except the directory entry. **OK**.
+
+**Coupling.** `web/api.ts` is the only file that knows the transport (line 151) and after D5 the bundle is produced by `cli/build.rs`, so `core` has no knowledge of the web at all. The `Scheduler` trait with a single backend is the only abstraction without a second implementation; accepted by HOLD-2. **OK**.
+
+**Findings.**
+
+1. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:549,556 — The HTTP server crate is explicitly "pending (owner: /plan-eng-review)". The choice decides whether `serve` carries a tokio runtime (axum/hyper, ~40 transitive crates, async) or a thread-per-connection synchronous server (tiny_http, last release 2022, no HTTP/1.1 keep-alive nuances handled for us). The security rules of line 119 (Host check, token header, Origin, CSP) are middleware in axum and hand-written in tiny_http.` → R4.
+2. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:117,137,199 — The systemd unit is specified only as "unit без параметров" + `Persistent=true`. Nothing says how a 7M-inode scan at 02:00 is kept from stealing the rotational disk from an interactive session that is still running, or what the unit may write. On a 97%-full rotational disk a full-priority scan is the loudest process on the box.` → R5.
+3. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:99,119,431 — `gui` starts `serve` and "leaves serve running" when no browser is found; nothing defines when a `gui`-started `serve` exits. A token-bearing loopback server that outlives the browser tab for days is a lifetime leak and a small attack-surface leak (the residual-risk paragraph assumes a short-lived server).` → R6.
+4. `[P3] (confidence: 6/10) docs/designs/free-space-disk-analyzer.md:119 — Snap-packaged browsers (Firefox/Chromium on Mint via snap) are confined and often cannot open `file://` under `$XDG_RUNTIME_DIR`, so the redirect-file bootstrap silently does nothing. Mitigation already present: the URL (with token) is printed to stderr, so the user can paste it. No question; note recorded for T4: `gui` must print the URL whenever `xdg-open` returns non-zero or the bootstrap file is not consumed within 10 s.`
+5. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:1348 — `jwalk` parallelises per directory; a single directory with 1M+ files (maildir, cache dirs) is read by one thread. Acceptable on this machine (the benchmark T1 measures it); recorded as a known limitation, no question.`
+
+**Dispositions.** 1 → R4 (question). 2 → R5 (question). 3 → R6 (question). 4, 5 → notes carried into tasks T4/T1, no decision needed.
+
+### R4: HTTP server crate for `serve`
+
+Finding: `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:549` — crate pending, owner this review.
+Plan baseline: "a small HTTP server (tiny_http or axum)" (threat 9); security rules in line 119; `serve` pool of 4 read-only connections (line 671).
+Runtime evidence: search check (Scope Challenge A): axum on tokio/hyper is the standard choice in 2025–2026; tiny_http's last release is 2022 and it is synchronous thread-per-request. The machine has 8 CPUs and the server serves one tab.
+Comparison grid:
+| Option | Runtime | Binary/compile cost | Middleware for Host/Origin/CSP/token | Tauri path |
+| A axum | tokio multi-thread (can be current_thread) | +~40 crates, +~2–3 MB, +~20 s cold build | tower layers, built in | same handlers can be called from Tauri commands only if they are plain fns over `core` (they are) |
+| B tiny_http | none, blocking threads | +3 crates | hand-written per request (~80 lines) | same |
+| C ureq-style custom over `std::net` | none | 0 | hand-written, plus HTTP parsing | same |
+Question D6 — R4: Какой HTTP-сервер для `serve`: axum на tokio или синхронный tiny_http?
+Project/branch/task: freespace, master, Section 1 Architecture, finding 1.
+ELI10: `serve` отдаёт одну вкладке страницу и пять GET-маршрутов с проверкой заголовков. axum даёт эти проверки готовыми слоями, но тянет tokio и ~40 крейтов; tiny_http — три крейта и потоки, но проверки Host/Origin/токена пишутся руками, а сам крейт не обновлялся с 2022 года.
+Stakes if we pick wrong: с tiny_http каждая проверка безопасности из таблицы угроз пишется и тестируется вручную, и крейт может остаться без фиксов; с axum бинарник толще и сборка дольше, но вся логика серверной безопасности стандартная.
+Recommendation: A because проверки безопасности (Host, Origin, токен, CSP) — это ровно то, что tower-слои делают декларативно и тестируемо; цена в 2–3 МБ бинарника незаметна на фоне 0.5 ГБ снимка.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) axum + tokio (recommended)
+  ✅ Готовые слои для заголовков и CSP, стандартная экосистема, активная поддержка
+  ✅ `tokio::task::spawn_blocking` для SQLite-запросов изолирует пул соединений от обработчиков
+  ❌ Плюс ~40 крейтов и ~20 с холодной сборки; async-код в единственном сетевом компоненте (human: ~1 д / CC: ~30 мин)
+B) tiny_http (synchronous)
+  ✅ Минимум зависимостей, нет async, потоки напрямую мапятся на пул SQLite
+  ✅ Самый маленький бинарник и самая быстрая сборка
+  ❌ Последний релиз 2022; Host/Origin/токен/CSP/404 пишутся руками и тестируются только нашими тестами (human: ~1.5 д / CC: ~40 мин)
+Net: стандартная безопасность «из коробки» против минимального бинарника.
+Header: R4 HTTP crate
+Options:
+A) axum + tokio (recommended)
+Эффорт S (human: ~1 д / CC: ~30 мин), риск low, обслуживание: активный крейт. ✅ готовые слои ✅ spawn_blocking для SQLite ❌ +40 крейтов, async.
+B) tiny_http (synchronous)
+Эффорт S (human: ~1.5 д / CC: ~40 мин), риск medium (крейт без релизов с 2022), обслуживание: ручные проверки. ✅ минимум зависимостей ✅ нет async ❌ вся безопасность руками.
+
+State: approved
+Actual answer: A) axum + tokio (D6, 2026-10-22)
+Accepted scope: `serve` built on axum (tokio `current_thread` runtime is enough for one tab; multi-thread not required); tower layers implement Host check, `X-Freespace-Token`, Origin rejection, CSP/Referrer headers; SQLite queries run via `spawn_blocking` on the inode-keyed pool (OV-6); threat 9 updated: HTTP crate = axum. Task T4 names axum.
+History: D6 asked, A chosen as recommended.
+
+### R5: systemd unit hardening and I/O priority for the nightly scan
+
+Finding: `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:117,137` — unit contents unspecified beyond `Persistent=true`.
+Plan baseline: line 117 "systemd-unit не содержит параметров"; line 199 task 5 (timer + unit); Section 9 rollout.
+Runtime evidence: host is rotational ext4 at 97%, 7M inodes; `scan` reads metadata of every inode with up to 8 workers (Open Question 3). A full-priority scan competes with any interactive I/O. systemd offers `Nice=`, `IOSchedulingClass=idle`, `ProtectSystem=strict` + `ReadWritePaths=`, `PrivateTmp=`, `NoNewPrivileges=` for exactly this.
+Comparison grid:
+| Option | Interactive impact | Blast radius if scan is buggy | Scan duration |
+| A hardened + idle I/O | minimal | writes only `snapshot_dir`, `/var/lib/freespace` | +10–30 % when the disk is busy, same when idle (02:00) |
+| B plain unit | scan at full priority | root can write anywhere | baseline |
+Question D7 — R5: Вшивать ли в systemd-unit ограничения (idle I/O, ProtectSystem) для ночного скана?
+Project/branch/task: freespace, master, Section 1 Architecture, finding 2.
+ELI10: Ночной скан читает метаданные 7 миллионов файлов от root на вращающемся диске. Без ограничений он соревнуется за диск с чем угодно, что в этот момент работает, а как root-процесс может писать куда угодно. systemd умеет сказать «работай на диске только когда он свободен» и «писать можно только в каталог снимка» двумя-тремя строками в unit.
+Stakes if we pick wrong: без ограничений ночной скан тормозит всё, что работает ночью (бэкапы, сборки), а ошибка в коде записи может задеть файловую систему; с idle-приоритетом скан на занятом диске длится дольше, что ночью не важно.
+Recommendation: A because строки стоят ничего, а `ProtectSystem=strict` превращает «scan пишет только под snapshot_dir» из обещания в гарантию ядра.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Hardened unit: Nice=19, IOSchedulingClass=idle, ProtectSystem=strict, ReadWritePaths=snapshot_dir, NoNewPrivileges, PrivateTmp (recommended)
+  ✅ Скан не мешает ночным задачам; запись ограничена каталогом снимка на уровне ядра
+  ✅ Обещание из таблицы угроз («пишет только под snapshot_dir») становится проверяемым: тест читает unit
+  ❌ `ProtectSystem=strict` требует явного списка путей (snapshot_dir, `/etc/freespace` для lock), ошибка в списке даёт EROFS и красный таймер (human: ~0.5 д / CC: ~15 мин)
+B) Plain unit (ExecStart + Persistent only)
+  ✅ Ничего не может сломаться из-за песочницы, проще отлаживать первые запуски
+  ✅ Ноль дополнительной работы
+  ❌ Скан идёт на полном приоритете и с полными правами root на диске, где 3 % свободно
+Net: гарантии ядра и тихий скан против простоты первых запусков.
+Header: R5 unit hardening
+Options:
+A) Hardened unit (idle I/O + ProtectSystem) (recommended)
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск low, обслуживание: список ReadWritePaths. ✅ тихий скан ✅ запись только в snapshot_dir ❌ EROFS при ошибке в списке.
+B) Plain unit
+Эффорт 0, риск medium (полный приоритет и права), обслуживание: нет. ✅ просто ✅ ноль работы ❌ скан мешает всему ночному.
+
+State: approved
+Actual answer: A) Hardened unit (D7, 2026-10-22)
+Accepted scope: `install-timer` writes `freespace.service` with `Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir> /var/lib/freespace`, `NoNewPrivileges=true` (`PrivateTmp` is NOT set: it would hide the host `/tmp` from the scanner — OV-10), `ProtectHome=read-only` is NOT set (scan must read `/home`); lock file and `state.json` live under `snapshot_dir` so one `ReadWritePaths` entry covers writes; a unit test asserts the rendered unit contains these keys (T12).
+History: D7 asked, A chosen as recommended.
+
+### R6: Lifetime of `serve` started by `gui`
+
+Finding: `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:99,431` — exit condition undefined.
+Plan baseline: `gui` "поднимает serve и открывает браузер" (line 99); nil-path "leave serve running" (line 431); residual risk assumes short-lived server (line 119).
+Runtime evidence: desktop VM, single user; a background process holding a token and a SQLite pool for days is invisible (no tray, no notification). The page already polls `/api/status` for the "snapshot updated" banner (line 605), so the server can see liveness.
+Comparison grid:
+| Option | Exit rule | Stale-process risk | Reopen cost |
+| A idle timeout | exit after 10 min without any `/api/*` request; page keeps a 30 s heartbeat via its existing status poll; `--keep-alive` disables | none | `freespace gui` again (~1 s) |
+| B until Ctrl-C | explicit | server lives until the terminal closes | none |
+| C close on tab unload | `navigator.sendBeacon('/api/bye')` | tab crash → leak; also a mutating endpoint | none |
+Question D8 — R6: Когда завершать `serve`, запущенный командой `gui`: по простою, по Ctrl-C или по закрытию вкладки?
+Project/branch/task: freespace, master, Section 1 Architecture, finding 3.
+ELI10: `gui` запускает локальный сервер с токеном и открывает браузер. Если никто не определил, когда сервер выключается, он живёт, пока жив терминал или пока его не убьют, и держит токен и открытый снимок. Простой вариант — сервер сам выходит, если страница 10 минут не присылала запросов; страница и так опрашивает `/api/status` для баннера «снимок обновился».
+Stakes if we pick wrong: забытые серверы копятся по одному на каждый `gui`, каждый с живым токеном; слишком короткий тайм-аут заставляет перезапускать `gui` после кофе.
+Recommendation: A because страница уже опрашивает статус, значит «нет запросов 10 минут» = «вкладка закрыта», и ни одной новой кнопки или endpoint-а не нужно.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Idle timeout 10 min (page heartbeat via the existing status poll), `--keep-alive` to disable (recommended)
+  ✅ Ни одного нового endpoint-а: heartbeat — это уже существующий опрос `/api/status`
+  ✅ Забытых серверов нет: выход через 10 минут после закрытия последней вкладки
+  ❌ Открытая вкладка без сети (ноутбук в сне) приводит к выходу; повторный `gui` возвращает всё за секунду (human: ~0.5 д / CC: ~15 мин)
+B) Run until Ctrl-C / terminal closes
+  ✅ Поведение предсказуемо и совпадает с `serve` без `gui`
+  ✅ Ноль дополнительной логики
+  ❌ Каждый `gui` из скрипта или ярлыка оставляет процесс с токеном навсегда
+C) Exit on tab unload (`sendBeacon` to `/api/bye`)
+  ✅ Мгновенный выход при закрытии вкладки
+  ✅ Нет тайм-аутов
+  ❌ Единственный мутирующий endpoint в v1 и утечка при падении вкладки или браузера (human: ~0.5 д / CC: ~20 мин)
+Net: самовыключение по простою против явного управления жизнью процесса.
+Header: R6 serve lifetime
+Options:
+A) Idle timeout 10 min + --keep-alive (recommended)
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск low, обслуживание: один таймер. ✅ без новых endpoint-ов ✅ нет забытых серверов ❌ выход при спящей вкладке.
+B) Until Ctrl-C
+Эффорт 0, риск medium (утечка процессов с токеном), обслуживание: нет. ✅ предсказуемо ✅ ноль логики ❌ процесс живёт вечно.
+C) Exit on tab unload (sendBeacon)
+Эффорт S (human: ~0.5 д / CC: ~20 мин), риск medium, обслуживание: endpoint. ✅ мгновенный выход ✅ без тайм-аутов ❌ мутирующий endpoint, утечка при краше.
+
+State: approved
+Actual answer: B) Run until Ctrl-C / terminal closes (D8, 2026-10-22; user chose against recommendation A)
+Accepted scope: `gui` runs `serve` in the foreground of the invoking terminal and exits on Ctrl-C/SIGTERM/SIGHUP (terminal close); `gui` prints the URL and the line `press Ctrl-C to stop` to stderr; no idle timeout, no `--keep-alive`, no `/api/bye`. Mitigation kept for the residual-risk paragraph: the token dies with the process, and `freespace status` shows nothing about servers (no registry). Documented in SKILL.md: agents should not call `gui`, only `--json` commands.
+History: D8 asked with A recommended; answer B recorded.
+
+### Eng Section 2: Code Quality Review
+
+**Shared-code rubric.** One query layer in `core::queries` returning typed structs; `cli` and `serve` serialize the same structs (plan line 615). Parsers for `--min-size`, durations and dates are shared between `top`/`find`/`ls` (amendment above). Platform traits (`allocated_size`, `file_identity`, `is_mount_boundary`) are the only `cfg`-split code. `web/api.ts` is the single transport adapter. No duplication is planned; the rubric passes on paper, and the regression guard is the E2E contract harness (Section 3, R7).
+
+**Findings.**
+
+1. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:147 — `--name` is executed as SQL `GLOB`/`LIKE`. SQLite `GLOB` is byte-wise and case-sensitive, `LIKE` folds ASCII only, and neither has an escape for a literal `*`/`?`/`[`. Names are stored as raw bytes (Linux file names are not guaranteed UTF-8). `--iname '*.MKV'` therefore misses `фильм.mkv` only on case, but misses `Видео.MKV` vs `видео.mkv` entirely, and `[` in a name cannot be searched at all. The CLI promise (glob with `--iname`) is stronger than the engine.` → R2.
+2. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:117 — `config.toml` is both read by root (`scan`) and parsed by the user (`gui`/`serve` for `port`, `snapshot_dir`); a single `Config` struct with `serde` defaults and `deny_unknown_fields` is implied but not stated. Note for T5: unknown keys are a usage error (exit 2) with the key name, so a typo in `roots` never silently scans nothing.`
+3. `[P3] (confidence: 6/10) docs/designs/free-space-disk-analyzer.md:121 — `path` in every JSON entry is reconstructed by walking `parent_id` up to the root for each row. For `find --limit 30` that is 30 walks; for `total` nothing is reconstructed. Note for T6: reconstruct with one recursive CTE per response, cached per request, not per row.`
+
+**Dispositions.** 1 → R2 (question). 2, 3 → notes into tasks T5/T6, no decision.
+
+### R2: Name matching engine for `find --name` / `--iname`
+
+Finding: `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:147` — SQL `GLOB`/`LIKE` cannot honour the documented semantics on non-ASCII names.
+Plan baseline: "выполняется SQL `GLOB`/`LIKE` по диапазону `id BETWEEN x AND subtree_end`" (line 147); recall REALITY row (line 1345).
+Runtime evidence: search check (Scope Challenge A, Layer 3): SQLite `GLOB` case-sensitive, no escape; `LIKE` ASCII folding; Unicode needs ICU or a custom function. `rusqlite` supports `create_scalar_function`; `globset` compiles a glob once and matches `&[u8]` via `Candidate`. Home directory on this host contains Cyrillic names.
+Comparison grid:
+| Option | Unicode `--iname` | Literal `[`/`*` | Cost per row | Engine |
+| A registered Rust scalar `fs_glob(name, pattern, icase)` via globset | yes (`case_insensitive(true)` folds Unicode simple case) | yes (`\` escape per globset) | one FFI call + matcher (~100 ns) | same sequential range scan |
+| B SQL `GLOB`/`LIKE` as planned | no (ASCII only) | no | native | same |
+| C fetch names to Rust, filter in process | yes | yes | row transfer for the whole range | moves the filter out of SQL; `total` needs full materialisation |
+Question D9 — R2: Чем сопоставлять `--name`/`--iname`: Rust-функцией в SQLite (globset) или встроенными `GLOB`/`LIKE`?
+Project/branch/task: freespace, master, Section 2 Code quality, finding 1.
+ELI10: План обещает glob по имени с `--iname` без учёта регистра. Встроенный `GLOB` SQLite сравнивает байты и регистр не игнорирует, а `LIKE` игнорирует регистр только у латиницы, и ни у одного нет экранирования для `*` и `[`. На машине с русскими именами файлов `--iname '*видео*'` пропустит `Видео.mkv`. Зарегистрированная Rust-функция поверх globset делает ровно то, что написано в контракте, и стоит столько же, сколько тот же последовательный проход.
+Stakes if we pick wrong: агент получает неполный `total` и не узнаёт об этом; обещание в SKILL.md становится ложным для любого не-ASCII имени.
+Recommendation: A because контракт уже написан (glob, `--iname`), проход по диапазону всё равно последовательный, а скалярная функция стоит 20 строк и делает обещание истинным.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Registered scalar function `fs_glob` via globset (recommended)
+  ✅ Unicode-регистр и экранирование по документации globset; одна семантика в CLI, API и тестах
+  ✅ Стоимость — та же последовательность по `id BETWEEN`, плюс ~100 нс на строку; на 7M строк это ≤ 1 с
+  ❌ Функция регистрируется на каждом соединении пула; забытая регистрация = SQL-ошибка, тест нужен (human: ~0.5 д / CC: ~15 мин)
+B) SQL `GLOB`/`LIKE` as planned
+  ✅ Ноль Rust-кода вокруг матчинга, план не меняется
+  ✅ Нативная скорость SQLite
+  ❌ `--iname` врёт на не-ASCII именах; `[`/`*` в имени не ищутся; контракт нужно ослабить в SKILL.md
+C) Filter in Rust after fetching names for the range
+  ✅ Та же семантика, что и A, без регистрации функции
+  ✅ Проще отлаживать
+  ❌ Весь диапазон перетекает в процесс ради `total`; на `/` это 7M строк и сотни МБ (human: ~0.5 д / CC: ~15 мин)
+Net: истинный контракт за 20 строк против нативного, но более слабого матчинга.
+Header: R2 glob engine
+Options:
+A) fs_glob scalar function via globset (recommended)
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск low, обслуживание: регистрация на соединении. ✅ Unicode-регистр ✅ экранирование ❌ тест на регистрацию.
+B) SQL GLOB/LIKE as planned
+Эффорт 0, риск medium (ложный контракт), обслуживание: нет. ✅ ноль кода ✅ нативно ❌ ASCII-only, нет escape.
+C) Filter in Rust after fetch
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск medium (память), обслуживание: нет. ✅ та же семантика ✅ просто ❌ 7M строк в процесс.
+
+State: approved
+Actual answer: A) fs_glob scalar function via globset (D9, 2026-10-22)
+Accepted scope: `core` registers a deterministic scalar `fs_glob(name BLOB, pattern TEXT, icase INT)` on every connection it opens (pool factory + CLI connection); pattern translated glob→regex once per query and compiled with the `regex` crate in Unicode mode (`(?iu)` when `icase`; `globset`'s `(?-u)` output is NOT used — OV-9), names decoded as UTF-8, invalid-UTF-8 names matched byte-wise without folding; backslash escape; `find --name/--iname` SQL becomes `fs_glob(name, ?1, ?2)` over the `id BETWEEN` range; tests: Cyrillic `--iname`, literal `[`, missing registration fails loudly (T6). Plan line 147 amended.
+History: D9 asked, A chosen as recommended.
+
+### Eng Section 3: Test Review
+
+**Framework detection.** No `Cargo.toml` exists yet (greenfield); the plan implies Rust with `cargo test --workspace` (unit + integration), `assert_cmd` for CLI, `reqwest` against an in-process axum server, and a manual benchmark. CI (R1) runs them. JavaScript side: `tsc --noEmit` only; no page tests in v1 (one screen, manual QA via `gui`).
+
+**Step 1 — what is covered by the CEO test plan (Section 6).** Tree/attribution, publish crash window, queries on a 3-generation synthetic snapshot, serve security, gui bootstrap, install-timer, SKILL.md E2E, benchmark. `find` was added after that plan and has no tests listed there.
+
+**Step 2 — coverage diagram (eng).**
+
+```
+ scan ──► tree ──► write ──► publish ──► state.json          [★★ TESTED: CEO #1,#3]
+   │                 │          │
+   │ hardlinks       │ ENOSPC   │ crash window                [★★ TESTED: CEO #2,#3]
+   ▼                 ▼          ▼
+ queries: ls / top / diff / status                             [★★ TESTED: CEO #4,#5]
+ queries: find  ── total / nested dedup / date edge /          [GAP → unit on synthetic snapshot]
+                   --iname Unicode / hardlink zero / escape    [GAP → R2 decides engine; tests same]
+ params: --min-size K|M|G|T, Nd|Nw|Nmo|Ny, YYYY-MM-DD          [GAP → unit, shared parser]
+ serve: Host/token/Origin/CSP/404 (axum layers)                [★★ TESTED: CEO #7] + lifetime (D8: Ctrl-C) [→E2E manual]
+ gui: 0600 redirect, TTL, URL printed on xdg-open failure      [★★ TESTED: CEO #6] + snap note [GAP → integration]
+ install-timer: unit keys (Nice, IOSchedulingClass, Protect…)  [GAP → unit: rendered unit contains keys]
+ build.rs: bun present / absent message                        [GAP → CI job on a runner without bun]
+ skill: SKILL.md commands executed, JSON validated              [GAP → R7: schema-driven E2E harness]
+ benchmark: docs/benchmarks.md (T1)                            [manual, recorded]
+```
+
+**Step 3 — value cards for new tests.**
+
+1. *find totals equal sum of matches* → `Value: protects=total.{allocated,apparent,count} over ALL matches, not top-limit; fails_when=total computed from the limited page; why_new=find added after CEO plan; seam=none; no_claim=performance on 7M rows (benchmark)`.
+2. *nested `--kind dir --name node_modules` counted once* → `Value: protects=id-range dedup; fails_when=inner match added to total; why_new=D15 rule; seam=none; no_claim=none`.
+3. *date boundary* → `Value: protects=YYYY-MM-DD = local midnight, --older-than 30d excludes mtime == now-30d exactly as documented; fails_when=off-by-one day or UTC vs local; why_new=find/top share parser; seam=none; no_claim=DST transitions`.
+4. *`--iname` on Cyrillic names and literal `[`* → `Value: protects=R2 engine semantics; fails_when=ASCII-only fold; why_new=R2; seam=none; no_claim=locale-specific folding (Turkish i)`.
+5. *hardlink zero* → `Value: protects=unattributed links add 0 to total; fails_when=double counting; why_new=find; seam=none; no_claim=none`.
+6. *parsers reject junk with exit 2* → `Value: protects=`--min-size 10X`, `--older-than 3y2` → usage error; fails_when=silent 0 or panic; why_new=shared parser; seam=none; no_claim=none`.
+7. *rendered systemd unit contains hardening keys* → `Value: protects=D7 scope; fails_when=key dropped during refactor; why_new=D7; seam=none; no_claim=systemd actually enforcing (system test out of CI)`.
+8. *SKILL.md commands run and validate against JSON schema* → `Value: protects=agent contract; fails_when=field renamed, command flag removed; why_new=R7; seam=none; no_claim=agent behaviour`.
+
+**Step 4 — REGRESSION RULE.** Greenfield: no existing behaviour to preserve; the first commit's CLI contract becomes the regression baseline via the R7 harness.
+
+**Step 5 — Test Plan Artifact.** Written to `/home/tass/.gstack/projects/tass/tass-master-eng-review-test-plan-20261022-195444.md` (local-only repo; path recorded in the report).
+
+**Findings.**
+
+1. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:636 — "SKILL.md examples executed verbatim, compare JSON schema" names no mechanism: no schema file exists, and SKILL.md is prose. Without a derived schema the E2E test is a hand-maintained copy of the structs and drifts.` → R7.
+2. `[P3] (confidence: 7/10) — `find` tests absent from the CEO plan; covered by value cards 1–6 (no question).`
+3. `[P3] (confidence: 6/10) — `build.rs` bun dependency (D5) needs a negative CI job proving the error message when bun is missing; added to R1 scope as a note (no question).`
+
+**Dispositions.** 1 → R7 (question). 2, 3 → tasks T6/T13, no decision.
+
+### R7: Contract harness between SKILL.md, CLI JSON and the HTTP API
+
+Finding: `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:636` — "compare JSON schema" has no schema source.
+Plan baseline: line 636 (CEO test #8), line 141 (SKILL.md documents commands verbatim), line 149 (API and CLI JSON identical).
+Runtime evidence: Rust structs in `core::queries` are the single source; `schemars` derives JSON Schema from `serde` structs; `assert_cmd` runs the binary; `jsonschema` crate validates. SKILL.md code blocks can be extracted by a test (fenced blocks starting with `freespace `).
+Comparison grid:
+| Option | Source of truth | Drift detection | Extra crates | Effort |
+| A schemars-derived schema + test that runs every SKILL.md command | Rust structs | compile-time for schema, test-time for SKILL.md | schemars, jsonschema, assert_cmd | S |
+| B golden JSON files per command | committed fixtures | test-time, manual update | assert_cmd, insta | S |
+| C none beyond CEO #8 prose | — | none | — | 0 |
+Question D10 — R7: Как проверять контракт SKILL.md ↔ CLI ↔ API: схема из структур (schemars) или golden-файлы?
+Project/branch/task: freespace, master, Section 3 Test review, finding 1.
+ELI10: Агент работает по SKILL.md, где написаны команды и поля JSON. Если кто-то переименует поле в Rust, SKILL.md об этом не узнает, и агент сломается молча. Можно генерировать JSON Schema прямо из Rust-структур и тестом прогонять каждую команду из SKILL.md через бинарник, проверяя ответ по схеме; или хранить эталонные JSON-файлы и сравнивать с ними.
+Stakes if we pick wrong: без механизма «ключевая мотивация — один скилл для всех машин» держится на внимательности; с golden-файлами каждое изменение требует ручного обновления фикстур, и тест превращается в «нажми обновить».
+Recommendation: A because структуры уже единственный источник правды для CLI и API, а schemars делает из них схему без копирования; тест читает SKILL.md, так что документация и контракт проверяются одним прогоном.
+Completeness: A=9/10, B=6/10, C=2/10
+Pros / cons:
+A) schemars-derived JSON Schema + SKILL.md command runner (recommended)
+  ✅ Переименование поля ломает тест, а не агента; SKILL.md исполняется, а не читается
+  ✅ Та же схема публикуется в `skill/schema.json` для агентов, которые умеют её читать
+  ❌ Три крейта в dev-dependencies и дисциплина «каждая команда в SKILL.md — в fenced-блоке» (human: ~1 д / CC: ~30 мин)
+B) Golden JSON fixtures (insta snapshots)
+  ✅ Просто завести, видно весь ответ целиком
+  ✅ Ловит и изменения значений, не только форму
+  ❌ Фикстуры обновляются вручную и быстро становятся «accept all»; SKILL.md не исполняется (human: ~0.5 д / CC: ~15 мин)
+C) Keep CEO #8 as prose, no harness
+  ✅ Ноль работы
+  ✅ Нет новых зависимостей
+  ❌ Контракт для агента не проверяется ничем, кроме глаз
+Net: исполняемая документация против ручных эталонов.
+Header: R7 contract harness
+Options:
+A) schemars schema + SKILL.md runner (recommended)
+Эффорт S (human: ~1 д / CC: ~30 мин), риск low, обслуживание: fenced-блоки в SKILL.md. ✅ переименование ломает тест ✅ schema.json для агентов ❌ 3 dev-крейта.
+B) Golden JSON fixtures
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск medium (accept-all), обслуживание: фикстуры. ✅ просто ✅ ловит значения ❌ SKILL.md не исполняется.
+C) No harness
+Эффорт 0, риск high (контракт не проверяется), обслуживание: нет. ✅ ноль работы ✅ без зависимостей ❌ только глаза.
+
+State: approved
+Actual answer: A) Generated schema.json, SKILL.md links to it (D10, 2026-10-22; re-asked once after the user's clarification that SKILL.md must not carry the schema itself)
+Accepted scope: response structs in `core::queries` derive `schemars::JsonSchema`; `freespace schema --json` prints the schema (new CLI command, exit 0); `skill/schema.json` is generated from it and committed; SKILL.md contains the commands (fenced blocks) and one link to `schema.json`, no schema text; tests: (1) committed `schema.json` equals the generated one, (2) every `freespace …` fenced command in SKILL.md runs via `assert_cmd` against a synthetic snapshot and its stdout validates with `jsonschema`; CI runs both (R1). Task T9 updated.
+History: D10 asked; user asked whether SKILL.md can just link the single source of truth; re-asked with that refinement; A chosen.
+
+### Eng Section 4: Performance Review
+
+**Targets restated.** `ls`/`top`/`status` ≤ 300 ms warm on 7M rows; `find` by date/size indexed; `find --name` 1–3 s warm, ≤ 5 s cold; scan faster than `du` (benchmark T1 decides workers on the rotational disk, Open Question 3).
+
+**Findings.**
+
+1. `[P2] (confidence: 6/10) docs/designs/free-space-disk-analyzer.md:147 — `find --name` is a sequential pass over the `id` range reading `name` from the row. On a 0.5 GB snapshot, cold, that is a full table read (rotational disk ≈ 100–150 MB/s → 4–6 s, at the edge of the 5 s target). A covering index `(id, name, kind, allocated, mtime)` would make the pass ~5× narrower but adds ~20 % to snapshot size and scan write time on a 97 %-full disk.` → R8.
+2. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:127 — `path_hash` (xxhash) per entry during scan is cheap (~7M × 50 ns = 0.35 s), noted as non-issue.`
+3. `[P3] (confidence: 6/10) docs/designs/free-space-disk-analyzer.md:147 — `--kind dir` nested dedup by id range is O(n) with a sorted sweep (keep `subtree_end` of the last accepted match); the naive pairwise version is O(n²) on `node_modules`-dense trees. Note for T6.`
+4. `[P3] (confidence: 7/10) — `serve` under axum: SQLite calls must go through `spawn_blocking`; a query on the runtime thread stalls the status poll. Already in R4 scope.`
+
+**Dispositions.** 1 → R8 (question). 2, 3, 4 → notes into T1/T6/T4.
+
+### R8: Covering index for `find --name`
+
+Finding: `[P2] (confidence: 6/10) docs/designs/free-space-disk-analyzer.md:147` — cold `--name` pass may miss the 5 s target without an index.
+Plan baseline: indexes on `mtime`, `allocated` (line 145, 147); snapshot size 0.4–0.7 GB (line 113); benchmark T1 measures queries.
+Runtime evidence: disk rotational, 97 % full; precheck reserves `N × size(current)` so a 20 % larger snapshot raises the reserve by 20 % too.
+Comparison grid:
+| Option | Cold `--name` on 7M | Snapshot size | Decision time |
+| A benchmark first, add index only if cold > 5 s | measured | +0 or +20 % | after T1 |
+| B add covering index now | ~1 s | +20 % | now |
+| C never index names | 4–6 s | +0 | now |
+Question D11 — R8: Добавлять ли покрывающий индекс по `name` сейчас или по результату бенчмарка?
+Project/branch/task: freespace, master, Section 4 Performance, finding 1.
+ELI10: Поиск по имени читает все 7 миллионов строк снимка. На холодном вращающемся диске это может быть 4–6 секунд против цели в 5. Индекс по имени ускорит в разы, но сделает снимок на пятую часть больше на диске, где свободно 3 %. Бенчмарк T1 и так меряет запросы, так что можно решить по цифре.
+Stakes if we pick wrong: индекс «на всякий случай» съедает место и время записи на самом тесном диске; без индекса `find --name` может оказаться медленнее обещанного, но это измеримо и обратимо (индекс добавляется в схему одним `CREATE INDEX`).
+Recommendation: A because цель задана цифрой, бенчмарк её меряет, и снимок на 97 %-диске дороже секунды ожидания.
+Completeness: A=8/10, B=9/10, C=5/10
+Pros / cons:
+A) Benchmark first (T1), add index only if cold `--name` > 5 s (recommended)
+  ✅ Решение по измерению, а не по оценке; снимок не растёт без причины
+  ✅ Изменение схемы обратимо: `CREATE INDEX` в следующем скане, миграции нет (снимок пересоздаётся)
+  ❌ Если индекс всё же нужен, это второй PR после бенчмарка (human: ~0.5 д / CC: ~10 мин)
+B) Add covering index `(id, name, kind, allocated, mtime)` now
+  ✅ `--name` холодный ≈ 1 с сразу, без второго захода
+  ✅ Один раз в схеме, один раз в тестах
+  ❌ +20 % к снимку и к резерву precheck на диске с 3 % свободного места (human: ~0.5 д / CC: ~10 мин)
+C) Never index names (accept 4–6 s cold)
+  ✅ Самый маленький снимок
+  ✅ Ноль работы
+  ❌ Цель ≤ 5 с cold может не выполняться, и SKILL.md должен это признать
+Net: измерить и решить против заплатить местом заранее.
+Header: R8 name index
+Options:
+A) Benchmark first, index only if cold > 5 s (recommended)
+Эффорт S (human: ~0.5 д / CC: ~10 мин), риск low, обслуживание: одна строка в бенчмарке. ✅ по измерению ✅ обратимо ❌ возможен второй PR.
+B) Add covering index now
+Эффорт S (human: ~0.5 д / CC: ~10 мин), риск medium (место), обслуживание: индекс. ✅ ~1 с сразу ✅ один раз ❌ +20 % снимок.
+C) Never index names
+Эффорт 0, риск medium (цель), обслуживание: нет. ✅ меньше снимок ✅ ноль работы ❌ цель может не выполняться.
+
+State: approved
+Actual answer: A) Benchmark first, index only if cold > 5 s (D11, 2026-10-22)
+Accepted scope: benchmark T1 adds rows for `find` cold and warm on the 7M snapshot: `--name '*.iso'`, `--name '*'`, `--older-than 1y`, `--kind dir --name node_modules` (OV-12); `total` always aggregates every match, so `find` latency is proportional to match count and is never in the 300-ms class; schema v1 ships without a name index; if cold > 5 s the covering index `(id, name, kind, allocated, apparent, mtime, subtree_end)` is added in the same release as a schema change (snapshot is regenerated, no migration) and precheck estimate per entry rises from 100 B to 120 B.
+History: D11 asked, A chosen as recommended.
+
+### Outside Voice (codex gpt-6-astra, plan-review, 2026-10-22)
+
+Status: completed, 8 findings (5 High, 3 Medium), Recommendation "revise before implementation". Full output shown verbatim in chat. Dispositions below; the parent reviewer verified each claim against the plan text and the cited sources.
+
+**Factual corrections (no choice; applied to the records they amend):**
+
+- OV-9 (codex #1, High) → R2 amended: `globset` emits `(?-u)` regexes, so `case_insensitive` folds ASCII only. `fs_glob` keeps the D9 shape (registered scalar function) but is implemented as glob→regex translation compiled with the `regex` crate in Unicode mode (`(?iu)` when `icase`), matching names decoded as UTF-8; invalid-UTF-8 names fall back to byte-wise matching with `regex::bytes` without `i`. Tests: Cyrillic `--iname` must pass on both cases.
+- OV-10 (codex #3, High) → R5 amended: `PrivateTmp=true` removed (the scanner must see the host `/tmp` and `/var/tmp`); hardening keeps `Nice=19`, `IOSchedulingClass=idle`, `ProtectSystem=strict`, `ReadWritePaths=<snapshot_dir>`, `NoNewPrivileges=true`; the unit test asserts `PrivateTmp` is absent.
+- OV-11 (codex #4, High) → refresh attribution (line 109) amended: an inode with `nlink > 1` absent from the old `hardlinks` table is attributed normally (smallest path) **if the refresh walk observed exactly `nlink` links inside the subtree** (all links are new and internal); otherwise some link is outside the subtree and the inode keeps `allocated = 0` with the `partial` flag, as before.
+- OV-12 (codex #6, Medium) → R8 amended: benchmark T1 measures `find` with (a) `--name '*.iso'`, (b) `--name '*'`, (c) `--older-than 1y` (broad date), (d) `--kind dir --name node_modules` (nested); the plan text "фильтр только по дате/размеру — индексный" is qualified: index narrows the range but `total` always aggregates every match, so latency is proportional to match count, outside the 300-ms class; fallback index columns become `(id, name, kind, allocated, apparent, mtime, subtree_end)`.
+- OV-13 (codex #7, Medium) → R3 amended: `cli/build.rs` resolves `web/` as `$CARGO_MANIFEST_DIR/../web`, runs `bun build <that>/src/main.ts --outdir $OUT_DIR/web --minify`, and emits `cargo:rerun-if-changed=../web/src` and `../web/index.html` so frontend edits rebuild.
+- OV-14 (codex #8, Medium) → serve section (line 119) clarified: the page never strips `#t=<token>` from the URL (fragments are not sent to servers; CSP + `Referrer-Policy: no-referrer` already in T4), so the "snapshot updated, reload" banner survives reload; the page additionally keeps the token in `sessionStorage` for the tab so an in-page navigation without the fragment still works.
+
+**Open choices (ledger records R9, R10):**
+
+### R9: `find` totals with overlapping matches under `--kind any`
+
+Finding: codex #2 (High), plan line 147 — dedup is defined only for `--kind dir`; `--kind any` can select a directory and its descendants; `total.count`/`apparent` rules unstated.
+Plan baseline: "`--kind dir` вместе с `--name` … вложенные совпадения исключаются по диапазону `id`"; nothing for `--kind any`.
+Runtime evidence: `find / --name '*' --kind any` would count `/` plus everything under it. Union of selected subtrees is computable in one sorted sweep over `id` (keep `subtree_end` of the last accepted match).
+Comparison grid:
+| Option | Semantics | Extra fields | Cost |
+| A union of selected subtrees for all kinds | a match inside an already-selected directory contributes 0 to `total.allocated/apparent`; `total.count` = number of matches, `total.counted` = entries contributing; dedup before sort/limit; entries carry `nested: true` | `total.counted`, `nested` | one sorted sweep, O(matches) |
+| B keep as written | only `--kind dir` dedups; `--kind any` may double count | none | none |
+| C investigate | prototype both on synthetic snapshot before choosing | — | delays T6 |
+| D defer | leave `--kind any` undefined, document "may double count" in SKILL.md | — | none |
+Question D12 — R9: Как считать `total` в `find --kind any`, если совпали и каталог, и его потомки?
+Project/branch/task: freespace, master, Outside Voice finding #2.
+ELI10: `find --name '*cache*' --kind any` может найти каталог `.cache` и файлы внутри него. Если сложить всё, место внутри `.cache` посчитается дважды. Для `--kind dir` план уже исключает вложенные совпадения по диапазону `id`; для `--kind any` правило не написано. Предлагается одно правило для всех видов: совпадение внутри уже выбранного каталога даёт 0 в `total`, помечается `nested: true`, а `total.count` считает все совпадения отдельно от `total.counted`.
+Stakes if we pick wrong: агент получает `total` больше реального и предлагает удалить «100 ГБ», которых нет; либо правило остаётся неопределённым и каждый клиент трактует по-своему.
+Recommendation: A because это то же самое правило, что уже принято для `--kind dir`, распространённое на остальные виды, и оно даёт `total`, который никогда не превышает занятое место.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Apply: union-of-subtrees dedup for all kinds, `total.counted` + `nested` (recommended)
+  ✅ `total` никогда не превышает реально занятое место, одно правило для dir/file/any
+  ✅ Реализация — один проход по отсортированным `id`, тот же, что для `--kind dir`
+  ❌ Два новых поля в контракте (`total.counted`, `nested`), SKILL.md объясняет разницу count/counted (human: ~0.5 д / CC: ~15 мин)
+B) Keep as written (dedup only for `--kind dir`)
+  ✅ Ничего не меняется в плане
+  ✅ Меньше полей в JSON
+  ❌ `--kind any` может считать дважды; контракт обещает «total не превышает занятое место» и нарушает его
+C) Investigate before choosing
+  ✅ Решение по прототипу
+  ✅ Нет риска выбрать неверную семантику
+  ❌ T6 ждёт; семантика очевидна и не требует эксперимента
+D) Defer this change only
+  ✅ v1 выходит быстрее
+  ✅ SKILL.md честно предупреждает
+  ❌ Агент получает ненадёжный `total` именно в самом частом запросе («сколько весит кэш»)
+Net: одно правило для всех видов против неопределённого `total` в `--kind any`.
+Header: R9 find dedup
+Options:
+A) Apply: union dedup for all kinds (recommended)
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск low, обслуживание: два поля. ✅ total не превышает занятое ✅ одно правило ❌ два новых поля.
+B) Keep as written
+Эффорт 0, риск high (двойной счёт), обслуживание: нет. ✅ без изменений ✅ меньше полей ❌ контракт нарушается.
+C) Investigate before choosing
+Эффорт S, риск low, обслуживание: нет. ✅ по прототипу ✅ без риска ❌ T6 ждёт.
+D) Defer this change only
+Эффорт 0, риск medium, обслуживание: предупреждение в SKILL.md. ✅ быстрее v1 ✅ честно ❌ ненадёжный total.
+
+State: approved
+Actual answer: A) Apply: union-of-subtrees dedup for all kinds (D12, 2026-10-22)
+Accepted scope: for every `--kind`, matches are processed in `id` order; a match whose `id` lies inside the `[id, subtree_end]` of an already-accepted directory match contributes 0 to `total.allocated`/`total.apparent`, is flagged `nested: true` in `entries[]`, and is excluded from `total.counted`; `total.count` = all matches; dedup runs before `--sort`/`--limit`; SKILL.md explains count vs counted; plan line 147 amended; tests in T6 (value card 2 extended to `--kind any`).
+History: D12 asked (codex #2), A chosen as recommended.
+
+### R10: `diff` deltas over subtrees with unreadable directories
+
+Finding: codex #5 (High), plan line 143 — surviving rows above an unreadable subtree shrink and show as freed space.
+Plan baseline: OV-3 suppresses disappeared descendants under a `DENIED` directory and lists them in `unknown_subtrees[]`; nothing marks ancestor rows.
+Runtime evidence: `errors` is already an aggregate per subtree in both generations; `flags & DENIED` per row. A row is "incomplete" in a generation when its subtree contains a `DENIED` directory. The nightly scan runs as root, so this is rare at night but common for manual `scan` by a non-root user, and plan line 1148 says `partial` badge exists.
+Comparison grid:
+| Option | Behaviour | Fields | Cost |
+| A mark and demote | each diff row carries `incomplete: "cur"|"prev"|"both"|null` computed from subtree `errors`/`DENIED` in each generation; rows with `incomplete != null` are listed after complete rows regardless of `|delta|` and web shows ⚠; SKILL.md tells the agent not to treat them as freed | `incomplete` | one lookup per row per generation |
+| B keep as written | ancestors show negative delta | none | none |
+| C investigate | measure how often DENIED occurs in root scans first | — | delays T7 |
+| D defer | document the limitation | — | none |
+Question D13 — R10: Что делать со строками `diff`, у которых поддерево нечитаемо в одной из генераций?
+Project/branch/task: freespace, master, Outside Voice finding #5.
+ELI10: Если `/home/user` стал нечитаемым в новом скане, строка `/home` показывает «минус 300 ГБ», хотя ничего не удалено. План прячет исчезнувшие потомки, но предок всё равно «худеет». Можно помечать такие строки флагом `incomplete` и опускать их в конец списка, чтобы агент и страница не принимали их за освобождённое место.
+Stakes if we pick wrong: агент докладывает «освободилось 300 ГБ» после смены прав на каталог; либо строки всегда помечены, и это стоит один lookup на строку.
+Recommendation: A because `errors`/`DENIED` уже есть в обеих генерациях, пометка стоит один lookup, а ложное «освободилось» — худший ответ для инструмента, которому агент верит.
+Note: options differ in kind, not coverage — no completeness score.
+Pros / cons:
+A) Apply: `incomplete` flag per row, demote below complete rows, ⚠ in web, SKILL.md note (recommended)
+  ✅ Ложное «освободилось» невозможно пропустить: флаг в JSON, демоция в списке, ⚠ на странице
+  ✅ Данные уже есть (`errors`, `DENIED`), новых проходов по снимку нет
+  ❌ Одно новое поле и правило сортировки «неполные ниже», которое надо объяснить в SKILL.md (human: ~0.5 д / CC: ~15 мин)
+B) Keep as written
+  ✅ Ничего не меняется
+  ✅ Нет нового поля
+  ❌ Предки нечитаемого поддерева выглядят как освобождённое место
+C) Investigate before choosing
+  ✅ Решение по частоте DENIED в реальных сканах
+  ✅ Без лишних полей, если DENIED не встречается
+  ❌ Ночной скан от root почти не даёт DENIED, но ручной `scan` даёт; статистика ничего не изменит
+D) Defer this change only
+  ✅ v1 быстрее
+  ✅ Ограничение задокументировано
+  ❌ Самый опасный ответ `diff` остаётся в v1
+Net: честный `diff` за одно поле против ложных «освобождений».
+Header: R10 diff incomplete
+Options:
+A) Apply: incomplete flag + demote (recommended)
+Эффорт S (human: ~0.5 д / CC: ~15 мин), риск low, обслуживание: одно поле. ✅ нет ложных освобождений ✅ данные уже есть ❌ новое поле и правило сортировки.
+B) Keep as written
+Эффорт 0, риск high, обслуживание: нет. ✅ без изменений ✅ без поля ❌ ложное «освободилось».
+C) Investigate before choosing
+Эффорт S, риск medium, обслуживание: нет. ✅ по статистике ✅ без лишних полей ❌ статистика не меняет вывод.
+D) Defer this change only
+Эффорт 0, риск medium, обслуживание: документация. ✅ быстрее ✅ задокументировано ❌ опасный ответ в v1.
+
+State: approved
+Actual answer: user-specified (D13, 2026-10-22): «мы предполагаем работу под суперюзером, нечитаемых файлов быть не должно. если они не читаются — это авария и она должна бросаться в глаза» — treat any `DENIED` as a loud anomaly, not a per-row nuance.
+Accepted scope: `scan`/`refresh` run as root (already required), so a `DENIED` directory is an anomaly: the scan finishes but records `warnings[]` ("N directories unreadable", first 10 paths) in `state.json`/`status`; every query response (`status`, `ls`, `top`, `diff`, `find`) carries top-level `incomplete: true` + `unknown_subtrees[]` when the current or `prev` generation has any `DENIED`; CLI prints a one-line red warning to stderr (never silent in `--json`); web shows a persistent red banner "snapshot incomplete: N unreadable directories"; `diff` rows are not demoted or individually flagged (the whole answer is marked); SKILL.md instructs agents to report the warning before any numbers. Exit codes unchanged (0), the warning is data. Tests: synthetic snapshot with one DENIED dir → `incomplete: true` in all five responses (T7).
+History: D13 asked with A recommended; user gave a stronger rule (whole-answer anomaly instead of per-row flag); recorded as the decision.
+
+Approval readiness: PASS — R1 (D4 A), R3 (D5 A), R4 (D6 A), R5 (D7 A + OV-10), R6 (D8 B), R2 (D9 A + OV-9), R7 (D10 A), R8 (D11 A + OV-12), R9 (D12 A), R10 (D13 user rule); amendments applied; no pending ledger rows.
+
+## Eng Review — Required Outputs (plan-eng-review, 2026-10-22)
+
+### NOT in scope (eng review)
+
+- TUI, scheduler stubs, `--apparent-only`, alerts, `--host` (CEO deferrals, TODOS.md).
+- `serve` idle timeout and Unix-socket transport (D14, TODOS.md).
+- Path-glob (`**/node_modules/**`) in `find` (D15 exclusion).
+- Any refactor of the accepted schema beyond the conditional name index (R8).
+- Non-Linux build targets in CI (cargo-dist matrix is Linux x86_64 + aarch64 musl only).
+
+### What already exists
+
+Nothing: greenfield repository (no `Cargo.toml`, no commits). Reused third-party: `jwalk`, `rusqlite` (bundled), `axum`/`tokio`/`tower-http`, `clap`, `serde`/`schemars`, `regex`, `xxhash-rust`, `include_dir`, `bun` (build-time), `cargo-dist`, `assert_cmd`/`jsonschema` (dev).
+
+### Diagrams (eng)
+
+Build and serve path after D5/D6:
+
+```
+ web/src/*.ts ──bun build (cli/build.rs, rerun-if-changed)──► $OUT_DIR/web/*.js
+                                                                   │ include_dir!
+ cli ──clap──► core::queries ──► typed structs ──serde──► stdout --json
+                     ▲                 │
+                     │                 └─schemars──► skill/schema.json ◄── SKILL.md (link)
+ serve (axum, current_thread) ──tower layers: Host ▸ token ▸ Origin ▸ CSP──► /api/* ──spawn_blocking──► SQLite pool (inode-keyed)
+                     ▲
+ gui ── 0600 redirect file ── xdg-open ── browser (#t= kept, sessionStorage) ── Ctrl-C ends serve (D8)
+```
+
+Nightly unit (D7, OV-10): `freespace.timer` → `freespace.service` [Nice=19, IOSchedulingClass=idle, ProtectSystem=strict, ReadWritePaths=snapshot_dir, NoNewPrivileges; no PrivateTmp] → `scan` → precheck → tmp → rename → `state.json` (+ `warnings[]` on any DENIED, D13).
+
+### Failure modes (eng additions)
+
+| Failure | Detect | Handle | Critical gap? |
+|---|---|---|---|
+| `bun` missing on build host | `build.rs` checks `bun --version` first | fail with "install bun ≥1.1 (https://bun.sh)"; CI negative job | no |
+| `fs_glob` not registered on a pooled connection | SQL error "no such function" | pool factory registers in one place; test asserts registration | no |
+| `ProtectSystem=strict` blocks a write path | EROFS in journal, timer red | `ReadWritePaths` covers snapshot_dir and `/var/lib/freespace`; unit test on rendered unit; `install-timer` runs `systemd-analyze verify` | no |
+| Unreadable directory under root scan | `DENIED` flag | `warnings[]`, `incomplete: true` on every response, stderr line, red banner (D13) | no |
+| `find --kind any` overlapping matches | — | union-of-subtrees dedup, `nested`, `total.counted` (D12) | no |
+| Nested inner match wrongly deduped after `--limit` | test value card 2 | dedup before sort/limit | no |
+| Schema drift vs `skill/schema.json` | CI test | regenerate and commit; test fails until done (D10) | no |
+
+Critical gaps: 0.
+
+### Worktree parallelization
+
+| Lane | Tasks | Depends on | Conflicts with |
+|---|---|---|---|
+| core-scan | T1, T3, T11, T19 (OV-11) | — | — |
+| core-queries | T6, T15 (+D12), T17 (fs_glob), T20 (incomplete) | T11 (schema) | — |
+| cli-serve | T4 (axum), T7 (fragment rule), T12 (unit), T22 (schema cmd) | core-queries structs | — |
+| web | T14, T16 (bun build.rs), T21 (banner, filter box) | T22 for schema types | cli-serve (build.rs lives in `cli/`) |
+| ci | T18 (ci.yml, release.yml, bun setup, negative job) | T16 | — |
+| tests/skill | T9, T10, T23 (contract harness), T24 (benchmark rows) | all lanes | — |
+
+### Eng review tasks (appended to `## Implementation Tasks` as T16–T24; amendments to T4, T6, T7, T9, T12, T15 noted there)
+
+See `## Implementation Tasks`. JSONL: `/home/tass/.gstack/projects/tass/tasks-eng-review-20261022-195444.jsonl`.
+
+### Suppressed findings (appendix)
+
+- `[P3] (confidence: 4/10) line 119 — snap-confined browsers may refuse `file://` redirect; mitigation (URL on stderr) already exists.` Kept as a T4 note, not a finding.
+- `[P3] (confidence: 3/10) line 113 — precheck `max(1 GB, 2% used)` fallback may be too small on multi-TB arrays; out of scope for this machine.`
+- `[P3] (confidence: 4/10) line 127 — `path_hash` collision across generations (64-bit) is ~1e-13 for 7M rows; not actionable.`
+- `[P3] (confidence: 3/10) D5 — bun version pinning across local and CI builds could produce different bundles; cosmetic, `--minify` output is not byte-compared anywhere.`
+
+### Completion summary (eng review)
+
+| Item | Value |
+|---|---|
+| Mode | FULL_REVIEW (scope accepted as-is) |
+| Reality rows | 11/11, verdict complete |
+| Questions asked | D1–D14 (D10 re-asked once) |
+| Findings, Sections 1–4 | 15 (S1: 5, S2: 3, S3: 3, S4: 4); 8 became ledger rows R1–R8, 7 notes into tasks |
+| Scope Challenge findings | 3 (R1, R3, factual correction) |
+| Outside Voice | codex gpt-6-astra, completed, 8 findings (5 High, 3 Medium): 6 factual corrections applied (OV-9…OV-14), 2 decisions (R9, R10) |
+| Critical gaps | 0 |
+| Unresolved decisions | 0 |
+| Suppressed | 4 (appendix) |
+| Lake Score | N/A (no answered question offered a scored shortcut; D8 and D5 were kind choices, not completeness cuts) |
+| Test plan artifact | `/home/tass/.gstack/projects/tass/tass-master-eng-review-test-plan-20261022-195444.md` |
+| Answers against recommendation | D5 (A: bun build), D8 (B: Ctrl-C), D13 (user rule) — recorded, not re-litigated |
+
+<!-- eng-review:end -->
+
+<!-- design-review:begin -->
+## Design Review (plan-design-review, 2026-10-22)
+
+Target (fixed): `docs/designs/free-space-disk-analyzer.md`, named explicitly by the user. Report file: this plan. UI scope: the single embedded web page (`web/`), states added after the sketch (find filter, Top files, Δ column, DENIED banner, reload banner, session ended, no snapshot), v1 narrow-width rule. DESIGN.md: absent; the sketch `docs/designs/free-space-disk-analyzer-sketch.png` was the only visual reference. Designer mockups: unavailable (`No OpenAI API key found`), text-only review. Prior learnings applied: `tass-root-scan-denied-is-emergency` (9/10, user-stated), `outside-voice-before-sections` (7/10). Step 0 initial rating: 6/10; focus: all 7 dimensions (D3 A).
+
+### Outside voices (design phase)
+
+Codex `gpt-6-astra` (`OUTSIDE_STATUS: completed`, 15 findings, classification APP UI, 0 hard rejections) and an independent Claude subagent (15 findings) ran before the passes. Litmus consensus: brand not identifiable on the first screen (both NO), one strong anchor (the ranked table, both YES), not scannable by headlines alone (both NO), one job per section (YES), no cards needed (YES), no motion specified (not needed), premium without shadows (YES). The only disagreement: Codex wants a separate **Changes** mode over `/api/diff`; the subagent keeps a Δ column with a noise threshold and `|Δ|` sort (resolved in Pass 2). All findings are integrated into the passes below as pre-identified issues.
+
+### Pass 1: Information Architecture — 5/10 before
+
+The sketch orders the normal state (snapshot pill → table → inspector) and the CEO review accepted it. Four banners, the filter row, the Top files view and the Δ column were added afterwards without a place on the screen. Both outside voices flagged the same two structural gaps.
+
+#### Issue 1 — notice slot and priority (D5)
+
+Finding: the plan names a red `DENIED` banner (D13), a "snapshot updated" banner, `partial` after refresh and a "session expired" message, but never where they sit, which one wins or what happens when several are active; `state.json.last_error` (likely at 97% disk: a failed precheck) is not shown anywhere in the UI.
+Plan baseline: line 143 ("web показывает красный баннер"), Section 11 state table ("generation changed → reload banner", "403 → session expired").
+Options: A) one full-width slot below the header with a fixed priority table, only the highest notice shown, the rest collapsed into a "+1 notice" chip; B) stack all active banners by priority; C) leave unspecified.
+Recommendation: A (both outside voices independently proposed it; hierarchy as service).
+State: approved
+Actual answer: A) Один слот + таблица приоритетов (D5, 2026-10-22)
+Accepted scope: one notice slot directly under the top bar, full width, above the working area, present in every view. Priority table:
+
+| # | Notice | Color | Dismiss | Copy (en) | Action |
+|---|--------|-------|---------|-----------|--------|
+| 1 | Scan incomplete (`incomplete: true`) | red, `role="alert"` | never while the snapshot is incomplete | "Scan incomplete: N directories could not be read as root. Sizes below are lower bounds." | "Show unreadable paths" expands `unknown_subtrees[]` inline; "Copy: sudo freespace scan" |
+| 2 | Last scan failed (`state.last_error`) | red, `role="alert"` | never while `last_error` is newer than `last_success_ts` | "Last scan failed <relative time>: <message>. Showing the snapshot from <scanned_at>." | "Copy: sudo freespace scan" |
+| 3 | Newer snapshot available (generation changed) | neutral | yes (until the next change) | "A newer snapshot is ready (<scanned_at>). Δ will now compare to the previous scan." | "Load latest" (keeps path, mode, filters, sort, selection; see D-reload) |
+| 4 | Session ended (403) | full-page state, not a banner | — | see Pass 2 | — |
+
+Only the highest-priority active notice renders in full; the others collapse into a chip "+N notice" at the right end of the slot, which expands them on click. `partial`/`roots_changed` from `diff` are badges on the Δ column header, never banners. Rows under `unknown_subtrees[]` get a red "?" marker and a "≥" prefix on their size in every view (banner alone is ignored after five seconds). The amber disk pill stays in the top bar as secondary context; red always outranks it.
+
+#### Issue 2 — header hierarchy and modes (D6)
+
+Finding: the sketch's single 48 px strip mixes breadcrumbs, a snapshot pill (host, time, age, entry count), the disk pill and two buttons; the most urgent fact ("14 G free") is the smallest element, "Top files" reads as the primary action because of its dark fill, and "Refresh this folder" promises a rescan it cannot perform (v1 copies a command). Litmus 1 (brand) and 3 (scannable by headlines) failed in both outside reviews.
+Plan baseline: Visual Sketch (line 161), Section 11 "Information architecture … OK".
+Options: A) two-row header with view modes as a segmented control; B) one row with reordered emphasis; C) keep the sketch.
+Recommendation: A (Krug's 3-second billboard test: who/where → emergency → what folder and how big → modes → rows).
+State: approved
+Actual answer: A) Двухстрочная шапка + режимы (D6, 2026-10-22)
+Accepted scope:
+
+```
+┌ identity row (32 px, quiet) ──────────────────────────────────────────────────┐
+│ freespace · tass-vm                 snapshot 7h ago   Filesystem /: 97% ▓▓▓▓░ │
+│                                                        14 G free at scan       │
+├ notice slot (D5; empty = 0 px) ───────────────────────────────────────────────┤
+│ ▌Scan incomplete: 2 directories could not be read as root …  Show paths  Copy │
+├ folder row (40 px) ───────────────────────────────────────────────────────────┤
+│ / › home › tass · 196 G            [Browse][Top files][Find][Changes]  Copy refresh command │
+├ filter row (Find mode only, D-find) ──────────────────────────────────────────┤
+├ results table (72%) ──────────────────────────┬ inspector (28%) ──────────────┤
+│ name  allocated  share  (Δ)  items  modified  │ SELECTED / BIGGEST INSIDE /   │
+│ ▸ .cache  121.4 G ▓▓▓▓▓▓ 62%  2 104 331 today │ CLI COMMAND                    │
+├ footer (36 px, keys) ─────────────────────────┴───────────────────────────────┤
+```
+
+Identity row: product name and `host` left (brand visible, litmus 1); right: snapshot age "7h ago" (neutral; amber after 36 h; red after 7 days with copy "snapshot is 9 days old, is the timer running?"), then the filesystem of the current path: "Filesystem /: 97% used · 14 G free at scan" with a thin fill bar (amber ≥ 80 %, red ≥ 90 %). Entry count, `generation`, scan time move to the age tooltip and the inspector. Folder row: breadcrumbs plus the current folder's allocated size left; right: segmented control Browse | Top files | Find | Changes (one results table, four modes; keys `t`, `/`, `d` switch modes, `Esc` returns to Browse) and a ghost button "Copy refresh command" (footer key `r refresh command`; after copy a toast "Command copied: sudo freespace refresh /path", never "Refreshed"). On load the first row is selected and the inspector is populated. Outlined/filled styling is reserved for operable controls; passive metadata is plain text. The sketch is superseded by the diagram above; a redrawn sketch is a task (see Implementation Tasks).
+
+Pass 1 after fixes: 9/10 (remaining: the redrawn sketch is a task, not yet an artifact).
+
+### Pass 2: Interaction State Coverage — 5/10 before
+
+Section 11 already has a state table, but every cell is a phrase ("empty directory", "banner with exit-code text", "session expired, run freespace gui") with no copy, no action and no distinction between absence, non-observation and failure. Outside voices: Codex #4, #5, #7, #9, #10, #11; subagent #3, #4, #7, #8, #11, #12.
+
+#### Issue 3 — state copy and actions (D7)
+
+Finding: Section 11's state table holds phrases, not designs: "banner with exit-code text" puts `path hash collision (exit 7)` in front of the user; empty, mount and unreadable directories look identical; the first run ("no snapshot yet", exit 8) and the 403 page are a CLI sentence each.
+Plan baseline: Section 11 state table; exit codes 3–8 (lines 109–143).
+Options: A) full copy table (11 states, each one sentence + one action, raw error only under "details"); B) only the two full-page states; C) keep the phrases.
+Recommendation: A (empty states are features; users muddle through, so the next action must be on screen).
+State: approved
+Actual answer: A) Полная таблица состояний (D7, 2026-10-22)
+Accepted scope: the table below replaces the EMPTY/ERROR columns of Section 11 for `web/` and is the copy source for the v1.1 TUI. Every state exposes the raw API error (`error`, exit code) under a collapsed "details" disclosure; none shows it inline.
+
+| State (trigger) | Where | Copy (en) | Action |
+|---|---|---|---|
+| No snapshot (`/api/status` → exit 8) | full page | "No snapshot yet. Run this once; it takes a few minutes and you can leave the terminal." | `sudo freespace scan` with Copy; second line "Then `sudo freespace install-timer` refreshes it nightly". Page polls `/api/status` every 5 s and switches to Browse by itself. If `state.lock` is held: "A scan is running now." |
+| Session ended (403 or fetch refused) | full page | "Session ended: freespace stopped or this tab lost its key. It will reopen at <last path>." | `freespace gui` with Copy; page retries `/api/status` every 10 s and recovers silently if the token is still valid. Never says "expired". |
+| Empty readable folder (`items = 0`, no DENIED) | table body | "Nothing here in this snapshot." | "Up one level" |
+| Mount point (`kind = mount`) | table body | "Not scanned here: separate filesystem (<fs_type>, used X of Y)." | "Open this filesystem" when its root is in the set, else plain text |
+| Unreadable folder (`flags & DENIED`) | table body + notice 1 | "Contents unavailable: this folder could not be read as root." | "Copy: sudo freespace scan" |
+| No matches (Find) | table body | "No matches within <path>." Filters stay visible. | "Clear filters" |
+| Invalid filter (400) | inline under the field | per field: "Not a size. Try 100M or 2G." / "Enter a date as YYYY-MM-DD or a duration such as 180d." / "Invalid pattern." | field focused, `aria-invalid` |
+| No previous snapshot (exit 3) | Changes segment | segment disabled with tooltip "No previous snapshot to compare yet." | none |
+| Snapshot rotated (exit 4) | notice slot (priority 3) | "A new scan just finished." | "Load latest" (D-reload) |
+| Schema mismatch (exit 5) / hash collision (exit 7) | notice slot (priority 2) | "Snapshot was made by another version. Rescan to compare." / "Snapshot inconsistency detected. Rescan." | "Copy: sudo freespace scan" |
+| Path gone after rescan (`ls` 404 after Load latest) | table body | "This folder is not in the new snapshot." | "Go to parent" (nearest existing ancestor) |
+| Request failure (network) | notice slot (priority 2, dismissible) | "Can't reach freespace. Is `freespace serve` still running?" | "Retry" |
+
+Loading: Browse/Top keep a 300 ms grace period before any indicator (no skeleton flash); after it, a 2 px progress line under the folder row. Find keeps the previous rows dimmed and labeled "previous results" with the total line reading "Searching… name filters can take a few seconds" and a Cancel (AbortController); superseded responses are discarded. Truncation: the last row reads "Showing 30 of 242" with a "Show more" link that doubles `limit`; the share denominator is the folder's measured size, never the shown rows.
+
+#### Issue 4 — Δ as a column toggle or a Changes mode (D8)
+
+Finding: the plan's "Δ since prev column toggle" sits over the Browse table, but `/api/diff` returns a differently ranked and limited set with removed entries, `partial`, `roots_changed` and `unknown_subtrees[]`; a column cannot show "no comparison data" differently from zero, and a removed entry has no Browse row to attach to. Codex #7 (High) vs subagent #8 (keep the column, add `|Δ|` sort and ghost rows).
+Plan baseline: line 143 ("Web показывает колонку «Δ since prev» переключателем"), Section 11 row "Δ since prev column".
+Options: A) Changes mode over `/api/diff`; B) Δ column in Browse merged from a second request; C) keep the toggle unspecified.
+Recommendation: A (the API contract is the honest source; D6 already made the table multi-mode).
+State: approved
+Actual answer: A) Режим Changes над /api/diff (D8, 2026-10-22)
+Accepted scope: the "Δ since prev column toggle" is replaced by the **Changes** segment (key `d`, hash `#/path?mode=changes`). Columns: name, allocated, Δ allocated, Δ items, modified. Δ format: `+9.8 G` / `−1.2 G` (true minus, tabular figures, right-aligned) with ▲/▼ glyphs so direction is never color-only; growth uses the danger hue, shrink the success hue; `—` for 0. Order is the API order (`|delta|` descending). Removed entries render as ghost rows (muted, strikethrough name, badge "gone"); new entries carry a badge "new". A context line above the table reads "vs <prev_scanned_at> (gen <prev_generation>) · depth 1 · files included" and carries badges "partial: <paths> rescanned after prev" and "roots changed" with tooltips; `unknown_subtrees[]` rows are listed under the notice (D5). Rows inside Changes use `--kind any --depth 1` so files directly under the folder appear. `Enter`/`→` on a directory row descends and stays in Changes mode; the inspector shows "Δ since prev" as an extra line in every mode where the value is known (Changes only). No previous generation: the segment is disabled with the D7 tooltip. The Amendments paragraph in Implementation Tasks (T14) is updated to name the mode.
+
+
+#### Issue 5 — Find mode: scope, labels, honest totals (D9)
+
+**Decision record.** D9 asked: Find as a mode with a labeled form, a field above Browse, or leave the plan text. User chose **A) Find mode with form and honest totals**. State: approved. Completeness 10/10.
+
+**Why it was an issue.** The plan said "filter field above the table and a total line `N files · X G`". A field above a table reads as "filter these rows", but `find` is recursive over the subtree. "N files" is wrong for `--kind dir|any` and hides that only the top 30 are shown. The plan did not say when the query fires; name search can take up to 5 s on 7M rows, so search-as-you-type would flood SQLite. Placeholder-only labels vanish on input (universal rule). Sources: Codex #4, #5; subagent #7.
+
+**Spec (binding for T14/T15 and the web task).**
+
+- **Entry.** `Find` segment in the folder row (D6, key `/`). Switching modes keeps the current path. Hash: `#/path?mode=find&name=*.iso&kind=files&min=100M&before=…&after=…&icase=1`.
+- **Form row** (only in Find mode, 56 px, below the folder row):
+  ```
+  Find within /home/tass, including subfolders
+  Name pattern        Modified before   Modified after   Min size   Kind
+  [*.iso           ]  [YYYY-MM-DD   ]   [YYYY-MM-DD  ]   [100M   ]  [files ▾]   [Find] [Clear]
+  [ ] ignore case     hint: name only · all filters must match
+  ```
+  Labels are persistent text above each input, never placeholder-only. Placeholders show an example value (`*.iso`, `2025-01-01`, `100M`). `Kind` = files / folders / any (maps to `--kind file|dir|any`).
+- **Submit.** Query fires on Enter in any field or the `Find` button. No search-as-you-type. While loading: D7 rules (300 ms grace, 2 px progress line, previous results dimmed, `Cancel`). `Clear` resets every field and returns to the empty-form state; `Esc` returns to Browse at the same path.
+- **Results table.** Columns: name (relative to the scope path, e.g. `Downloads/ubuntu.iso`), allocated, modified, kind icon. Order: allocated desc. Rows nested under another match get a muted badge `in parent total`. Selecting a row fills the inspector as in Browse; `Show in folder` jumps to Browse at the parent with the row selected.
+- **Total line** (two lines, below the form, above the table):
+  ```
+  128 matches · 42.6 G allocated
+  Showing the largest 30. Total includes all matches; nested folders counted once.
+  ```
+  The word `matches` is used for every kind; `files` only when kind=files. `Show more` doubles the limit (D7). With 0 matches: D7 "No matches" state + `Clear filters`.
+- **Active filters** are also shown as removable chips on the results header (`name: *.iso ×`, `min: 100M ×`), so a scrolled page still shows what is applied. Removing a chip re-runs the query.
+- **Top files** = the same Find view with no filters, kind=files, min size 100M by default, scope chip visible. One component, two entry points. Sorting toggle Biggest/Oldest lives there (Pass 7).
+- **Inspector CLI line** mirrors the form: `freespace find /home/tass --name '*.iso' --kind file --min-size 100M --json` and updates with every field change (Pass 7 "Agent → CLI command").
+- **API.** `/api/find` returns `{ total_count, total_allocated, truncated, limit, rows[] }`; `total_*` cover all matches, not just the returned page. Nested-folder dedup is computed server-side via `subtree_end` ranges.
+
+**Plan amendments.** Section 11 "filter field above the table" → "Find mode form (D9)". T14 adds the two-line total and the `total_*` API fields. T15 (web) adds the Find form component and the chip row.
+
+
+#### Issue 6 — reload continuity after "Load latest" (D10)
+
+**Decision record.** D10 asked what survives "Load latest" and how the page learns about a newer snapshot. User chose **A) preserve everything, poll every 60 s + on tab focus**. State: approved. Completeness 10/10.
+
+**Why it was an issue.** The plan had "Newer snapshot available · Load latest" (D5 notice 3) but no behaviour after the click. A naive `location.reload()` would drop the user to `/` and wipe Changes/Find state, which is exactly where a fresh scan matters most. Sources: Codex #9; subagent #11.
+
+**Spec (binding for T15 web task).**
+
+- **Detection.** The page polls `GET /api/status` every 60 s while visible, and immediately on `visibilitychange` → visible and on `focus`. No polling while hidden. A new `snapshot_id` (or generation) shows notice 3; the page never reloads itself and never swaps data under the user.
+- **"Load latest" click.** Re-reads the current hash (`#/path?mode=…&…`) against the new snapshot in place: path, mode, every Find field, sort column/direction, scroll position (best effort) and the selected row (by full path) are preserved. The identity row updates snapshot age and the fill bar; notice 3 disappears.
+- **Path gone in the new snapshot.** Walk up to the nearest ancestor that exists, open it in the same mode, and show a 6 s toast: `“/home/tass/.cache/pip” is gone in the new snapshot; showing /home/tass/.cache`. Selection is cleared in this case.
+- **Selected row gone, path alive.** Keep the folder, select the first row, toast: `“old-name” is no longer here`.
+- **Changes mode.** The comparison base moves to the previous generation of the new snapshot (new N vs N−1); the context line (D8) updates its `vs <prev_scanned_at> (gen N)` text so the user sees the window shifted.
+- **Find mode.** The form stays filled; the query re-runs automatically against the new snapshot (one request, with the D7 loading rules). Totals update; chips unchanged.
+- **Filters that no longer apply** (e.g. a `before` date later than the new scan time) are kept as typed; the server answers normally. No silent clearing.
+- **Keyboard.** `r` = "Load latest" when notice 3 is visible; otherwise no-op (listed in the shortcut help).
+- **API.** `/api/status` already carries `snapshot_id`, `scanned_at`, `generation`; no change. `/api/ls` and `/api/find` accept an optional `snapshot=` param so the page can explicitly target the latest id and detect rotation races (D7 "Snapshot rotated" → notice 3 again).
+
+**Plan amendments.** Section 11 gains a "Snapshot refresh" paragraph pointing here. T15 adds the status poller, hash re-hydration and the ancestor-walk helper with a unit test (path gone / row gone / both alive).
+
+**Pass 2 after fixes: 9/10.** Every state in Section 11 now has copy and a primary action (D7), Changes and Find are explicit modes with their own loading/empty/truncation rules (D8, D9), and snapshot refresh preserves place (D10). Remaining gap: no mockups to validate the 56 px form row against the 40 px folder row visually.
+
+
+### Pass 3: User Journey & Emotional Arc — 6/10 before
+
+Section 11 has a one-line arc ("relief that nothing waits, then a concrete target") and the Changes "aha" beat. It skips the first run (nothing to show for 1–2 minutes), the incomplete-scan doubt, and the last step: what the user does with the 61 G row once found. Storyboard for the primary journey ("disk is full again, what do I delete?"), rendered as required:
+
+```
+STEP | USER DOES                              | USER FEELS                         | PLAN SPECIFIES?
+-----|----------------------------------------|------------------------------------|---------------------------------------------
+0    | Runs `freespace gui` before any scan   | Impatient; "did it work?"          | D7: full-page "No snapshot yet" + hint; no progress while the first scan runs → Issue 8
+1    | Lands on page (5-sec visceral)         | Relief: numbers are already there  | D6: identity row with age, 97% fill bar amber/red; first row selected
+1a   | Sees red "Scan incomplete" banner      | Doubt: can I trust these numbers?  | D5: lower-bound copy, "≥" prefixes, sudo command to fix; never dismissed
+2    | Clicks the biggest row twice (5-min)   | Hunting; momentum                  | D6 breadcrumbs, 40 px rows, Enter/→ keys, 300 ms loading grace (D7)
+3    | Hits "Not scanned here" on a mount     | Brief confusion                    | D7 mount state + "Open this filesystem"
+4    | Switches to Changes                    | "Aha: Downloads grew 9.8 G"        | D8 Changes mode, ▲/▼ deltas, context line vs prev gen
+5    | Lands on .cache/huggingface/hub 61 G   | Found it; now what?                | Inspector exists, but the payoff action is one sentence ("copies the agent command or deletes by hand") → Issue 7
+6    | Deletes by hand in a terminal          | Did it free what the tool said?    | `freespace refresh /path` via "Copy refresh command" (D6); numbers update after refresh
+7    | Comes back next week (5-year reflective)| Trust: still fresh? still running? | D6 staleness amber >36 h, red >7 d with "is the timer running?"; `status` first-line sentence (T13)
+```
+
+Time horizons: 5-sec = fill bar + age + first row selected (D6); 5-min = Browse → Changes → target with keyboard only (D6, D8); 5-year = staleness and `last_error` surfacing so the tool stays trusted when the timer silently dies (D5 notice 2, D6).
+
+Two gaps remain: step 0 (first-run wait) and step 5 (payoff action). Asked as D11 and D12.
+
+
+#### Issue 7 — end of the journey: "Hide until next scan" (D11)
+
+**Decision record.** D11 first proposed an "If deleted, frees up to X" line plus Copy buttons. The user rejected it ("размер папки и так показан") and proposed a **"Hide until next scan"** action for rows already deleted by hand. Re-asked; user chose **A) Hide until next scan + "N hidden" chip + Copy path / Copy refresh command**. State: approved. Completeness 10/10. User-stated need: "я уже удалил и не хочу больше обращать внимание на это".
+
+**Spec (binding for T15 web task).**
+
+- **Inspector actions** (bottom of the inspector, in this order): `Hide until next scan` (key `h`), `Copy path`, `Copy refresh command`. The "CLI command" line (Pass 7) stays above them with its own copy icon. No delete action in v1 (unchanged).
+- **Hide.** Removes the row from Browse, Top files, Find and Changes. Toast 6 s: `Hidden until the next scan · Undo`. Selection moves to the next row. Hidden paths are stored in `localStorage` under `freespace.hidden.<host>.<snapshot_id>` as full paths; any other key prefix is purged on load, so a new snapshot clears the list automatically. Nothing is sent to the server; CLI and other machines are unaffected (accepted con).
+- **Chip.** When a folder has hidden descendants among its direct children, the folder row shows a muted chip `2 hidden · 63 G` after the folder size. Clicking it toggles a temporary "show hidden" state: hidden rows reappear dimmed with an `Unhide` button and a `hidden` badge; the chip reads `Showing 2 hidden`. In Find and Changes the same chip sits in the results header and counts hidden matches. Totals (folder size, Find `total_allocated`, Changes Δ) never change: the snapshot is immutable; the chip is what explains the difference between the visible rows and the folder total.
+- **Hardlinks.** Rows with `nlink > 1` keep the small link icon (T14) and, in the inspector, one muted line under the size: `Hardlinked (3 paths); space is counted once, at <attributed path>. rm here may not free it.` Shown only when `nlink > 1`. Rows with `allocated = 0` and `nlink > 1` read `0 (counted at /other/path)` (Pass 7 check against the API: the attributed path is not in the current JSON; T15 adds `hardlink_owner` to `/api/ls` rows or the inspector shows `counted elsewhere`).
+- **Keyboard help** (`?` overlay) lists `h` with the others.
+
+**Plan amendments.** Section 11 "copies the agent command or deletes by hand" → "hides the row until the next scan (D11), copies the path or the refresh command". T14 list adds "Hide until next scan + hidden chip". T15 adds the localStorage key schema and the purge-on-load rule.
+
+
+#### Issue 8 — first-run wait: "Scanning…" from the lock file (D12)
+
+**Decision record.** D12 asked what the page shows while the very first scan runs. User chose **A) `status.scanning` from the lock file + two page variants**. State: approved. Completeness 10/10.
+
+**Spec (binding for T4 core/status, T15 web, T16 skill).**
+
+- **Lock file content.** `scan` and `refresh`, right after taking `flock`, write `{ "op": "scan"|"refresh", "path": "/", "started_at": <unix>, "pid": N }` into `.lock` (truncate + write; the lock is held by fd, content is informational). `status` tries a non-blocking `flock(LOCK_SH|LOCK_NB)`: success → `scanning: null`; busy → parse the content → `scanning: {op, path, started_at, elapsed_seconds}`; unparsable → `scanning: {op: "unknown", started_at: null}`. Cost: one syscall + one small read.
+- **No-snapshot page, scan running:**
+  ```
+  No snapshot yet
+  Scanning / … started 48 s ago. A first scan of a 7M-file disk takes about 1–2 min.
+  This page opens the snapshot by itself when the scan finishes.
+  ```
+  Elapsed time ticks client-side every second; `/api/status` polled every 5 s (D7). On `snapshot_id` appearing → navigate to `#/` (first row selected, D6).
+- **No-snapshot page, nothing running:**
+  ```
+  No snapshot yet
+  Run in a terminal:              sudo freespace scan /            [Copy]
+  Or install the nightly timer:   sudo freespace install-timer     [Copy]
+  ```
+  If `state.last_error` exists, it is shown under the commands in the notice-2 red style (D5) with its `op` and message, so a failed first scan is not silent.
+- **With a snapshot, scan running** (nightly or `refresh`): identity row gains a muted `Scanning / · 1 m 12 s` text after the snapshot age; when it finishes, notice 3 "Newer snapshot available · Load latest" (D5/D10) takes over. No spinner, no progress percentage (none available).
+- **CLI/skill.** `freespace status` first-line sentence (T13) appends `· scanning / since 12:03` when applicable; SKILL.md documents `scanning` so an agent waits instead of starting a second scan (exit 6).
+
+**Plan amendments.** `state.json`/lock paragraph (Section "Изменяемое состояние") gains the lock-file content; `status --json` field list adds `scanning`; D7 state table row "No snapshot" is replaced by the two variants above.
+
+**Pass 3 after fixes: 9/10.** Storyboard covers steps 0–7 with a plan reference per step; first-run (D12), payoff (D11) and refresh (D10) beats are specified. Remaining gap: no visual to check that the no-snapshot page reads calm rather than alarming.
+
+
+### Pass 4: AI Slop Risk — 6/10 before
+
+Classifier: **OPERATE / APP UI** (the user finishes a task: find what to delete). Hard rejections: none (dense table, one accent, no card grid, no hero; outside voices agreed, 0 hard rejections). Litmus after Passes 1–3: 1 brand YES (D6 identity row "freespace · host", was NO), 2 anchor YES (fill bar + first selected row), 3 scannable YES (D6 header, was NO), 4 one job YES, 5 cards YES (none), 6 motion N/A → one authored moment to be fixed in Pass 5 tokens, 7 premium YES. Blacklist hits in the plan text: #11 "system font" as the primary face (Issue 9); "dark text on white" chosen by category, not by the use scene (Issue 10). Universal-rule gaps: body text under 16 px (table at 13–14 px) and placeholder-as-label (fixed by D9) → carried into the Pass 5 token spec.
+
+#### Issue 9 — typeface (D13)
+
+**Decision record.** D13 asked which typeface the page uses. User chose **A) bundle IBM Plex Sans + IBM Plex Mono**. State: approved. Completeness 10/10.
+
+**Spec (binding for T15 web task and build.rs).**
+- `IBM Plex Sans` 400 and 500, `IBM Plex Mono` 400; woff2 subset `latin, latin-ext, cyrillic` (pyftsubset at build or committed pre-subset files); ~150 KB total; OFL license file committed next to the fonts under `web/fonts/`. Embedded by `cli/build.rs` with the page; served from `/fonts/*.woff2` with `Cache-Control: immutable`. `font-display: swap`; fallback stack `"IBM Plex Sans", system-ui, sans-serif` and `"IBM Plex Mono", ui-monospace, monospace` so a broken asset never blanks the page.
+- Roles: Plex Sans = identity row, notices, inspector prose, form labels, buttons; Plex Mono = every size, Δ, count, date, path, breadcrumb segment and CLI command, with `font-variant-numeric: tabular-nums slashed-zero`. Names in the table: Plex Sans (names are words), paths in the inspector: Mono.
+- No third face; no italic files (italic unused).
+
+
+#### Issue 10 — light or dark (D14)
+
+**Decision record.** D14 asked whether the page is light, dark, or both from the system setting. User chose **B) light only; dark theme deferred to TODOS.md**. State: approved. Completeness 7/10 (accepted shortcut; decision log id `ea8cbf40-0442-4c0e-a013-72a9db1a4630` with ceiling and upgrade trigger; implementation marks the theme block with `gstack-shortcut(dec-ea8cbf40): light only, upgrade when dark-theme TODO is picked up`).
+
+**Spec (binding for T15 web task).**
+- Light theme only in v1. Use scene recorded for the record: launched from a terminal, often at night, next to a dark terminal; the dark theme is the first polish item after v1 ships.
+- Every color is a semantic CSS variable on `:root` (`--bg`, `--surface`, `--fg`, `--muted`, `--line`, `--accent`, `--warn`, `--danger`, `--ok`, `--selected`), never a literal in component CSS, so the dark set is a second block of values, not a rewrite. `color-scheme: light` declared explicitly so form controls and scrollbars do not auto-dark.
+- Contrast ≥ 4.5:1 for all text, including on the amber and red notice backgrounds; tested in the web unit tests against the token file.
+- Ceiling: users on dark systems get a light page. Upgrade trigger: dark theme TODO (added at Required Outputs), or the first user report of the night-time white flash.
+
+**Pass 4 after fixes: 9/10.** Named typeface pair with roles (D13), tokens declared (D14), APP UI rules satisfied: calm hierarchy, one accent, table not cards, utility copy throughout (D5, D7). Residual: the "dark by category" rule is answered by a deliberate deferral, not a both-themes build.
+
+
+### Pass 5: Design System Alignment — 3/10 before
+
+No DESIGN.md exists; Section 11 says "the sketch is the design system (system font, one accent, tabular numerals)" and names no value. Every number below is new to the plan.
+
+#### Issue 11 — token sheet (D15)
+
+**Decision record.** D15 proposed a complete token sheet as the project's DESIGN.md. User answer: "я не могу оценить эти числа… если ты уверен, что так хорошо — записывай" → recorded as **A) accept the sheet**, reviewer-owned values. State: approved. Completeness 9/10 (accent chosen without a preview; verify on the live page in `/design-review`).
+
+**Token sheet (binding; becomes `web/DESIGN.md` via a task; CSS variables in `web/src/tokens.css`).**
+
+```yaml
+font:
+  sans: "IBM Plex Sans"        # 400, 500 — prose, labels, buttons, names (D13)
+  mono: "IBM Plex Mono"        # 400 — sizes, deltas, counts, dates, paths, commands (D13)
+  numerals: tabular-nums slashed-zero
+type:                          # px / line-height
+  host: 18/24 500              # identity row
+  body: 16/24 400              # inspector prose, notices, empty states, form hints
+  cell: 14/20 400              # table cells and column headers (data exception to the 16 px rule, recorded)
+  label: 13/16 500             # form labels, chips, footer keys; nothing smaller anywhere
+space: [4, 8, 12, 16, 24, 32]  # px scale; row 40, folder row 40, form row 56, identity row 32, footer 36
+radius: { control: 4, table: 0, notice: 0, chip: 999 }
+color:                         # light only (D14); all text pairs ≥ 4.5:1
+  bg: "#ffffff"
+  surface: "#f7f7f7"           # inspector, footer
+  fg: "#1a1a1a"
+  muted: "#5c5c5c"
+  line: "#e3e3e3"
+  accent: "#0a6b4f"            # selection bar, primary button, focus ring, links
+  accent-bg: "#e6f3ee"         # selected row
+  hover: "#f5f5f5"
+  warn-fg: "#7a4b00"  warn-bg: "#fff3d6"     # amber: fill ≥ 80 %, age > 36 h, partial badges
+  danger-fg: "#9b1c1c" danger-bg: "#ffe8e8"  # red: incomplete scan, last_error, fill ≥ 90 %, Δ growth
+  ok-fg: "#0a6b4f"                           # Δ shrink reuses accent hue (no third green)
+share-bar: { track: line, fill: accent at 35 % opacity, height: 6 }
+states:
+  hover: bg hover
+  selected: bg accent-bg + 2 px left bar accent; aria-selected
+  focus-visible: 2 px solid accent, offset 2 px (never removed)
+  disabled: opacity .5, cursor default, aria-disabled
+  invalid: 1 px danger-fg border + error text under the field (D7, D9)
+motion:
+  authored: disk fill bar grows 0 → value in 400 ms cubic-bezier(.2,.8,.2,1) on first paint, once per load
+  toast: 120 ms fade; progress line (D7): indeterminate 1.2 s linear loop
+  reduced-motion: all of the above disabled; progress line becomes a static 2 px accent line
+browser-surfaces:
+  ::selection: accent-bg / fg; caret-color accent; scrollbar thin, thumb line, track bg
+  links: underline offset 2 px, thickness 1 px; visited (help overlay only) #064d39
+  color-scheme: light
+```
+
+**Component vocabulary (every UI element maps to one):** identity row, notice (D5), folder row with segmented control (D6), form row (D9), data table, share bar, chip (hidden D11, filters D9, "+N notice" D5), inspector, action button (ghost / primary), toast, full-page state (D7, D12), help overlay. No new component may be added without extending this list in `web/DESIGN.md`.
+
+**Pass 5 after fixes: 9/10.** Tokens named, every earlier decision now cites a token (notice colors = warn/danger, rows = space 40, focus = states.focus-visible). Residual: accent unverified visually.
+
+
+### Pass 6: Responsive & Accessibility — 4/10 before
+
+Section 11 has one responsive rule (collapse two columns under 700 px, panel as bottom sheet) and four accessibility sentences. Nothing about the header, the Find form, the footer or focus management on narrow screens; no ARIA roles named; no reduced-motion rule.
+
+#### Issue 12 — phone layout (D16)
+
+**Decision record.** D16 asked whether the single-column phone layout ships in v1. User chose **B) specify it for v2; v1 must only not break down to 360 px**. State: approved. Completeness 7/10 (accepted shortcut; decision log id `8e0d4823-69ef-4edb-8517-be3c746edf2d`; implementation marks the responsive CSS block with `gstack-shortcut(dec-8e0d4823): v1 no-break only, upgrade when Termux build lands`).
+
+**v1 rule (binding for T15).** Breakpoint 700 px: identity row wraps to two lines (host · age / fill bar); folder row keeps breadcrumbs (ellipsis in the middle, last segment always visible) and the segmented control; Find form wraps to two rows; table scrolls horizontally inside its container with the name column sticky; `items` and `modified` columns hidden under 700 px; inspector becomes a bottom sheet (40 vh, drag handle, Close button, Escape closes, focus returns to the row); footer keys hidden under 700 px, help overlay reachable from a "?" button in the folder row; every tap target ≥ 44 × 44 px. No horizontal page scroll at 360 px (test in Playwright at 360 and 700).
+
+**v2 spec (recorded, TODOS.md "Phone layout").** Single column: identity row (host + fill bar) → notice slot → "↑ Up" + folder name + size → mode selector as a native `<select>` + "Filters (N)" button opening the Find form as a sheet → rows 56 px with two lines: name / size + share bar + modified (no `items`) → details sheet (same inspector, Close + Escape + focus restore) → shortcut help in the overflow menu; footer removed.
+
+#### Accessibility mechanics (no decision: specifies behaviour already accepted in Section 11 and D5–D12)
+
+- **Landmarks.** `<header>` (identity + notice + folder row), `<main>` (table), `<aside aria-label="Details">` (inspector), `<footer>` (keys). One `<h1>` = visually the folder name in the folder row.
+- **Table.** Native `<table>` with `<th scope="col">`, `aria-sort` on the sorted header, rows `tabindex` roving (one row in tab order), `aria-selected` on the selected row, share bar `aria-hidden` with the percentage in cell text. Keyboard: ↑/↓ move, →/Enter open, ←/Backspace up, Home/End, PageUp/PageDown; `t` Top files, `d` Changes, `/` Find (focuses the first field), `h` hide (D11), `r` Load latest (D10), `?` help, Esc back to Browse or close sheet. All single-key shortcuts are ignored while focus is inside an input, select or the help overlay.
+- **Notices.** Notice 1–2 `role="alert"`; notice 3 and toasts `role="status"` (`aria-live="polite"`); the loading progress line `aria-busy` on `<main>`. Toasts stay 6 s and are also readable in the help overlay's "recent messages" list (so a screen-reader user can re-read a missed toast).
+- **Forms (D9).** Visible `<label for>`; invalid fields `aria-invalid` + `aria-describedby` pointing at the error text; the Find button is a submit in a real `<form>`.
+- **Focus.** `states.focus-visible` token everywhere; focus never removed; opening the inspector sheet or help overlay traps focus and restores it on close.
+- **Motion and contrast.** `prefers-reduced-motion` disables the fill-bar animation and the progress loop (D15); contrast test over the token file (D15); no information carried by color alone (▲/▼ glyphs next to Δ, "?" glyph on unknown subtrees, text labels on badges).
+- **Hit targets.** Buttons and chips ≥ 32 px tall on desktop, ≥ 44 px under 700 px; rows 40 px with full-row click area.
+
+**Pass 6 after fixes: 8/10.** v1 narrow-screen rule and the full a11y contract are specified; the phone layout itself is deferred by D16 (recorded ceiling).
+
+
+### Pass 7: Unresolved Design Decisions — 5/10 before
+
+Open in the plan before this pass: the Top files screen (a button, no layout), the inspector contents per row kind, column labels ("share" of what, "modified" meaning), the "Agent" wording and the "same view as TUI" promise, hardlink wording.
+
+#### Issue 13 — Top files screen (D17)
+
+**Decision record.** D17 first proposed a Biggest | Oldest toggle (Oldest = `--sort mtime`). The user challenged it ("покажет файлы 1970 года размеров в 100М? а смысл?") — correct: date order hides the large files. Re-asked; user chose **A) always sorted by size, plus an "Untouched" filter**. State: approved. Completeness 10/10.
+
+**Spec (binding for T15; T14 amendment).**
+- Header line: `Top files within /home/tass · larger than [100 M ▾]   [ ] Untouched for [6 ▾] months`. Size threshold options 10 M / 100 M / 1 G; months 3 / 6 / 12. Both in the hash (`#/path?mode=top&min=100M&untouched=6`).
+- "Untouched" = `mtime` older than N months. Label tooltip and inspector line say "not modified since <date>" — mtime is modification, not last open (user-visible wording fixed here).
+- Row: name 500 weight, parent path relative to the scope muted on a second line (row height 56 under Top, 40 elsewhere; tokens space), size, modified. No share bar (share of the folder is meaningless here). Inspector adds `Show in folder` (opens Browse at the parent with the row selected).
+- Total line as in Find (D9): `312 files larger than 100 M · 188 G` / `Showing the largest 30`.
+- CLI mirror in the inspector: `freespace top /home/tass --min-size 100M --older-than 180d --json`.
+
+#### Issue 14 — Untouched folders: `newest_mtime` (D18, user-initiated)
+
+**Decision record.** The user asked for folders as well ("папки, в которых не трогали файлы больше полугода"). This needs a per-directory subtree aggregate the snapshot does not have. User chose **A) add `newest_mtime` to the schema and JSON; Top gets a Files | Folders switch with the same Untouched filter**. State: approved. Completeness 10/10. **Core/contract change after the eng review — amendments listed below.**
+
+**Spec.**
+- Schema: `entries.newest_mtime` (i64, max over the FILE entries of the subtree of `min(mtime, own scanned_at)`; directory mtimes excluded (D5, eng review run 2); for a file = `min(mtime, scanned_at)`; no files in the subtree → 0 "unknown"; identity for the max is `i64::MIN`, not 0 (codex #7)). Computed in the same post-walk aggregation pass as `allocated`/`items`/`errors`; `refresh` recomputes it up the `parent_id` chain in the same transaction (T19 path). Index `(kind, newest_mtime)` is not needed: Top folders filters by `allocated` index first and checks `newest_mtime` per candidate.
+- JSON: every entry gains `newest_mtime`; `0` renders as "unknown". `schema_version` bump is free (no released snapshots).
+- CLI: `top --kind dir --older-than N` compares `newest_mtime` (not the directory's own `mtime`); `--kind file` compares raw `mtime` as before (`newest_mtime` of a file differs from `mtime` only when the date is in the future, D3/D4). Dir rows: qualifying set selected `ORDER BY id`, topmost dedup by `[id, subtree_end]` (order-independent in preorder), totals = count and sum over the topmost set, then `--sort` and `--limit` (codex #3/#4). SKILL.md: the "directory mtime is listing change" warning is replaced by "for directories `--older-than` uses the newest file inside".
+- Dedup: among qualifying directories, only the topmost is returned (nested qualifying dirs are implied), reusing the `find` nested-dedup rule by `id`/`subtree_end`.
+- GUI: Top header gains `Files | Folders`; Folders rows read `old-game/  38 G  newest file 2024-11-03  (1,204 items)`; share bar off; `Untouched` default on for Folders (the mode exists for this question), off for Files. Inspector for a folder shows `Newest file inside: 2024-11-03` under Modified. Hash `mode=top&kind=dir`.
+- Tests (T5/T19 amendments): aggregation equals a brute-force max per directory on a fixture; refresh of a subtree updates ancestors' `newest_mtime`; `top --kind dir --older-than` returns only topmost qualifying dirs.
+
+#### Remaining items — resolved as mechanics (no decision needed; each follows an approved decision)
+
+- **Column labels.** `Name` · `Allocated` (header tooltip: "disk blocks used; apparent size in the details panel") · `Share` (bar + `12 %`, share of the current folder's allocated) · `Items` · `Modified` (mtime). Changes mode (D8) replaces Share with `Δ allocated` and `Δ items`.
+- **Inspector per kind.** Directory: path (mono, copyable), allocated / apparent, items, modified, newest file inside (D18), errors count with "Show unreadable paths" when > 0, Δ vs prev when in Changes, actions (D11), CLI command. File: path, allocated / apparent, modified, hardlink line when `nlink > 1` (D11), actions, CLI command. Mount point: path, "Separate filesystem: <fs_type>, <used> of <total> used", `Open this filesystem`, no size. Unreadable (`?` rows, D5): path, "Could not be read as <user>; sizes below are lower bounds", `Copy: sudo freespace scan`.
+- **"Agent command" → "CLI command".** The inspector line is labelled `CLI command`, with a copy icon, and tracks the current mode and filters (ls / top / diff / find). The line "same view as TUI" is removed from Section 11 (TUI is v1.1 and will share the vocabulary, not the view).
+- **Hardlink wording.** `Hardlinked (N paths); space counted once at <path>` (owner) / `0 · counted at <path>` (non-owner). `/api/ls` rows carry `hardlink_owner: "<path>"|null` for `nlink > 1` (T15 + core: one lookup in `hardlinks` by `(dev, ino)` for returned rows only).
+- **Staleness thresholds** fixed by D6 (amber > 36 h, red > 7 d); **T14 priority** raised to P1 (see Implementation Tasks).
+
+**Pass 7 after fixes: 9/10.** Every screen and panel state now has a layout and copy; one new core field (D18) is specified with tests. Residual: the Folders/Untouched defaults are a guess until used on the real 442 G disk.
+
+
+### NOT in scope (design review)
+
+- **Delete from the GUI.** v1 does not delete (plan rule, unchanged); the end of the journey is "Hide until next scan" + copy actions (D11).
+- **Dark theme.** Deferred by D14 (light only; semantic variables make it a second value block). TODOS.md.
+- **Single-column phone layout.** Deferred by D16 (v1: no breakage down to 360 px; v2 spec recorded in Pass 6). TODOS.md.
+- **Scan progress percentage.** Only elapsed time is shown (D12); the scanner has no total to report against.
+- **Visual mockups.** Designer unavailable in this run (no OpenAI key); accent and spacing are verified on the live page by `/design-review`.
+- **TUI view parity.** "Same view as TUI" removed; TUI (v1.1) shares the token vocabulary and copy, not the layout.
+- **Hidden list across browsers/machines.** Hidden rows live in one browser's localStorage (D11 accepted con); no server state.
+- **Search-as-you-type.** Rejected by D9 (5 s name queries on 7M rows).
+- **Cleanup suggestions / cache classification.** Rejected earlier by CEO D7; the GUI measures, the skill prompt advises.
+
+### What already exists (design review)
+
+No DESIGN.md before this review; `docs/designs/free-space-disk-analyzer-sketch.png` (1280 px, one screen) is the only visual and stays valid for the table/inspector split. Reused as-is: the `<table>` semantics, share bar, footer keys, hash routing, `/api/status` poll, `state.json` fields (`last_error`, `incomplete`, `unknown_subtrees`), the `find` nested-dedup rule (reused by Top folders, D18) and the T14 polish list (now re-homed into T25–T35). New vocabulary is listed under Pass 5 and becomes `web/DESIGN.md` (T32).
+
+### TODOS.md updates (design review)
+
+Two deferred items proposed and both accepted (D19, D20): dark theme (D14) and phone layout (D16). Appended to `TODOS.md` under "Deferred from /plan-design-review 2026-10-22".
+
+### Design review tasks (appended to `## Implementation Tasks` as T25–T35; amendments to T14, T15 noted there)
+
+- [ ] **T25 (P1, human: ~1d / CC: ~1h)** — web — Header per D5/D6: identity row (host, snapshot age with amber/red thresholds, fill bar), single notice slot with the priority table and "+N notice" chip, folder row with breadcrumbs, folder size, segmented Browse | Top files | Find | Changes, ghost "Copy refresh command"
+  - Surfaced by: Pass 1 — Issues 1–2 (D5, D6)
+  - Files: `web/src/header.ts`, `web/src/notices.ts`, `web/src/app.ts`
+  - Verify: synthetic `status` with `incomplete`, `last_error` and a newer snapshot shows only the incomplete banner + "+2 notices"; age 40 h renders amber, 8 d red with the timer sentence
+- [ ] **T26 (P1, human: ~1d / CC: ~45min)** — web — All twelve interaction states with copy and primary action per D7, plus the two no-snapshot variants per D12 (scanning / nothing running, with `last_error` under the commands); 300 ms loading grace, 2 px progress line, "Showing N of M · Show more"
+  - Surfaced by: Pass 2 — Issue 3 (D7); Pass 3 — Issue 8 (D12)
+  - Files: `web/src/states.ts`, `web/src/table.ts`
+  - Verify: Playwright walk hitting each state via mocked `/api/*` responses; every state has visible copy and a focusable action
+- [ ] **T27 (P1, human: ~1d / CC: ~1h)** — web — Changes mode over `/api/diff` (key `d`, `?mode=changes`): columns name / allocated / Δ allocated / Δ items / modified, ▲/▼ with danger/success hues, ghost "gone" rows, "new" badge, context line "vs <prev> (gen N)" with partial / roots-changed badges; segment disabled with "No previous snapshot" when `prev` is absent
+  - Surfaced by: Pass 2 — Issue 4 (D8); supersedes the "Δ column toggle" in T14
+  - Files: `web/src/changes.ts`, `web/src/api.ts`
+  - Verify: fixture with two generations: rows ordered by |Δ|, a deleted dir renders as ghost, totals line matches `diff --depth 1 --json`
+- [ ] **T28 (P1, human: ~1d / CC: ~1h)** — web/core — Find mode per D9: labeled form row (Name pattern + ignore case, Modified before/after, Min size, Kind), submit on Enter/Find only, "Find within /path, including subfolders", relative-path rows, "in parent total" badge, removable filter chips, two-line total; `/api/find` returns `total_count`, `total_allocated`, `truncated`, `limit`
+  - Surfaced by: Pass 2 — Issue 5 (D9); amends T15 (web part)
+  - Files: `web/src/find.ts`, `core/queries/find.rs`, `cli/serve/api.rs`
+  - Verify: 128-match fixture with limit 30: total line shows 128 and the full sum; typing does not fire requests (network log); Esc returns to Browse at the same path
+- [ ] **T29 (P1, human: ~0.5d / CC: ~30min)** — web — Snapshot refresh continuity per D10: `/api/status` poll every 60 s + on focus/visibility, never auto-reload; "Load latest" re-hydrates path/mode/filters/sort/selection; ancestor walk + toast when the path or row is gone; `r` key; `snapshot=` param on `/api/ls|find` for rotation races
+  - Surfaced by: Pass 2 — Issue 6 (D10)
+  - Files: `web/src/snapshot.ts`, `web/src/router.ts`, `cli/serve/api.rs`
+  - Verify: unit tests for the ancestor walk (path gone / row gone / both alive); Playwright: swap the mocked snapshot id while in Find with filters → same filters, new totals, no page reload
+- [ ] **T30 (P2, human: ~0.5d / CC: ~40min)** — web/core — Inspector actions per D11 and Pass 7: "Hide until next scan" (`h`, localStorage key `freespace.hidden.<host>.<snapshot_id>`, purge other keys on load, Undo toast, "N hidden · X G" chip with show/unhide), Copy path, Copy refresh command, "CLI command" line tracking the mode; per-kind inspector layouts; hardlink line using `hardlink_owner` added to `/api/ls` rows with `nlink > 1`
+  - Surfaced by: Pass 3 — Issue 7 (D11); Pass 7 mechanics
+  - Files: `web/src/inspector.ts`, `web/src/hidden.ts`, `core/queries/ls.rs`
+  - Verify: hide a row → absent in Browse/Top/Find/Changes, chip count and size correct, reload keeps it, a new snapshot id clears it; `ls` JSON for a 2-link inode shows the owner path on the non-owner row
+- [ ] **T31 (P1, human: ~0.5d / CC: ~30min)** — core/cli/skill — `scanning` in `status` per D12: `scan`/`refresh` write `{op, path, started_at, pid}` into `.lock` after `flock`; `status` tries `LOCK_SH|LOCK_NB` and reports `scanning {op, path, started_at, elapsed_seconds}` or `null`; first-line sentence appends "· scanning / since HH:MM"; SKILL.md tells agents to wait instead of starting a second scan
+  - Surfaced by: Pass 3 — Issue 8 (D12)
+  - Files: `core/lock.rs`, `core/status.rs`, `cli/status.rs`, `skill/SKILL.md`
+  - Verify: hold the lock in a test with a written payload → `status --json` has `scanning.op == "scan"`; unparsable payload → `op: "unknown"`; no lock → `null`
+- [ ] **T32 (P1, human: ~0.5d / CC: ~30min)** — web/build — Typography and tokens per D13/D15: `web/fonts/` IBM Plex Sans 400/500 + Plex Mono 400 woff2 (latin, latin-ext, cyrillic) with OFL file, served immutable; `web/src/tokens.css` with every value from the Pass 5 sheet; `web/DESIGN.md` written from the same sheet; `color-scheme: light`; themed `::selection`, caret, scrollbar, link underline
+  - Surfaced by: Pass 4 — Issue 9 (D13); Pass 5 — Issue 11 (D15)
+  - Files: `web/fonts/*`, `web/src/tokens.css`, `web/DESIGN.md`, `cli/build.rs`
+  - Verify: no `system-ui` as primary in computed styles; contrast test over `tokens.css` passes 4.5:1 for every fg/bg pair; `cargo build` embeds the three font files (size delta ≤ 200 KB)
+- [ ] **T33 (P1, human: ~1d / CC: ~45min)** — core/cli/skill — `newest_mtime` per D18: column in `entries`, computed in the post-walk aggregation, recomputed up the parent chain by `refresh`, emitted in every JSON entry, `top --kind dir --older-than` compares `newest_mtime` and returns only topmost qualifying dirs; `schema_version` bump; `schema.json` regenerated; SKILL.md wording updated *(Eng review run 2: fold = one `SubtreeAgg::merge` shared by scan and refresh, identity `i64::MIN` for `newest_mtime`; files only (D5), each file clamped `min(mtime, own scanned_at)` (D3/D4), dir mtimes excluded, no files → 0; refresh re-folds `min_scanned_at`/`newest_mtime` over direct children at each ancestor (F2), child aggregates merge unchanged (invariant `newest_mtime <= max(scanned_at over subtree)`); dir query `ORDER BY id`, topmost dedup by `[id, subtree_end]`, totals over the topmost set, then `--sort`/`--limit` (codex #3/#4; F3 "stop at limit" withdrawn); `find` dir rows use `newest_mtime` (D2); no special case for 0/DENIED (D1 = B, marker `gstack-shortcut(dec-ac91ac89)` in `core/queries/top.rs`); tests 1–6 of Section 3 run 2 plus: mixed-refresh parent/child test, limit-1 totals test with two disjoint and one nested match, `--sort mtime` dir dedup test, identity test; T23 harness rows added.)*
+  - Surfaced by: Pass 7 — Issue 14 (D18, user-initiated); amends T5, T19, T22
+  - Files: `core/schema.rs`, `core/scan/aggregate.rs`, `core/refresh.rs`, `core/queries/top.rs`, `skill/SKILL.md`, `skill/schema.json`
+  - Verify: fixture equality against a brute-force max per directory; refreshing a subtree updates ancestors; `top / --kind dir --older-than 180d --json` excludes nested dirs of a returned dir
+- [ ] **T34 (P1, human: ~0.5d / CC: ~30min)** — web — Top screen per D17/D18: header "Top files within /path · larger than [10 M|100 M|1 G] · [ ] Untouched for [3|6|12] months", Files | Folders switch (Folders: Untouched on by default, "newest file" column), rows name + muted parent path (56 px), no share bar, two-line total, "Show in folder"; hash `mode=top&kind=&min=&untouched=`; CLI line mirrors flags
+  - Surfaced by: Pass 7 — Issues 13–14 (D17, D18)
+  - Files: `web/src/top.ts`
+  - Verify: fixture with a 40 G ISO dated 2023 and a 100 M file dated 1970: both shown in size order under Untouched; Folders returns the project dir once; "Show in folder" lands on Browse with the row selected
+- [ ] **T35 (P2, human: ~1d / CC: ~45min)** — web/tests — Accessibility and narrow-screen contract per Pass 6: landmarks, `aria-sort`/`aria-selected`/roving tabindex, `role=alert|status`, focus trap + restore for the sheet and help overlay, shortcut suppression inside inputs, `prefers-reduced-motion`, 44 px targets under 700 px, sticky name column, no horizontal page scroll at 360 px, help overlay "recent messages" list
+  - Surfaced by: Pass 6 — a11y mechanics and D16 v1 rule
+  - Files: `web/src/a11y.ts`, `web/src/responsive.css`, `web/tests/a11y.spec.ts`
+  - Verify: Playwright + axe at 1280, 700 and 360 px: zero serious violations; keyboard-only journey from `/` to a hidden row and back; `document.scrollingElement.scrollWidth == clientWidth` at 360 px
+
+**Amendments to earlier tasks (design review):** T14 → **P1** and reduced to: `?` key overlay, `nlink > 1` link icon, hash memory of the last path (Δ toggle → T27; copy path → T30; column collapse → T35; reload banner → T29). T15 → web part replaced by T28 (form row and totals), API gains `total_count/total_allocated/truncated/limit`. T4 (`serve`) → `snapshot=` query param (T29) and `hardlink_owner` (T30). T5/T19/T22 → `newest_mtime` (T33). T13 → `scanning` clause (T31).
+
+
+## Design Review Completion Summary
+
+```
+System Audit:      no DESIGN.md; sketch PNG (1 screen, 1280 px) is the only visual; system font, one accent
+Step 0:            6/10 — table/inspector/status line present; states, copy, tokens, a11y, Top/Find/Changes screens missing
+Pass 1 (Hierarchy):      5/10 → 9/10   (D5 notice slot, D6 header)
+Pass 2 (Flows & states): 5/10 → 9/10   (D7 twelve states, D8 Changes, D9 Find, D10 reload continuity)
+Pass 3 (Journey):        6/10 → 9/10   (storyboard 0–7, D11 Hide until next scan, D12 scanning from lock)
+Pass 4 (Typography):     6/10 → 9/10   (D13 IBM Plex Sans + Mono bundled, D14 light only)
+Pass 5 (Tokens):         3/10 → 9/10   (D15 full token sheet → web/DESIGN.md + tokens.css)
+Pass 6 (Responsive/a11y):4/10 → 8/10   (D16 v2 phone spec, v1 no-break ≤360 px; a11y contract)
+Pass 7 (Challenge):      14 issues resolved, 2 deferred (dark theme D19, phone layout D20)
+NOT in scope:      9 items (delete, dark theme, phone layout, progress %, mockups, TUI parity, cross-browser hidden list, search-as-you-type, cleanup suggestions)
+What already exists: sketch, <table> semantics, share bar, footer keys, hash routing, status poll, state.json fields, find dedup rule, T14 list
+TODOS updates:     2 (dark theme, phone layout)
+Approved Mockups:  0 generated, 0 approved (designer unavailable: no OpenAI key)
+Decisions made:    14 (D5–D18)
+Decisions deferred: 2 (D19 dark theme → TODOS, D20 phone layout → TODOS)
+Tasks added:       T25–T35; amended T4, T5, T13, T14, T15, T19, T22
+Overall:           3/10 → 8/10 (lowest pass: Pass 6)
+```
+
+**Deferred (recorded in TODOS.md):** dark theme (D14/D19, trigger: first night-time white flash); single-column phone layout (D16/D20, trigger: Termux build or regular phone use).
+
+**Unresolved Decisions:** none.
+
+**Follow-up for engineering:** D18 adds `entries.newest_mtime` (schema column, aggregation, refresh recomputation, `top --kind dir` semantics) after the eng review cleared the schema → `/plan-eng-review` should be re-run on T33 before implementation.
+
+<!-- design-review:end -->
+
+<!-- eng-review-2:begin -->
+## Eng review, run 2 — `newest_mtime` (D18) and tasks T5/T19/T22/T33/T34
+
+Target: `docs/designs/free-space-disk-analyzer.md` (fixed). Scope: the core/contract change introduced by design-review D18 after eng run 1 cleared the schema. Everything else keeps its run-1 dispositions (R1–R8, D1–D14 of that run). Report file: this plan. Evidence kind: static read of the plan; no code exists yet (no `Cargo.toml` in the repo), so every claim about behavior is a plan claim, not runtime evidence.
+
+### Scope Challenge
+
+**What already solves each sub-problem.** The snapshot already carries one non-additive subtree aggregate, `min_scanned_at` (line 132: "минимум по поддереву для `age_seconds`"), computed in the same post-walk pass as `allocated`/`items`/`errors`. `newest_mtime` is its max-twin: same pass, same storage shape (one i64 per row), same refresh path. The nested-dedup sweep by `id`/`subtree_end` exists for `find` (R8 of run 1, line 1917) and is reused unchanged. Nothing new is built from scratch.
+
+**Minimum change.** One column, one line in the aggregation pass, one comparison in `top`, one wording change in SKILL.md, schema regen. Scope creep check: the Folders view (T34) is web-only and already approved by D18; no new CLI flags beyond `--kind dir` accepting `--older-than`.
+
+**Complexity.** 6 proposed files (`core/schema.rs`, `core/scan/aggregate.rs`, `core/refresh.rs`, `core/queries/top.rs`, `skill/SKILL.md`, `skill/schema.json`) [estimated], 0 new classes/services → complexity gate not tripped, block B skipped.
+
+**Search check.** No new architectural pattern (subtree max is the same fold as subtree min); search skipped, **[Layer 1]**.
+
+**TODOS cross-reference.** `TODOS.md` has nothing that blocks T33; the phone-layout and dark-theme items do not touch the schema.
+
+**Distribution.** No new artifact; `schema_version` bump has no migration (line 691: a newer binary refuses an older snapshot with exit 5, fix = rescan).
+
+**Reality rows (phase eng):**
+- REALITY: premise-table pass — premises below, `unverified=0` (all cite plan lines; no runtime claims made) docs/designs/free-space-disk-analyzer.md:2413
+  | premise | claim | receipt | verdict |
+  |---|---|---|---|
+  | P1 | snapshot has a subtree-min aggregate already (`min_scanned_at`) | line 132 | true |
+  | P2 | refresh recomputes ancestor aggregates along `parent_id` in the same transaction | line 109 | true |
+  | P3 | `top --older-than` on directories is a usage error today | line 145 | true (contradicts D18, see F1) |
+  | P4 | `find --older-than` applies to directory mtime for `--kind dir` | line 147 (no dir rule stated) | true, unspecified |
+  | P5 | `mtime == 0` renders "unknown" | line 121 | true |
+  | P6 | no released snapshots, so the `schema_version` bump needs no migration | line 2414, line 691 | true |
+- REALITY: already-done pass — no remote, one commit `4c0814b`, no source files; nothing to re-plan docs/designs/free-space-disk-analyzer.md:2485
+- REALITY: surface-check finding — `top --kind dir --older-than` is rejected by the plan's own rule at line 145 ("каталоги с `--older-than` отвергаются ошибкой использования"); corrected by F1 below docs/designs/free-space-disk-analyzer.md:145
+- REALITY: binding-decisions pass — D13 (DENIED = loud anomaly, `incomplete: true`), D12 (union-of-subtrees dedup for all `find` kinds), D11 (no name index until benchmark) all honored; R1 below is built on D13 docs/designs/free-space-disk-analyzer.md:143
+- REALITY: numbers pass — one i64 column [estimated: 8 bytes per row, schema at docs/designs/free-space-disk-analyzer.md:132]; row count 7M [estimated: benchmark target at docs/designs/free-space-disk-analyzer.md:169]; product ~56 MB [estimated: 8 × 7M, inside the snapshot file, docs/designs/free-space-disk-analyzer.md:2413]; refresh re-aggregation reads ≤ depth × fan-out rows via the `parent_id` index [estimated: docs/designs/free-space-disk-analyzer.md:109] docs/designs/free-space-disk-analyzer.md:132
+- REALITY: deferred-asks pass — no linked issue; the user's ask ("папки, в которых не трогали файлы больше полугода") is covered whole by D18 docs/designs/free-space-disk-analyzer.md:2410
+- REALITY: pr-count pass — no `.gstack/ship-policy.json`; default one PR per wave; T33 lands with T5/T19 in the core lane, no extra PR docs/designs/free-space-disk-analyzer.md:2485
+
+**Scope Challenge findings:**
+1. `[P1] (confidence: 9/10) docs/designs/free-space-disk-analyzer.md:145` — "каталоги с `--older-than` отвергаются ошибкой использования (exit 2)" contradicts D18 (`top --kind dir --older-than` compares `newest_mtime`). Two sections of the same plan now specify opposite behavior for one flag. → **F1, factual correction, no decision**: line 145 amended to the D18 rule; the usage error stays only for `--older-than` without a parsable duration.
+2. `[P1] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:109` — refresh recomputes ancestor aggregates "по цепочке `parent_id` до корня"; that works by delta for additive columns (`allocated`, `items`, `errors`) but not for `max`/`min` columns. If the refreshed subtree lost its newest file, the ancestor's `newest_mtime` cannot be derived from the old value and a delta; it must be re-folded from the ancestor's children. The same hole already exists for `min_scanned_at` (line 132) and was not stated in run 1. → **F2, factual correction + required proof**: refresh re-aggregates non-additive columns at each ancestor as `max(own mtime, max(children.newest_mtime))` / `min(...)` using the `parent_id` index; test "refresh that deletes the newest file lowers every ancestor's `newest_mtime`" added to T33 (decrease case is the one a delta implementation gets wrong).
+3. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:2416` — "only the topmost qualifying directory is returned" is stated, but the candidate order is not. `top` orders by `allocated DESC`; an ancestor's `allocated` ≥ its descendants', so ancestors come first **except on ties** (a directory whose only content is one subdirectory has the same `allocated`); on a tie the nested directory can be accepted before its parent and the parent then wrongly rejected or both returned. → **F3, mechanics**: candidate order `allocated DESC, id ASC`; a candidate inside an accepted `[id, subtree_end]` is skipped; accepted ranges are at most `--limit` entries, so the check is O(limit) per candidate; test with the single-child tie.
+4. `[P1] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:121,143` — unknown and unreadable cases: `mtime == 0` means "unknown" (line 121) and a DENIED directory has an unknown subtree (line 143). A plain `newest_mtime < now − N` comparison treats both as "untouched since 1970" and would put an unreadable or unstat-able directory at the top of the Untouched list as the strongest candidate for deletion. → **R11, policy choice** (question D1 below).
+5. `[P2] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:147` — `find --kind dir|any --older-than` still has no directory rule; after D18 the natural reading is "same as `top`" (`newest_mtime`), but the plan does not say it, so `top` and `find` could answer the same question differently. → **R12, policy choice** (question D2).
+
+Dispositions: F1 accepted (factual correction, applied to line 145); F2 accepted (correction + required proof of the approved D18 refresh contract, T33 amended); F3 accepted (mechanics of the approved dedup, T33 amended); R11 pending (D1); R12 pending (D2).
+
+Scope Challenge result: **scope accepted as-is** (B skipped; no reduction).
+
+## Decision ledger (run 2)
+
+### R11: Unknown or unreadable `newest_mtime` under `--older-than`
+Finding: Scope Challenge #4, P1, confidence 8/10, docs/designs/free-space-disk-analyzer.md:121,143,2415, reviewer: native (Claude Fable 5.1)
+Plan baseline: D18 approved "`top --kind dir --older-than N` compares `newest_mtime`"; no rule for `newest_mtime == 0` or for directories whose subtree contains a DENIED directory. Results are ordered by `allocated DESC` (D17), so an unknown date changes membership in the list, not position. For files, line 649 tests only the boundary at 179/180/181 days; `mtime == 0` files are unspecified.
+Runtime evidence: none (no code). `stat` returning `mtime = 0` is possible on some filesystems/FUSE; DENIED directories are the D13 anomaly path.
+Comparison grid:
+| Choice | Current | A | B |
+|---|---|---|---|
+| R11 unknown `mtime`/`newest_mtime` (= 0) under `--older-than` | unspecified | excluded from results; counted in `skipped_unknown` | included (0 passes any `--older-than` threshold) |
+| R11 subtree containing DENIED (`errors > 0` on the dir row, `flags & DENIED` somewhere below) under `--kind dir --older-than` | unspecified | excluded; counted in `skipped_unknown`; `incomplete: true` already set by D13 | included, compared on the readable part only |
+| D17 order `allocated DESC` | approved | unchanged | unchanged |
+| D18 comparison on known values | approved | unchanged | unchanged |
+| D13 whole-answer `incomplete` | approved | unchanged | unchanged |
+Question D1 (re-asked; first brief wrongly said the folder would come first by age):
+D1 — Показывать ли в списке «Untouched» папки, у которых дата неизвестна или часть содержимого не прочитана?
+Project/branch/task: freespace, ветка master, повторное eng-ревью T33 (`newest_mtime`).
+ELI10: Список Untouched отсортирован по размеру, и это не меняется. Вопрос только в том, попадает ли папка в список. Фильтр «старше 6 месяцев» сравнивает дату самого нового файла внутри с порогом. Если дата неизвестна (в снимке 0) или подпапку не удалось прочитать, то реальный самый новый файл может быть вчерашним, а в снимке его дата отсутствует. Пример: `/var/lib/docker/overlay2 40 G` с одной нечитаемой подпапкой: по известной части «самый новый файл 2024-01», и папка показывается в Untouched на своём месте по размеру как «не трогали 9 месяцев», хотя контейнер пишет туда каждый день.
+Stakes if we pick wrong: папка, про которую снимок не знает всей правды, выглядит как безопасный кандидат на удаление; или, наоборот, честная папка пропадает из списка без объяснения.
+Recommendation: A because неизвестная дата не доказывает старость, а D13 уже требует громко сообщать о нечитаемом; скрыть с видимым счётчиком честнее, чем показать как «не трогали».
+Completeness: A=10/10, B=5/10
+Pros / cons:
+A) Не показывать, считать в `skipped_unknown` (recommended)
+  ✅ В Untouched только папки, про которые снимок знает дату каждого файла; ничего не выглядит старее, чем есть
+  ✅ Ответ сообщает `skipped_unknown: N`, web показывает «N skipped: date unknown», так что пропуск виден, а не молчалив
+  ❌ Папка с одним файлом без даты и тысячей старых не попадёт в список, пока ФС не отдаст дату
+B) Показывать как есть (0 проходит любой порог)
+  ✅ Проще: одно сравнение, без счётчика и без дополнительного поля в JSON
+  ✅ Нечитаемые папки всё равно помечены `incomplete: true` на всём ответе
+  ❌ Папка с нечитаемой или бездатной частью показывается как «не трогали N месяцев», хотя это неизвестно
+Net: один счётчик и одно условие в запросе против списка, где «не трогали» иногда означает «не знаем».
+Header: Unknown dates
+Options:
+A) Не показывать, считать в skipped_unknown (recommended)
+✅ В Untouched только папки, про которые снимок знает дату каждого файла ✅ Ответ сообщает skipped_unknown: N, web показывает «N skipped: date unknown» ❌ Папка с одним файлом без даты и тысячей старых не попадёт в список, пока ФС не отдаст дату
+B) Показывать как есть (0 проходит любой порог)
+✅ Проще: одно сравнение, без счётчика и без доп. поля в JSON ✅ Нечитаемые папки всё равно помечены incomplete: true на всём ответе ❌ Папка с нечитаемой или бездатной частью показывается как «не трогали N месяцев», хотя это неизвестно
+
+State: approved
+Actual answer: B) Показывать как есть (0 проходит любой порог) — D1 (re-asked), 2026-10-23
+Accepted scope: `top`/`find --older-than` compare `mtime` (files) and `newest_mtime` (directories) with no special case for 0 or for subtrees containing DENIED directories; no `skipped_unknown` field; D13 whole-answer `incomplete: true` is the only signal. Completeness 5/10 shortcut logged as decision `ac91ac89-547e-48fd-877a-ef852d26a696`; T33 carries the marker `gstack-shortcut(dec-ac91ac89): unknown/unreadable dates pass --older-than, upgrade when a running-service dir is listed as untouched or mtime=0 appears in a real snapshot` in `core/queries/top.rs`. Required proof of the accepted behavior: test that an entry with `mtime = 0` and a directory with a DENIED child are both returned by `--older-than` (documents the choice; fails if someone silently adds the exclusion).
+History: first D1 brief claimed the folder "всплывает первой как самый старый кандидат"; results are ordered by size (D17), so the claim was wrong; superseded by the re-asked brief above, answered B.
+
+### R12: `find --kind dir|any --older-than` date rule for directories
+Finding: Scope Challenge #5, P2, confidence 7/10, docs/designs/free-space-disk-analyzer.md:147, reviewer: native (Claude Fable 5.1)
+Plan baseline: `find` accepts `--older-than`/`--newer-than` with `--kind file|dir|any` (line 147); no statement of which timestamp a directory row is compared against. D18 fixed `top --kind dir` to `newest_mtime`.
+Runtime evidence: none (no code).
+Comparison grid:
+| Choice | Current | A | B |
+|---|---|---|---|
+| R12 timestamp used for a directory row in `find --older-than/--newer-than` | unspecified | `newest_mtime` (same as `top --kind dir`) | directory's own `mtime` |
+| R11 unknown handling | approved D1 = B (0 passes any threshold) | unchanged | unchanged |
+| `find` nested dedup (D12) | approved | unchanged | unchanged |
+Question D2:
+D2 — Какую дату сравнивать у папки в `find --older-than`: самый новый файл внутри или дату самой папки?
+Project/branch/task: freespace, ветка master, повторное eng-ревью T33.
+ELI10: После D18 у `top` папка считается «старой», если самый новый файл внутри старше порога. У `find` та же опция `--older-than` работает и для папок (`--kind dir|any`), но какую дату брать, в плане не сказано. Дата самой папки меняется только когда в ней создают или удаляют записи, поэтому папка с файлами, обновлёнными вчера, может иметь дату 2019 года. Пример: `find / --name node_modules --kind dir --older-than 1y` по дате папки вернёт проект, в котором вчера шёл `npm install` в подпапке.
+Stakes if we pick wrong: `top` и `find` отвечают на вопрос «старая ли папка» по-разному, и агент по SKILL.md получает противоречивые списки.
+Recommendation: A because одно определение «старости» на все команды; `newest_mtime` уже есть в строке и стоит столько же, сколько `mtime`.
+Completeness: A=10/10, B=6/10
+Pros / cons:
+A) `newest_mtime`, как в `top` (recommended)
+  ✅ Одно правило для `top`, `find` и web-фильтра Untouched; SKILL.md описывает его одной фразой
+  ✅ Ноль дополнительной стоимости: колонка в той же строке, индекс не нужен (фильтр по имени/размеру идёт первым)
+  ❌ Строка «Modified» папки в `ls` и дата в `find` будут разными числами; инспектор уже показывает обе (D18)
+B) Дата самой папки (`mtime`)
+  ✅ Совпадает с тем, что показывает `ls -l` и `stat`, знакомо из POSIX
+  ✅ Ничего не менять в спецификации `find`
+  ❌ Папка с обновлёнными вчера файлами проходит как «старая»; `top` и `find` расходятся
+Net: единое определение старости против привычной, но вводящей в заблуждение даты каталога.
+Header: find dir date
+Options:
+A) newest_mtime, как в top (recommended)
+✅ Одно правило для top, find и web-фильтра Untouched ✅ Ноль дополнительной стоимости: колонка в той же строке ❌ Строка Modified папки в ls и дата в find будут разными числами; инспектор показывает обе
+B) Дата самой папки (mtime)
+✅ Совпадает с ls -l и stat ✅ Ничего не менять в спецификации find ❌ Папка с обновлёнными вчера файлами проходит как «старая»; top и find расходятся
+
+State: approved
+Actual answer: A) newest_mtime, как в top — D2, 2026-10-23
+Accepted scope: `find --older-than`/`--newer-than` compare `mtime` for file rows and `newest_mtime` for directory rows (`--kind dir|any`), identical to `top --kind dir`; D1 = B applies (no special case for 0); SKILL.md states the rule once for both commands; line 147 amended; test: `find / --kind dir --older-than 1y` excludes a 2019-dated directory containing a file modified yesterday and includes one whose newest file is 2 years old.
+History: none
+
+
+### Section 1 — Architecture (run 2, `newest_mtime`)
+
+Data flow of the new column (ASCII, proposed; no code exists):
+
+```
+scan (parallel walk)            post-walk aggregation (one fold per dir)        snapshot write
+ stat(file) → mtime  ──┐        SubtreeAgg { allocated, items, errors,            entries(..., mtime,
+ stat(dir)  → mtime  ──┼──▶      min_scanned_at = min(children),        ──▶       newest_mtime, ...)
+                       │         newest_mtime   = max(own mtime,                  meta.schema_version += 1
+                       └──▶                       children.newest_mtime) }
+
+refresh /path                   ancestors of /path (parent_id chain to /)
+ rescan subtree → new agg ──▶   allocated/items/errors: += delta
+                                min_scanned_at / newest_mtime: RE-FOLD over children   (F2: not delta)
+                                  SELECT min(min_scanned_at), max(newest_mtime) FROM entries WHERE parent_id = ?
+                                  (one indexed query per ancestor; depth × 1 query)
+
+top --kind dir --older-than N   SELECT … WHERE kind='dir' AND allocated >= min
+                                ORDER BY allocated DESC, id ASC          (F3: tie-break)
+                                  keep if newest_mtime < now − N          (D1 = B: 0 passes)
+                                  skip if id ∈ any accepted [id, subtree_end]   (topmost only)
+                                  stop at --limit accepted
+find --kind dir --older-than N  same comparison on newest_mtime (D2 = A), inside the existing union-of-subtrees sweep (D12)
+```
+
+Findings:
+1. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:2413` — "max `mtime` over the subtree" has no bound on the future. One file with a bogus future timestamp (archives extracted with their original times, a VM with a drifted clock, a 2099 build artifact) raises `newest_mtime` of every ancestor up to `/` above `now`, so the whole chain can never be "untouched" and the Folders view silently loses the one tree the user wanted. The file's own `mtime` keeps rendering as a date, which is fine; only the subtree aggregate is poisoned. → **R13, policy choice** (question D3).
+2. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:115,691` — `schema_version` bump: a timer still running the old binary after an upgrade writes an old-schema snapshot; the new binary refuses it with exit 5 until the next scan by the new binary. Already handled by the plan's deploy-time note (line 695); the upgrade must restart the timer (the systemd unit does, T? run-1 R3). No new work; recorded so the bump is not treated as free at upgrade time.
+3. `[P3] (confidence: 7/10)` — one realistic production failure for the refresh re-fold: the ancestor query `WHERE parent_id = ?` on `/home` with 50k direct children reads 50k rows per refresh; bounded (depth × fan-out), no index change, inside the write transaction. Users see nothing; `refresh` gains milliseconds. Not a gap.
+
+Dispositions: #1 pending (D3); #2 accepted as already covered (no task); #3 accepted, no task.
+
+### Section 2 — Code quality (run 2)
+
+Findings:
+1. `[P2] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:132,2413` — shared-code opportunity, **proposed callers** (plan review): the aggregation pass already folds `allocated`, `items`, `errors`, `min_scanned_at` per directory; `newest_mtime` is a fifth field of the same fold. Reuse: one `SubtreeAgg` struct with a single `merge(&mut self, child: &SubtreeAgg)` used by both `scan` (post-walk) and `refresh` (re-fold at each ancestor, F2). Callers: `core/scan/aggregate.rs` (proposed, T33) and `core/refresh.rs` (proposed, T19/T33). Contract: pure, associative, identity element `{0,0,0,i64::MAX,0}`; savings: the refresh re-fold is one function call instead of a second hand-written SQL aggregate per column; estimated lines: +25 (struct + merge + tests) / −20 (duplicated fold in refresh), net ≈ 0 in code, the gain is one definition of "subtree aggregate" with one property test (`merge` associativity + fixture equality). Blast radius: a wrong merge breaks every aggregate at once, which the existing fixture-equality tests (T33) catch. Accepted as mechanics of the approved D18/F2 contract (same behavior, one definition), no separate approval row; amends T33 Files.
+2. `[P3] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:2413` — edge case stated for the record: an empty directory has `newest_mtime = own mtime`; a DENIED directory (readdir failed) has `newest_mtime = own mtime` and `errors ≥ 1`; a file has `newest_mtime = mtime`. All three follow from "max over own mtime and children", so the fold needs no special cases; the test fixture must include all three.
+3. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:109` — the diagram-equivalent prose at line 109 ("Агрегаты предков (`allocated`, `items`, `errors`) пересчитываются по цепочке `parent_id`") is now stale: it omits the two non-additive columns. Amended in the same edit (F2).
+
+Dispositions: #1 accepted (mechanics, T33 amended); #2 accepted (fixture requirement, T33 Verify); #3 accepted (line 109 amended).
+
+### R13: Future-dated files in the `newest_mtime` fold
+Finding: Section 1 #1, P2, confidence 8/10, docs/designs/free-space-disk-analyzer.md:2413, reviewer: native (Claude Fable 5.1)
+Plan baseline: D18: `newest_mtime` = max `mtime` over the subtree, no clamp. Per-entry `mtime` is raw i64 (line 121).
+Runtime evidence: none (no code). Future mtimes are common in practice: tar/zip extraction preserving bad timestamps, clock drift on VMs, build tools stamping artifacts.
+Comparison grid:
+| Choice | Current | A | B |
+|---|---|---|---|
+| R13 value folded into `newest_mtime` for an entry with `mtime > scanned_at` | raw mtime | `min(mtime, scanned_at)` for the fold only; per-entry `mtime` stays raw | raw mtime (one future file pins the whole ancestor chain to the future) |
+| R13 visibility | none | inspector/`ls` show the raw future date on the file itself; no extra field | none |
+| D18 max fold on sane values | approved | unchanged | unchanged |
+| D1 = B (0 passes threshold) | approved | unchanged | unchanged |
+| D2 = A (`find` dirs use `newest_mtime`) | approved | unchanged | unchanged |
+Question D3:
+D3 — Что делать с файлами, у которых дата «из будущего», при подсчёте самого нового файла в папке?
+Project/branch/task: freespace, ветка master, повторное eng-ревью T33 (`newest_mtime`).
+ELI10: «Самый новый файл внутри» считается как максимум дат по всему поддереву. Если в поддереве есть хотя бы один файл с датой 2099 года (так бывает после распаковки архивов с кривыми датами или при сбое часов), то максимум у этой папки, у её родителя и так далее до корня становится 2099. Такие папки никогда не попадут в «Untouched», и вы не узнаете почему. Пример: `/home/tass/old-games 38 G`, внутри `readme.txt` с датой 2099-01-01: папка исчезает из Folders-списка Untouched навсегда, хотя остальные 38 G не трогали три года.
+Stakes if we pick wrong: один битый файл прячет целое дерево из единственного режима, ради которого добавляли колонку.
+Recommendation: A because дата позже времени скана физически невозможна как «последнее касание», а обрезка только в агрегате ничего не скрывает: сам файл по-прежнему показывает 2099.
+Completeness: A=10/10, B=4/10
+Pros / cons:
+A) В агрегате обрезать до времени скана: `min(mtime, scanned_at)` (recommended)
+  ✅ Папка с одним битым файлом считается «не тронута» с даты реального последнего изменения остального содержимого или с момента скана, но не с 2099
+  ✅ Сам файл в `ls`/инспекторе показывает свою настоящую дату 2099, так что аномалия видна там, где она есть
+  ❌ Папка, в которой битый файл действительно создали только что, покажет «самый новый файл = время скана», что честно, но не равно дате файла
+B) Не обрезать, брать максимум как есть
+  ✅ Проще: один `max`, агрегат равен буквальному максимуму дат, тест пишется одной строкой
+  ✅ Никакой «магии» со временем скана в данных
+  ❌ Один файл из будущего убирает всё дерево до корня из Untouched без объяснения
+Net: одна строка `min(…)` в свёртке против молчаливого исчезновения больших старых папок из списка.
+Header: Future dates
+Options:
+A) Обрезать до времени скана в агрегате (recommended)
+✅ Папка с одним битым файлом не считается «из будущего» ✅ Сам файл по-прежнему показывает 2099 в ls/инспекторе ❌ Папка с только что созданным битым файлом покажет «самый новый = время скана»
+B) Не обрезать, максимум как есть
+✅ Проще: один max, тест в одну строку ✅ Никакой магии со временем скана ❌ Один файл из будущего убирает всё дерево до корня из Untouched без объяснения
+
+State: approved
+Actual answer: A) Обрезать до времени скана в агрегате — D3, 2026-10-23
+Accepted scope: the fold uses `min(mtime, scanned_at)` for every entry when computing `newest_mtime` (own value and children); per-entry `mtime` stays raw in the snapshot and JSON; `scanned_at` is the scan start time already stored per entry; refresh uses the refresh start time for the rescanned subtree. Tests: fixture with one file at `now + 10 years` under a 3-year-old directory: `newest_mtime` of the directory and all ancestors equals the directory's real newest (not the future), `ls` still shows the file's raw future date; property: `newest_mtime <= scanned_at` for every row.
+History: none
+
+
+### Section 3 — Test review (run 2)
+
+Framework: no `CLAUDE.md` testing section and no `Cargo.toml` yet; the plan fixes `cargo test` with `assert_cmd` + `jsonschema` for the contract harness (run-1 R7/D10, T23) and fixture snapshots for query tests (T5/T19). Reused as the framework; nothing new proposed.
+
+Concrete source read: none possible (no code); the diagram is traced from the plan text (lines 109, 121, 132, 145, 147, 2413–2418) and the run-2 ledger (R11–R13, F1–F3).
+
+```
+CODE PATHS (all proposed, all [GAP] until T33 lands)              USER FLOWS
+[+] core/scan/aggregate.rs  SubtreeAgg::merge                      [+] Top → Folders, Untouched 6 mo (web, T34)
+  ├── [GAP] file: newest = min(mtime, scanned_at)      (D3)           ├── [GAP] old 38 G dir with one 2099 file listed  (D3)
+  ├── [GAP] empty dir: newest = own mtime                             ├── [GAP] nested old dir hidden under its parent (F3)
+  ├── [GAP] dir own mtime newer than all children                     ├── [GAP] single-child tie: parent shown, child not (F3)
+  ├── [GAP] DENIED dir: own mtime, errors ≥ 1, passes filter (D1=B)   ├── [GAP] mtime=0 entry still listed            (D1=B)
+  ├── [GAP] mtime=0 entry folds as 0 (max ignores it)                 └── [GAP] "newest file" column equals ls of the dir
+  └── [GAP] brute-force max equality on a 3-level fixture         [+] Agent via SKILL.md
+[+] core/refresh.rs  ancestor re-fold (F2)                            ├── [GAP] `top / --kind dir --older-than 180d --json` in harness (T23)
+  ├── [GAP] newest increases: ancestors raised                        └── [GAP] `find / --kind dir --older-than 1y --json` in harness (D2)
+  ├── [GAP] newest file deleted: ancestors LOWERED  (CRITICAL)
+  ├── [GAP] sibling subtree untouched by refresh keeps its value
+  └── [GAP] min_scanned_at re-fold (same bug class, existing column)
+[+] core/queries/top.rs  --kind dir --older-than
+  ├── [GAP] boundary 179/180/181 d on newest_mtime (mirror of line 649)
+  ├── [GAP] ORDER BY allocated DESC, id ASC; tie parent-before-child (F3)
+  ├── [GAP] nested qualifying dir skipped; --limit counts accepted only
+  ├── [GAP] mtime=0 / DENIED child returned (documents D1=B; marker gstack-shortcut(dec-ac91ac89))
+  └── [GAP] --kind file unchanged (regression on line 649 fixture)      ← CRITICAL regression guard
+[+] core/queries/find.rs  dir rows compare newest_mtime (D2)
+  ├── [GAP] --older-than 1y excludes 2019-dated dir with yesterday's file
+  └── [GAP] --newer-than 7d includes dir whose only change is a nested file
+[+] skill/schema.json / T22  [GAP] every entry has integer `newest_mtime`; schema_version bumped; harness validates
+
+COVERAGE: 0/24 paths tested (0%)  |  Code paths: 0/17  |  User flows: 0/7
+QUALITY: ★★★:0 ★★:0 ★:0  |  GAPS: 24 (2 E2E via T23 harness, 0 eval)
+```
+Legend: ★★★ behavior + edge + error | ★★ happy path | ★ smoke check | [→E2E] = contract harness (T23) | [GAP] = no test yet
+
+**REGRESSION RULE.** Existing approved behavior at risk: `top --older-than` for files (line 649 test, 179/180/181 d) and the additive ancestor aggregates in `refresh` (T19). Regression contract (carried forward from run-1 R? line 649 and T19; no new question): the line-649 fixture must pass unchanged with `--kind file`, and the T19 refresh fixture must keep `allocated`/`items`/`errors` equal before and after adding the re-fold.
+
+**Step 5 — tests added to T33 (each with a value card):**
+1. `core/scan/aggregate.rs` unit, fixture 3 levels + empty dir + DENIED dir + mtime=0 + future file: `newest_mtime` equals brute-force `max(min(mtime, scanned_at))` per directory. `Value: protects=subtree max fold incl. D3 clamp and own-mtime rule; fails_when=merge drops a child, forgets own mtime or skips the clamp; why_new=no aggregate test exists; seam=none; no_claim=real filesystems (synthetic fixture only)`.
+2. `core/refresh.rs` unit: refresh that deletes the newest file lowers `newest_mtime` on every ancestor; refresh that adds a newer file raises them; untouched sibling unchanged; `min_scanned_at` re-folded. **CRITICAL.** `Value: protects=F2 re-fold for non-additive columns; fails_when=delta implementation (max never decreases); why_new=T19 covers additive columns only; seam=none; no_claim=performance of the re-fold`.
+3. `core/queries/top.rs` unit: `--kind dir --older-than` boundary, tie order (F3), nested skip, limit counts accepted only, mtime=0 and DENIED-child rows returned (D1=B). `Value: protects=D17/D18 Folders list semantics; fails_when=tie reversal, nested duplicate, exclusion added silently; why_new=no dir path existed; seam=none; no_claim=UI rendering`.
+4. `core/queries/top.rs` regression: line-649 file fixture unchanged with `--kind file`. `Value: protects=file semantics after the dir branch; fails_when=shared code path compares newest_mtime for files or default kind changes; why_new=same fixture, new branch; seam=none; no_claim=none beyond protects`.
+5. `core/queries/find.rs` unit: dir rows use `newest_mtime` for both bounds (D2). `Value: protects=D2 rule; fails_when=find compares dir mtime; why_new=find date tests (line 1734) cover files only; seam=none; no_claim=none`.
+6. T23 harness rows: `top / --kind dir --older-than 180d --json` and `find / --kind dir --older-than 1y --json` validate against `skill/schema.json` with `newest_mtime` required. [→E2E] `Value: protects=SKILL.md ↔ CLI ↔ schema for the new field; fails_when=field renamed or omitted; why_new=new commands in SKILL.md; seam=none; no_claim=real-disk timing`.
+
+Tests made obsolete by this plan: the line-145 "`--older-than` on a directory is a usage error" assertion, if written before T33, is retired (behavior reversed by D18/F1).
+
+No new test-depth question: every test above is required proof of an approved contract (D18, F2, F3, D1, D2, D3). Dispositions: all 6 accepted into T33 (and T23 for #6).
+
+### Section 4 — Performance review (run 2)
+
+Findings:
+1. `[P3] (confidence: 7/10) docs/designs/free-space-disk-analyzer.md:2413` — `top --kind dir --older-than` walks directory rows in `allocated DESC` order via the existing `allocated` index and filters `newest_mtime` per row. Scale: ~700k directory rows on the 7M fixture [estimated: typical 1:10 dir:file ratio, line 169]; with the web default `--min-size 100M` the candidate set is a few thousand rows and the sweep ends at `--limit`; with no size floor and a tree where almost nothing is untouched, the sweep reads every directory row (~700k, hundreds of ms in SQLite) — against the Top target of 300 ms warm / 2 s cold (line 155, not Find's 5 s; corrected per codex #6). After codex #3/#4 the dir query is `WHERE kind = dir AND newest_mtime < ? [AND allocated >= ?] ORDER BY id`, always a full pass over the dir rows; without an index leading with `kind` it touches the file rows too (~7M). No index on `(kind, newest_mtime)` (D18 text, consistent with D11 "no index until the benchmark says so"). → amend T24 (benchmark rows): add `top / --kind dir --older-than 180d` cold and warm, with and without `--min-size`; the D11 trigger (cold > 5 s) decides the index later. Mechanics, no decision.
+2. `[P3] (confidence: 8/10) docs/designs/free-space-disk-analyzer.md:109` — refresh re-fold cost: depth × one indexed `parent_id` query; worst realistic case `/home/<user>` with 50k direct children ≈ 50k rows read once per refresh; inside the existing write transaction; no user-visible change. No task.
+3. Memory: +8 bytes per `SubtreeAgg` during the post-walk fold (700k dirs → ~6 MB) [estimated]; the fold already holds the per-directory aggregates, so this is a field, not a structure. No task.
+
+Dispositions: #1 accepted (T24 amended); #2, #3 accepted, no task.
+
+### Outside Voice — codex (run 2)
+
+Prompt: D18 spec (Issue 14), T33 line, full run-2 block; `codex exec --sandbox read-only`, effort high, 300 s timeout, completed. Verbatim:
+
+```
+CODEX SAYS
+The plan needs fixes. The main problems are contradictory timestamp guarantees and a dedup algorithm that only works for one sort order. This is a static design review; no files were changed and no network was used.
+
+1. **P1 — R13’s approved clamp cannot produce its promised Untouched result.**  
+   R13 says the fold uses **“`min(mtime, scanned_at)`”**, but requires the future-file fixture’s aggregate to equal **“the directory’s real newest”**. The test map also expects **“old 38 G dir with one 2099 file listed.”** [R13](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2740)
+
+   Suppose all ordinary timestamps are from 2023, one file says 2099, and the scan starts on 2026-10-23. The aggregate becomes **2026-10-23**, not 2023. The directory fails `--older-than 180d`. Nightly scans keep advancing that value, so the directory remains excluded indefinitely.
+
+   The clamp removes the literal future date; it does **not** solve the exclusion described as R13’s motivation. Keep the approved clamp and correct the promised behavior/tests, or reopen the policy if listing this folder is essential. Also amend D18’s `mtime == newest_mtime` claim for files: future-dated files now violate it.
+
+2. **P1 — R13’s invariant is incompatible with partial refresh.**  
+   The required property is **“`newest_mtime <= scanned_at` for every row”**, while **“refresh uses the refresh start time for the rescanned subtree.”** Ancestors retain their earlier observation times. [R13](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2740)
+
+   Example: `/p` was scanned January 1. Refresh `/p/c` on October 23 and observe a file modified October 22. Correct propagation gives `/p.newest_mtime = October 22`, exceeding `/p.scanned_at = January 1`.
+
+   Enforcing the stated invariant by capping the propagated value at the parent’s scan time would make a recently modified tree appear old. Updating the parent’s `scanned_at` would falsely imply that its other contents were rescanned.
+
+   Specify the recurrence explicitly: cap each entry’s **own raw timestamp at its own observation time**, then merge child aggregates unchanged. Replace the invariant with one valid for mixed observation times. Add a refresh test with an old parent and a newly observed child; the current increase/decrease tests do not explicitly cover this contradiction.
+
+3. **P2 — F3 fixes allocated-order ties but leaves supported sorts broken.**  
+   T33 requires **“candidate order `allocated DESC, id ASC`”**, while `top` supports **“`--sort mtime` … ascending.”** [T33](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2484), [sort contract](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:145)
+
+   Let qualifying `/p` have timestamp 2025 and qualifying `/p/c` have timestamp 2020. Under ascending date order, the child arrives first. With `--limit 1`, it is returned although its qualifying parent should suppress it. Without that limit, the specified interval check does not suppress the later parent: the parent’s ID lies outside the child’s interval, so both can be returned.
+
+   Conversely, retaining allocated order and stopping at the limit before applying the requested sort selects the wrong date-sorted results.
+
+   Establish topmost membership independently of presentation order, then sort and limit—or explicitly restrict directory sorts. The existing single-child allocated-tie test addresses a different case.
+
+4. **P2 — Early termination cannot supply the promised full totals.**  
+   The Top specification promises **“Total line as in Find”**, whereas run 2 says **“stop at `--limit` accepted”** and assumes accepted ranges are **“at most `--limit` entries.”** [total requirement](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2405), [query algorithm](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2677)
+
+   With two disjoint qualifying directories of 40 G and 30 G and `--limit 1`, stopping after the first cannot establish the full count of two or sum of 70 G.
+
+   Directory totals additionally need a definition: a qualifying 40 G parent and its qualifying 40 G child represent 40 G after topmost dedup, not 80 G. Find distinguishes matches from counted matches; D18 does not specify the corresponding Top contract.
+
+   Define counts and sums, then include their computation in the algorithm and performance model. Add a limit-one test with multiple disjoint matches and a nested match.
+
+5. **P2 — “Newest file inside” misrepresents the approved aggregate, and the deletion test overstates its guarantee.**  
+   D18 includes **“files and directories”** in the maximum, but the GUI says **“Newest file inside.”** Run 2 explicitly includes the **“dir own mtime newer than all children”** case. [D18](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2413), [GUI wording](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2417)
+
+   A directory dated yesterday containing only files from 2020 displays yesterday as the newest **file** date. That date belongs to no file. An empty directory has the same problem.
+
+   This also affects **“refresh that deletes the newest file lowers `newest_mtime` on every ancestor.”** Ordinary deletion changes the containing directory’s own mtime to now; under the approved fold, the aggregate can increase instead. [refresh test](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2784)
+
+   Including directory timestamps is already explicit; it is not an unhandled aggregation rule. Correct the labels and make the decrease fixture’s necessary conditions explicit. Test ordinary deletion separately.
+
+6. **P2 — The performance review uses Find’s budget for Top and understates candidate work.**  
+   Run 2 estimates **“every directory row (~700k … inside the 5 s budget of run-1 R8)”**. The existing Top target is **300 ms warm / 2 s cold**; the five-second budget belongs to name-filtered Find. [performance review](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2797), [latency targets](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:155)
+
+   Furthermore, the specified `allocated` index does not contain `kind`. With no size floor and no qualifying directories, traversing it can examine file entries too—approximately seven million entries in the cited fixture, rather than only 700,000 directories. Full totals also remove the assumed early-exit advantage.
+
+   **Benchmark coverage is already addressed by T24**; requesting a date index now would repeat an addressed concern. The remaining defect is the acceptance criterion and work estimate. Measure the actual query and required totals against an explicit Top budget.
+
+7. **P3 — Zero is not a maximum-fold identity over signed timestamps.**  
+   The shared aggregate declares identity **“`{0,0,0,i64::MAX,0}`”**, although timestamps are signed Unix seconds. [merge contract](/home/tass/myprojects/corp_v2/free-space/docs/designs/free-space-disk-analyzer.md:2696)
+
+   For an empty directory with `mtime = -1`, initializing the maximum to zero yields `newest_mtime = 0`, rather than `-1`. A wholly pre-1970 subtree therefore becomes “unknown.” Against an absolute cutoff before 1970, this can change Find membership.
+
+   Use `i64::MIN` or an explicit empty accumulator, and test identity as well as associativity. Max remains associative even with this incorrect initialization, so associativity alone will not catch it.
+
+Already addressed: F1 removes the directory usage error; F2 requires ancestor re-folding and explicitly includes the ancestor’s own timestamp; F3 handles allocated-order ties; R12 selects the Find timestamp rule. R11’s inclusion of unknown/DENIED cases is an explicit accepted tradeoff, not a new omission.
+
+**What I would change before implementation**
+
+- Reconcile R13’s clamp with its promised results, file contract, and mixed-refresh invariant.
+- Define one seeded aggregate recurrence and correct its signed-timestamp identity.
+- Separate topmost selection, requested sorting, full totals, and limiting.
+- Make folder labels describe the actual aggregate; qualify deletion/decrease expectations.
+- Add the counterexamples above and benchmark complete Top behavior against its stated latency target.
+
+VERDICT: needs-fixes
+```
+
+**Dispositions (cross-model):**
+1. Clamp cannot deliver the promised result — **agree**; my R13 "Accepted scope" promised a test the clamp cannot pass (a 2099 file clamps to *today*, so the folder is "touched today"). D3 was answered on a wrong premise → reopened as **R14 / D4**.
+2. `newest_mtime <= scanned_at` invariant breaks under partial refresh — **agree**, mechanics: each entry caps/ignores its *own* raw mtime against its *own* `scanned_at`; child aggregates merge unchanged; invariant becomes `newest_mtime <= max(scanned_at over subtree)`. Test: parent scanned Jan 1, child refreshed Oct 23 with a file from Oct 22 → parent `newest_mtime` = Oct 22. → T33.
+3. Topmost dedup depends on sort order (`--sort mtime` is in the contract, line 145) — **agree**, mechanics: for `--kind dir` select qualifying rows `ORDER BY id` (preorder: a parent always precedes its descendants, so an accepted `[id, subtree_end]` skip-interval is order-independent), compute the full topmost set streaming, then sort by the requested key and apply `--limit` (top-N heap). F3's "stop at limit" is withdrawn. → T33.
+4. Totals need the full set — **agree**, same fix as #3; definition: count and sum over the topmost accepted directories (a 40 G parent with a 40 G qualifying child counts once, 40 G). Test: two disjoint 40 G/30 G matches with `--limit 1` → total `2 folders · 70 G`. → T33.
+5. "Newest file inside" vs fold including the directory's own mtime — **agree it is a real choice**, not mechanics (I had suppressed it as low): → **R15 / D5**.
+6. Wrong budget (5 s is Find's; Top is 300 ms warm / 2 s cold) and `allocated` index without `kind` — **agree**; Section 4 #1 corrected: the dir query after #3 is `WHERE kind = dir AND newest_mtime < ? [AND allocated >= ?] ORDER BY id`, a full pass over ~700k dir rows [estimated]; the file rows are skipped by the `kind` predicate only if an index leads with `kind`, otherwise ~7M rows are touched. T24 benchmark row measures it against the Top target; D11 trigger (`> 2 s cold or > 300 ms warm`) decides a `(kind, newest_mtime)` index. → T24 (amended).
+7. Identity `0` for a signed max — **agree**, mechanics: `SubtreeAgg` identity for `newest_mtime` is `i64::MIN` (or `Option`), unit test on identity. → T33.
+
+Codex-only findings adopted: #2, #3, #4, #6, #7 as mechanics (T33/T24); #1 and #5 as decisions D4/D5. Nothing rejected.
+
+### R14: Future-dated files — what the fold does with them (reopens D3)
+
+Finding: codex #1. The approved clamp `min(mtime, scanned_at)` turns a 2099 file into "modified at scan time", so its folder is never untouched while the file exists; R13's promised test ("equals the directory's real newest") cannot pass.
+Plan baseline: R13 (D3 = A, clamp).
+Runtime evidence: none (no code). Worked example: files from 2023, one file dated 2099, scan 2026-10-23 → clamp gives `newest_mtime` = 2026-10-23 → fails `--older-than 180d`; every nightly scan moves it forward.
+Comparison grid: A) ignore entries with `mtime > own scanned_at` in the fold (treated like unknown, max skips them; per-entry `mtime` raw) → folder shows its real newest 2023 and is listed. B) keep the clamp, fix the promise → folder shows "today", excluded until the file is fixed.
+Question D4 / Header: "Будущие даты" / Options: A, B.
+State: approved
+Actual answer: B) Оставить обрезку (как в D3) — D4, 2026-10-23
+Accepted scope: the clamp `min(mtime, own scanned_at)` stays (D3 confirmed); the promise in R13 is corrected: a folder containing a future-dated file reads "newest file = scan time" and is NOT untouched until the file is fixed; `ls` shows the raw date. Per codex #2 the clamp is per entry against that entry's own `scanned_at` (refresh keeps ancestors' values), so the invariant is `newest_mtime <= max(scanned_at over subtree)`. Tests: future-file fixture → folder `newest_mtime` = its scan time, excluded by `--older-than 180d`; parent scanned Jan 1 + child refreshed Oct 23 with an Oct 22 file → parent `newest_mtime` = Oct 22.
+History: R13 "Accepted scope" test superseded (it promised the real newest, which the clamp cannot give).
+
+### R15: Does a folder's own date count in `newest_mtime`?
+
+Finding: codex #5. D18 says the max covers "files and directories", but the GUI label and SKILL.md say "newest file inside". A directory's own mtime changes on any create/delete/rename inside it, so `rm junk.log` in an otherwise 3-year-old folder marks the folder as touched today, and the "Newest file" column shows a date no file has.
+Plan baseline: D18 spec line 2413 ("files and directories").
+Runtime evidence: none. Worked example: `/data/old-game/` files from 2020; user deletes one stray file today → own mtime = today → with B the folder leaves Untouched; with A it stays.
+Comparison grid: A) files only: `newest_mtime` = max over files in the subtree; directory mtimes ignored; a subtree with no files → 0 "unknown" (listed per D1 = B); label "Newest file inside" is literally true. B) files and directories (as D18): label changes to "Last change inside"; any listing change counts as touching.
+Question D5 / Header: "Дата папки" / Options: A, B.
+State: approved
+Actual answer: A) Только файлы — D5, 2026-10-23
+Accepted scope: `newest_mtime` of a directory = max over FILE entries in its subtree of `min(mtime, own scanned_at)`; directory mtimes are excluded; a subtree with no files (empty or dirs-only) stores 0 = "unknown" and passes `--older-than` per D1 = B. For a file row `newest_mtime = min(mtime, scanned_at)` (raw `mtime` kept). GUI/SKILL.md wording "newest file inside" stays. Tests: fixture dir dated today with 2020 files → `newest_mtime` = 2020; deleting a file and refreshing does NOT raise the parent (dir mtime ignored); empty dir → 0.
+History: amends D18 spec line "files and directories".
+
+### R16: TODO entries (D6, D7)
+
+Finding: two candidate TODOS.md entries from this run: (1) D1 upgrade — exclude or mark `newest_mtime = 0` and DENIED-descendant folders in Untouched; (2) `future_dated` flag + badge for folders holding a future-dated file (D4 consequence).
+Plan baseline: TODOS.md (CEO, eng run 1, design review sections).
+Runtime evidence: none.
+Comparison grid: A add / B skip / C build now, per entry.
+Question D6 / Header "TODO D1"; Question D7 / Header "TODO будущее".
+State: approved
+Actual answer: D6 = B) Не записывать; D7 = B) Не записывать — 2026-10-23
+Accepted scope: TODOS.md unchanged by this run. D1's trail stays in `decisions.jsonl` (ac91ac89) and the `gstack-shortcut` marker; the future-date explanation stays out of scope (ls shows the raw date).
+History: none
+
+Approval readiness: PASS
+
+## Required outputs (run 2)
+
+**NOT in scope.** Web rendering of Folders (T34), TUI, any index on `newest_mtime` (D11 trigger via T24), a `future_dated` flag (D7 = skip), exclusion of unknown dates (D6 = skip), changes to `diff`, `status`, scheduling, or to any decision from runs 1 and the design review other than the D18 spec amendments listed here.
+
+**What already exists.** `min_scanned_at` is a subtree-min aggregate with the same fold/refresh path as `newest_mtime` (so the F2 re-fold fixes an existing hole as well); the `allocated` index and `[id, subtree_end]` preorder ranges; `find` nested dedup (D12); the T23 contract harness; the line-649 `--older-than` boundary test; T19 refresh fixture for additive aggregates.
+
+**Diagrams.** Data flow in Section 1 (run 2); coverage map in Section 3 (run 2).
+
+**Failure modes / critical gaps (closed in this run).**
+1. Refresh never lowering `newest_mtime`/`min_scanned_at` (delta-style update) → F2 re-fold + CRITICAL test 2.
+2. Topmost dedup depending on sort order and `--limit` → id-order selection, totals over the topmost set, then sort/limit (codex #3/#4).
+3. Future-dated files pinning a folder to "touched now" → accepted knowingly (D4 = B); unknown dates passing the filter → accepted knowingly (D1 = B, marker).
+4. Signed-timestamp identity bug (`0` as max identity) → `i64::MIN` + identity test (codex #7).
+5. Top budget misquoted → corrected; measured by T24 against 300 ms warm / 2 s cold.
+Critical gaps open: 0.
+
+**Worktree parallelization.** Two lanes: lane 1 `core` (T33: aggregate, refresh, queries, schema.json, SKILL.md, T23 rows); lane 2 `web` (T34: Folders view) can start on the JSON contract (`newest_mtime` field, totals) before lane 1 lands, using a fixture snapshot. T24 benchmark row runs after lane 1.
+
+**Implementation Tasks (run 2 amendments).**
+- T33 (P1, human: ~1d / CC: ~45min) — amended in place above (fold rules D3/D4/D5, F2 re-fold, id-order dedup + totals, D1 marker, D2 find rule, tests 1–6 + 4 codex tests, T23 rows).
+- T24 (P2) — amended: `top / --kind dir --older-than 180d` benchmark rows, with/without `--min-size`, against the Top target.
+- T34 (P1) — note: the Folders total line reads `N folders · X G` over the topmost set (codex #4); label stays "newest file" (D5).
+- No new task ids.
+
+**Unresolved decisions.** None. D1–D7 answered this run.
+
+## Eng Review Completion Summary (run 2)
+
+- Scope: T33 `newest_mtime` (D18) + T5/T19/T22/T24/T34 touch points; everything else keeps run-1 dispositions.
+- Findings: Section 1: 3, Section 2: 3, Section 3: 6 tests (24 GAP paths mapped), Section 4: 3, Outside (codex): 7 — all dispositioned; 3 factual corrections (F1–F3, F3 partly withdrawn by codex #3); 0 rejected.
+- Decisions: D1 = B (shortcut 5/10, logged ac91ac89), D2 = A, D3 = A, D4 = B (confirms D3 after the promise was corrected), D5 = A, D6 = B, D7 = B.
+- Lake Score: 3 of 4 scored decisions complete (10/10); D1 is an accepted 5/10 shortcut with a marker; D5–D7 differ in kind (no score).
+- Test Plan Artifact: `~/.gstack/projects/tass/tass-master-eng-review-test-plan-20261023-043546.md` (D4/D5 supersede its future-file and deletion rows: future file → folder "touched at scan time"; deletion of a file does not raise the parent since dir mtimes are excluded).
+- Critical gaps: 0. Unresolved: 0.
+
+### Suppressed findings appendix (run 2)
+- `min_scanned_at` semantics for DENIED subtrees (unchanged by T33; run-1 D13 covers it).
+- `--sort mtime` for `--kind dir` sorts by `newest_mtime` (follows from D2/D18, mechanics, noted in T33).
+- Hardlinked file counted once for size but its mtime folds into every directory that contains a link — correct for "touched", no change.
+<!-- eng-review-2:end -->
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 2 | CLEAR | 6 proposals, 3 accepted, 2 deferred (+3 HOLD items deferred) |
+| Outside Review | codex (gpt-6-astra) via `/plan-ceo-review`, `/plan-eng-review` ×2, `/plan-design-review` | Independent 2nd opinion | 4 | completed (issues_found) | CEO phase: 7 findings, 7 resolved. Eng phase run 1: 8 findings, 6 corrected (OV-9…OV-14), 2 decided (D12, D13). Design phase: 15 codex + 15 Claude-subagent findings, folded into Passes 1–7. Eng phase run 2: 7 findings, 5 adopted as mechanics (T33/T24), 2 decided (D4, D5), 0 rejected |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR (FULL_REVIEW, 0 critical gaps) — run 2 covered T33 `newest_mtime` (D18) | Run 1: 15 findings → R1–R8 approved + 7 task notes; D1–D14. Run 2: 16 findings (3+3+3 sections, 7 codex), R11–R16, D1–D7 answered, 24 test paths mapped, T33/T24/T34 amended |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL_REVIEW) | score: 3/10 → 8/10; 14 decisions (D5–D18), 2 deferred to TODOS (D19, D20); tasks T25–T35; 0 mockups (designer unavailable) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | — |
+
+- **OUTSIDE COVERAGE:** provider codex, model gpt-6-astra, phases plan-review (CEO, Eng ×2) and design (2026-10-22/23). Eng run 2 prompt: D18 spec, T33, the full run-2 block; codex found the clamp promise contradiction (D4), the dedup/sort-order and totals holes, the invariant under partial refresh, the dir-mtime label mismatch (D5), the wrong Top budget and the signed max identity. All closed in T33/T24 or decided.
+- **CROSS-MODEL:** native eng pass (Claude Fable 5.1) found the refresh re-fold hole (F2), the tie-break (F3) and the plan contradiction (F1); codex extended F3 to all sort orders and totals and corrected a false promise in the native R13 record; no disagreement remained after D4/D5. Design-phase overrides (D11, D17, D18) stand.
+- **VERDICT:** CEO + ENG + DESIGN CLEARED — ready for implementation; T33 is unblocked (schema change reviewed), benchmark gate T1/T24 still decides indexes.
+
+NO UNRESOLVED DECISIONS
