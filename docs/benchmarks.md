@@ -16,16 +16,16 @@ Measured on the machine freespace was built for (the design's primary target), 2
 
 ## Scan
 
-All tools scan `/` on one filesystem (`-x` or the default), as root, at normal priority.
+All tools scan `/` on one filesystem (`-x` or the default), as root, at normal priority. This first table uses the packages of the machine's Ubuntu 22.04 base; the next section repeats the comparison with current releases.
 
 | Tool | Config | Cold | Warm | Peak RSS |
 |---|---|---|---|---|
-| du | `-sx` | 1199 s | 891 s | 9 MB |
-| duc | `index -x` | 1206 s | 1046 s | 29 MB |
-| ncdu | `-x -0 -o` | 615 s | 847 s ¹ | 3 MB |
-| gdu | `-x -m 8` | 286 s | 318 s | 3.3 GB |
-| gdu | `-x -m 1` | 956 s | | 2.9 GB |
-| **freespace** | `scan`, 8 workers (the default) | **239 s** ² | 434 s ¹ | 1.42 GB |
+| du 8.32 | `-sx` | 1199 s | 891 s | 9 MB |
+| duc 1.4.4 | `index -x` | 1206 s | 1046 s | 29 MB |
+| ncdu 1.15.1 | `-x -0 -o` | 615 s | 847 s ¹ | 3 MB |
+| gdu 5.13.2 | `-x -m 8` | 286 s | 318 s | 3.3 GB |
+| gdu 5.13.2 | `-x -m 1` | 956 s | | 2.9 GB |
+| **freespace** (glibc build) | `scan`, 8 workers (the default) | **239 s** ² | 434 s ¹ | 1.42 GB |
 | freespace | `scan --workers 4` | 379 s, 657 s ³ | | 1.41 GB |
 | freespace | `scan --workers 2` | 725 s | | 1.40 GB |
 | freespace | `scan --workers 1` | 1234 s | | 1.40 GB |
@@ -34,9 +34,30 @@ All tools scan `/` on one filesystem (`-x` or the default), as root, at normal p
 ² Idle rerun. The first 8-worker run, during a compile, took 576 s. Of the 239 s: walk 198 s, finalize 1.8 s, SQLite insert 11 s, indexes 28 s.
 ³ Two runs of the same binary on an idle machine: the variance of this disk.
 
-freespace's time includes writing the snapshot that every later answer reads; du and gdu only print. On the default settings freespace is 5× faster than `du` cold and a little faster than gdu, at under half of gdu's memory.
+freespace's time includes writing the snapshot that every later answer reads; du and gdu only print. On the default settings freespace is 5× faster than `du` cold and on par with this gdu, at under half of its memory. Current releases of ncdu and gdu walk as fast or faster with far less memory (below).
 
 Snapshot: 1.05 GB for 7.77 M entries, 135 B per entry with indexes (before the first snapshot exists, the free-space precheck assumes 150 B per entry). Peak RSS of the scan is ~183 B per entry.
+
+### Current releases
+
+The same cold scan of `/` (7.78 M entries) with the latest release of each multi-threaded tool, from its project's own static build: ncdu 2.9.1 (signature checked), gdu 5.38.0 and dust 1.2.6 (sha256 checked), against the installed freespace 0.1.1 release (static musl with mimalloc). Two rounds on an idle machine, the second in reverse order (ncdu, gdu, dust, freespace, freespace, dust, gdu, ncdu), so a slow stretch of the disk does not land on one tool:
+
+<!-- no-run -->
+```sh
+sudo env TOOLS=gdu WARM=0 GDU_CORES=8 GDU=./gdu scripts/bench-baseline.sh /   # one tool, one cold run
+```
+
+| Tool | Config | Cold, round 1 | Cold, round 2 | Peak RSS |
+|---|---|---|---|---|
+| ncdu 2.9.1 | `-x -0 -t 8 -O FILE` (binary export) | 287 s | 324 s | 9–11 MB |
+| gdu 5.38.0 | `-n -p -s -x -m 8` | **214 s** | 303 s | 53–54 MB |
+| dust 1.2.6 | `-x -T 8 -d 1` | 484 s | 534 s | 2.78 GB |
+| freespace 0.1.1 | `scan --workers 8` | 288 s (walk 241 s) | 399 s (walk 354 s) | 1.49–1.52 GB |
+
+- The walk is not where freespace wins. ncdu 2 and gdu are within this disk's noise of it, and gdu was the fastest in round 1. All of them wait on the same metadata reads.
+- freespace's time includes writing the 1.05 GB snapshot with its indexes, 47 s and 45 s here. That is what makes every later answer take a second instead of a walk.
+- Memory: ncdu streams its export and gdu `-s` evidently keeps only totals (53 MB for 7.8 M entries), so they need megabytes; their interactive browsers keep the tree in memory (not measured here). freespace holds the tree until the snapshot is written, ~190 B per entry; dust holds it at ~360 B.
+- du and duc walk with one thread, so a newer release would not change their rows above.
 
 ### Workers (Open Question 3)
 

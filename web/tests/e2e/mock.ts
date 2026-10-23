@@ -15,6 +15,8 @@ export interface Node {
   allocated?: number;
   mtime?: number;
   denied?: boolean;
+  /** Entries below this folder beyond its modelled children (screenshots). */
+  items?: number;
   children?: Node[];
 }
 
@@ -55,7 +57,7 @@ function flatten(root: Node): Map<string, Flat> {
     if (n.kind === "file") {
       f = { path, node: n, allocated: n.allocated ?? 0, items: 0, newest: n.mtime ?? 0, errors: 0 };
     } else {
-      f = { path, node: n, allocated: 0, items: 0, newest: 0, errors: n.denied ? 1 : 0 };
+      f = { path, node: n, allocated: 0, items: n.items ?? 0, newest: 0, errors: n.denied ? 1 : 0 };
       for (const c of n.children ?? []) {
         const cf = walk(c, path === "/" ? `/${c.name}` : `${path}/${c.name}`);
         f.allocated += cf.allocated;

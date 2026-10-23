@@ -4,7 +4,30 @@ Where did my disk go? `freespace` keeps a snapshot of the whole filesystem tree,
 
 Linux with systemd, x86_64 and aarch64. One static binary, MIT licensed.
 
-![freespace gui: the home folder with .cache selected, 83 G of 95 G](docs/img/gui.png)
+![freespace gui: a 169 G home folder, its fifteen folders by size, .cache (46 G) selected with what is biggest inside it](docs/img/gui.png)
+
+## How it compares
+
+`du`, `ncdu`, `gdu` and `dust` walk the disk when you ask, and the walk is the slow part. freespace walks it at night, at idle priority, and answers from the saved snapshot. One machine, a VMware disk with 408 G in 7.8 million entries, every tool run cold as root, du and duc once, the others twice ([method and all runs](docs/benchmarks.md#current-releases)):
+
+| Tool | Answer to "what is using my disk?" | Full walk of `/` | Peak memory of the walk |
+|---|---|---|---|
+| du 8.32 | after a walk | 1199 s | 9 MB |
+| dust 1.2.6, 8 threads | after a walk | 484 s, 534 s | 2.78 GB |
+| ncdu 2.9.1, 8 threads | after a walk | 287 s, 324 s | 11 MB |
+| gdu 5.38.0, 8 cores | after a walk | 214 s, 303 s | 54 MB |
+| duc 1.4.4 | from its index, after `duc index` | 1206 s | 29 MB |
+| **freespace 0.1.1** | **0.01 s for a folder, under 2 s for the whole disk** | 288 s, 399 s, at night | 1.52 GB |
+
+The walk itself is no faster than ncdu's or gdu's: all of them wait on the same disk, and the same binary took 288 s and 399 s here. It also takes more memory, because the tree is held until the snapshot is written (47 s of the 288). What that buys:
+
+- **The answer is already there.** `freespace ls /home` and `freespace top / --min-size 1G` read last night's snapshot, as your user, without sudo and without waiting.
+- **What changed since yesterday.** `freespace diff /` and the Changes view compare with the previous snapshot, so a model pulled overnight or a log that keeps growing shows up at the top, not after a hunt.
+- **Questions across the whole disk, with a total.** Folders nobody touched for half a year (`freespace top / --kind dir --older-than 180d`), every ISO and how much they take together (`freespace find / --name '*.iso'`), every `node_modules`.
+- **For scripts and AI agents.** Every answer comes as `--json` with a JSON Schema and stable error codes, and the installer adds a Claude Code skill.
+- **In your browser, also over ssh.** `freespace gui` serves the snapshot on 127.0.0.1 ([Over ssh](#over-ssh)).
+
+![freespace gui, Changes: the home folder grew by 28 G since the previous scan; .cache +15 G, .ollama new with 8.9 G, Downloads +6.1 G, Videos −4.2 G](docs/img/gui-changes.png)
 
 ## Install
 
@@ -197,7 +220,7 @@ sudo install -m 0755 target/release/freespace /usr/local/bin/freespace
 sudo freespace install-timer
 ```
 
-How it works, in short: one parallel walk of the tree, written into a new SQLite file that replaces the old one with a rename, so readers never see a half-written snapshot. About 135 bytes per entry on disk (1 GB for 7.7 million files). Timings against `du`, `gdu`, `duc` and `ncdu`: [docs/benchmarks.md](docs/benchmarks.md). Design notes: [docs/designs/free-space-disk-analyzer.md](docs/designs/free-space-disk-analyzer.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+How it works, in short: one parallel walk of the tree, written into a new SQLite file that replaces the old one with a rename, so readers never see a half-written snapshot. About 135 bytes per entry on disk (1 GB for 7.7 million files). Timings against `du`, `ncdu`, `gdu`, `dust` and `duc`: [docs/benchmarks.md](docs/benchmarks.md). Design notes: [docs/designs/free-space-disk-analyzer.md](docs/designs/free-space-disk-analyzer.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
