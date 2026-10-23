@@ -1,6 +1,6 @@
 # freespace
 
-Where did my disk go? `freespace` keeps a snapshot of the whole filesystem tree, refreshed every night by a systemd timer, so every question about disk usage answers in milliseconds: in the terminal, in your browser, or for an AI agent through `--json`. It reads the disk and never changes, moves or deletes anything on it.
+Where did my disk go? `freespace` keeps a snapshot of the whole filesystem tree, refreshed every night by a systemd timer, so every question about disk usage is answered from that snapshot in under two seconds instead of the minutes a walk takes: in the terminal, in your browser, or for an AI agent through `--json`. It reads the disk and never changes, moves or deletes anything on it.
 
 Linux with systemd, x86_64 and aarch64. One static binary, MIT licensed.
 

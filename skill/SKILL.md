@@ -5,7 +5,7 @@ description: Find what is using disk space on this Linux machine and help the us
 
 # freespace: disk usage from a ready snapshot
 
-`freespace` keeps a snapshot of the whole filesystem tree, refreshed every night by a systemd timer. Every command below reads that snapshot, answers in milliseconds and changes nothing on disk. Always pass `--json` and parse stdout. The JSON Schema of every answer is in `schema.json` next to this file (`freespace schema --json` prints the same).
+`freespace` keeps a snapshot of the whole filesystem tree, refreshed every night by a systemd timer. Every command below reads that snapshot, answers in under two seconds and changes nothing on disk. Always pass `--json` and parse stdout. The JSON Schema of every answer is in `schema.json` next to this file (`freespace schema --json` prints the same).
 
 ## Start every session with status
 

@@ -11,7 +11,7 @@ First public release.
 ### Added
 
 - `scan`: parallel walk of every real filesystem (or the given roots), one snapshot per scan in SQLite, published with a rename so readers never see a partial file; hardlinks counted once; unreadable folders reported as `incomplete` with their paths.
-- `ls`, `top`, `find`, `diff`, `status`: answers from the snapshot in milliseconds, as tables or `--json`; `top --kind dir --older-than` lists folders by their newest file; `find` totals every match and counts nested matches once.
+- `ls`, `top`, `find`, `diff`, `status`: answers from the snapshot, not the disk, as tables or `--json` (`ls`, `diff` and `status` in milliseconds; `top` and `find` read a 7.7 M-entry snapshot in parallel in under 1.7 s cold); `top --kind dir --older-than` lists folders by their newest file; `find` totals every match and counts nested matches once.
 - `refresh`: rescan one folder into the current snapshot.
 - `install-timer`: nightly systemd timer at idle priority, read access for the sudo user through an ACL (group fallback), first scan right away; `--uninstall` removes everything it added.
 - `gui` and `serve`: the snapshot in the browser on 127.0.0.1 with a per-run token, keyboard driven, with Browse, Top files, Find and Changes views; over ssh `gui` prints the tunnel line.

@@ -1224,7 +1224,7 @@ ASCII diagrams in files this plan touches: the architecture block in «Recommend
 Synthesized from this review's findings. Each task derives from a specific
 finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~3d / CC: ~3h)** — core — Benchmark the scan + SQLite write on this machine before any UI work (RSS, scan time, snapshot size, `ls`/`top`/`diff` latency, refresh re-emit time)
+- [x] **T1 (P1, human: ~3d / CC: ~3h)** — core — Benchmark the scan + SQLite write on this machine before any UI work (RSS, scan time, snapshot size, `ls`/`top`/`diff` latency, refresh re-emit time) *(done 2026-10-23: docs/benchmarks.md; default workers stay min(CPUs, 8); `top /` misses the 300 ms warm target at 0.68 s, follow-up in TODOS.md)*
   - Surfaced by: Reality rows (numbers), Section 7, Open Questions 1/3/5, OV-1
   - Files: to be determined (`docs/benchmarks.md`, `core/`)
   - Verify: `docs/benchmarks.md` has one table with [measured] values replacing every [estimated] number in the plan
@@ -1318,7 +1318,7 @@ finding above. Run with Claude Code or Codex; checkbox as you ship.
   - Surfaced by: Eng R7 (D10), CEO test #8
   - Files: `cli/tests/skill_contract.rs`, `core/tests/fixtures/`
   - Verify: adding a bogus flag to a SKILL.md example fails CI; all documented commands exit 0
-- [ ] **T24 (P2, human: ~2h / CC: ~15min)** — benchmark — extend T1 with `find` rows: `--name '*.iso'`, `--name '*'`, `--older-than 1y`, `--kind dir --name node_modules`, cold and warm; decide the covering index by the 5 s cold rule (R8) *(Eng review run 2: also `top / --kind dir --older-than 180d` cold/warm, with and without `--min-size 100M`; the D11 trigger decides a `(kind, newest_mtime)` index.)*
+- [x] **T24 (P2, human: ~2h / CC: ~15min)** — benchmark — extend T1 with `find` rows: `--name '*.iso'`, `--name '*'`, `--older-than 1y`, `--kind dir --name node_modules`, cold and warm; decide the covering index by the 5 s cold rule (R8) *(Eng review run 2: also `top / --kind dir --older-than 180d` cold/warm, with and without `--min-size 100M`; the D11 trigger decides a `(kind, newest_mtime)` index.)* *(done 2026-10-23: no covering name index and no `(kind, newest_mtime)` index; the parallel pass brings `find --name '*'` from 6.38 s to 1.63 s cold, docs/benchmarks.md)*
   - Surfaced by: Eng R8 (D11), OV-12
   - Files: `docs/benchmarks.md`
   - Verify: table has the four rows with [measured] values; index decision recorded as a line under the table
