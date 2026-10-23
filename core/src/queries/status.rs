@@ -14,6 +14,17 @@ use crate::snapshot::reader::Snapshot;
 use crate::snapshot::{SnapshotDir, lock, progress, state};
 
 pub fn status(dir: &SnapshotDir) -> Result<StatusResponse> {
+    build(dir, false)
+}
+
+/// `/api/status`: like [`status`], but answers before the first snapshot too
+/// (`generation: null`), so the page can show the first-run state with
+/// `scanning` and `last_error` instead of an error.
+pub fn status_page(dir: &SnapshotDir) -> Result<StatusResponse> {
+    build(dir, true)
+}
+
+fn build(dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
     let scanning = lock::probe(dir);
     let prog = if scanning.is_some() {
         progress::read(dir)
@@ -51,7 +62,9 @@ pub fn status(dir: &SnapshotDir) -> Result<StatusResponse> {
     };
     let snap = match Snapshot::open_current(dir) {
         Ok(s) => s,
-        Err(e) if e.code == ErrorCode::NoSnapshot && resp.scanning.is_some() => return Ok(resp),
+        Err(e) if e.code == ErrorCode::NoSnapshot && (allow_missing || resp.scanning.is_some()) => {
+            return Ok(resp);
+        }
         Err(e) => return Err(e),
     };
     let m = &snap.meta;

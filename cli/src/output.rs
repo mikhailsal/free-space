@@ -19,6 +19,10 @@ pub fn stderr_is_tty() -> bool {
     std::io::stderr().is_terminal()
 }
 
+pub fn stdin_is_tty() -> bool {
+    std::io::stdin().is_terminal()
+}
+
 pub fn stdout_is_tty() -> bool {
     std::io::stdout().is_terminal()
 }

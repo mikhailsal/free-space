@@ -1,0 +1,149 @@
+/* gstack-shortcut(dec-8e0d4823): v1 no-break only, upgrade when Termux build lands
+   D16 v1 rule: nothing breaks down to 360 px. Identity row wraps, the table
+   scrolls inside its box with a sticky name column, items/modified hide, the
+   inspector becomes a 40 vh bottom sheet, footer keys hide, targets ≥ 44 px. */
+
+@media (max-width: 700px) {
+  :root {
+    --target: 44px;
+  }
+  .identity {
+    flex-wrap: wrap;
+    padding: var(--s1) var(--s4);
+  }
+  .identity .right {
+    justify-content: flex-start;
+    gap: var(--s1) var(--s3);
+  }
+  .folder {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .crumbs {
+    padding: var(--s2) 0;
+  }
+  .tabs {
+    gap: var(--s3);
+    overflow-x: auto;
+  }
+  .tabs [role="tablist"] {
+    gap: var(--s3);
+  }
+  .tabs [role="tab"],
+  .tabs .help-btn {
+    min-height: 44px;
+    padding-top: var(--s3);
+  }
+  .tabs .ghost {
+    display: none;
+  }
+  .notice {
+    flex-wrap: wrap;
+  }
+  .notice .outline,
+  .chip,
+  .seg button,
+  .crumbs .hid,
+  .inspector .links .link,
+  .link {
+    min-height: 44px;
+  }
+  .findform .fields {
+    gap: var(--s2);
+  }
+  .field input,
+  .f-name input {
+    width: 100%;
+  }
+  .field {
+    flex: 1 1 140px;
+  }
+  .namegroup {
+    flex: 1 1 100%;
+  }
+  .namegroup .field {
+    flex: 1;
+  }
+
+  .grid th.items,
+  .grid td.items,
+  .grid th.date,
+  .grid td.date {
+    display: none;
+  }
+  table.grid {
+    min-width: 360px;
+  }
+  .grid th.name,
+  .grid td.name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg);
+    width: 55%;
+  }
+  .grid th.name {
+    z-index: 3;
+  }
+  .grid tbody tr.sel td.name {
+    background: var(--accent-bg);
+  }
+
+  .work {
+    position: relative;
+  }
+  .results.sheet-open {
+    padding-bottom: 40vh;
+  }
+  .inspector {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 40vh;
+    min-width: 0;
+    max-width: none;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 0.12);
+    z-index: 10;
+    transform: translateY(100%);
+    visibility: hidden;
+    transition:
+      transform 160ms var(--ease-out),
+      visibility 0s 160ms;
+  }
+  .inspector.open {
+    transform: none;
+    visibility: visible;
+    transition: transform 160ms var(--ease-out);
+  }
+  .inspector .handle {
+    display: block;
+    align-self: center;
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+    margin: -8px 0 -8px;
+  }
+  .inspector .sheet-close {
+    display: inline-flex;
+    align-self: flex-end;
+    margin-bottom: -12px;
+  }
+  .keys {
+    display: none;
+  }
+  .toasts {
+    bottom: var(--s4);
+  }
+}
+
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  .inspector,
+  .inspector.open {
+    transition: none;
+  }
+}
