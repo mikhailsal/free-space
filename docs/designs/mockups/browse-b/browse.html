@@ -1,0 +1,107 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>freespace · Browse mockup B</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+body{width:1280px;height:800px;display:flex;flex-direction:column;overflow:hidden}
+.identity{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:13px;line-height:16px}
+.identity .brand{font-size:18px;line-height:24px;font-weight:500}
+.identity .brand span{color:var(--muted);font-weight:400}
+.identity .right{display:flex;gap:16px;align-items:baseline}
+.identity .fs{color:var(--danger-fg);font-weight:500}
+.fillline{height:4px;background:var(--line);position:relative}
+.fillline i{position:absolute;left:0;top:0;bottom:0;width:97%;background:var(--danger-fg)}
+.notice{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--danger-bg);color:var(--danger-fg);font-size:14px;line-height:20px;border-bottom:1px solid var(--danger-line)}
+.notice .ic{width:20px;height:20px;border-radius:999px;background:var(--danger-fg);color:var(--bg);display:grid;place-items:center;font-weight:500;font-size:13px;flex:none}
+.notice p{flex:1}
+.notice button{border:1px solid var(--danger-fg);border-radius:4px;padding:3px 10px;font-size:13px;line-height:16px;font-weight:500;color:var(--danger-fg);background:var(--bg)}
+.notice .chip{font-size:13px;line-height:16px;font-weight:500;text-decoration:underline;text-underline-offset:2px}
+.folder{height:52px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line)}
+.crumbs{display:flex;align-items:baseline;gap:6px;padding-bottom:12px;font-size:14px}
+.crumbs a{color:var(--muted);text-decoration:none}
+.crumbs h1{font-size:18px;line-height:24px;font-weight:500}
+.crumbs .size{font-size:14px;margin-left:10px}
+.crumbs .hid{font-size:13px;line-height:16px;color:var(--muted);margin-left:10px;text-decoration:underline dotted;text-underline-offset:3px}
+.tabs{display:flex;gap:24px;align-items:flex-end}
+.tabs button{font-size:14px;line-height:20px;padding:0 2px 12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--fg);font-weight:500;border-bottom-color:var(--accent)}
+.tabs .ghost{margin-left:16px;font-size:13px;color:var(--accent);font-weight:500}
+.work{flex:1;display:flex;min-height:0}
+.results{width:72%;overflow:hidden}
+.grid{display:grid;grid-template-columns:1fr 112px 64px 128px 96px}
+.head{font-size:13px;line-height:16px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--line)}
+.head span{padding:12px 12px 8px;text-align:right}
+.head span:first-child{text-align:left;padding-left:16px}
+.head .sorted{color:var(--fg)}
+.row{position:relative;height:40px;align-items:center;font-size:14px;line-height:20px;border-bottom:1px solid var(--line-soft)}
+.row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--w);background:var(--accent);opacity:.13}
+.row>span{position:relative;padding:0 12px;text-align:right;white-space:nowrap}
+.row>span:first-child{text-align:left;padding-left:16px}
+.row .k{color:var(--muted);display:inline-block;width:16px;font-size:11px}
+.row.sel{background:var(--accent-bg);box-shadow:inset 3px 0 0 var(--accent),inset 0 1px 0 var(--accent),inset 0 -1px 0 var(--accent)}
+.row.sel::before{opacity:.22}
+.row.sel>span:first-child{font-weight:500}
+.q{color:var(--danger-fg);font-weight:500;margin-left:6px;font-family:var(--font-mono)}
+.more{padding:10px 16px;font-size:14px;color:var(--muted)}
+.more a{color:var(--accent);text-underline-offset:2px}
+aside{width:28%;border-left:1px solid var(--line);padding:20px 20px 16px;display:flex;flex-direction:column;gap:20px;overflow:hidden}
+.title{font-size:18px;line-height:24px;font-weight:500}
+.big{display:flex;align-items:baseline;gap:10px;margin-top:4px}
+.big .v{font-size:18px;line-height:24px}
+.big .of{font-size:13px;line-height:16px;color:var(--muted)}
+.path{font-size:13px;line-height:20px;color:var(--muted)}
+aside h2{font-size:13px;line-height:16px;font-weight:500;color:var(--muted);margin-bottom:8px}
+.mini{display:flex;flex-direction:column;gap:6px}
+.mini div{display:grid;grid-template-columns:1fr 64px;font-size:14px;line-height:20px;position:relative}
+.mini div::after{content:"";position:absolute;left:0;bottom:-2px;height:3px;width:var(--w);background:var(--accent);opacity:.35}
+.mini .num{text-align:right}
+dl{display:grid;grid-template-columns:96px 1fr;row-gap:2px;font-size:14px;line-height:20px}
+dt{color:var(--muted)}
+.cmd{font-family:var(--font-mono);font-size:13px;line-height:20px;border-top:1px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;color:var(--fg)}
+.cmd .c{color:var(--accent);font-family:var(--font-sans);font-weight:500}
+.actions{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.actions .primary{background:var(--accent);color:var(--bg);border-radius:4px;padding:8px 12px;font-size:14px;line-height:20px;font-weight:500;text-align:center}
+.actions .links{display:flex;gap:16px;justify-content:center;font-size:13px;line-height:16px;font-weight:500;color:var(--accent)}
+footer{height:36px;border-top:1px solid var(--line);display:flex;align-items:center;gap:20px;padding:0 16px;font-size:13px;line-height:16px;color:var(--muted)}
+footer b{font-family:var(--font-mono);font-weight:400;color:var(--fg)}
+</style></head><body>
+<header>
+  <div class="identity">
+    <div class="brand">freespace <span>· tass-vm</span></div>
+    <div class="right"><span class="muted">snapshot 7h ago</span><span class="fs num">Filesystem / · 97% used · 14 G free at scan</span></div>
+  </div>
+  <div class="fillline" aria-hidden="true"><i></i></div>
+  <div class="notice" role="alert"><span class="ic">!</span>
+    <p><b>Scan incomplete.</b> 2 directories could not be read as root, so sizes below are lower bounds.</p>
+    <button>Show unreadable paths</button><button>Copy: sudo freespace scan</button><span class="chip">+1 notice</span>
+  </div>
+  <div class="folder">
+    <div class="crumbs"><a href="#">/</a><span class="muted">›</span><a href="#">home</a><span class="muted">›</span><h1>tass</h1><span class="size num">≥ 206.8 G</span><span class="hid">1 hidden · 4.1 G</span></div>
+    <div class="tabs"><button class="on">Browse</button><button>Top files</button><button>Find</button><button>Changes</button><button class="ghost">Copy refresh command</button></div>
+  </div>
+</header>
+<div class="work">
+<main class="results">
+  <div class="grid head"><span>Name</span><span class="sorted">Allocated ▾</span><span>Share</span><span>Items</span><span>Modified</span></div>
+  <div id="rows"></div>
+  <div class="more">Showing 12 of 221 · <a href="#">Show more</a></div>
+</main>
+<aside aria-label="Details">
+  <div><div class="title">.cache</div>
+    <div class="big"><span class="v num">121.4 G</span><span class="of">59% of tass · apparent 124.0 G</span></div>
+    <div class="path mono">/home/tass/.cache</div></div>
+  <div><h2>Biggest inside</h2><div class="mini">
+    <div style="--w:50%"><span>huggingface</span><span class="num">61.2 G</span></div>
+    <div style="--w:19%"><span>pip</span><span class="num">22.8 G</span></div>
+    <div style="--w:12%"><span>uv</span><span class="num">14.0 G</span></div>
+    <div style="--w:8%"><span>ms-playwright</span><span class="num">9.9 G</span></div></div></div>
+  <dl><dt>Files / dirs</dt><dd class="num">2 071 400 / 32 931</dd><dt>Modified</dt><dd>today 01:12</dd><dt>Newest file</dt><dd class="num">2026-10-23</dd><dt>Errors</dt><dd class="num">0</dd></dl>
+  <div class="cmd"><span>freespace ls ~/.cache --json</span><span class="c">Copy</span></div>
+  <div class="actions"><button class="primary">Hide until next scan · h</button><div class="links"><span>Copy path</span><span>Copy refresh command</span></div></div>
+</aside>
+</div>
+<footer><span><b>↑↓</b> move</span><span><b>→</b> open</span><span><b>←</b> up</span><span><b>t</b> top files</span><span><b>/</b> find</span><span><b>d</b> changes</span><span><b>h</b> hide</span><span><b>?</b> help</span></footer>
+<script src="data.js"></script>
+<script>
+document.getElementById("rows").innerHTML = FS.rows.map((r,i)=>`<div class="grid row${i===0?' sel':''}" style="--w:${Math.max(r[3],0.3)}%"><span><span class="k">${r[0]==="dir"?"▸":""}</span>${r[1]}${r[6]?'<span class="q">?</span>':''}</span><span class="num">${FS.ge(r,r[2])}</span><span class="num">${FS.pct(r[3])}</span><span class="num">${FS.ge(r,r[4])}</span><span>${r[5]}</span></div>`).join("");
+</script>
+</body></html>

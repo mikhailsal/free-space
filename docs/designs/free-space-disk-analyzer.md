@@ -160,6 +160,8 @@ freespace install-timer [--interval daily] [--at 02:00] [--roots / /home]
 
 `docs/designs/free-space-disk-analyzer-sketch.png` (1280px). Один экран: хлебные крошки, пилюля со снимком («tass-vm · 02:00 · 7h ago · 6.99M entries»), предупреждение «disk 97%», кнопки «Refresh this folder» и «Top files», таблица детей с allocated/share/items/modified, правая панель с деталями выбранного (allocated vs apparent, hardlinks, errors, generation) и подсказка команды для агента. Футер с горячими клавишами, одинаковыми для web и (с v1.1) TUI.
 
+**Утверждённый макет (design-shotgun, 2026-10-23):** `docs/designs/free-space-browse-mockup.png`, исходник `docs/designs/mockups/browse-b/browse.html`. Для внешнего вида экрана Browse он заменяет скетч; поведение и тексты по-прежнему задают D5–D18. Подробности и отступления от D6/D15: раздел «Approved mockup: Browse, variant B».
+
 ## Open Questions
 
 1. **Формат снимка.** SQLite по умолчанию или mmap/гибрид. Решает бенчмарк: задержка `ls`/`top` на 7M записей и время записи снимка.
@@ -2124,7 +2126,7 @@ Accepted scope:
 ├ footer (36 px, keys) ─────────────────────────┴───────────────────────────────┤
 ```
 
-Identity row: product name and `host` left (brand visible, litmus 1); right: snapshot age "7h ago" (neutral; amber after 36 h; red after 7 days with copy "snapshot is 9 days old, is the timer running?"), then the filesystem of the current path: "Filesystem /: 97% used · 14 G free at scan" with a thin fill bar (amber ≥ 80 %, red ≥ 90 %). Entry count, `generation`, scan time move to the age tooltip and the inspector. Folder row: breadcrumbs plus the current folder's allocated size left; right: segmented control Browse | Top files | Find | Changes (one results table, four modes; keys `t`, `/`, `d` switch modes, `Esc` returns to Browse) and a ghost button "Copy refresh command" (footer key `r refresh command`; after copy a toast "Command copied: sudo freespace refresh /path", never "Refreshed"). On load the first row is selected and the inspector is populated. Outlined/filled styling is reserved for operable controls; passive metadata is plain text. The sketch is superseded by the diagram above; a redrawn sketch is a task (see Implementation Tasks).
+Identity row: product name and `host` left (brand visible, litmus 1); right: snapshot age "7h ago" (neutral; amber after 36 h; red after 7 days with copy "snapshot is 9 days old, is the timer running?"), then the filesystem of the current path: "Filesystem /: 97% used · 14 G free at scan" with a thin fill bar (amber ≥ 80 %, red ≥ 90 %). Entry count, `generation`, scan time move to the age tooltip and the inspector. Folder row: breadcrumbs plus the current folder's allocated size left; right: segmented control Browse | Top files | Find | Changes (one results table, four modes; keys `t`, `/`, `d` switch modes, `Esc` returns to Browse) and a ghost button "Copy refresh command" (footer key `r refresh command`; after copy a toast "Command copied: sudo freespace refresh /path", never "Refreshed"). On load the first row is selected and the inspector is populated. Outlined/filled styling is reserved for operable controls; passive metadata is plain text. The sketch is superseded by the diagram above; a redrawn sketch is a task (see Implementation Tasks). *(Mockup B, design-shotgun 2026-10-23: the fill bar becomes a full-width 4 px line under the identity row (threshold colour), the figures stay as text in the row; modes render as underline tabs, not a segmented control; the folder row is 52 px with the tabs on its bottom border; "Copy refresh command" is an accent text button. See "Approved mockup: Browse, variant B".)*
 
 Pass 1 after fixes: 9/10 (remaining: the redrawn sketch is a task, not yet an artifact).
 
@@ -2340,24 +2342,27 @@ type:                          # px / line-height
   body: 16/24 400              # inspector prose, notices, empty states, form hints
   cell: 14/20 400              # table cells and column headers (data exception to the 16 px rule, recorded)
   label: 13/16 500             # form labels, chips, footer keys; nothing smaller anywhere
-space: [4, 8, 12, 16, 24, 32]  # px scale; row 40, folder row 40, form row 56, identity row 32, footer 36
+space: [4, 8, 12, 16, 24, 32]  # px scale; row 40, folder row 52 (mockup B), form row 56, identity row 32, fill line 4, footer 36
 radius: { control: 4, table: 0, notice: 0, chip: 999 }
 color:                         # light only (D14); all text pairs ≥ 4.5:1
   bg: "#ffffff"
-  surface: "#f7f7f7"           # inspector, footer
+  surface: "#f7f7f7"           # help overlay, full-page states; Browse inspector and footer are white (mockup B)
   fg: "#1a1a1a"
   muted: "#5c5c5c"
   line: "#e3e3e3"
+  line-soft: "#f0f0f0"         # table row dividers (mockup B)
   accent: "#0a6b4f"            # selection bar, primary button, focus ring, links
   accent-bg: "#e6f3ee"         # selected row
   hover: "#f5f5f5"
   warn-fg: "#7a4b00"  warn-bg: "#fff3d6"     # amber: fill ≥ 80 %, age > 36 h, partial badges
   danger-fg: "#9b1c1c" danger-bg: "#ffe8e8"  # red: incomplete scan, last_error, fill ≥ 90 %, Δ growth
+  danger-line: "#f3caca"                     # bottom rule of a red notice (mockup B)
   ok-fg: "#0a6b4f"                           # Δ shrink reuses accent hue (no third green)
-share-bar: { track: line, fill: accent at 35 % opacity, height: 6 }
+share-bar: { track: none, fill: accent at 35 % opacity, height: 3 }   # inspector "Biggest inside" mini bars only (mockup B)
+share-row: { fill: accent at 13 % opacity, selected: 22 %, width: row share of the current folder }  # Browse table (mockup B): tint behind the whole row; the Share column shows % text only
 states:
   hover: bg hover
-  selected: bg accent-bg + 2 px left bar accent; aria-selected
+  selected: bg accent-bg + 3 px left bar accent + 1 px accent top/bottom rule, name 500 (mockup B); aria-selected
   focus-visible: 2 px solid accent, offset 2 px (never removed)
   disabled: opacity .5, cursor default, aria-disabled
   invalid: 1 px danger-fg border + error text under the field (D7, D9)
@@ -2371,7 +2376,7 @@ browser-surfaces:
   color-scheme: light
 ```
 
-**Component vocabulary (every UI element maps to one):** identity row, notice (D5), folder row with segmented control (D6), form row (D9), data table, share bar, chip (hidden D11, filters D9, "+N notice" D5), inspector, action button (ghost / primary), toast, full-page state (D7, D12), help overlay. No new component may be added without extending this list in `web/DESIGN.md`.
+**Component vocabulary (every UI element maps to one):** identity row, notice (D5), folder row with mode tabs (D6; underline tabs per mockup B), form row (D9), data table, share row tint (Browse, mockup B), share bar (inspector mini bars), chip (hidden D11, filters D9, "+N notice" D5), inspector, action button (ghost / primary), toast, full-page state (D7, D12), help overlay. No new component may be added without extending this list in `web/DESIGN.md`.
 
 **Pass 5 after fixes: 9/10.** Tokens named, every earlier decision now cites a token (notice colors = warn/danger, rows = space 40, focus = states.focus-visible). Residual: accent unverified visually.
 
@@ -2384,7 +2389,7 @@ Section 11 has one responsive rule (collapse two columns under 700 px, panel as 
 
 **Decision record.** D16 asked whether the single-column phone layout ships in v1. User chose **B) specify it for v2; v1 must only not break down to 360 px**. State: approved. Completeness 7/10 (accepted shortcut; decision log id `8e0d4823-69ef-4edb-8517-be3c746edf2d`; implementation marks the responsive CSS block with `gstack-shortcut(dec-8e0d4823): v1 no-break only, upgrade when Termux build lands`).
 
-**v1 rule (binding for T15).** Breakpoint 700 px: identity row wraps to two lines (host · age / fill bar); folder row keeps breadcrumbs (ellipsis in the middle, last segment always visible) and the segmented control; Find form wraps to two rows; table scrolls horizontally inside its container with the name column sticky; `items` and `modified` columns hidden under 700 px; inspector becomes a bottom sheet (40 vh, drag handle, Close button, Escape closes, focus returns to the row); footer keys hidden under 700 px, help overlay reachable from a "?" button in the folder row; every tap target ≥ 44 × 44 px. No horizontal page scroll at 360 px (test in Playwright at 360 and 700).
+**v1 rule (binding for T15).** Breakpoint 700 px: identity row wraps to two lines (host · age / fill bar); folder row keeps breadcrumbs (ellipsis in the middle, last segment always visible) and the mode tabs (mockup B); Find form wraps to two rows; table scrolls horizontally inside its container with the name column sticky; `items` and `modified` columns hidden under 700 px; inspector becomes a bottom sheet (40 vh, drag handle, Close button, Escape closes, focus returns to the row); footer keys hidden under 700 px, help overlay reachable from a "?" button in the folder row; every tap target ≥ 44 × 44 px. No horizontal page scroll at 360 px (test in Playwright at 360 and 700).
 
 **v2 spec (recorded, TODOS.md "Phone layout").** Single column: identity row (host + fill bar) → notice slot → "↑ Up" + folder name + size → mode selector as a native `<select>` + "Filters (N)" button opening the Find form as a sheet → rows 56 px with two lines: name / size + share bar + modified (no `items`) → details sheet (same inspector, Close + Escape + focus restore) → shortcut help in the overflow menu; footer removed.
 
@@ -2461,10 +2466,10 @@ Two deferred items proposed and both accepted (D19, D20): dark theme (D14) and p
 
 ### Design review tasks (appended to `## Implementation Tasks` as T25–T35; amendments to T14, T15 noted there)
 
-- [ ] **T25 (P1, human: ~1d / CC: ~1h)** — web — Header per D5/D6: identity row (host, snapshot age with amber/red thresholds, fill bar), single notice slot with the priority table and "+N notice" chip, folder row with breadcrumbs, folder size, segmented Browse | Top files | Find | Changes, ghost "Copy refresh command"
+- [ ] **T25 (P1, human: ~1d / CC: ~1h)** — web — Header per D5/D6: identity row (host, snapshot age with amber/red thresholds, fill bar), single notice slot with the priority table and "+N notice" chip, folder row with breadcrumbs, folder size, mode tabs Browse | Top files | Find | Changes, "Copy refresh command" text button; look per mockup B (`docs/designs/free-space-browse-mockup.png`): 4 px fill line under the identity row, underline tabs, share-row tint in the Browse table
   - Surfaced by: Pass 1 — Issues 1–2 (D5, D6)
   - Files: `web/src/header.ts`, `web/src/notices.ts`, `web/src/app.ts`
-  - Verify: synthetic `status` with `incomplete`, `last_error` and a newer snapshot shows only the incomplete banner + "+2 notices"; age 40 h renders amber, 8 d red with the timer sentence
+  - Verify: synthetic `status` with `incomplete`, `last_error` and a newer snapshot shows only the incomplete banner + "+2 notices"; age 40 h renders amber, 8 d red with the timer sentence; a 1280×800 screenshot of Browse on the mockup state (`docs/designs/mockups/browse-b/data.js`) matches mockup B side by side: header rows, tabs, row tint, inspector order
 - [ ] **T26 (P1, human: ~1d / CC: ~45min)** — web — All twelve interaction states with copy and primary action per D7, plus the two no-snapshot variants per D12 (scanning / nothing running, with `last_error` under the commands); 300 ms loading grace, 2 px progress line, "Showing N of M · Show more"
   - Surfaced by: Pass 2 — Issue 3 (D7); Pass 3 — Issue 8 (D12)
   - Files: `web/src/states.ts`, `web/src/table.ts`
@@ -2481,7 +2486,7 @@ Two deferred items proposed and both accepted (D19, D20): dark theme (D14) and p
   - Surfaced by: Pass 2 — Issue 6 (D10)
   - Files: `web/src/snapshot.ts`, `web/src/router.ts`, `cli/serve/api.rs`
   - Verify: unit tests for the ancestor walk (path gone / row gone / both alive); Playwright: swap the mocked snapshot id while in Find with filters → same filters, new totals, no page reload
-- [ ] **T30 (P2, human: ~0.5d / CC: ~40min)** — web/core — Inspector actions per D11 and Pass 7: "Hide until next scan" (`h`, localStorage key `freespace.hidden.<host>.<snapshot_id>`, purge other keys on load, Undo toast, "N hidden · X G" chip with show/unhide), Copy path, Copy refresh command, "CLI command" line tracking the mode; per-kind inspector layouts; hardlink line using `hardlink_owner` added to `/api/ls` rows with `nlink > 1`
+- [ ] **T30 (P2, human: ~0.5d / CC: ~40min)** — web/core — Inspector actions per D11 and Pass 7: "Hide until next scan" (`h`, localStorage key `freespace.hidden.<host>.<snapshot_id>`, purge other keys on load, Undo toast, "N hidden · X G" chip with show/unhide), Copy path, Copy refresh command, "CLI command" line tracking the mode; per-kind inspector layouts; directory inspector order per mockup B (name, size + share + apparent, path, Biggest inside with mini bars, details, CLI command, primary "Hide until next scan", Copy links); hardlink line using `hardlink_owner` added to `/api/ls` rows with `nlink > 1`
   - Surfaced by: Pass 3 — Issue 7 (D11); Pass 7 mechanics
   - Files: `web/src/inspector.ts`, `web/src/hidden.ts`, `core/queries/ls.rs`
   - Verify: hide a row → absent in Browse/Top/Find/Changes, chip count and size correct, reload keeps it, a new snapshot id clears it; `ls` JSON for a 2-link inode shows the owner path on the non-owner row
@@ -2489,10 +2494,10 @@ Two deferred items proposed and both accepted (D19, D20): dark theme (D14) and p
   - Surfaced by: Pass 3 — Issue 8 (D12)
   - Files: `core/lock.rs`, `core/status.rs`, `cli/status.rs`, `skill/SKILL.md`
   - Verify: hold the lock in a test with a written payload → `status --json` has `scanning.op == "scan"`; unparsable payload → `op: "unknown"`; no lock → `null`
-- [ ] **T32 (P1, human: ~0.5d / CC: ~30min)** — web/build — Typography and tokens per D13/D15: `web/fonts/` IBM Plex Sans 400/500 + Plex Mono 400 woff2 (latin, latin-ext, cyrillic) with OFL file, served immutable; `web/src/tokens.css` with every value from the Pass 5 sheet; `web/DESIGN.md` written from the same sheet; `color-scheme: light`; themed `::selection`, caret, scrollbar, link underline
+- [ ] **T32 (P1, human: ~0.5d / CC: ~30min)** — web/build — Typography and tokens per D13/D15: `web/fonts/` IBM Plex Sans 400/500 + Plex Mono 400 woff2 (latin, latin-ext, cyrillic) with OFL file, served immutable; `web/src/tokens.css` with every value from the Pass 5 sheet (start from `docs/designs/mockups/browse-b/tokens.css`, which already carries the mockup-B tokens); `web/DESIGN.md` written from the same sheet; `color-scheme: light`; themed `::selection`, caret, scrollbar, link underline
   - Surfaced by: Pass 4 — Issue 9 (D13); Pass 5 — Issue 11 (D15)
   - Files: `web/fonts/*`, `web/src/tokens.css`, `web/DESIGN.md`, `cli/build.rs`
-  - Verify: no `system-ui` as primary in computed styles; contrast test over `tokens.css` passes 4.5:1 for every fg/bg pair; `cargo build` embeds the three font files (size delta ≤ 200 KB)
+  - Verify: no `system-ui` as primary in computed styles; contrast test over `tokens.css` passes 4.5:1 for every fg/bg pair, including `fg` on the share-row tint (13 % over `bg`, 22 % over `accent-bg`); `cargo build` embeds the three font files (size delta ≤ 200 KB)
 - [ ] **T33 (P1, human: ~1d / CC: ~45min)** — core/cli/skill — `newest_mtime` per D18: column in `entries`, computed in the post-walk aggregation, recomputed up the parent chain by `refresh`, emitted in every JSON entry, `top --kind dir --older-than` compares `newest_mtime` and returns only topmost qualifying dirs; `schema_version` bump; `schema.json` regenerated; SKILL.md wording updated *(Eng review run 2: fold = one `SubtreeAgg::merge` shared by scan and refresh, identity `i64::MIN` for `newest_mtime`; files only (D5), each file clamped `min(mtime, own scanned_at)` (D3/D4), dir mtimes excluded, no files → 0; refresh re-folds `min_scanned_at`/`newest_mtime` over direct children at each ancestor (F2), child aggregates merge unchanged (invariant `newest_mtime <= max(scanned_at over subtree)`); dir query `ORDER BY id`, topmost dedup by `[id, subtree_end]`, totals over the topmost set, then `--sort`/`--limit` (codex #3/#4; F3 "stop at limit" withdrawn); `find` dir rows use `newest_mtime` (D2); no special case for 0/DENIED (D1 = B, marker `gstack-shortcut(dec-ac91ac89)` in `core/queries/top.rs`); tests 1–6 of Section 3 run 2 plus: mixed-refresh parent/child test, limit-1 totals test with two disjoint and one nested match, `--sort mtime` dir dedup test, identity test; T23 harness rows added.)*
   - Surfaced by: Pass 7 — Issue 14 (D18, user-initiated); amends T5, T19, T22
   - Files: `core/schema.rs`, `core/scan/aggregate.rs`, `core/refresh.rs`, `core/queries/top.rs`, `skill/SKILL.md`, `skill/schema.json`
@@ -2501,7 +2506,7 @@ Two deferred items proposed and both accepted (D19, D20): dark theme (D14) and p
   - Surfaced by: Pass 7 — Issues 13–14 (D17, D18)
   - Files: `web/src/top.ts`
   - Verify: fixture with a 40 G ISO dated 2023 and a 100 M file dated 1970: both shown in size order under Untouched; Folders returns the project dir once; "Show in folder" lands on Browse with the row selected
-- [ ] **T35 (P2, human: ~1d / CC: ~45min)** — web/tests — Accessibility and narrow-screen contract per Pass 6: landmarks, `aria-sort`/`aria-selected`/roving tabindex, `role=alert|status`, focus trap + restore for the sheet and help overlay, shortcut suppression inside inputs, `prefers-reduced-motion`, 44 px targets under 700 px, sticky name column, no horizontal page scroll at 360 px, help overlay "recent messages" list
+- [ ] **T35 (P2, human: ~1d / CC: ~45min)** — web/tests — Accessibility and narrow-screen contract per Pass 6: landmarks, `aria-sort`/`aria-selected`/roving tabindex, `role=alert|status`, focus trap + restore for the sheet and help overlay, shortcut suppression inside inputs, `prefers-reduced-motion`, 44 px targets under 700 px, sticky name column, no horizontal page scroll at 360 px, help overlay "recent messages" list; mode tabs (mockup B) as `role="tablist"` with `aria-selected`; the "N hidden" text button keeps a ≥ 32 px hit area
   - Surfaced by: Pass 6 — a11y mechanics and D16 v1 rule
   - Files: `web/src/a11y.ts`, `web/src/responsive.css`, `web/tests/a11y.spec.ts`
   - Verify: Playwright + axe at 1280, 700 and 360 px: zero serious violations; keyboard-only journey from `/` to a hidden row and back; `document.scrollingElement.scrollWidth == clientWidth` at 360 px
@@ -2524,7 +2529,7 @@ Pass 7 (Challenge):      14 issues resolved, 2 deferred (dark theme D19, phone l
 NOT in scope:      9 items (delete, dark theme, phone layout, progress % (reopened by DX D14), mockups, TUI parity, cross-browser hidden list, search-as-you-type, cleanup suggestions)
 What already exists: sketch, <table> semantics, share bar, footer keys, hash routing, status poll, state.json fields, find dedup rule, T14 list
 TODOS updates:     2 (dark theme, phone layout)
-Approved Mockups:  0 generated, 0 approved (designer unavailable: no OpenAI key)
+Approved Mockups:  0 generated, 0 approved (designer unavailable: no OpenAI key) → after the review: 1 approved (Browse, variant B, /design-shotgun 2026-10-23)
 Decisions made:    14 (D5–D18)
 Decisions deferred: 2 (D19 dark theme → TODOS, D20 phone layout → TODOS)
 Tasks added:       T25–T35; amended T4, T5, T13, T14, T15, T19, T22
@@ -2538,6 +2543,25 @@ Overall:           3/10 → 8/10 (lowest pass: Pass 6)
 **Follow-up for engineering:** D18 adds `entries.newest_mtime` (schema column, aggregation, refresh recomputation, `top --kind dir` semantics) after the eng review cleared the schema → `/plan-eng-review` should be re-run on T33 before implementation.
 
 <!-- design-review:end -->
+
+## Approved mockup: Browse, variant B (design-shotgun, 2026-10-23)
+
+**Files.** `docs/designs/free-space-browse-mockup.png` (1280×800) and its source `docs/designs/mockups/browse-b/` (`browse.html`, `tokens.css`, `data.js`). The source opens in a browser as is; fonts load from Google Fonts there, while the product bundles them (D13).
+
+**How it was made.** Three HTML mockups on the D15 tokens, same state in each (`/home/tass`, disk 97 %, "Scan incomplete" + "+1 notice", `.cache` selected, `myprojects` with `?` and `≥`), screenshotted in headless Chrome: A "Ledger" (literal D6/D15), B "Heat rows", C "Console" (mono-led, keyed tabs). The image generator was unavailable (no OpenAI key), so the mockups use the real fonts and colours. The user approved B ("looks modern"). Rejected images: `~/.gstack/projects/mikhailsal-free-space/designs/browse-20261023/`.
+
+**What B fixes visually (binding for T25, T30, T32, T35):**
+
+- Identity row without a bottom rule; under it a full-width 4 px fill line in the threshold colour (D6 thresholds unchanged); "Filesystem / · 97% used · 14 G free at scan" as mono text in the row.
+- Red notice: `danger-bg` band, round "!" mark, actions as outlined buttons, "+N notice" as an underlined text button, `danger-line` bottom rule.
+- Folder row 52 px: breadcrumbs with `›`, folder name 18/24 500, size mono, "N hidden · X G" as a dotted-underline text button; mode tabs on the bottom border (active: `fg` 500 + 2 px accent underline); "Copy refresh command" as an accent text button.
+- Browse table: share drawn as an accent tint behind the whole row (13 %, 22 % on the selected row), Share column = % text; selected row = `accent-bg`, 3 px accent left bar, 1 px accent top/bottom rule, name 500; row dividers `line-soft`.
+- Inspector on white: name 18/24 500, size mono 18 + "59% of tass · apparent 124.0 G", path mono muted; "Biggest inside" with 3 px mini bars relative to the selected folder; details list; CLI command line with a "Copy" text button; full-width primary "Hide until next scan · h", then "Copy path" and "Copy refresh command" as text buttons.
+- Footer on white, key glyphs in mono without key-cap boxes.
+
+**Plan amendments made with this approval:** D6 (tabs, fill line, folder row height), D15 token sheet (`share-row`, `share-bar` now inspector-only, `selected`, `line-soft`, `danger-line`, `surface` usage), component vocabulary, T25, T30, T32, T35.
+
+**What the mockup does not decide.** Copy comes from the D5/D7 tables, not from the mockup text. Find, Top, Changes, the first-run page and the 700/360 px layouts have no mockup; they reuse the same components under the Pass 5/6 rules. If a screen needs a new component, extend the vocabulary first (D15 rule).
 
 <!-- eng-review-2:begin -->
 ## Eng review, run 2 — `newest_mtime` (D18) and tasks T5/T19/T22/T33/T34
@@ -3353,7 +3377,7 @@ None. Every question in this review (D1–D23) has an answer; D23 was answered "
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 2 | CLEAR | 6 proposals, 3 accepted, 2 deferred (+3 HOLD items deferred) |
 | Outside Review | codex (gpt-6-astra) via `/plan-ceo-review`, `/plan-eng-review` ×2, `/plan-design-review`, `/plan-devex-review` | Independent 2nd opinion | 5 | 4 completed (issues_found); DX phase unavailable (codex timeout) | CEO phase: 7 findings, 7 resolved. Eng phase run 1: 8 findings, 6 corrected (OV-9…OV-14), 2 decided (D12, D13). Design phase: 15 codex + 15 Claude-subagent findings, folded into Passes 1–7. Eng phase run 2: 7 findings, 5 adopted as mechanics (T33/T24), 2 decided (D4, D5), 0 rejected. DX phase: codex timed out after 5 min (exit 124); native Claude Plan subagent fallback, 15 findings: 1 decided (D22), 14 routine follow-through, 0 rejected (in-host, not outside coverage) |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR (FULL_REVIEW, 0 critical gaps) — run 2 covered T33 `newest_mtime` (D18) | Run 1: 15 findings → R1–R8 approved + 7 task notes; D1–D14. Run 2: 16 findings (3+3+3 sections, 7 codex), R11–R16, D1–D7 answered, 24 test paths mapped, T33/T24/T34 amended |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL_REVIEW) | score: 3/10 → 8/10; 14 decisions (D5–D18), 2 deferred to TODOS (D19, D20); tasks T25–T35; 0 mockups (designer unavailable) |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL_REVIEW) | score: 3/10 → 8/10; 14 decisions (D5–D18), 2 deferred to TODOS (D19, D20); tasks T25–T35; 0 mockups (designer unavailable); Browse mockup B approved later via `/design-shotgun` 2026-10-23 |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 1 | CLEAR (EXPANSION) | score: 4/10 → 8/10, TTHW: 4–14 min (5 steps) → 2–5 min target (2 commands; first scan unmeasured until T1/T48); 23 decisions (D1–D23), tasks T36–T48 |
 
 - **OUTSIDE COVERAGE:** provider codex, model gpt-6-astra, phases plan-review (CEO, Eng ×2) and design (2026-10-22/23), completed. Eng run 2 prompt: D18 spec, T33, the full run-2 block; codex found the clamp promise contradiction (D4), the dedup/sort-order and totals holes, the invariant under partial refresh, the dir-mtime label mismatch (D5), the wrong Top budget and the signed max identity. All closed in T33/T24 or decided. DX phase (plan-review, 2026-10-23): codex unavailable (timed out after 5 minutes); the native Claude Plan subagent fallback completed in-host with 15 findings and does not count as outside coverage.
