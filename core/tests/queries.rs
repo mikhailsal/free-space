@@ -10,6 +10,7 @@ use std::time::{Duration, UNIX_EPOCH};
 use freespace_core::ErrorCode;
 use freespace_core::job::{self, ScanReport, ScanRequest};
 use freespace_core::platform::now_secs;
+use freespace_core::queries::pass::{self, Filter, Order};
 use freespace_core::queries::{self, diff, params::*, types::*};
 use freespace_core::refresh::{self, RefreshReport, RefreshRequest};
 use freespace_core::scan::Kind;
@@ -395,6 +396,85 @@ fn find_nested_matches_counted_once() {
     assert_eq!(i.total, r.total);
     assert_eq!(i.entries.len(), 1);
     assert!(i.truncated);
+}
+
+/// Wide subtrees are read as parallel id ranges, a selective --min-size
+/// through the size index. Every split and the index answer like one pass,
+/// `nested` included, when a matched directory starts in an earlier range.
+#[test]
+fn split_passes_answer_like_one_pass() {
+    let f = fx();
+    let now = now_secs();
+    for p in 0..3usize {
+        for depth in 1..=3usize {
+            let dir = format!("p{p}{}", "/node_modules/m".repeat(depth));
+            for i in 0..4usize {
+                // all of p0 and every deepest folder untouched, the rest mixed
+                let aged = p == 0 || depth == 3 || (p + i) % 2 == 0;
+                let t = if aged { now - 400 * DAY } else { now };
+                f.file(&format!("{dir}/f{i}.js"), (i + 1) * depth * 4096, t);
+            }
+        }
+    }
+    f.scan(false);
+    let snap = Snapshot::open_current(&f.dir).unwrap();
+    let cases = || {
+        let filter = |kind, min_size, older, name: Option<&str>| Filter {
+            kind,
+            min_size,
+            older,
+            newer: None,
+            name: name.map(|n| (n.to_owned(), false)),
+        };
+        let order = |sort, limit, list_nested| Order {
+            sort,
+            limit,
+            list_nested,
+        };
+        let old = Some(now - 180 * DAY);
+        [
+            (
+                filter(KindFilter::Dir, 0, None, Some("node_modules")),
+                order(SortKey::Allocated, 5, true),
+            ),
+            (
+                filter(KindFilter::Any, 0, None, None),
+                order(SortKey::Mtime, 3, true),
+            ),
+            (
+                filter(KindFilter::Dir, 0, old, None),
+                order(SortKey::Allocated, 4, false),
+            ),
+            (
+                filter(KindFilter::File, 8192, None, None),
+                order(SortKey::Apparent, 2, false),
+            ),
+            (
+                filter(KindFilter::Any, 0, old, Some("*")),
+                order(SortKey::Allocated, 50, true),
+            ),
+        ]
+    };
+    for rel in ["", "p1"] {
+        let (scope, _) = queries::common::resolve(&snap, f.s(rel).as_bytes()).unwrap();
+        let scope = (scope.id, scope.subtree_end);
+        for (i, (filter, order)) in cases().iter().enumerate() {
+            let one = pass::run_in(&snap, scope, filter, order, 1).unwrap();
+            // a small fixture: any --min-size reads through entries_alloc
+            assert_eq!(pass::run(&snap, scope, filter, order).unwrap(), one);
+            assert!(
+                one.total.count > 0,
+                "case {i} under {rel:?} matches nothing"
+            );
+            if i == 0 {
+                assert!(one.total.count > one.total.counted, "no nested matches");
+            }
+            for n in 2..=12 {
+                let split = pass::run_in(&snap, scope, filter, order, n).unwrap();
+                assert_eq!(split, one, "case {i} under {rel:?} in {n} ranges");
+            }
+        }
+    }
 }
 
 #[test]
