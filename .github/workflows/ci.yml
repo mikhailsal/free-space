@@ -34,3 +34,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: shellcheck scripts/*.sh
+
+  # T37/T44 on a real systemd VM: install, first scan through the unit, doctor,
+  # uninstall; afterwards nothing from the file-mode table may remain.
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - name: install-timer
+        run: |
+          sudo ./target/release/freespace install-timer --roots "$PWD/core" --json | tee install.json
+          test "$(jq -r .access install.json)" = acl
+          test "$(jq -r .scan_started install.json)" = true
+          test "$(stat -c '%U %a' /usr/local/bin/freespace)" = "root 755"
+          systemctl is-enabled freespace.timer
+      - name: first scan publishes through the unit
+        run: |
+          for _ in $(seq 60); do
+            freespace status --json > status.json 2>/dev/null && [ "$(jq -r .generation status.json)" != null ] && break
+            sleep 2
+          done
+          jq -e '.generation == 1' status.json
+          freespace ls "$PWD/core" --json | jq -e '.entries | length > 0'
+          test "$(stat -c '%U:%G %a' /var/lib/freespace/snapshot.db)" = "root:freespace 640"
+      - name: doctor
+        run: |
+          freespace skill install
+          freespace doctor || true
+          freespace doctor --json | jq -e '[.checks[] | select(.id != "path") | .ok] | all'
+      - name: uninstall leaves only the group
+        run: |
+          sudo freespace install-timer --uninstall
+          for p in /usr/local/bin/freespace /etc/freespace /var/lib/freespace \
+                   /etc/systemd/system/freespace.service /etc/systemd/system/freespace.timer \
+                   "$HOME/.claude/skills/freespace"; do
+            if [ -e "$p" ]; then echo "left behind: $p"; exit 1; fi
+          done
+          getent group freespace

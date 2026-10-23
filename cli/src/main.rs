@@ -1,9 +1,14 @@
 mod bare;
+mod completions;
+mod crash;
+mod doctor;
+mod install;
 mod output;
 mod query;
 mod refresh;
 mod scan;
 mod schema;
+mod skill;
 mod status;
 
 use std::process::ExitCode;
@@ -23,11 +28,15 @@ Look:
 
 Maintain:
   status          Snapshot age, free space, last error, running scan
+  doctor          Check the timer, binary, access and space; print fixes
   scan            Scan and publish a new snapshot (root)
   refresh         Rescan one folder into the current snapshot (root)
 
 Setup:
+  install-timer   Nightly scan, read access for you, first scan now (root)
+  skill           Install the Claude Code skill
   schema          JSON Schema of every --json answer
+  completions     Shell completions for bash, zsh, fish
 
 Run without a command for a one-line summary and next steps.
 Every Look command takes --json. Errors under --json are JSON on stdout too.
@@ -52,9 +61,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Snapshot age, free space, last error, running scan
-    #[command(after_help = "Examples:\n  freespace status\n  freespace status --json")]
-    Status(status::StatusArgs),
     /// Children of a folder, biggest first
     #[command(
         after_help = "Examples:\n  freespace ls /home --limit 20\n  freespace ls ~/Downloads --sort mtime --json"
@@ -75,6 +81,12 @@ enum Command {
         after_help = "Examples:\n  freespace diff /\n  freespace diff /home/tass --kind any --json"
     )]
     Diff(query::DiffArgs),
+    /// Snapshot age, free space, last error, running scan
+    #[command(after_help = "Examples:\n  freespace status\n  freespace status --json")]
+    Status(status::StatusArgs),
+    /// Check the timer, binary, access and space; print fixes
+    #[command(after_help = "Examples:\n  freespace doctor\n  freespace doctor --json")]
+    Doctor(doctor::DoctorArgs),
     /// Scan and publish a new snapshot (root)
     #[command(after_help = "Examples:\n  sudo freespace scan\n  sudo freespace scan / --workers 4")]
     Scan(scan::ScanArgs),
@@ -83,12 +95,31 @@ enum Command {
         after_help = "Examples:\n  sudo freespace refresh /home/tass/.cache\n  sudo freespace refresh /var/log --json"
     )]
     Refresh(refresh::RefreshArgs),
+    /// Nightly scan, read access for you, first scan now (root)
+    #[command(
+        name = "install-timer",
+        after_help = "Examples:\n  sudo freespace install-timer\n  sudo freespace install-timer --roots / /home --at 03:30\n  sudo freespace install-timer --uninstall"
+    )]
+    InstallTimer(install::InstallArgs),
+    /// Install the Claude Code skill
+    #[command(
+        after_help = "Examples:\n  freespace skill install\n  freespace skill print > SKILL.md"
+    )]
+    Skill(skill::SkillArgs),
     /// JSON Schema of every --json answer
-    #[command(after_help = "Examples:\n  freespace schema --json > schema.json")]
+    #[command(
+        after_help = "Examples:\n  freespace schema --json > schema.json\n  freespace schema | jq '.commands'"
+    )]
     Schema(schema::SchemaArgs),
+    /// Shell completions for bash, zsh, fish
+    #[command(
+        after_help = "Examples:\n  freespace completions bash > ~/.local/share/bash-completion/completions/freespace\n  freespace completions fish > ~/.config/fish/completions/freespace.fish"
+    )]
+    Completions(completions::CompletionsArgs),
 }
 
 fn main() -> ExitCode {
+    crash::install_hook();
     let matches = match Cli::command().try_get_matches() {
         Ok(m) => m,
         Err(e) => return output::clap_error(e),
@@ -104,6 +135,13 @@ fn main() -> ExitCode {
         Some(Command::Top(a)) => (query::top(&a), a.json),
         Some(Command::Find(a)) => (query::find(&a), a.json),
         Some(Command::Diff(a)) => (query::diff(&a), a.json),
+        Some(Command::Doctor(a)) => {
+            return if doctor::run(&a) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            };
+        }
         Some(Command::Scan(a)) => {
             let json = a.json;
             (scan::run(a), json)
@@ -112,7 +150,13 @@ fn main() -> ExitCode {
             let json = a.json;
             (refresh::run(a), json)
         }
+        Some(Command::InstallTimer(a)) => {
+            let json = a.json;
+            (install::run(a), json)
+        }
+        Some(Command::Skill(a)) => (skill::run(a), false),
         Some(Command::Schema(a)) => (schema::run(&a), true),
+        Some(Command::Completions(a)) => (completions::run(&a, &mut Cli::command()), false),
     };
     match res {
         Ok(()) => ExitCode::SUCCESS,
