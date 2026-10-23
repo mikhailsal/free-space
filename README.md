@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/mikhailsal/free-space/master/instal
 freespace
 ```
 
-prints one line (free space, snapshot age) and the next commands to try. While the first scan runs, `freespace status` shows how far it got. Then open the browser view:
+prints one line (free space, snapshot age) and the next commands to try. While the first scan runs, `freespace status` shows how far it got (on a 7.8-million-entry disk the first scan took four and a half minutes). Then open the browser view:
 
 <!-- no-run -->
 ```sh
