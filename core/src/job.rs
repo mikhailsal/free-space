@@ -99,17 +99,24 @@ pub fn next_generation(dir: &SnapshotDir) -> (u64, Option<u64>) {
     (base + 1, cur)
 }
 
-fn expected_entries(tree_roots: &[PathBuf]) -> Option<u64> {
+/// Entries a scan of `tree_roots` will find: inodes in use, once per
+/// filesystem. Filesystems that keep no inode count (vfat, exfat) add nothing;
+/// an EFI partition holds a few hundred entries next to millions.
+pub fn expected_entries(tree_roots: &[PathBuf]) -> Option<u64> {
     use std::os::unix::fs::MetadataExt;
     let mut seen = std::collections::HashSet::new();
-    let mut total = 0u64;
+    let mut total = None;
     for r in tree_roots {
-        let dev = std::fs::metadata(r).ok()?.dev();
-        if seen.insert(dev) {
-            total += platform::statvfs(r).ok()?.inodes_used()?;
+        let Ok(md) = std::fs::metadata(r) else {
+            continue;
+        };
+        if seen.insert(md.dev())
+            && let Some(n) = platform::statvfs(r).ok().and_then(|s| s.inodes_used())
+        {
+            *total.get_or_insert(0) += n;
         }
     }
-    Some(total)
+    total
 }
 
 fn record(dir: &SnapshotDir, op: &str, e: &Error) {

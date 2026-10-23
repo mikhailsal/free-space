@@ -3,7 +3,7 @@ resolver = "3"
 members = ["core", "cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
@@ -12,7 +12,7 @@ homepage = "https://github.com/mikhailsal/free-space"
 authors = ["Mikhail Salnikov"]
 
 [workspace.dependencies]
-freespace-core = { path = "core", version = "0.1.0" }
+freespace-core = { path = "core", version = "0.1.1" }
 libc = "0.2"
 regex = "1.11"
 rusqlite = { version = "0.40", features = ["bundled", "functions", "hooks"] }
