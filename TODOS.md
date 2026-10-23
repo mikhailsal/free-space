@@ -30,3 +30,7 @@
 - **Cons:** a second layout to keep in sync with every table change; needs Playwright runs at 360/390 px added to T35.
 - **Context:** D16 chose "spec v2, v1 no-break" (decision `8e0d4823-69ef-4edb-8517-be3c746edf2d`, marker `gstack-shortcut(dec-8e0d4823)` in responsive.css). Trigger: Termux build lands or the user opens gui from a phone regularly.
 - **Depends on:** T35 (responsive/a11y contract), T26 (states).
+
+## Found by the benchmark 2026-10-23 (T24)
+
+- [ ] **Per-folder file totals for `top` under 300 ms warm.** `top /` on 7.77 M entries answers in 0.68 s warm (1.31 s cold) against the 300 ms target, and untouched folders in 0.39 s. The answer's total covers all 5.9 M files, so every row is read; one core needs 2.0 s and 8 threads on 4 physical cores give 2.9× (docs/benchmarks.md, "Missed"). Context: three columns per directory (files, file allocated, file apparent) filled in the post-walk aggregation pass would answer the unfiltered total in O(1) and the page through `entries_alloc`; filtered totals still need the pass. Schema change (snapshot regenerated, ~+15 B per entry, refresh must refold them up the parent chain). Trigger: a user who finds Top files slow, or a host with 2× the entries. Source: docs/benchmarks.md, core/src/queries/pass.rs.

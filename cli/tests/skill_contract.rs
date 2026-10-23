@@ -3,6 +3,7 @@
 //! must validate against skill/schema.json. The rest (sudo, gui, serve, ssh
 //! lines, and every block after `<!-- no-run -->` in the README) are parsed by
 //! clap only, with `--help` appended. A renamed or bogus flag fails either way.
+//! A block after `<!-- output -->` is sample output and is skipped.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -23,6 +24,7 @@ struct Doc {
 fn commands(file: &str, md: &str) -> Vec<Doc> {
     let mut out = Vec::new();
     let (mut fenced, mut no_run, mut block_no_run) = (false, false, false);
+    let (mut output, mut block_output) = (false, false);
     for (i, line) in md.lines().enumerate() {
         let at = format!("{file}:{}", i + 1);
         let t = line.trim();
@@ -30,12 +32,19 @@ fn commands(file: &str, md: &str) -> Vec<Doc> {
             no_run = true;
             continue;
         }
+        if t.starts_with("<!-- output -->") {
+            output = true;
+            continue;
+        }
         if t.starts_with("```") {
             fenced = !fenced;
             if fenced {
-                block_no_run = no_run;
-                no_run = false;
+                (block_no_run, block_output) = (no_run, output);
+                (no_run, output) = (false, false);
             }
+            continue;
+        }
+        if fenced && block_output {
             continue;
         }
         let spans: Vec<&str> = if fenced {
@@ -301,7 +310,8 @@ fn a_bogus_flag_in_an_example_fails_the_contract() {
 fn commands_are_found_in_spans_blocks_and_no_run_blocks() {
     let md = "Run `freespace ls / --json` or `sudo freespace scan`.\n\
               ```\n$ freespace top / --json | jq .\n```\n\
-              <!-- no-run -->\n```sh\nfreespace status --json\n```\n";
+              <!-- no-run -->\n```sh\nfreespace status --json\n```\n\
+              <!-- output -->\n```\nfreespace 0.1.0 installed in 18 s\n```\n";
     let d = commands("x.md", md);
     let got: Vec<(&str, bool)> = d.iter().map(|d| (d.text.as_str(), d.run)).collect();
     assert_eq!(
@@ -317,4 +327,32 @@ fn commands_are_found_in_spans_blocks_and_no_run_blocks() {
         shell_words("freespace find / --name '*.iso' --json | jq"),
         ["freespace", "find", "/", "--name", "*.iso", "--json"]
     );
+}
+
+/// D16: the `docs` link of every error code lands on an anchor in the README.
+#[test]
+fn every_error_code_has_a_readme_anchor() {
+    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let readme = fs::read_to_string(base.join("README.md")).unwrap();
+    let schema: Value =
+        serde_json::from_str(&fs::read_to_string(base.join("skill/schema.json")).unwrap()).unwrap();
+    // one `oneOf` arm per variant, each with its doc comment
+    let codes: Vec<Value> = schema["$defs"]["ErrorCode"]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|arm| arm.get("const").unwrap_or(&arm["enum"][0]).clone())
+        .collect();
+    assert!(codes.len() >= 15, "{codes:?}");
+    let missing: Vec<String> = codes
+        .iter()
+        .filter_map(|c| {
+            let code: freespace_core::error::ErrorCode = serde_json::from_value(c.clone()).unwrap();
+            let docs = code.docs();
+            let id = docs.split_once('#').unwrap().1;
+            let anchor = format!("<a id=\"{id}\"></a>");
+            (!readme.contains(&anchor)).then(|| format!("{c} → {anchor}"))
+        })
+        .collect();
+    assert!(missing.is_empty(), "README lacks: {missing:?}");
 }

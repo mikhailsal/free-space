@@ -41,6 +41,9 @@ pub fn age(seconds: i64) -> String {
     }
 }
 
+// libc marks musl's time_t deprecated (it may change width); it is the type
+// localtime_r takes on every target, so the cast follows it either way
+#[allow(deprecated)]
 fn local_tm(ts: i64) -> libc::tm {
     let t: libc::time_t = ts as libc::time_t;
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };

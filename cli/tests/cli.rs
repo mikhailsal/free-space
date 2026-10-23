@@ -235,6 +235,48 @@ fn install_timer_needs_root() {
     );
 }
 
+#[test]
+fn scan_and_refresh_without_write_access_say_sudo() {
+    if euid_is_root() {
+        return;
+    }
+    use std::os::unix::fs::PermissionsExt;
+    let e = Env::new();
+    e.fixture();
+    // like /var/lib as a normal user: the snapshot dir cannot be created
+    let locked = e.tmp.path().join("locked");
+    fs::create_dir(&locked).unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
+    let root = e.root();
+    let run = |args: &[&str]| {
+        e.cmd(args)
+            .env("FREESPACE_SNAPSHOT_DIR", locked.join("snap"))
+            .output()
+            .unwrap()
+    };
+    let o = run(&["scan", s(&root), "--json"]);
+    assert_eq!(code(&o), 1);
+    assert_eq!(json(&o)["error"]["code"], "NOT_ROOT", "{}", json(&o));
+    assert_eq!(
+        json(&o)["error"]["fix"],
+        format!("sudo freespace scan {}", root.display())
+    );
+    // nothing published there yet: refresh has nothing to refresh
+    let o = run(&["refresh", s(&root), "--json"]);
+    assert_eq!(code(&o), 8);
+    assert_eq!(json(&o)["error"]["code"], "NO_SNAPSHOT", "{}", json(&o));
+    // a snapshot this user can read but not write
+    e.scan();
+    let snap = e.tmp.path().join("snap");
+    fs::set_permissions(snap.join(".lock"), fs::Permissions::from_mode(0o440)).unwrap();
+    let o = e.run(&["refresh", s(&root), "--json"]);
+    assert_eq!(json(&o)["error"]["code"], "NOT_ROOT", "{}", json(&o));
+    assert_eq!(
+        json(&o)["error"]["fix"],
+        format!("sudo freespace refresh {}", root.display())
+    );
+}
+
 fn euid_is_root() -> bool {
     Command::new("id")
         .arg("-u")
@@ -582,8 +624,8 @@ fn gui_over_ssh_prints_the_tunnel_instead_of_opening_a_browser() {
         return;
     };
     let rx = lines_of(child.stdout.take().unwrap());
-    let tunnel = wait_for(&rx, "ssh -N -L");
     let url = wait_for(&rx, "http://127.0.0.1:");
+    let tunnel = wait_for(&rx, "ssh -N -L");
     let (port, _) = url_parts(&url);
     assert!(
         tunnel.contains(&format!("{port}:127.0.0.1:{port}")),

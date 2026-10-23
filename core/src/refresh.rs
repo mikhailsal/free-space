@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::time::Instant;
@@ -422,6 +422,15 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
 
     let t = Instant::now();
     let os_path = PathBuf::from(std::ffi::OsStr::from_bytes(&xpath));
+    // a folder replaced by a file (or a symlink) since the scan: the parent
+    // holds the new entry, so that is what to refresh
+    if os_path.symlink_metadata().is_ok_and(|m| !m.is_dir()) {
+        let parent = os_path.parent().unwrap_or(Path::new("/"));
+        return Err(
+            Error::usage(format!("{label} is no longer a folder on disk"))
+                .with_fix(format!("sudo freespace refresh {}", parent.display())),
+        );
+    }
     let sub = if os_path.exists() {
         let opts = scan::WalkOptions {
             roots: vec![os_path.clone()],
@@ -459,6 +468,18 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let policy = graft(&mut loaded, x.id, x.subtree_end, sub, &mut paths)?;
     drop(paths);
     let mut tree = loaded.tree;
+    // a refresh usually follows a cleanup: the free space shown "at scan"
+    // should move with it
+    if let Some(r) = tree
+        .roots
+        .iter_mut()
+        .filter(|r| is_under(&xpath, r.path.as_os_str().as_bytes()))
+        .max_by_key(|r| r.path.as_os_str().len())
+        && scan::walk::statvfs_safe(&r.fs_type)
+        && let Ok(st) = platform::statvfs(&r.path)
+    {
+        r.stats = st;
+    }
     let fin = tree.finalize_with(&policy);
     let finalize_seconds = t.elapsed().as_secs_f64();
     let denied = denied_paths(&tree, &fin);
@@ -529,4 +550,23 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
         snapshot_bytes: ws.bytes,
         denied,
     })
+}
+
+/// `path` is `root` or lies below it.
+fn is_under(path: &[u8], root: &[u8]) -> bool {
+    root == b"/" || path == root || (path.starts_with(root) && path.get(root.len()) == Some(&b'/'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_under;
+
+    #[test]
+    fn a_path_is_under_its_root_by_whole_names() {
+        assert!(is_under(b"/home/tass", b"/"));
+        assert!(is_under(b"/home/tass", b"/home"));
+        assert!(is_under(b"/home", b"/home"));
+        assert!(!is_under(b"/homework", b"/home"));
+        assert!(!is_under(b"/var", b"/home"));
+    }
 }

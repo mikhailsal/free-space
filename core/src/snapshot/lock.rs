@@ -6,6 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use schemars::JsonSchema;
@@ -74,6 +75,19 @@ fn read_payload(f: &mut File) -> Option<LockPayload> {
 
 /// Take the exclusive lock, retrying for 2 s (a concurrent `status` probe holds
 /// `LOCK_SH` for microseconds), then fail with exit 6 naming the holder.
+/// Creating or opening a file in the snapshot directory failed. Without root
+/// that means "run it with sudo" (NOT_ROOT), not an unexplained I/O error.
+pub fn open_error(op: &str, path: &str, what: &Path, e: std::io::Error) -> Error {
+    if e.kind() == std::io::ErrorKind::PermissionDenied && !fsutil::is_root() {
+        return Error::new(
+            ErrorCode::NotRoot,
+            format!("{op} needs root: it writes {}", what.display()),
+        )
+        .with_fix(format!("sudo freespace {op} {path}"));
+    }
+    Error::io(format!("open {}", what.display()), e)
+}
+
 pub fn acquire(dir: &SnapshotDir, op: &str, path: &str) -> Result<LockGuard> {
     acquire_with_timeout(dir, op, path, Duration::from_secs(2))
 }
@@ -92,7 +106,14 @@ pub fn acquire_with_timeout(
         .truncate(false)
         .mode(fsutil::FILE_MODE)
         .open(&p)
-        .map_err(|e| Error::io(format!("open {}", p.display()), e))?;
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => Error::new(
+                ErrorCode::NoSnapshot,
+                format!("no snapshot in {}", dir.as_path().display()),
+            )
+            .with_fix("sudo freespace scan"),
+            _ => open_error(op, path, &p, e),
+        })?;
     fsutil::secure_file(&file).map_err(|e| Error::io(format!("chmod {}", p.display()), e))?;
     let deadline = Instant::now() + timeout;
     loop {

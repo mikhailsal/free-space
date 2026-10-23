@@ -10,6 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use freespace_core::ErrorCode;
 use freespace_core::job::{self, ScanReport, ScanRequest};
 use freespace_core::queries::{self, diff, params::*};
 use freespace_core::refresh::{self, RefreshRequest};
@@ -179,4 +180,60 @@ fn refresh_keeps_prev_and_marks_the_diff_partial() {
         let e = d.entries.iter().find(|e| e.name == grew).unwrap();
         assert!(e.delta >= 64 << 10, "{grew}: {}", e.delta);
     }
+}
+
+#[test]
+fn after_a_schema_change_the_old_snapshot_is_not_kept_as_prev() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("r");
+    tree(&root, 2, 3);
+    let dir = SnapshotDir::new(tmp.path().join("snap"));
+    scan(&root, &dir, 2); // 1
+    scan(&root, &dir, 2); // 2, prev 1
+    // what an older freespace left behind: current and prev both unreadable
+    for p in [dir.current(), dir.prev()] {
+        let c = rusqlite::Connection::open(&p).unwrap();
+        c.execute("UPDATE meta SET schema_version = 0", []).unwrap();
+    }
+    let Err(e) = diff::open_pair(&dir) else {
+        panic!("diff opened")
+    };
+    assert_eq!(
+        e.code,
+        ErrorCode::Schema,
+        "current is unreadable: {}",
+        e.message
+    );
+
+    let rep = scan(&root, &dir, 2); // 3, the rescan after the upgrade
+    assert_eq!(rep.prev_generation, None);
+    assert!(
+        !dir.prev().exists(),
+        "the old-schema file is not rotated into prev"
+    );
+    let Err(e) = diff::open_pair(&dir) else {
+        panic!("diff opened")
+    };
+    assert_eq!(e.code, ErrorCode::NoPrev, "{}", e.message);
+
+    scan(&root, &dir, 2); // 4, prev 3
+    let (cur, prev) = diff::open_pair(&dir).unwrap();
+    assert_eq!((cur.meta.generation, prev.meta.generation), (4, 3));
+}
+
+#[test]
+fn an_old_schema_prev_reads_as_no_prev() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("r");
+    tree(&root, 2, 3);
+    let dir = SnapshotDir::new(tmp.path().join("snap"));
+    scan(&root, &dir, 2);
+    scan(&root, &dir, 2);
+    let c = rusqlite::Connection::open(dir.prev()).unwrap();
+    c.execute("UPDATE meta SET schema_version = 0", []).unwrap();
+    drop(c);
+    let Err(e) = diff::open_pair(&dir) else {
+        panic!("diff opened")
+    };
+    assert_eq!(e.code, ErrorCode::NoPrev, "{}", e.message);
 }

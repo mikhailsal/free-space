@@ -124,14 +124,14 @@ fn record(dir: &SnapshotDir, op: &str, e: &Error) {
 }
 
 pub fn run_scan(req: ScanRequest) -> Result<ScanReport> {
-    fsutil::ensure_dir(req.dir.as_path())
-        .map_err(|e| Error::io(format!("create {}", req.dir.path.display()), e))?;
     let label = req
         .roots
         .iter()
         .map(|r| r.display().to_string())
         .collect::<Vec<_>>()
         .join(" ");
+    fsutil::ensure_dir(req.dir.as_path())
+        .map_err(|e| lock::open_error("scan", &label, req.dir.as_path(), e))?;
     let _lock = lock::acquire(&req.dir, "scan", &label)?;
     let dir = req.dir.clone();
     let r = scan_locked(req, &label);
@@ -196,12 +196,12 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     })?;
     fault::point(&req.dir, "prechecked");
     let (generation, current_gen) = next_generation(&req.dir);
-    let has_current = req.dir.current().exists();
-    let prev_generation = if req.keep_previous && has_current {
-        current_gen
-    } else {
-        None
-    };
+    // D13: a snapshot this binary cannot read (an older schema) is not a
+    // previous generation; `diff` answers NO_PREV until the next scan
+    let has_current = req.dir.current().exists()
+        && !matches!(Snapshot::open_current(&req.dir), Err(e) if e.code == ErrorCode::Schema);
+    let rotate = req.keep_previous && has_current;
+    let prev_generation = if rotate { current_gen } else { None };
     let mut meta = WriteMeta::new(generation, prev_generation, tree.started_at);
     meta.one_file_system = req.one_file_system;
     meta.scan_seconds = Some(walk_seconds);
@@ -211,11 +211,11 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
 
     pw.set_stage(progress::STAGE_PUBLISH);
     let t = Instant::now();
-    if req.keep_previous {
+    if rotate {
         publish::rotate_prev(&req.dir)?;
     }
     publish::publish_current(&req.dir, &tmp)?;
-    if !req.keep_previous {
+    if !rotate {
         publish::drop_prev(&req.dir);
     }
     let publish_seconds = t.elapsed().as_secs_f64();

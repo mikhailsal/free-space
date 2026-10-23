@@ -121,7 +121,7 @@ fn normalize_root(p: &Path) -> io::Result<PathBuf> {
 }
 
 /// Statvfs only on filesystems where it cannot hang or trigger an automount.
-fn statvfs_safe(fs_type: &str) -> bool {
+pub fn statvfs_safe(fs_type: &str) -> bool {
     platform::REAL_FS.contains(&fs_type)
         || matches!(
             fs_type,

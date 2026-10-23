@@ -43,10 +43,10 @@ pub fn gather(dir: &SnapshotDir) -> Result<Summary> {
 pub fn sentence(s: &Summary) -> String {
     let r = &s.status;
     let mut parts = Vec::new();
-    if r.generation.is_none() {
-        if let Some(sc) = &r.scanning {
-            return scanning_line(sc, r.progress.as_ref(), true);
-        }
+    if r.generation.is_none()
+        && let Some(sc) = &r.scanning
+    {
+        return scanning_line(sc, r.progress.as_ref(), true);
     }
     if let Some(fs) = r.fs.first() {
         let avail = fs.avail.map(format::size).unwrap_or_else(|| "?".into());

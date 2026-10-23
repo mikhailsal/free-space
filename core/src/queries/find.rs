@@ -1,45 +1,20 @@
 //! `find`: every match under a path with a total over all of them (D15).
-//! Matches are streamed in id order; a match inside an already matched
-//! directory is `nested` (counted, not summed). The page is a bounded heap.
-
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-
-use rusqlite::params;
+//! The pass (`super::pass`) marks a match inside an already matched directory
+//! `nested` (counted, not summed) and keeps the page in a bounded heap.
 
 use super::common::{
-    COLS, Paths, Row, check_snapshot_id, decorate, entry_out, get_row, header, lossy, raw_if_lossy,
+    Paths, Row, check_snapshot_id, decorate, entry_out, get_row, header, lossy, raw_if_lossy,
     resolve,
 };
 use super::glob;
 use super::params::{
     FindParams, KindFilter, PathArg, SortKey, check_limit, parse_size, parse_time_bound,
 };
-use super::types::{FindEntry, FindResponse, Total};
+use super::pass::{self, Filter, Order};
+use super::types::{FindEntry, FindResponse};
 use crate::error::{Error, Result};
 use crate::platform::now_secs;
 use crate::snapshot::reader::Snapshot;
-
-/// Heap item: the "largest" item is the one to evict (worst in sort order).
-#[derive(Debug, PartialEq, Eq)]
-struct Ranked {
-    key: i64,
-    id: i64,
-    nested: bool,
-}
-
-impl Ord for Ranked {
-    fn cmp(&self, o: &Self) -> Ordering {
-        // smaller key = better; ties: smaller id better
-        self.key.cmp(&o.key).then(self.id.cmp(&o.id))
-    }
-}
-
-impl PartialOrd for Ranked {
-    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
-        Some(self.cmp(o))
-    }
-}
 
 pub fn find(snap: &Snapshot, p: &FindParams) -> Result<FindResponse> {
     check_snapshot_id(snap, p.snapshot.as_deref())?;
@@ -82,81 +57,20 @@ pub fn find(snap: &Snapshot, p: &FindParams) -> Result<FindResponse> {
     let (scope, path) = resolve(snap, &input)?;
     let conn = &snap.conn;
 
-    let mut sql = format!("SELECT {COLS} FROM entries WHERE id > ?1 AND id <= ?2");
-    match kind {
-        KindFilter::File => sql.push_str(" AND kind = 0"),
-        KindFilter::Dir => sql.push_str(" AND kind = 1"),
-        KindFilter::Any => {}
-    }
-    sql.push_str(" AND allocated >= ?3");
-    // directories compare newest_mtime, everything else mtime (D2)
-    let date = "(CASE WHEN kind = 1 THEN newest_mtime ELSE mtime END)";
-    if older.is_some() {
-        sql.push_str(&format!(" AND {date} < ?4"));
-    } else {
-        sql.push_str(" AND ?4 IS NULL");
-    }
-    if newer.is_some() {
-        sql.push_str(&format!(" AND {date} >= ?5"));
-    } else {
-        sql.push_str(" AND ?5 IS NULL");
-    }
-    if pattern.is_some() {
-        sql.push_str(" AND fs_glob(name, ?6, ?7)");
-    } else {
-        sql.push_str(" AND ?6 IS NULL AND ?7 IS NOT NULL");
-    }
-    sql.push_str(" ORDER BY id");
-
-    let mut st = conn.prepare(&sql)?;
-    let mut rows = st.query(params![
-        scope.id,
-        scope.subtree_end,
-        i64::try_from(min_size.unwrap_or(0)).unwrap_or(i64::MAX),
+    let filter = Filter {
+        kind,
+        min_size: i64::try_from(min_size.unwrap_or(0)).unwrap_or(i64::MAX),
         older,
         newer,
-        pattern,
-        icase as i64
-    ])?;
-    let mut total = Total::default();
-    let mut heap: BinaryHeap<Ranked> = BinaryHeap::new();
-    let mut end = i64::MIN;
-    while let Some(r) = rows.next()? {
-        let id: i64 = r.get(0)?;
-        let kind_code: i64 = r.get(3)?;
-        let allocated: i64 = r.get(5)?;
-        let apparent: i64 = r.get(6)?;
-        let mtime: i64 = r.get(7)?;
-        let sub_end: i64 = r.get(12)?;
-        let newest: i64 = r.get(14)?;
-        let nested = id <= end;
-        total.count += 1;
-        if !nested {
-            total.counted += 1;
-            total.allocated += allocated.max(0) as u64;
-            total.apparent += apparent.max(0) as u64;
-            if kind_code == 1 {
-                end = sub_end;
-            }
-        }
-        let key = match sort {
-            SortKey::Mtime => {
-                if kind_code == 1 {
-                    newest
-                } else {
-                    mtime
-                }
-            }
-            _ => -allocated,
-        };
-        heap.push(Ranked { key, id, nested });
-        if heap.len() > limit as usize {
-            heap.pop();
-        }
-    }
-    drop(rows);
-    let mut page = heap.into_sorted_vec();
-    page.truncate(limit as usize);
+        name: pattern.map(|p| (p, icase)),
+    };
+    let order = Order {
+        sort,
+        limit,
+        list_nested: true,
+    };
+    let pass::Pass { total, page } =
+        pass::run(snap, (scope.id, scope.subtree_end), &filter, &order)?;
 
     let mut paths = Paths::new(conn);
     paths.remember(scope.id, path.clone());

@@ -7,6 +7,7 @@ pub mod find;
 pub mod glob;
 pub mod ls;
 pub mod params;
+pub mod pass;
 pub mod status;
 pub mod top;
 pub mod types;

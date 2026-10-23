@@ -213,6 +213,18 @@ pub fn mount_for(mounts: &[MountInfo], path: &Path) -> Option<MountInfo> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn getent_lines_parse_into_users() {
+        let u = parse_passwd_line("ann:*:1500:1500:Ann,,,:/home/ann:/bin/bash\n").unwrap();
+        assert_eq!((u.name.as_str(), u.uid, u.gid), ("ann", 1500, 1500));
+        assert_eq!(u.home, PathBuf::from("/home/ann"));
+        assert!(parse_passwd_line("").is_none());
+        assert!(parse_passwd_line("ann:x:notanumber:1:::").is_none());
+        // the uid form finds the same entry as the name form
+        let me = user_by_uid(unsafe { libc::geteuid() }).unwrap();
+        assert_eq!(getent_passwd(&me.name).map(|u| u.uid), Some(me.uid));
+    }
+
     const SAMPLE: &str = "\
 22 1 8:3 / / rw,relatime shared:1 - ext4 /dev/sda3 rw,errors=remount-ro
 25 22 0:22 / /proc rw,nosuid shared:12 - proc proc rw
@@ -284,11 +296,39 @@ fn user_from(pw: *const libc::passwd) -> Option<UserInfo> {
 
 pub fn user_by_name(name: &str) -> Option<UserInfo> {
     let c = std::ffi::CString::new(name).ok()?;
-    user_from(unsafe { libc::getpwnam(c.as_ptr()) })
+    user_from(unsafe { libc::getpwnam(c.as_ptr()) }).or_else(|| getent_passwd(name))
 }
 
 pub fn user_by_uid(uid: u32) -> Option<UserInfo> {
-    user_from(unsafe { libc::getpwuid(uid) })
+    user_from(unsafe { libc::getpwuid(uid) }).or_else(|| getent_passwd(&uid.to_string()))
+}
+
+/// The release binary is static musl, whose getpwnam reads /etc/passwd only;
+/// LDAP or SSSD users come from the host's own NSS through getent(1).
+fn getent_passwd(key: &str) -> Option<UserInfo> {
+    let o = std::process::Command::new("getent")
+        .args(["passwd", key])
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if !o.status.success() {
+        return None;
+    }
+    parse_passwd_line(&String::from_utf8_lossy(&o.stdout))
+}
+
+/// `name:x:uid:gid:gecos:home:shell`
+fn parse_passwd_line(line: &str) -> Option<UserInfo> {
+    let f: Vec<&str> = line.lines().next()?.split(':').collect();
+    if f.len() < 7 || f[0].is_empty() {
+        return None;
+    }
+    Some(UserInfo {
+        name: f[0].to_owned(),
+        uid: f[2].parse().ok()?,
+        gid: f[3].parse().ok()?,
+        home: PathBuf::from(f[5]),
+    })
 }
 
 /// The human behind this process: `$SUDO_USER` under sudo, else the caller.
