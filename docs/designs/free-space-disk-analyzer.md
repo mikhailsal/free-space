@@ -3299,7 +3299,7 @@ Synthesized from this review's findings. Each task derives from a specific findi
   - Surfaced by: Pass 2
   - Files: `cli/output.rs`, `cli/main.rs`
   - Verify: pty snapshot of the table; piped output has no ANSI codes; `--help` lists the three groups
-- [ ] **T48 (P2, human: ~2h / CC: ~10min)** — benchmark — TTHW row: clean cold start (uninstall + drop_caches), real install path, install / first-scan / reading seconds next to T1's normal-priority cold scan
+- [x] **T48 (P2, human: ~2h / CC: ~10min)** — benchmark — TTHW row: clean cold start (uninstall + drop_caches), real install path, install / first-scan / reading seconds next to T1's normal-priority cold scan *(done 2026-10-23 on v0.1.1: install 4.4 s, first scan 271.6 s, first answer 0.01 s, total 4.6 min; the v0.1.0 run found the /home self-bind bug fixed in 0.1.1; docs/benchmarks.md)*
   - Surfaced by: Pass 8, D4, OV-7
   - Files: `docs/benchmarks.md`
   - Verify: the row exists with three timings and the scheduler noted
