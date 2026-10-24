@@ -82,9 +82,10 @@ test("Show more asks for twice the rows and keeps the selection", async ({ page 
   await page.getByRole("button", { name: "Show more" }).click();
   await expect(rows(page)).toHaveCount(35);
   await expect(page.locator(".more")).toBeHidden();
-  await expect(page).toHaveURL(/limit=60/);
+  await expect(page).toHaveURL(/[?&]limit=60(&|$)/);
   await expect(page.locator('table.grid tbody tr[aria-selected="true"]')).toContainText("part-03.bin");
-  expect(api.requests.filter((r) => r.startsWith("/api/find") && r.includes("limit=60"))).toHaveLength(1);
+  const limits = api.requests.filter((r) => r.startsWith("/api/find")).map((r) => new URL(r, "http://mock").searchParams.get("limit"));
+  expect(limits).toEqual(["30", "60"]);
 });
 
 // As in browse.spec.ts: with the abort lost, the late answer arrives and only the count of loads drops it.
