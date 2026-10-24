@@ -76,9 +76,14 @@ for (const k of KEYS) {
 }
 
 // The request coordinator drops a late answer twice over: it aborts the request it gave up on, and a load that is no
-// longer the latest applies nothing. With the abort lost, the answer arrives and only the second keeps it off the screen.
-for (const lost of [false, true]) {
-  test(`a Browse answer that arrives after Top was chosen leaves Top on screen${lost ? ", even with the abort lost" : ""} (D19)`, async ({
+// longer the latest applies nothing. With the abort lost, the answer arrives and only the second keeps it off the screen,
+// rows or an error alike.
+for (const [lost, error] of [
+  [false, false],
+  [true, false],
+  [true, true],
+] as const) {
+  test(`a Browse answer that arrives after Top was chosen leaves Top on screen${lost ? ", even with the abort lost" : ""}${error ? " and an error for an answer" : ""} (D19)`, async ({
     page,
   }) => {
     if (lost) await loseAborts(page);
@@ -90,6 +95,8 @@ for (const lost of [false, true]) {
     const late = await browse.arrived;
     await page.keyboard.press("t");
     await expect(selected(page)).toContainText("model.safetensors");
+    // the held listing answers as for a folder gone from the snapshot
+    if (error) api.failWith = { status: 404, code: "PATH_NOT_FOUND", message: "/home/tass is not in the snapshot" };
     await browse.release();
     // the page has the late answer in full before the checks below
     if (lost) await (await late.response())?.finished();
@@ -99,6 +106,7 @@ for (const lost of [false, true]) {
     await expect(page.locator(".summary")).toContainText("files larger than 100 M");
     await expect(page.locator("table.grid")).toHaveClass(/\bmode-top\b/);
     await expect(selected(page)).toContainText("model.safetensors");
+    await expect(page.getByText("This folder is not in the snapshot.")).toHaveCount(0);
   });
 }
 
@@ -162,6 +170,21 @@ test("Top files and Top folders follow the controls (D17, D18)", async ({ page }
   await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("a toast stays 6 s, then goes (Pass 6)", async ({ page }) => {
+  await page.clock.install({ time: NOW * 1000 });
+  await page.clock.pauseAt(NOW * 1000 + 1000);
+  await new MockApi().install(page);
+  await page.goto(url());
+  await expect(selected(page)).toContainText(".cache");
+  await page.keyboard.press("d");
+  const toast = page.locator(".toast");
+  await expect(toast).toHaveText("No previous snapshot to compare yet.");
+  await page.clock.runFor(5_999);
+  await expect(toast).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(toast).toHaveCount(0);
+});
+
 test("Changes is disabled without a previous snapshot", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto(url());
@@ -180,6 +203,8 @@ test("Changes lists growth and removals with glyphs, not color alone (D8)", asyn
   tass.children.push({ name: "new.bin", kind: "file", allocated: 2 ** 30 });
   await api.install(page);
   await page.goto(url());
+  // "d" before the status answer finds no previous snapshot yet and only shows a toast
+  await expect(page.getByRole("tab", { name: "Changes" })).toHaveAttribute("aria-disabled", "false");
   await page.keyboard.press("d");
   await expect(page.locator(".summary .context")).toContainText("depth 1 · files included");
   await expect(rows(page)).toHaveCount(2);

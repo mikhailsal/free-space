@@ -115,3 +115,33 @@ for (const lost of [false, true]) {
     await expect(page.locator(".progress")).not.toHaveClass(/\bon\b/);
   });
 }
+
+// A load that is no longer the latest leaves the busy state to the one that is: ending the search it gave up on must not
+// end the newer search's progress and its Cancel.
+for (const lost of [false, true]) {
+  test(`a search given up on for a newer one leaves the newer one busy and cancellable${lost ? ", even with the abort lost" : ""} (D19)`, async ({
+    page,
+  }) => {
+    if (lost) await loseAborts(page);
+    const api = await new MockApi().install(page);
+    await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
+    await expect(rows(page)).toHaveCount(1);
+    const first = api.hold("find", (q) => q.get("name") === "*.mp4");
+    const second = api.hold("find", (q) => q.get("name") === "*.log");
+    await page.locator("#f-name").fill("*.mp4");
+    await page.locator("#f-name").press("Enter");
+    const late = await first.arrived;
+    await page.locator("#f-name").fill("*.log");
+    await page.locator("#f-name").press("Enter");
+    await second.arrived;
+    await first.release();
+    // the page has the first answer in full before the checks below; with the abort working, it gave up on it at once
+    if (lost) await (await late.response())?.finished();
+    await expect(page.locator("main")).toHaveAttribute("aria-busy", "true");
+    await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await second.release();
+    await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("big.log");
+  });
+}
