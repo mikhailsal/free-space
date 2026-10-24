@@ -114,6 +114,9 @@
     "scripts/rust-diff.sh": [
       "web/tests/unit/rust-diff.test.ts"
     ],
+    "scripts/rust-diff/**": [
+      "web/tests/unit/rust-diff.test.ts"
+    ],
     "scripts/test-files.sh": [
       "web/tests/unit/test-files.test.ts"
     ],
@@ -153,7 +156,7 @@
         "install.sh",
         ".githooks/**"
       ],
-      "command": "shellcheck install.sh scripts/*.sh",
+      "command": "shellcheck -x install.sh scripts/*.sh scripts/rust-diff/*.sh",
       "fix": "fix the shellcheck finding"
     }
   ],

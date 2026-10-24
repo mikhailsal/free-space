@@ -29,12 +29,18 @@ const script = join(repo, "scripts/rust-diff.sh");
 // EXTRA (a stub may make it vary). A question about /nope is refused as the CLI refuses: the message on stderr in plain
 // text, also under --json, the error body on stdout under --json, and a non-zero exit status. The other questions
 // follow the real CLI: --version and --help name the VERSION (and the file it runs as, which the script fixes to
-// "freespace"); a refresh counts itself in the snapshot dir it runs on; completions, schema and skill print static text.
-// SH is shell code run after the snapshot writes; it may set NEED, the space the next scan needs (a figure, not live).
-const REFUSAL = { exit: 4, message: "no such path" };
-const stub = (entries: number, extra = "", refusal = REFUSAL, version = "0.1.0", sh = "") => `#!/bin/sh
+// "freespace"); a refresh counts itself in the snapshot dir it runs on; completions, schema and skill print static text;
+// the questions the harness expects refused (EXPECTED in scripts/rust-diff/questions.sh) are refused with the CLI's
+// status, the config phase's included; `serve` is a small server of the same rules (SERVE_JS).
+// SH is shell code run before the answer; it may set NEED, the space the next scan needs (a figure, not live), and FAILS,
+// the count a scan or a refresh writes to state.json beside its live time. EARLY runs before anything else. A text answer
+// names the time zone and says when it goes to a terminal. --json echoes a date bound back as given and an age bound
+// (`1y`) as a time, as the CLI does (now minus the age), so the second is live.
+const REFUSAL = { exit: 2, message: "no such path" };
+const stub = (entries: number, extra = "", refusal = REFUSAL, version = "0.1.0", sh = "", early = "") => `#!/bin/sh
 t=$(date +%s%N); n=$((t / 1000 % 50 + 1)); s=\${t%?????????}
 dir=\${FREESPACE_SNAPSHOT_DIR:?}
+${early}
 case "$*" in
   */nope*)
     printf 'freespace: ${refusal.message}: %s\\nfix: freespace scan\\n' "$*" >&2
@@ -48,31 +54,87 @@ case " $* " in
     printf 'error: unexpected argument\\nUsage: %s\\n' "\${0##*/}" >&2
     case " $* " in *" --json "*) printf '{"error":{"code":"USAGE","exit":2,"context":{"version":"${version}"}}}\\n' ;; esac
     exit 2 ;;
+  *" --snapshot not-this-one "*) echo "freespace: snapshot rotated" >&2; exit 4 ;;
+  *" --older-than 3x "*) echo "freespace: bad date" >&2; exit 2 ;;
+  *"/top.bin "*) echo "freespace: not a folder" >&2; exit 2 ;;
 esac
+conf=\${FREESPACE_CONFIG:-/none}
+if grep -q keep_old "$conf" 2>/dev/null; then echo "freespace: unknown field keep_old" >&2; exit 2; fi
+if [ -f "$conf" ]; then
+  [ "$1" != diff ] || { echo "freespace: no previous generation" >&2; exit 3; }
+  case "$2" in */projects* | */media* | -*) ;; /*) echo "freespace: outside the scanned roots" >&2; exit 2 ;; esac
+fi
 case "$1" in
   completions) printf '# completions for %s\\n' "$2"; exit 0 ;;
   schema) printf '{"commands":["ls","top"]}\\n'; exit 0 ;;
   skill) printf '<!-- freespace-version: ${version} -->\\n'; exit 0 ;;
+  install-timer) echo "freespace: install-timer needs root" >&2; exit 1 ;;
+  serve) ENTRIES=${entries} exec "\${BUN:?}" -e "$SERVE_JS" ;;
 esac
 if [ "$1" = scan ] || [ "$1" = refresh ]; then mkdir -p "$dir"; echo "$t" > "$dir/id"; fi
 if [ "$1" = refresh ]; then echo "$2" >> "$dir/refreshed"; fi
 id=none; [ ! -f "$dir/id" ] || read -r id < "$dir/id"
 r=0; if [ -f "$dir/refreshed" ]; then while read -r _; do r=$((r + 1)); done < "$dir/refreshed"; fi
 need="512 M"
+fails=0
+bound=; k=
+for a in "$@"; do
+  case "$k" in
+    older_than | newer_than) case "$a" in [0-9]*d | [0-9]*w | [0-9]*mo | [0-9]*y) bound=",\\"$k\\":$t" ;; *) bound=",\\"$k\\":\\"$a\\"" ;; esac ;;
+  esac
+  case "$a" in --older-than) k=older_than ;; --newer-than) k=newer_than ;; *) k= ;; esac
+done
 ${sh}
+if [ "$1" = scan ] || [ "$1" = refresh ]; then printf '{"last_success_ts":%s,"consecutive_failures":%s}\n' "$t" "$fails" > "$dir/state.json"; fi
 case " $* " in
   *" --json "*)
     printf '{"snapshot_id":"%s","scanned_at":%s,"prev_scanned_at":%s,"age_seconds":%s,"last_success_ts":%s,' "$id" "$s" "$s" "$n" "$s"
     printf '"walk_seconds":0.%s,"fs":[{"path":"/","fs_type":"ext4","total":%s,"used":%s,"avail":%s}],' "$n" "$n" "$n" "$n"
     printf '"roots":[{"path":"/","allocated":1024,"fs_used":%s,"fs_avail":%s}],' "\${id#?????????????}" "\${id#??????????????}"
-    printf '"version":"${version}","refreshed":%s,"detail":"generation 2 · %s min old","entries":${entries}${extra}}\\n' "$r" "$n" ;;
+    printf '"version":"${version}","refreshed":%s,"detail":"generation 2 · %s min old"%s,"entries":${entries}${extra}}\\n' "$r" "$n" "$bound" ;;
   *)
     printf 'args %s\\n%s G free · snapshot %s min old\\n' "$*" "$n.5" "$n"
     printf 'scanned 2026-10-24 %02d:%02d · filesystem %s G used of %s G, %s M free now\\n' "$n" "$n" "$n" "$n" "$n"
     printf 'next scan needs %s free, %s G available; scanned in %s.%s s\\n' "$need" "$n" "$n" "$n"
     printf 'host · linux · freespace ${version}; skill 9.9.9, binary ${version}\\n'
-    printf 'snapshot %s was replaced\\nentries ${entries}${extra}\\nrefreshed %s\\n' "$id" "$r" ;;
+    printf 'snapshot %s was replaced\\nentries ${entries}${extra}\\nrefreshed %s\\ntz %s\\n' "$id" "$r" "$TZ"
+    [ ! -t 1 ] || echo "on a terminal" ;;
 esac
+`;
+
+// The stub's `serve`: what `freespace serve --port 0` does, in small. It prints its address with a 64-hex token on
+// stderr, answers only GET, checks the Host, then for /api/* the Origin and the token, refuses what the real server
+// refuses with its status (a gone snapshot 409, a path not in it 404, a bad limit 400, an unknown endpoint 404), and stops
+// with exit 0 on TERM. FRAME is its x-frame-options; a head may set another.
+const SERVE_JS = `
+const token = "ab".repeat(32);
+const frame = process.env.FRAME ?? "DENY";
+const reply = (status, body, type = "application/json") =>
+  new Response(typeof body === "string" ? body : JSON.stringify(body), {
+    status,
+    headers: { "content-type": type, "cache-control": "no-store", "x-frame-options": frame },
+  });
+const server = Bun.serve({
+  hostname: "127.0.0.1",
+  port: 0,
+  fetch(req) {
+    const u = new URL(req.url);
+    const p = u.searchParams;
+    if (req.method !== "GET") return reply(405, "only GET", "text/plain");
+    if (req.headers.get("host") !== "127.0.0.1:" + server.port)
+      return reply(403, "answers on 127.0.0.1:" + server.port + " only; ssh -N -L " + server.port + ":127.0.0.1:" + server.port, "text/plain");
+    if (!u.pathname.startsWith("/api/")) return reply(200, "<!doctype html>" + Date.now(), "text/html");
+    if (req.headers.get("origin") || req.headers.get("x-freespace-token") !== token) return reply(403, "forbidden", "text/plain");
+    if (u.pathname === "/api/status") return reply(200, { scanned_at: Date.now(), entries: Number(process.env.ENTRIES) });
+    if (!["/api/ls", "/api/top", "/api/find", "/api/diff"].includes(u.pathname)) return reply(404, { error: { code: "USAGE" } });
+    if (p.get("snapshot") === "not-this-one") return reply(409, { error: { code: "ROTATED" } });
+    if ((p.get("path") ?? "").endsWith("/nope")) return reply(404, { error: { code: "PATH_NOT_FOUND" } });
+    if (p.has("limit") && !/^[0-9]+$/.test(p.get("limit"))) return reply(400, { error: { code: "USAGE" } });
+    return reply(200, { endpoint: u.pathname, query: Object.fromEntries(p), entries: Number(process.env.ENTRIES) });
+  },
+});
+console.error("freespace serve: http://127.0.0.1:" + server.port + "/#t=" + token + "\\npress Ctrl-C to stop");
+process.on("SIGTERM", () => process.exit(0));
 `;
 
 // A base whose scan number AT fails: it says why on stderr and exits 7. The scans before it work, as far as the script
@@ -92,9 +154,16 @@ let tmp = "";
 let runs = 0;
 const pending: Record<string, Promise<Run>> = {};
 
+// Every run: the stub's server needs bun and its code; one folder per level keeps the wide part of the trees small.
+const STUB_ENV = { BUN: process.execPath, SERVE_JS, RUST_DIFF_FAN: "1" };
+
 async function guard(base: string, head: string, env: Record<string, string> = {}): Promise<Run> {
   const out = join(tmp, `out-${runs++}`);
-  const p = Bun.spawn([script, join(tmp, base), join(tmp, head), out], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ...env } });
+  const p = Bun.spawn([script, join(tmp, base), join(tmp, head), out], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, ...STUB_ENV, ...env },
+  });
   const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
   return { out, code, stdout, stderr };
 }
@@ -111,12 +180,20 @@ beforeAll(() => {
   write("flaky", stub(3, ',"pid":$$'));
   write("exit", stub(3, "", { ...REFUSAL, exit: 5 }));
   write("words", stub(3, "", { ...REFUSAL, message: "nothing at" }));
-  // three differences no mask may hide, in one head so the suite pays for one more run, not three: the space doctor
-  // says the next scan needs, a wider mode and a stray file in the snapshot folder, and `diff @` (text) hanging
+  // four differences no mask may hide, in one head so the suite pays for one more run, not four: the space doctor
+  // says the next scan needs, a count in state.json, a wider mode and a stray file in the snapshot folder, and
+  // `diff @` (text) hanging
   const need = '[ "$1" != doctor ] || need="1.0 G"';
   const leak = '[ ! -f "$dir/id" ] || { chmod 666 "$dir/id"; : > "$dir/leftover.tmp"; }';
   const hang = 'case " $* " in *" --json "*) ;; *) [ "$1" != diff ] || exec sleep 30 ;; esac';
-  write("unlike", stub(3, "", REFUSAL, "0.1.0", `${need}\n${leak}\n${hang}`));
+  write("unlike", stub(3, "", REFUSAL, "0.1.0", `${need}\nfails=1\n${leak}\n${hang}`));
+  // a base whose CLI has moved on from the harness: a flag it no longer takes, a refusal it no longer makes
+  const moved = `case " $* " in *" --min-size "*) echo "error: unexpected argument '--min-size'" >&2; exit 2 ;; *" install-timer --no-start"*) exit 0 ;; esac`;
+  write("stale", stub(3, "", REFUSAL, "0.1.0", "", moved));
+  // a head that leaves a file in the tree it lists
+  write("tamper", stub(3, "", REFUSAL, "0.1.0", "", '[ "$1" != ls ] || [ ! -d "$2" ] || : > "$2/.freespace-was-here"'));
+  // a head whose server lets other pages frame it
+  write("frame", stub(3, "", REFUSAL, "0.1.0", "", "FRAME=SAMEORIGIN; export FRAME"));
   write("noscan1", scanFails(1));
   write("noscan2", scanFails(2));
   writeFileSync(join(tmp, "not-executable"), stub(3));
@@ -126,6 +203,9 @@ beforeAll(() => {
   pending.exit = guard("base", "exit");
   pending.words = guard("base", "words");
   pending.unlike = guard("base", "unlike", { RUST_DIFF_TIMEOUT: "5" });
+  pending.stale = guard("stale", "base");
+  pending.tamper = guard("base", "tamper");
+  pending.frame = guard("base", "frame");
 });
 
 afterAll(async () => {
@@ -137,6 +217,10 @@ afterAll(async () => {
 //   --json form too, and the run goes on; fails_when=`|| code=$?` or the `|| cat` fallback of normalize_json is dropped
 //   (the job aborts at ls @/nope) or the status is not written; why_new=the stub never refused anything, so no test
 //   ran those paths; seam=none; no_claim=the real CLI's wording and codes (a stub refuses /nope as the CLI does)
+// Value: protects=an age bound's echoed time and state.json's times are dropped, while a date bound and state.json's
+//   other fields stay compared; fails_when=the $rel drop goes (base against itself differs, exit 3), covers date bounds
+//   too, or ask() misses the `d` unit; why_new=no stub echoed a bound or wrote state.json; seam=none; no_claim=which
+//   fields the real CLI echoes (it echoes both bounds) and what its state.json holds
 test(
   "answers that differ only in times, live numbers and the snapshot id match (D20)",
   async () => {
@@ -145,11 +229,11 @@ test(
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("exactly like base");
     for (const run of ["base", "base2", "head"]) {
-      for (const phase of ["fixture", "fresh"]) expect(existsSync(join(r.out, run, `${phase}.txt`))).toBe(true);
+      for (const phase of ["fixture", "fresh", "config"]) expect(existsSync(join(r.out, run, `${phase}.txt`))).toBe(true);
     }
     const text = readFileSync(join(r.out, "head/fresh.txt"), "utf8");
     for (const masked of [
-      "args scan <work>/tree --workers 2\n<size> free · snapshot <age> old\n",
+      "args scan <work>/ftree --workers 8\n<size> free · snapshot <age> old\n",
       "scanned <time> · filesystem <size> used of <size>, <size> free now\n",
       "needs 512 M free, <size> available; scanned in <seconds>\n",
       "snapshot <snapshot_id> was replaced\n",
@@ -163,19 +247,37 @@ test(
     expect(text).toContain('"fs_type": "ext4"');
     const fixture = readFileSync(join(r.out, "head/fixture.txt"), "utf8");
     for (const key of ["fs_used", "fs_avail"]) expect(fixture).toContain(`"${key}"`);
+    // an age bound comes back as a live time and is dropped, a date bound comes back as given and stays
+    const json = (q: string) => fixture.slice(fixture.indexOf(`== ${q} --json\n`)).split("\n== ")[0];
+    expect(json("top @ --older-than 2024-06-01")).toContain('"older_than": "2024-06-01"');
+    expect(json("find @ --newer-than 2024-06-01 --min-size 10K --kind file")).toContain('"newer_than": "2024-06-01"');
+    for (const q of [
+      "top @ --older-than 1y --limit 5",
+      "top @/media --older-than 400d --limit 3",
+      "find @ --newer-than 3y --kind file --limit 8",
+    ]) {
+      expect(json(q)).toContain('"entries": 3');
+      expect(json(q)).not.toMatch(/older_than|newer_than/);
+    }
+    // state.json is compared without its times
+    expect(text).toContain('-- state.json\n{\n  "consecutive_failures": 0\n}\n');
+    expect(text).not.toContain("last_success_ts");
     for (const key of [...dropped, "total", "used", "avail"]) expect(fixture).not.toContain(`"${key}"`);
     // the folder of each phase and what is in it, after its questions
     expect(fixture).toMatch(/^== files in <work>\/snap\n\. d \d+\n\.\/id f \d+\n/m);
     expect(fixture).toMatch(/^== files in <work>\/refreshed\n\. d \d+\n\.\/id f \d+\n\.\/refreshed f \d+\n/m);
     expect(text).toMatch(/^== files in <work>\/fresh\n\. d \d+\n\.\/id f \d+\n/m);
     // a refused question: the status and the stderr are recorded, in plain text also under --json, and the job goes on
-    const refused = (json: string) =>
-      `== ls @/nope${json}\nexit 4\n-- stdout\n${json ? '{\n  "error": {\n    "code": "NOT_FOUND",\n    "exit": 4\n  }\n}\n' : ""}` +
-      `-- stderr\nfreespace: no such path: ls <work>/tree/nope${json}\nfix: freespace scan\n`;
-    for (const phase of ["fixture", "fresh"]) {
+    const refused = (json: string) => (tree: string) =>
+      `== ls @/nope${json}\nexit 2\n-- stdout\n${json ? '{\n  "error": {\n    "code": "NOT_FOUND",\n    "exit": 2\n  }\n}\n' : ""}` +
+      `-- stderr\nfreespace: no such path: ls <work>/${tree}/nope${json}\nfix: freespace scan\n`;
+    for (const [phase, tree] of [
+      ["fixture", "tree"],
+      ["fresh", "ftree"],
+    ]) {
       const answers = readFileSync(join(r.out, `head/${phase}.txt`), "utf8");
-      expect(answers).toContain(refused(""));
-      expect(answers).toContain(refused(" --json"));
+      expect(answers).toContain(refused("")(tree));
+      expect(answers).toContain(refused(" --json")(tree));
       expect(answers).toContain("== find @ --name *.iso\nexit 0\n");
     }
   },
@@ -263,11 +365,13 @@ test(
     expect(counts("ls @ --json", '"refreshed":'), "json").toEqual(["0", "3"]);
     expect(fixture).toContain("== refresh @/logs --workers 2\nexit 0\n-- stdout\nargs refresh <work>/tree/logs --workers 2\n");
     expect(fixture).toContain("== refresh @/cache --workers 2 --json\nexit 0\n");
-    expect(fixture).toContain("== refresh @/nope --workers 2\nexit 4\n");
-    expect(fixture).toContain("== refresh @/top.bin --workers 2 --json\nexit 0\n");
+    expect(fixture).toContain("== refresh @/nope --workers 2\nexit 2\n");
+    expect(fixture).toContain("== refresh @/top.bin --workers 2 --json\nexit 2\n");
+    expect(fixture).toContain("== refresh @/wide/d1 --workers 4\nexit 0\n");
     // an id of a snapshot is 19 digits here: none is left in any answer
     for (const text of [fixture, fresh]) expect(text).not.toMatch(/\d{19}/);
-    expect(fresh).not.toContain("== refresh");
+    // the fresh phase refreshes the snapshot the build made itself, of its own tree
+    expect(fresh).toContain("== refresh @/logs --workers 2\nexit 0\n-- stdout\nargs refresh <work>/ftree/logs --workers 2\n");
   },
   RUN_MS,
 );
@@ -300,8 +404,8 @@ test(
   RUN_MS,
 );
 
-// Value: protects=what a head leaves in the snapshot folder is compared: a wider mode or a stray file fails the job;
-//   fails_when=files() is dropped or lists names only; why_new=only the answers were compared, and a head that opened
+// Value: protects=what a head leaves in the snapshot folder is compared: a wider mode, a stray file or another count in
+//   state.json fails the job; fails_when=files() is dropped, lists names only or skips state.json; why_new=only the answers were compared, and a head that opened
 //   the folder to everyone passed (adversarial review); seam=none; no_claim=the real CLI's files and modes
 test(
   "a head that leaves a stray file or a wider mode in the snapshot folder fails",
@@ -310,6 +414,7 @@ test(
     expect(r.code).toBe(1);
     expect(r.stdout).toMatch(/^\+\.\/id f 666$/m);
     expect(r.stdout).toMatch(/^\+\.\/leftover\.tmp f \d+$/m);
+    expect(r.stdout).toContain('\n-  "consecutive_failures": 0\n+  "consecutive_failures": 1\n');
   },
   RUN_MS,
 );
@@ -335,7 +440,7 @@ test(
   async () => {
     const r = await pending.exit!;
     expect(r.code).toBe(1);
-    expect(r.stdout).toContain("-exit 4\n+exit 5\n");
+    expect(r.stdout).toContain("-exit 2\n+exit 5\n");
     expect(r.stderr).toContain("head answers differently from base");
   },
   RUN_MS,
@@ -399,6 +504,134 @@ test("bad input exits 2 before anything runs", async () => {
   }
 });
 
+// Value: protects=the floor: base must give the exit status the harness expects for every question (0 unless EXPECTED
+//   lists another), or the job stops as stale (exit 4) after base's first run, naming each question, before base again
+//   or head run; fails_when=floor() is dropped or not called from ask, the EXPECTED lookup takes the wrong phase, or the
+//   check runs after head; why_new=a flag both builds refuse alike compared equal and tested nothing (adversarial review
+//   of PR 2: 10 exit 2 blocks, job green); seam=none; no_claim=which flags a future CLI renames
+test(
+  "a base that refuses a question the harness asks, or answers one it should refuse, stops the job as stale",
+  async () => {
+    const r = await pending.stale!;
+    expect(r.code).toBe(4);
+    expect(r.stderr).toContain("fixture: top @ --min-size 100K --sort mtime: answered 2, the harness expects 0\n");
+    expect(r.stderr).toContain("fresh: top @ --min-size 100K --sort mtime: answered 2, the harness expects 0\n");
+    expect(r.stderr).toContain("once: install-timer --no-start: answered 0, the harness expects 1\n");
+    expect(r.stderr).toContain("the harness is stale");
+    expect(readdirSync(r.out)).toEqual(["base"]);
+  },
+  RUN_MS,
+);
+
+// Value: protects=no command may change the tree it reads: a head that leaves a file in the tree stops the job at once,
+//   with the listing's difference and the phase; fails_when=tree_check is dropped from a phase or the listing leaves out
+//   names; why_new=only the snapshot folder was listed (freespace never changes what it scans, CONTRIBUTING);
+//   seam=none; no_claim=changes the listing does not see (access and change times)
+test(
+  "a head that changes the tree it reads stops the job with the change and the phase",
+  async () => {
+    const r = await pending.tamper!;
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^\+\.freespace-was-here f \d+ 0 1 \d+/m);
+    expect(r.stderr).toContain("/bin/head/freespace changed the tree it read");
+    expect(r.stderr).toContain("during the fixture phase");
+  },
+  RUN_MS,
+);
+
+// Value: protects=serve is asked: each build serves the fixture snapshot on a free port, the requests with the token and
+//   the refusals get their status, headers (no Date, no Content-Length) and normalized body, the page its status and
+//   headers only, and the server stops on TERM; port and token are masked; fails_when=the serve phase is dropped, the
+//   token is not sent, a header leaves the comparison or the page's bytes enter it (they move with every web build);
+//   why_new=the HTTP API was not compared at all (D11); seam=none; no_claim=the real server's rules (a stub serves them)
+test(
+  "serve answers every request, its refusals too, and stops on TERM",
+  async () => {
+    const r = await pending.same!;
+    const fixture = readFileSync(join(r.out, "head/fixture.txt"), "utf8");
+    const headers = "-- headers\ncache-control: no-store\ncontent-type: application/json\nx-frame-options: DENY\n-- body\n";
+    expect(fixture).toContain(`== serve: status\nhttp 200\n${headers}{\n  "entries": 3\n}\n`);
+    expect(fixture).toContain(`== serve: ls of a snapshot that is gone\nhttp 409\n${headers}`);
+    expect(fixture).toContain(`== serve: a bad limit\nhttp 400\n${headers}`);
+    expect(fixture).toContain('"path": "<work>/tree"');
+    for (const [label, code] of [
+      ["no token", 403],
+      ["a wrong token", 403],
+      ["a foreign origin", 403],
+      ["another host name", 403],
+      ["a POST", 405],
+      ["the page", 200],
+    ] as const) {
+      expect(fixture, label).toContain(`== serve: ${label}\nhttp ${code}\n`);
+    }
+    // a body without a newline at its end says so on a line of its own
+    expect(fixture).toContain(
+      "answers on 127.0.0.1:<port> only; ssh -N -L <port>:127.0.0.1:<port>\n\\ no newline at end\n== serve: a POST",
+    );
+    expect(fixture).toContain("== serve: the page\nhttp 200\n-- headers\ncache-control: no-store\ncontent-type: text/html\n");
+    expect(fixture).toContain("(the web bundle: pixel-diff compares it)\n");
+    expect(fixture).toContain(
+      "== serve stopped by TERM\nexit 0\n-- stdout\n-- stderr\nfreespace serve: http://127.0.0.1:<port>/#t=<token>\npress Ctrl-C to stop\n",
+    );
+    expect(fixture).not.toMatch(/^(date|content-length):/m);
+  },
+  RUN_MS,
+);
+
+// Value: protects=a header the server answers differently fails the job; fails_when=headers leave the serve answers;
+//   why_new=the HTTP API was not compared; seam=none; no_claim=the real server's headers
+test(
+  "a head whose server answers with another header fails",
+  async () => {
+    const r = await pending.frame!;
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain("-x-frame-options: DENY\n+x-frame-options: SAMEORIGIN\n");
+  },
+  RUN_MS,
+);
+
+// Value: protects=the date questions are asked again in a time zone at a half-hour offset, and the terminal questions
+//   on a terminal (script), text only, with no carriage returns; fails_when=$tz does not reach the CLI's TZ, ask_tty runs
+//   the CLI without a terminal, or the CR mask is dropped; why_new=every answer ran in UTC and none on a terminal (D11);
+//   seam=none; no_claim=the real CLI's local-midnight rule and its terminal output (the stub prints TZ and the terminal)
+test(
+  "date questions run in another time zone too, and terminal questions on a terminal",
+  async () => {
+    const r = await pending.same!;
+    const fixture = readFileSync(join(r.out, "head/fixture.txt"), "utf8");
+    const zone = fixture.slice(fixture.indexOf("== TZ=Asia/Kolkata\n"), fixture.indexOf("== on a terminal: "));
+    expect(zone).toContain("== find @ --newer-than 2024-10-01 --kind file\nexit 0\n");
+    expect(zone).toContain("\ntz Asia/Kolkata\n");
+    expect(zone).not.toContain("\ntz UTC\n");
+    expect(fixture.slice(0, fixture.indexOf("== TZ="))).toContain("\ntz UTC\n");
+    expect(fixture).toContain("== on a terminal: status\nexit 0\nargs status\n");
+    const tty = fixture.slice(fixture.indexOf("== on a terminal: "), fixture.indexOf("== serve: "));
+    expect(tty.match(/^on a terminal$/gm)).toHaveLength(4);
+    expect(fixture).not.toContain("\r");
+  },
+  RUN_MS,
+);
+
+// Value: protects=the config phase: a config file with two roots, `scan` without a root, a refusal for a path above both
+//   and for diff without a previous snapshot, then a config with an unknown key refused; and each part lists what the CLI
+//   keeps in $HOME and the unit dir; fails_when=$config does not reach FREESPACE_CONFIG, the phase is dropped, or kept()
+//   lists only the snapshot folder; why_new=no answer read a config file, and nothing looked outside the snapshot folder
+//   (D11); seam=none; no_claim=the real config's keys and rules (a stub refuses as the CLI does)
+test(
+  "a config file's roots are scanned and asked, an unknown key refused, and $HOME and the unit dir listed",
+  async () => {
+    const r = await pending.same!;
+    const config = readFileSync(join(r.out, "head/config.txt"), "utf8");
+    expect(config).toContain("== scan --json\nexit 0\n");
+    expect(config).toContain("== diff @/media\nexit 3\n");
+    expect(config).toContain("== find @ --name *.iso\nexit 2\n-- stdout\n-- stderr\nfreespace: outside the scanned roots\n");
+    expect(config).toContain("== find @/media --name *.iso\nexit 0\n");
+    expect(config).toContain("== status\nexit 2\n-- stdout\n-- stderr\nfreespace: unknown field keep_old\n");
+    for (const dir of ["home", "units"]) expect(config).toMatch(new RegExp(`^== files in <work>/${dir}\\n\\. d \\d+\\n`, "m"));
+  },
+  RUN_MS,
+);
+
 // A base that holds its first call, the scan of the fixture tree: it says so in $STUB_HELD, then waits for $STUB_GO
 // (10 s at most, so a failed test cannot leave it running). The script is then past making its work dir and its tree.
 const HOLD = `#!/bin/sh
@@ -432,7 +665,7 @@ for (const [signal, code] of [
     writeFileSync(join(dir, "hold"), HOLD);
     chmodSync(join(dir, "hold"), 0o755);
     // TMPDIR is where the script's mktemp puts the work dir: anything left in it after the exit is a leftover
-    const env = { ...process.env, TMPDIR: scratch, STUB_HELD: held, STUB_GO: go };
+    const env = { ...process.env, TMPDIR: scratch, STUB_HELD: held, STUB_GO: go, RUST_DIFF_FAN: "1" };
     const proc = Bun.spawn([script, join(dir, "hold"), join(dir, "hold"), join(dir, "out")], { env, stdout: "ignore", stderr: "ignore" });
     try {
       expect(await until(() => existsSync(held)), "the script reached its first scan").toBe(true);
@@ -451,3 +684,50 @@ for (const [signal, code] of [
     }
   }, 30_000);
 }
+
+// Value: protects=the made-up trees hold what CONTRIBUTING says they hold, after each change too: every folder its own
+//   date, the wide part's 340 folders, hard links inside a folder, across folders and into the folder refresh rewalks,
+//   a sparse file, a name that is not UTF-8, a folder nobody may read; fails_when=settle_dirs gives folders one date
+//   (`--sort mtime` then compares only tie-breaks), make_wide loses a level or its links, or a blob stops being sparse;
+//   why_new=the guard runs use one folder per level and assert answers, not the tree; seam=none; no_claim=what the CLI
+//   makes of the tree (the guard runs compare that)
+// The tree at the default width, made, changed and drifted: a few seconds, more under the guard runs beforeAll starts.
+test(
+  "the trees hold distinct folder dates, hard links, a sparse file, an odd name and a locked folder",
+  async () => {
+    const tree = join(tmp, "shape");
+    const sh = `. "$1/scripts/rust-diff/tree.sh"
+dates() { echo "$1 dirs $(find "$tree" -type d 2>/dev/null | wc -l) dates $(find "$tree" -type d -printf '%T@\\n' 2>/dev/null | sort -u | wc -l)"; }
+make_tree; dates made
+echo "wide $(find "$tree/wide" -mindepth 1 -type d | wc -l)"
+echo "iso links $(stat -c %h "$tree/media/iso/debian.iso") $(stat -c %h "$tree/logs/debian.link")"
+echo "wide links $(find "$tree/wide" -name 'link*.dat' -links 2 | wc -l)"
+echo "sparse $(stat -c '%s %b' "$tree/media/sparse.img")"
+[ -e "$tree/odd/$(printf 'bad\\377name.bin')" ] && echo "odd name"
+echo "locked $(stat -c %a "$tree/locked")"
+change_tree; dates changed
+drift_tree; dates drifted
+remove_tree; [ -e "$tree" ] || echo removed`;
+    const p = Bun.spawn(["bash", "-c", `set -euo pipefail; tree=$2\n${sh}`, "shape", repo, tree], {
+      env: { ...process.env, RUST_DIFF_FAN: "4" },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+    expect(err).toBe("");
+    expect(code).toBe(0);
+    for (const step of ["made", "changed", "drifted"]) {
+      const [, dirs, dates] = out.match(new RegExp(`^${step} dirs (\\d+) dates (\\d+)$`, "m")) ?? [];
+      expect(Number(dirs), step).toBeGreaterThan(300);
+      expect(dates, `every folder its own date after ${step}`).toBe(dirs);
+    }
+    expect(out).toContain("\nwide 340\n");
+    expect(out).toContain("\niso links 3 3\n");
+    expect(Number(out.match(/^wide links (\d+)$/m)?.[1])).toBeGreaterThan(0);
+    expect(out).toContain("\nsparse 52428800 0\n");
+    expect(out).toContain("\nodd name\n");
+    expect(out).toContain("\nlocked 0\n");
+    expect(out.endsWith("removed\n")).toBe(true);
+  },
+  RUN_MS,
+);

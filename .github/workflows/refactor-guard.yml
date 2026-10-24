@@ -43,7 +43,7 @@ jobs:
       - name: harness files this PR changes
         run: |
           git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA" -- \
-            .github/workflows/refactor-guard.yml scripts/rust-diff.sh scripts/coverage-functions.sh \
+            .github/workflows/refactor-guard.yml scripts/rust-diff.sh scripts/rust-diff scripts/coverage-functions.sh \
             web/playwright.guard.config.ts web/tests/guard web/tests/e2e/mock.ts web/tests/e2e/serve.ts web/tests/shots/home.ts |
             while read -r f; do
               echo "::warning file=$f::This refactor PR changes the guard's own harness, which then judges the PR. Review this file first."
