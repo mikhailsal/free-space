@@ -37,8 +37,9 @@ code {
 .muted {
   color: var(--muted);
 }
+/* a rule that sets an element's display repeats this for it: .summary[hidden], .overlay[hidden] */
 [hidden] {
-  display: none !important;
+  display: none;
 }
 a {
   color: var(--accent);

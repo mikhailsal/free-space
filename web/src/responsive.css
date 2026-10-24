@@ -45,8 +45,8 @@
   .chip,
   .seg button,
   .crumbs .hid,
-  .inspector .links .link,
-  .link {
+  .link,
+  .inspector .links .link {
     min-height: 44px;
   }
   .findform .fields {

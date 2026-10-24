@@ -22,6 +22,9 @@
   align-items: center;
   justify-content: space-between;
 }
+.summary[hidden] {
+  display: none;
+}
 .summary .total b {
   font-weight: 500;
 }
@@ -136,40 +139,6 @@ table.grid {
 .grid tbody tr:focus-visible {
   outline-offset: -2px;
 }
-.grid tbody tr.sel {
-  background:
-    linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) var(--w, 0%), transparent var(--w, 0%)), var(--accent-bg);
-}
-.grid tbody tr.sel td {
-  box-shadow:
-    inset 0 1px 0 var(--accent),
-    inset 0 -1px 0 var(--accent);
-}
-.grid tbody tr.sel td:first-child {
-  box-shadow:
-    inset 3px 0 0 var(--accent),
-    inset 0 1px 0 var(--accent),
-    inset 0 -1px 0 var(--accent);
-}
-.grid tbody tr.sel .label {
-  font-weight: 500;
-}
-/* muted is 4.3:1 on the selected tint, below AA (tests/unit/contrast.test.ts) */
-.grid tbody tr.sel td,
-.grid tbody tr.sel .k,
-.grid tbody tr.sel .badge {
-  color: var(--fg);
-}
-.grid tr.ghost td {
-  color: var(--muted);
-}
-.grid tr.ghost .label {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
-.grid tr.hiddenrow td {
-  color: var(--muted);
-}
 .mode-top tbody td,
 .mode-find tbody td {
   height: var(--row);
@@ -207,6 +176,40 @@ table.grid {
 }
 .mode-top .namecell .label {
   font-weight: 500;
+}
+.grid tr.ghost td {
+  color: var(--muted);
+}
+.grid tr.ghost .label {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.grid tr.hiddenrow td {
+  color: var(--muted);
+}
+.grid tbody tr.sel {
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) var(--w, 0%), transparent var(--w, 0%)), var(--accent-bg);
+}
+.grid tbody tr.sel td {
+  box-shadow:
+    inset 0 1px 0 var(--accent),
+    inset 0 -1px 0 var(--accent);
+}
+.grid tbody tr.sel td:first-child {
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    inset 0 1px 0 var(--accent),
+    inset 0 -1px 0 var(--accent);
+}
+.grid tbody tr.sel .label {
+  font-weight: 500;
+}
+/* muted is 4.3:1 on the selected tint, below AA (tests/unit/contrast.test.ts) */
+.grid tbody tr.sel td,
+.grid tbody tr.sel .k,
+.grid tbody tr.sel .badge {
+  color: var(--fg);
 }
 .q {
   color: var(--danger-fg);
