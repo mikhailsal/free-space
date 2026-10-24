@@ -1,6 +1,7 @@
 // A fake `/api/*` over an in-memory tree, answering with the same JSON shapes
 // as `freespace serve` (src/types.ts). Each test builds one and installs it on
-// its page; `requests` records every call for "no request while typing" checks.
+// its page; `requests` records every call for "no request while typing" checks,
+// and `hold` keeps one request unanswered until the test releases it (D19).
 import type { Page, Route } from "@playwright/test";
 
 export const TOKEN = "e2etoken";
@@ -73,6 +74,20 @@ function flatten(root: Node): Map<string, Flat> {
   return out;
 }
 
+/** A request `hold` keeps back: `arrived` once the page sent it; `release` answers it and resolves when that is done. */
+export interface Held {
+  arrived: Promise<void>;
+  release: () => Promise<void>;
+}
+
+interface Hold {
+  endpoint: string;
+  match: (q: URLSearchParams) => boolean;
+  arrive: () => void;
+  gate: Promise<void>;
+  done: () => void;
+}
+
 function sizeArg(s: string | null): number {
   if (!s) return 0;
   const m = /^(\d+)([KMGT]?)$/i.exec(s.trim());
@@ -109,9 +124,17 @@ export class MockApi {
   /** Every request answers this error body. */
   failWith: { status: number; code: string; message: string; fix?: string } | null = null;
   requests: string[] = [];
+  private holds: Hold[] = [];
 
   private flat(tree = this.tree) {
     return flatten(tree);
+  }
+
+  /** The node at this path of the tree (a test changes it in place). */
+  node(path: string, tree = this.tree): Node {
+    const f = this.flat(tree).get(path);
+    if (!f) throw new Error(`mock: ${path} is not in the tree`);
+    return f.node;
   }
 
   header() {
@@ -213,10 +236,53 @@ export class MockApi {
     return (f?.node.children ?? []).map((c) => flat.get(path === "/" ? `/${c.name}` : `${path}/${c.name}`)!);
   }
 
+  /**
+   * Keep the next request to /api/<endpoint> whose query matches unanswered until `release`. The page may give up on it
+   * meanwhile (a newer load aborts the old one); the answer then goes nowhere, as a late answer from `freespace serve` would.
+   */
+  hold(endpoint: string, match: (q: URLSearchParams) => boolean = () => true): Held {
+    let arrive = () => {};
+    let open = () => {};
+    let done = () => {};
+    const arrived = new Promise<void>((r) => {
+      arrive = r;
+    });
+    const gate = new Promise<void>((r) => {
+      open = r;
+    });
+    const answered = new Promise<void>((r) => {
+      done = r;
+    });
+    this.holds.push({ endpoint, match, arrive, gate, done });
+    return {
+      arrived,
+      release: async () => {
+        open();
+        await answered;
+      },
+    };
+  }
+
+  private async serve(route: Route): Promise<void> {
+    const u = new URL(route.request().url());
+    this.requests.push(u.pathname + u.search);
+    const i = this.holds.findIndex((x) => `/api/${x.endpoint}` === u.pathname && x.match(u.searchParams));
+    const held = i < 0 ? undefined : this.holds.splice(i, 1)[0];
+    if (!held) return this.handle(route);
+    held.arrive();
+    await held.gate;
+    try {
+      await this.handle(route);
+    } catch {
+      // the page aborted the request while it was held
+    } finally {
+      held.done();
+    }
+  }
+
   async handle(route: Route): Promise<void> {
     const req = route.request();
     const u = new URL(req.url());
-    this.requests.push(u.pathname + u.search);
     if (this.sessionGone || req.headers()["x-freespace-token"] !== TOKEN) {
       return route.fulfill({ status: 403, contentType: "text/plain", body: "forbidden\n" });
     }
@@ -360,7 +426,7 @@ export class MockApi {
   }
 
   async install(page: Page): Promise<this> {
-    await page.route("**/api/**", (r) => this.handle(r));
+    await page.route("**/api/**", (r) => this.serve(r));
     return this;
   }
 

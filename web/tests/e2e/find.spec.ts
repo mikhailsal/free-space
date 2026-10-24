@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { MockApi, url } from "./mock";
+import { DAY, file, M, MockApi, NOW, url } from "./mock";
+
+const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 
 test("typing sends nothing; Enter sends one search (D9)", async ({ page }) => {
   const api = await new MockApi().install(page);
@@ -65,4 +67,41 @@ test("Esc leaves Find for Browse and keeps the filters for next time", async ({ 
   await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("/");
   await expect(page.locator("#f-name")).toHaveValue("*.iso");
+});
+
+test("Show more asks for twice the rows and keeps the selection", async ({ page }) => {
+  const api = new MockApi();
+  const tass = (api.node("/home/tass").children ??= []);
+  for (let i = 1; i <= 35; i++) tass.push(file(`part-${String(i).padStart(2, "0")}.bin`, (400 - 5 * i) * M, NOW - i * DAY));
+  await api.install(page);
+  await page.goto(url("/home/tass?mode=find&name=part-*&run=1"));
+  await expect(rows(page)).toHaveCount(30);
+  await expect(page.locator(".more")).toHaveText("Showing 30 of 35 · Show more");
+  await rows(page).nth(2).click();
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(rows(page)).toHaveCount(35);
+  await expect(page.locator(".more")).toBeHidden();
+  await expect(page).toHaveURL(/limit=60/);
+  await expect(page.locator('table.grid tbody tr[aria-selected="true"]')).toContainText("part-03.bin");
+  expect(api.requests.filter((r) => r.startsWith("/api/find") && r.includes("limit=60"))).toHaveLength(1);
+});
+
+test("a search cancelled while it runs keeps the previous results, and its late answer changes nothing (D19)", async ({ page }) => {
+  const api = await new MockApi().install(page);
+  await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
+  await expect(rows(page)).toHaveCount(1);
+  const slow = api.hold("find");
+  await page.locator("#f-name").fill("*.mp4");
+  await page.locator("#f-name").press("Enter");
+  await slow.arrived;
+  await expect(page.locator(".summary")).toContainText("Searching… name filters can take a few seconds");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator(".toast")).toHaveText("Search cancelled");
+  await expect(page.locator(".summary")).toContainText("1 match · 5.0 G allocated");
+  await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
+  await slow.release();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page)).toContainText("Downloads/ubuntu.iso");
+  await expect(page.locator(".summary")).toContainText("1 match · 5.0 G allocated");
+  await expect(page.locator(".progress")).not.toHaveClass(/\bon\b/);
 });

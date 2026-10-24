@@ -39,6 +39,47 @@ test("keyboard moves, opens and goes up, keeping the place (Pass 6)", async ({ p
   await expect(page.locator(".crumbs h1")).toHaveText("Downloads");
 });
 
+// The keys the test above does not press. /home/tass lists .cache, Downloads, old, projects, big.log (largest first);
+// PageUp and PageDown move ten rows, so here they stop at the ends.
+const KEYS = [
+  { key: "ArrowUp", from: "/home/tass?sel=/home/tass/old", folder: "tass", sel: "Downloads", at: "#/home/tass?sel=/home/tass/Downloads" },
+  { key: "ArrowRight", from: "/home/tass?sel=/home/tass/Downloads", folder: "Downloads", sel: "ubuntu.iso", at: "#/home/tass/Downloads" },
+  { key: "Home", from: "/home/tass?sel=/home/tass/big.log", folder: "tass", sel: ".cache", at: "#/home/tass?sel=/home/tass/.cache" },
+  { key: "PageUp", from: "/home/tass?sel=/home/tass/big.log", folder: "tass", sel: ".cache", at: "#/home/tass?sel=/home/tass/.cache" },
+  { key: "PageDown", from: "/home/tass", folder: "tass", sel: "big.log", at: "#/home/tass?sel=/home/tass/big.log" },
+  { key: "Backspace", from: "/home/tass/Downloads", folder: "tass", sel: "Downloads", at: "#/home/tass?sel=/home/tass/Downloads" },
+];
+
+for (const k of KEYS) {
+  test(`${k.key} from ${k.from} lands on ${k.sel} in ${k.folder} (Pass 6)`, async ({ page }) => {
+    await new MockApi().install(page);
+    await page.goto(url(k.from));
+    await expect(rows(page).first()).toBeVisible();
+    await page.keyboard.press(k.key);
+    await expect(page.locator(".crumbs h1")).toHaveText(k.folder);
+    await expect(selected(page)).toContainText(k.sel);
+    await expect(page).toHaveURL((u) => u.hash === k.at);
+  });
+}
+
+test("a Browse answer that arrives after Top was chosen leaves Top on screen (D19)", async ({ page }) => {
+  const api = new MockApi();
+  // the page's own listing, not the one-row ls that Top asks for the folder's size
+  const browse = api.hold("ls", (q) => q.get("limit") !== "1");
+  await api.install(page);
+  await page.goto(url());
+  await browse.arrived;
+  await page.keyboard.press("t");
+  await expect(selected(page)).toContainText("model.safetensors");
+  await browse.release();
+  await expect(page.getByRole("tab", { name: "Top files" })).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/mode=top/);
+  await expect(page.locator(".crumbs h1")).toHaveText("tass");
+  await expect(page.locator(".summary")).toContainText("files larger than 100 M");
+  await expect(page.locator("table.grid")).toHaveClass(/\bmode-top\b/);
+  await expect(selected(page)).toContainText("model.safetensors");
+});
+
 test("sorting by Modified asks the API and marks the header", async ({ page }) => {
   const api = await new MockApi().install(page);
   await page.goto(url());
