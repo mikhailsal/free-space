@@ -196,6 +196,21 @@ test("Changes is disabled without a previous snapshot", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("Changes the server cannot compare any more offer the way back to Browse", async ({ page }) => {
+  const api = new MockApi();
+  api.prevTree = structuredClone(api.tree);
+  await api.install(page);
+  await page.goto(url());
+  await expect(page.getByRole("tab", { name: "Changes" })).toHaveAttribute("aria-disabled", "false");
+  // the previous snapshot goes between the status that offered it and the diff
+  api.prevTree = null;
+  await page.keyboard.press("d");
+  await expect(page.locator(".bodystate")).toContainText("No previous snapshot to compare yet.");
+  await page.locator(".bodystate").getByRole("button", { name: "Browse" }).click();
+  await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
+  await expect(rows(page).first()).toContainText(".cache");
+});
+
 test("Changes lists growth and removals with glyphs, not color alone (D8)", async ({ page }) => {
   const api = new MockApi();
   api.prevTree = structuredClone(api.tree);

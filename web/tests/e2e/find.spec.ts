@@ -59,6 +59,17 @@ test("bad values are flagged at the field and never sent", async ({ page }) => {
   expect(api.count("find")).toBe(0);
 });
 
+test("a pattern the server refuses is flagged at the name field", async ({ page }) => {
+  const api = await new MockApi().install(page);
+  await page.goto(url("/home/tass?mode=find"));
+  await expect(page.locator(".bodystate")).toContainText("Fill in a name pattern or a filter");
+  api.failWith = { status: 400, code: "USAGE", message: "bad pattern [" };
+  await page.locator("#f-name").fill("[");
+  await page.locator("#f-name").press("Enter");
+  await expect(page.locator("#f-name-err")).toHaveText("Invalid pattern.");
+  await expect(page.locator("#f-name")).toHaveAttribute("aria-invalid", "true");
+});
+
 test("Esc leaves Find for Browse and keeps the filters for next time", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));

@@ -73,7 +73,7 @@ export class PageNotices {
 
   private lastError(s: Status, live: Status, scan: Action): Notice | null {
     const le = live.last_error;
-    if (!le || (live.last_success_ts && le.ts <= live.last_success_ts)) return null;
+    if (!(le && (!live.last_success_ts || le.ts > live.last_success_ts))) return null;
     return {
       id: "last-error",
       priority: 2,
