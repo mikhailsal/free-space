@@ -24,7 +24,8 @@ async function open(page: Page, hash?: string) {
  * From here no timer the page sets runs. In real time a toast hides after 6 s, and the page polls every 5 s while it has
  * no snapshot and every 10 s once the session ended; a slow runner may take longer than that to reach the shot, which
  * would then lose the toast or record one poll more. pauseAt only goes forward, and it runs the timers due on the way:
- * 5 s past NOW, before a load or after one (whose next poll is 60 s away), none is due yet.
+ * 5 s past NOW, before a load or after one (whose next poll is 60 s away), none is due yet. How often the page polls
+ * is for tests/e2e/states.spec.ts to pin, on every PR: here no state moves the clock on to the next poll.
  */
 async function stopTimers(page: Page) {
   await page.clock.install({ time: NOW * 1000 });
