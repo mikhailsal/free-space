@@ -5,23 +5,28 @@ import { readFileSync } from "node:fs";
 
 const css = readFileSync(new URL("../../src/tokens.css", import.meta.url), "utf8");
 const tok: Record<string, string> = {};
-for (const m of css.matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6})\s*;/gi)) tok[m[1]!] = m[2]!;
+for (const [, name, hex] of css.matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6})\s*;/gi)) if (name && hex) tok[name] = hex;
 
 type Rgb = [number, number, number];
 const rgb = (hex: string): Rgb => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
-const lum = (c: Rgb) => {
-  const [r, g, b] = c.map((v) => {
-    const s = v / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+/** A token's color; fails the test when tokens.css lacks it. */
+const color = (name: string): Rgb => {
+  const hex = tok[name];
+  if (!hex) throw new Error(`tokens.css has no --${name}`);
+  return rgb(hex);
 };
-const ratio = (a: Rgb, b: Rgb) => {
-  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
-  return (x! + 0.05) / (y! + 0.05);
+const lin = (v: number) => {
+  const s = v / 255;
+  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 };
+const lum = ([r, g, b]: Rgb) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+const ratio = (a: Rgb, b: Rgb) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
 /** `fg` at `alpha` over `bg`, as the share tint is drawn. */
-const over = (fg: Rgb, alpha: number, bg: Rgb): Rgb => fg.map((v, i) => v * alpha + bg[i]! * (1 - alpha)) as Rgb;
+const over = ([r, g, b]: Rgb, alpha: number, [r0, g0, b0]: Rgb): Rgb => [
+  r * alpha + r0 * (1 - alpha),
+  g * alpha + g0 * (1 - alpha),
+  b * alpha + b0 * (1 - alpha),
+];
 
 const PAIRS: [string, string][] = [
   ["fg", "bg"],
@@ -54,22 +59,22 @@ test("tokens.css defines every color the sheet names", () => {
 
 for (const [a, b] of PAIRS) {
   test(`${a} on ${b} ≥ 4.5:1`, () => {
-    expect(ratio(rgb(tok[a]!), rgb(tok[b]!))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(color(a), color(b))).toBeGreaterThanOrEqual(4.5);
   });
 }
 
 test("text on the share tint stays readable (13 % rows, 22 % selected)", () => {
-  const accent = rgb(tok.accent!);
-  const row = over(accent, 0.13, rgb(tok.bg!));
-  const sel = over(accent, 0.22, rgb(tok["accent-bg"]!));
+  const accent = color("accent");
+  const row = over(accent, 0.13, color("bg"));
+  const sel = over(accent, 0.22, color("accent-bg"));
   for (const t of ["fg", "muted", "danger-fg"]) {
-    expect(ratio(rgb(tok[t]!), row)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(color(t), row)).toBeGreaterThanOrEqual(4.5);
   }
   // muted reaches only 4.3:1 on the selected tint: work.css turns it to fg there
   for (const t of ["fg", "danger-fg"]) {
-    expect(ratio(rgb(tok[t]!), sel)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(color(t), sel)).toBeGreaterThanOrEqual(4.5);
   }
-  expect(ratio(rgb(tok.muted!), sel)).toBeLessThan(4.5);
+  expect(ratio(color("muted"), sel)).toBeLessThan(4.5);
 });
 
 test("work.css keeps muted text off the selected row", () => {

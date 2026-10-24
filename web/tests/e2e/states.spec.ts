@@ -72,6 +72,21 @@ test("snapshot not readable by this user (DX D8)", async ({ page }) => {
   await expect(page.locator(".cmdrow")).toContainText("sudo freespace install-timer");
 });
 
+test("a fix with a control character is not offered as a command", async ({ page }) => {
+  const api = new MockApi();
+  api.failWith = {
+    status: 403,
+    code: "SNAPSHOT_ACCESS",
+    message: "cannot read /var/lib/freespace/snapshot.db",
+    fix: "sudo freespace install-timer --user\x1b[8m",
+  };
+  await api.install(page);
+  await page.goto(url());
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Cannot read the snapshot");
+  await expect(page.locator(".cmdrow")).toHaveCount(0);
+  await expect(page.getByText("Fix: sudo freespace install-timer")).toBeVisible();
+});
+
 test("a folder that is not in the snapshot offers the way up", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto(url("/home/tass/nope/deeper"));

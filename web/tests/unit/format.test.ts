@@ -54,3 +54,8 @@ test("shell quoting", () => {
   expect(fmt.shellWord("a\u202eb")).toBe("$'a\\xe2\\x80\\xaeb'");
   expect(fmt.shellWord("it's\x7f")).toBe("$'it\\x27s\\x7f'");
 });
+
+test("control characters: C0 and DEL, nothing else", () => {
+  for (const c of ["\x00", "\x1f", "\x7f", "\n"]) expect(fmt.hasControl(`a${c}b`)).toBe(true);
+  for (const s of ["", " ", "~", "\x80", "\u202e", "é"]) expect(fmt.hasControl(s)).toBe(false);
+});

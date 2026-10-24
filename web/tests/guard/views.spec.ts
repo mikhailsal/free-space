@@ -51,8 +51,8 @@ async function newerSnapshot(page: Page, api: MockApi) {
 function withChanges(): MockApi {
   const api = new MockApi();
   api.prevTree = structuredClone(api.tree);
-  const tass = api.tree.children![0]!.children![0]!;
-  tass.children = tass.children!.filter((c) => c.name !== "old");
+  const tass = api.node("/home/tass");
+  tass.children = (tass.children ?? []).filter((c) => c.name !== "old");
   tass.children.push({ name: "new.bin", kind: "file", allocated: 2 ** 30 });
   return api;
 }
@@ -65,13 +65,13 @@ function withStatus(set: (api: MockApi) => void): () => MockApi {
   };
 }
 
-const tassDir = (api: MockApi) => api.tree.children![0]!.children![0]!;
+const tassDir = (api: MockApi) => api.node("/home/tass");
 
 /** part-01.bin to part-NN.bin in /home/tass, each a little smaller and older than the one before. */
 function addParts(api: MockApi, count: number) {
   for (let i = 1; i <= count; i++) {
     const name = `part-${String(i).padStart(2, "0")}.bin`;
-    tassDir(api).children!.push(file(name, (400 - 5 * i) * M, NOW - i * DAY));
+    tassDir(api).children?.push(file(name, (400 - 5 * i) * M, NOW - i * DAY));
   }
 }
 
@@ -79,7 +79,7 @@ function addParts(api: MockApi, count: number) {
 class MountApi extends MockApi {
   constructor() {
     super();
-    tassDir(this).children!.push(dir("backup", []));
+    tassDir(this).children?.push(dir("backup", []));
   }
 
   override entry(f: Parameters<MockApi["entry"]>[0]) {
@@ -120,7 +120,7 @@ const STATES: State[] = [
   { name: "folder", go: (p) => open(p, "/home/tass/Downloads") },
   {
     name: "empty-folder",
-    api: withStatus((a) => tassDir(a).children!.push(dir("empty", []))),
+    api: withStatus((a) => tassDir(a).children?.push(dir("empty", []))),
     go: async (p) => {
       await p.goto(url("/home/tass/empty"));
       await expect(p.locator(".bodystate")).toContainText("Nothing here in this snapshot.");

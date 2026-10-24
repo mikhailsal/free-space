@@ -78,6 +78,13 @@ function flatten(root: Node): Map<string, Flat> {
   return out;
 }
 
+/** The entry at this path; the mock's own paths are always there. */
+function at(flat: Map<string, Flat>, path: string): Flat {
+  const f = flat.get(path);
+  if (!f) throw new Error(`mock: ${path} is not in the tree`);
+  return f;
+}
+
 /** A request `hold` keeps back: `arrived` once the page sent it; `release` answers it and resolves when that is done. */
 export interface Held {
   arrived: Promise<Request>;
@@ -176,14 +183,14 @@ function sizeArg(s: string | null): number {
   if (!s) return 0;
   const m = /^(\d+)([KMGT]?)$/i.exec(s.trim());
   if (!m) return NaN;
-  const mul = { "": 1, K: 2 ** 10, M: 2 ** 20, G: 2 ** 30, T: 2 ** 40 }[m[2]!.toUpperCase()]!;
-  return Number(m[1]) * mul;
+  const [, n, unit = ""] = m;
+  return Number(n) * 2 ** (10 * (unit ? "KMGT".indexOf(unit.toUpperCase()) + 1 : 0));
 }
 
 function cutoff(s: string | null): number | null {
   if (!s) return null;
   const m = /^(\d+)(d|w|mo|y)$/.exec(s);
-  if (m) return NOW - Number(m[1]) * { d: 1, w: 7, mo: 30, y: 365 }[m[2] as "d"]! * DAY;
+  if (m) return NOW - Number(m[1]) * { d: 1, w: 7, mo: 30, y: 365 }[m[2] as "d"] * DAY;
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return Date.parse(`${s}T00:00:00`) / 1000;
   return NaN;
 }
@@ -216,9 +223,7 @@ export class MockApi {
 
   /** The node at this path of the tree (a test changes it in place). */
   node(path: string, tree = this.tree): Node {
-    const f = this.flat(tree).get(path);
-    if (!f) throw new Error(`mock: ${path} is not in the tree`);
-    return f.node;
+    return at(this.flat(tree), path).node;
   }
 
   header() {
@@ -258,7 +263,7 @@ export class MockApi {
   status() {
     const h = this.header();
     const empty = this.noSnapshot;
-    const root = this.flat().get("/")!;
+    const root = at(this.flat(), "/");
     return {
       host: this.host,
       os: "linux",
@@ -317,7 +322,7 @@ export class MockApi {
   private children(path: string, tree = this.tree): Flat[] {
     const flat = this.flat(tree);
     const f = flat.get(path);
-    return (f?.node.children ?? []).map((c) => flat.get(path === "/" ? `/${c.name}` : `${path}/${c.name}`)!);
+    return (f?.node.children ?? []).map((c) => at(flat, path === "/" ? `/${c.name}` : `${path}/${c.name}`));
   }
 
   /**

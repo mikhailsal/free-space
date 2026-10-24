@@ -10,8 +10,8 @@ test("Load latest keeps the place, or walks up when the folder is gone (D10)", a
   await expect(page.locator(".notice")).toHaveCount(0);
   // a nightly scan publishes a snapshot without /home/tass/old
   api.snapshotId = "snap-2";
-  const tass = api.tree.children![0]!.children![0]!;
-  tass.children = tass.children!.filter((c) => c.name !== "old");
+  const tass = api.node("/home/tass");
+  tass.children = (tass.children ?? []).filter((c) => c.name !== "old");
   await focusPoll(page);
   const notice = page.locator(".notice").filter({ hasText: "A newer snapshot is ready" });
   await expect(notice).toBeVisible();

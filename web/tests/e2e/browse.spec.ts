@@ -214,8 +214,8 @@ test("Changes the server cannot compare any more offer the way back to Browse", 
 test("Changes lists growth and removals with glyphs, not color alone (D8)", async ({ page }) => {
   const api = new MockApi();
   api.prevTree = structuredClone(api.tree);
-  const tass = api.tree.children![0]!.children![0]!;
-  tass.children = tass.children!.filter((c) => c.name !== "old");
+  const tass = api.node("/home/tass");
+  tass.children = (tass.children ?? []).filter((c) => c.name !== "old");
   tass.children.push({ name: "new.bin", kind: "file", allocated: 2 ** 30 });
   await api.install(page);
   await page.goto(url());
@@ -288,7 +288,7 @@ for (const c of [
 //   why_new=the guard's mount point has a root and usage; seam=none; no_claim=mount detection (the mock reports the mount)
 test("a mount point the snapshot does not cover offers no way in", async ({ page }) => {
   const api = new PatchedApi();
-  api.tree.children![0]!.children![0]!.children!.push(dir("nas", []));
+  api.node("/home/tass").children?.push(dir("nas", []));
   api.patch = { "/home/tass/nas": { kind: "mount", mount: { fs_type: "nfs4", used: null, total: null, root: null } } };
   await api.install(page);
   await page.goto(url("/home/tass?sel=/home/tass/nas"));
