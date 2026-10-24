@@ -1,6 +1,8 @@
 // refactor-guard's pixel-diff (D16, D23): every view and state the e2e mock reaches, at 1280, 700 and 360 px.
 // playwright.guard.config.ts keeps the shots in $GUARD_SHOTS: a run with --update-snapshots=all takes them from one
-// build, and the PNG files of two builds (base and head) must be byte-identical.
+// build, and the files of two builds (base and head) must be byte-identical. Next to each PNG goes what the page asked
+// of the API on the way (`<state>-<width>.requests.txt`), so a build that asks for other rows, drops a parameter or
+// asks twice differs too, though it draws the same picture.
 // Each state waits for what marks it, so a build that never reaches a state fails here, not in the picture.
 import { expect, type Page, test } from "@playwright/test";
 import { DAY, dir, file, G, M, MockApi, NOW, url } from "../e2e/mock";
@@ -17,6 +19,19 @@ async function open(page: Page, hash?: string) {
   await page.goto(url(hash));
   await expect(rows(page).first()).toBeVisible();
 }
+
+/**
+ * From here no timer the page sets runs: a toast hides after 6 s of real time, and a slow runner may take longer than
+ * that to reach the shot. pauseAt only goes forward, and it runs the timers due on the way: a few seconds ahead of the
+ * page's clock passes no poll (60 s) and leaves every age on the page as it reads at NOW.
+ */
+async function stopTimers(page: Page) {
+  await page.clock.install({ time: NOW * 1000 });
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 5000);
+}
+
+/** The API calls the page made, one per line and sorted: answers that race may come in either order. */
+const asked = (api: MockApi) => `${[...api.requests].sort().join("\n")}\n`;
 
 /** A nightly scan publishes snap-2; the page hears of it on the next focus poll. */
 async function newerSnapshot(page: Page, api: MockApi) {
@@ -163,6 +178,7 @@ const STATES: State[] = [
     name: "hidden",
     go: async (p) => {
       await open(p);
+      await stopTimers(p);
       await p.keyboard.press("h");
       await expect(p.locator(".crumbs .hid")).toHaveText(/^1 hidden · 83 G$/);
       await expect(p.locator(".toast")).toBeVisible();
@@ -252,6 +268,7 @@ const STATES: State[] = [
     name: "changes-unavailable",
     go: async (p) => {
       await open(p);
+      await stopTimers(p);
       await p.keyboard.press("d");
       await expect(p.locator(".toast")).toHaveText("No previous snapshot to compare yet.");
     },
@@ -415,6 +432,7 @@ for (const [width, height] of [
         await page.mouse.move(0, 0);
         await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
         await expect(page).toHaveScreenshot(`${s.name}-${width}.png`, { fullPage: true });
+        expect(asked(api)).toMatchSnapshot(`${s.name}-${width}.requests.txt`);
       });
     }
   });

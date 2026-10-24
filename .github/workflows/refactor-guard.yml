@@ -4,7 +4,7 @@
 # branched off its base branch:
 #   rust-diff   both CLI builds give the same answers (scripts/rust-diff.sh)
 #   pixel-diff  both GUI builds draw every view and state alike, to the byte of
-#               each PNG shot
+#               each PNG shot, and ask the same of the API on the way
 #   coverage    head's line coverage, per function for the Rust files the PR
 #               touches; it informs and never fails the PR
 name: refactor-guard
@@ -16,8 +16,11 @@ on:
 permissions:
   contents: read
 
+# A new push or the refactor label starts the guard again and cancels the run in
+# progress. Any other label also fires `labeled`; that run does nothing (the jobs'
+# `if`), and a group of its own keeps it from cancelling a guard that is running.
 concurrency:
-  group: refactor-guard-${{ github.event.pull_request.number }}
+  group: refactor-guard-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'refactor' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 env:
@@ -27,7 +30,7 @@ env:
 
 jobs:
   rust-diff:
-    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    if: contains(github.event.pull_request.labels.*.name, 'refactor') && (github.event.action != 'labeled' || github.event.label.name == 'refactor')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -44,7 +47,8 @@ jobs:
         run: |
           git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA" -- \
             .github/workflows/refactor-guard.yml scripts/rust-diff.sh scripts/coverage-functions.sh \
-            web/playwright.guard.config.ts web/tests/guard web/tests/e2e/mock.ts web/tests/e2e/serve.ts web/tests/shots/home.ts |
+            web/playwright.guard.config.ts web/playwright.config.ts web/tests/guard web/tests/e2e/mock.ts web/tests/e2e/serve.ts \
+            web/tests/shots/home.ts |
             while read -r f; do
               echo "::warning file=$f::This refactor PR changes the guard's own harness, which then judges the PR. Review this file first."
             done
@@ -77,7 +81,7 @@ jobs:
           overwrite: true
 
   pixel-diff:
-    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    if: contains(github.event.pull_request.labels.*.name, 'refactor') && (github.event.action != 'labeled' || github.event.label.name == 'refactor')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -102,27 +106,34 @@ jobs:
           bun install --frozen-lockfile
           bun run build
       # head's spec, mock and Playwright drive both builds. Each run only takes
-      # the shots, into a dir of its own; the verdict compares the PNG files byte
-      # for byte, as Playwright's own comparison skips pixels it takes for
-      # anti-aliasing (pixelmatch's includeAA is off and cannot be set).
+      # the shots and each state's API requests, into a dir of its own; the
+      # verdict compares the files byte for byte, as Playwright's own comparison
+      # skips pixels it takes for anti-aliasing (pixelmatch's includeAA is off and
+      # cannot be set). Each build is taken twice: one that draws two runs
+      # differently decides nothing.
       - run: bunx playwright install --with-deps chromium
-      - name: shoot base, base again and head
+      - name: shoot base, base again, head and head again
         run: |
-          for take in base base-again head; do
+          for take in base base-again head head-again; do
             dist=$RUNNER_TEMP/base/web/dist
-            [ "$take" != head ] || dist=$PWD/dist
+            [ "${take#head}" = "$take" ] || dist=$PWD/dist
             GUARD_DIST=$dist GUARD_SHOTS=$RUNNER_TEMP/shots/$take bunx playwright test -c playwright.guard.config.ts --update-snapshots=all --reporter=list
           done
       - name: base again matches base, or the comparison is unreliable
         run: diff -rq "$RUNNER_TEMP/shots/base" "$RUNNER_TEMP/shots/base-again"
+      # base draws alike twice, so a head that does not added a race: a load that
+      # lands late, a timer that decides the frame
+      - name: head again matches head, or head draws by chance
+        run: diff -rq "$RUNNER_TEMP/shots/head" "$RUNNER_TEMP/shots/head-again"
       - name: head matches base
         run: |
           diff -rq "$RUNNER_TEMP/shots/base" "$RUNNER_TEMP/shots/head" && exit 0
           # Draw what differs: head against base's shots, a diff image per shot
-          # Playwright sees differ (none for a change in anti-aliased pixels only).
+          # Playwright sees differ (none for a change in anti-aliased pixels only)
+          # and the lines of each requests file that differ.
           GUARD_DIST="$PWD/dist" GUARD_SHOTS="$RUNNER_TEMP/shots/base" bunx playwright test -c playwright.guard.config.ts --reporter=list --output="$RUNNER_TEMP/diff" || true
           exit 1
-      # shots/: every shot of each take; diff/: before, after and diff of each shot Playwright sees differ
+      # shots/: every shot and requests file of each take; diff/: before, after and diff of each Playwright sees differ
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -135,7 +146,7 @@ jobs:
           overwrite: true
 
   coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    if: contains(github.event.pull_request.labels.*.name, 'refactor') && (github.event.action != 'labeled' || github.event.label.name == 'refactor')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     continue-on-error: true
