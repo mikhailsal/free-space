@@ -1643,7 +1643,7 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: Section 2 — C3 (D12)
   - Files: web/src/app.css, web/src/main.ts
   - Verify: refactor-guard pixel-diff 0 px
-- [ ] **T10 (P1, human: ~4h / CC: ~30min)** — web — inspector, h and the mock's handle under the Biome limits
+- [x] **T10 (P1, human: ~4h / CC: ~30min)** — web — inspector, h and the mock's handle under the Biome limits
   - Surfaced by: Scope Challenge — S2b (D4), S5 (D6)
   - Files: web/src/inspector.ts, web/src/dom.ts, web/tests/e2e/mock.ts
   - Verify: `bunx biome lint --error-on-warnings` clean; e2e green
