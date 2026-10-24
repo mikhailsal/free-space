@@ -1,6 +1,8 @@
 // refactor-guard's pixel-diff (D16, D23): every view and state the e2e mock reaches, at 1280, 700 and 360 px.
 // playwright.guard.config.ts keeps the shots in $GUARD_SHOTS: a run with --update-snapshots=all takes them from one
-// build, and the PNG files of two builds (base and head) must be byte-identical.
+// build, and the files of two builds (base and head) must be byte-identical. Next to each PNG goes what the page asked
+// of the API on the way (`<state>-<width>-requests.txt`), so a build that asks for other rows, drops a parameter or
+// asks twice differs too, though it draws the same picture.
 // Each state waits for what marks it, so a build that never reaches a state fails here, not in the picture.
 import { expect, type Page, test } from "@playwright/test";
 import { DAY, dir, file, G, M, MockApi, NOW, url } from "../e2e/mock";
@@ -16,6 +18,27 @@ const notice = (page: Page) => page.locator(".notice").filter({ hasText: "newer 
 async function open(page: Page, hash?: string) {
   await page.goto(url(hash));
   await expect(rows(page).first()).toBeVisible();
+}
+
+/**
+ * From here no timer the page sets runs. In real time a toast hides after 6 s, and the page polls every 5 s while it has
+ * no snapshot and every 10 s once the session ended; a slow runner may take longer than that to reach the shot, which
+ * would then lose the toast or record one poll more. pauseAt only goes forward, and it runs the timers due on the way:
+ * 5 s past NOW, before a load or after one (whose next poll is 60 s away), none is due yet. How often the page polls
+ * is for tests/e2e/states.spec.ts to pin, on every PR: here no state moves the clock on to the next poll.
+ */
+async function stopTimers(page: Page) {
+  await page.clock.install({ time: NOW * 1000 });
+  await page.clock.pauseAt(NOW * 1000 + 5000);
+}
+
+/** The API calls the page made, one per line: each query in name order, and the lines sorted, as answers may race. */
+const asked = (api: MockApi) => `${api.requests.map(inOrder).sort().join("\n")}\n`;
+
+function inOrder(request: string) {
+  const u = new URL(request, "http://mock");
+  u.searchParams.sort();
+  return u.pathname + u.search;
 }
 
 /** A nightly scan publishes snap-2; the page hears of it on the next focus poll. */
@@ -163,6 +186,7 @@ const STATES: State[] = [
     name: "hidden",
     go: async (p) => {
       await open(p);
+      await stopTimers(p);
       await p.keyboard.press("h");
       await expect(p.locator(".crumbs .hid")).toHaveText(/^1 hidden · 83 G$/);
       await expect(p.locator(".toast")).toBeVisible();
@@ -252,6 +276,7 @@ const STATES: State[] = [
     name: "changes-unavailable",
     go: async (p) => {
       await open(p);
+      await stopTimers(p);
       await p.keyboard.press("d");
       await expect(p.locator(".toast")).toHaveText("No previous snapshot to compare yet.");
     },
@@ -338,6 +363,7 @@ const STATES: State[] = [
       a.lastError = { ts: NOW, op: "scan", message: "disk full" };
     }),
     go: async (p) => {
+      await stopTimers(p);
       await p.goto(url());
       await expect(heading(p)).toHaveText("No snapshot yet");
     },
@@ -349,6 +375,7 @@ const STATES: State[] = [
       a.scanning = { op: "scan", path: "/", pid: 42, since: NOW, elapsed_seconds: 48 };
     }),
     go: async (p) => {
+      await stopTimers(p);
       await p.goto(url());
       await expect(p.locator("#fp-scan")).toContainText("Scanning / · 48 s");
     },
@@ -356,6 +383,7 @@ const STATES: State[] = [
   {
     name: "session-ended",
     go: async (p) => {
+      await stopTimers(p);
       await p.goto("/#/home/tass");
       await expect(heading(p)).toHaveText("Session ended");
     },
@@ -364,6 +392,7 @@ const STATES: State[] = [
     name: "server-gone",
     go: async (p, api) => {
       await open(p);
+      await stopTimers(p);
       api.sessionGone = true;
       await p.keyboard.press("ArrowDown");
       await p.keyboard.press("Enter");
@@ -414,7 +443,9 @@ for (const [width, height] of [
         // :hover late; the inspector's Biggest inside and a slow answer finish loading (aria-busy) after the state's mark
         await page.mouse.move(0, 0);
         await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
-        await expect(page).toHaveScreenshot(`${s.name}-${width}.png`, { fullPage: true });
+        // soft: a run against another build's files reports both differences, the picture and the requests
+        await expect.soft(page).toHaveScreenshot(`${s.name}-${width}.png`, { fullPage: true });
+        expect(asked(api)).toMatchSnapshot(`${s.name}-${width}-requests.txt`);
       });
     }
   });

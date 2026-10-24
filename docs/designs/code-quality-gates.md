@@ -1604,7 +1604,7 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: TODO candidates — TD2 (D25): refresh.rs:402, walk.rs:392
   - Files: scripts/ (new script), .github/workflows/ci.yml
   - Verify: `sudo scripts/<script>.sh` passes locally; rust job green
-- [ ] **T5 (P1, human: ~6h / CC: ~40min)** — web tests — e2e for the six keys, Show more, cancel; mock hold-and-release; out-of-order e2e
+- [x] **T5 (P1, human: ~6h / CC: ~40min)** — web tests — e2e for the six keys, Show more, cancel; mock hold-and-release; out-of-order e2e
   - Surfaced by: Section 3 — T2 (D16); Outside voice — O1 (D19)
   - Files: web/tests/e2e/mock.ts, web/tests/e2e/browse.spec.ts, web/tests/e2e/find.spec.ts
   - Verify: `cd web && bunx playwright test` green on the unsplit App
