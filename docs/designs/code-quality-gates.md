@@ -1616,7 +1616,7 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: Section 2 — C2 (D11)
   - Files: core/src/refresh.rs, cli/src/install.rs, cli/src/query.rs, core/src/scan/walk.rs, core/src/scan/tree.rs (+ tests.rs submodules)
   - Verify: `wc -l` under 500; `cargo test -- --list` same names before and after
-- [ ] **T8 (P1, human: ~3 days / CC: ~4h)** — web — Split App by responsibility, one request coordinator
+- [x] **T8 (P1, human: ~3 days / CC: ~4h)** — web — Split App by responsibility, one request coordinator
   - Surfaced by: Problem; Outside voice — O1 (D19); Scope Challenge — S1 (App.notices), S2b (renderSummary)
   - Files: web/src/app.ts, web/src/ (new modules)
   - Verify: e2e green incl. out-of-order tests; refactor-guard pixel-diff 0 px

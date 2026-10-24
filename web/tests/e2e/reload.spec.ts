@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MockApi, url } from "./mock";
+import { MockApi, NOW, url } from "./mock";
 
 const focusPoll = (page: import("@playwright/test").Page) => page.evaluate(() => window.dispatchEvent(new Event("focus")));
 
@@ -62,6 +62,17 @@ test("Dismiss hides the notice until the next snapshot", async ({ page }) => {
   api.snapshotId = "snap-3";
   await focusPoll(page);
   await expect(notice).toBeVisible();
+});
+
+test("a refresh that failed after the last good one raises the red notice (D5)", async ({ page }) => {
+  const api = new MockApi(false);
+  api.lastError = { ts: NOW, op: "refresh", message: "disk full" };
+  await api.install(page);
+  await page.goto(url());
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText("Last refresh failed");
+  await expect(alert).toContainText("disk full. Showing the snapshot from");
+  await expect(alert.getByRole("button", { name: "Copy: sudo freespace scan" })).toBeVisible();
 });
 
 test("a lower-priority notice waits behind the red one (D5)", async ({ page }) => {
