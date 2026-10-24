@@ -1,6 +1,6 @@
 # Code quality gates
 
-Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below); ready to implement. Date: 2026-10-23.
+Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Date: 2026-10-23.
 
 ## Problem
 
@@ -54,6 +54,12 @@ No test file is over 1000 (`core/tests/queries.rs` is 931).
 
 Rust functions over 80 lines (clippy count): `snapshot/writer.rs:119` 203, `refresh.rs:64` 175, `refresh.rs:394` 147, `queries/diff.rs:169` 141, `cli/src/install.rs:83` 132, `scan/tree.rs:281` 131, `scan/walk.rs:301` 124, `cli/src/status.rs:129` 115, `scan/walk.rs:137` 109, `refresh.rs:248` 107, `queries/status.rs:27` 103, `cli/src/doctor.rs:259` 103, `job.rs:151` 101. The next one down is 79, so the 80 limit cuts at a natural gap. Nesting over 4: none.
 
+Re-measured 2026-10-24 at `00f3535`, before the debt lanes:
+
+- Rust nesting over 4: **30 blocks**, not none. The probe of S2a that found 0 at threshold 4 read a cached clippy run (cargo does not re-lint when only `clippy.toml` changes); `CLIPPY_CONF_DIR` with a fresh `--target-dir` gives `core/src/queries/glob.rs:47,52,60`, `core/src/scan/tree.rs:324,328,335,341`, `core/src/scan/walk.rs:268,271,391,396`, `core/src/snapshot/progress.rs:81,103,106`, `core/src/snapshot/writer.rs:155`, `core/src/systemd.rs:132`, `core/tests/queries.rs:414` (2), `cli/src/output.rs:132,138,142`, `cli/src/serve/gui.rs:192,197,199` (lines of the innermost flagged block; several sit in one function). D3 stands: these are debt like the long functions and go in the Rust lane.
+- The 13 long Rust functions and 5 long files: unchanged.
+- `web/src/app.ts` 1663 lines, `web/src/app.css` 1136. Biome's recommended preset: 109 findings besides the 6 limit errors (noNonNullAssertion 80, noDescendingSpecificity 15, useTemplate 4, noControlCharactersInRegex 4, useOptionalChain 3, 4 single ones); PR 2's test files added to the count.
+
 Web functions over a Biome limit (Biome's count, after the width-140 format): `App.notices` (`web/src/app.ts:925`) 88 lines; `App.renderSummary` (`app.ts:1310`) complexity 64; `inspector` (`web/src/inspector.ts:75`) complexity 46; `h` (`web/src/dom.ts:7`) complexity 29; the mock API's `handle` (`web/tests/e2e/mock.ts:216`) 126 lines and complexity 34.
 
 ## Tasks
@@ -75,6 +81,11 @@ Order (D14): a format PR, the guards, the debt PRs, then the gates PR. Each step
 ### PR 3…n: the debt, regression contract first
 
 Every debt PR is labeled `refactor`, intends no behavior change, and passes: test names before = after plus the new ones; all CI jobs green; `refactor-guard` green.
+
+The PRs, as cut on 2026-10-24 (each lands before the next of its lane starts; the guard's own harness changes land in PRs of their own, so no refactor PR is judged by a harness it changed):
+
+- Lane A: **A0** `test: rust-diff` covers what the Rust debt PRs touch (the TODOS items of PR 2's review that named these PRs as their trigger: the floor, each build's own changed-tree rescan and refresh, 8 walker threads on a wide tree, folder dates, the tree left as it was, `$HOME` and the unit dir, a config file with two roots, a second time zone and age bounds, `serve`'s API, a terminal); **A1** D0 and the mount script (T3, T4) and `install-timer` as root in rust-diff; **A2** the scan path (`writer.rs`, `tree.rs`, `walk.rs`, `refresh.rs`, `progress.rs`): functions, files and nesting, with the D18 list; **A3** the rest of `core` (`queries/diff.rs`, `queries/status.rs`, `queries/glob.rs`, `job.rs`, `systemd.rs`, `core/tests/queries.rs`); **A4** `cli` (`install.rs`, `status.rs`, `doctor.rs`, `query.rs`, `output.rs`, `serve/gui.rs`).
+- Lane B: **B0** W0 and the pixel-diff items of PR 2's review; **B1** D1; **B2** D2; **B3** W1; **B4** W2; **B5** the pre-gate runner items of PR 1's review.
 
 Rust lane:
 
@@ -212,7 +223,7 @@ History: D2 accepted scope as answered: "... run in the CI quality job and pre-p
 ### S2a: complexity lint for Rust
 Finding: S2, P2, confidence 9/10, `docs/designs/code-quality-gates.md:62` (G2 `cognitive_complexity = "warn"`), reviewer Claude.
 Plan baseline: G2 as written: `cognitive_complexity = "warn"` in `[workspace.lints.clippy]`, default threshold 25. Not approved (scope record accepted G2 as a task; this lint is the finding's subject and stays pending). Approved and fixed in every column: `too_many_lines` at 80 (scope record).
-Runtime evidence: `cargo clippy --explain cognitive_complexity` (clippy 0.1.99): "We used to think it measured how hard a method is to understand", left in `restriction` "so as to not mislead users", suggests `excessive_nesting` and `too_many_lines` instead (rust-clippy#3793). Probe with CLIPPY_CONF_DIR: at threshold 25, 0 functions; at 15, 8 (max 22, `cli/tests/cli.rs:129`; `core/src/scan/walk.rs:301` 19). `excessive_nesting` (warn-by-default, active only with `excessive-nesting-threshold` set): threshold 4 flags 0, threshold 3 flags 80 blocks.
+Runtime evidence: `cargo clippy --explain cognitive_complexity` (clippy 0.1.99): "We used to think it measured how hard a method is to understand", left in `restriction` "so as to not mislead users", suggests `excessive_nesting` and `too_many_lines` instead (rust-clippy#3793). Probe with CLIPPY_CONF_DIR: at threshold 25, 0 functions; at 15, 8 (max 22, `cli/tests/cli.rs:129`; `core/src/scan/walk.rs:301` 19). `excessive_nesting` (warn-by-default, active only with `excessive-nesting-threshold` set): threshold 4 flags 0, threshold 3 flags 80 blocks. **Correction 2026-10-24:** threshold 4 flags 30 blocks in a fresh target dir; the 0 came from a cached run. The answer below stands; the 30 blocks are Rust debt (Current violations).
 Comparison grid:
 | Choice | Current | A Length only | B Nesting 4 | C Cognitive 25 | D Both |
 |---|---|---|---|---|---|
@@ -1592,10 +1603,18 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: Scope Challenge — S1 (D2), S3 (D5); Section 3 — T2 (D16, header bar `transition: width 400ms`)
   - Files: web/package.json, web/bun.lock, web/biome.json, web/src/, web/tests/, web/tests/shots/readme.spec.ts, docs/img/
   - Verify: `cd web && bunx biome format .` reports nothing; `bun run shots` twice gives identical PNGs
-- [ ] **T2 (P1, human: ~1 day / CC: ~1.5h)** — CI — Add refactor-guard workflow (rust-diff, pixel-diff, coverage)
+- [x] **T2 (P1, human: ~1 day / CC: ~1.5h)** — CI — Add refactor-guard workflow (rust-diff, pixel-diff, coverage)
   - Surfaced by: Outside voice — E2 (D23), O2 (D20); Section 3 — T1 (D15), T2 (D16)
   - Files: .github/workflows/refactor-guard.yml, web/tests/ (state-shooting spec), scripts/ (diff helper)
   - Verify: a no-op PR labeled `refactor` is green in all three jobs; a PR that changes one output byte fails rust-diff
+- [x] **T20 (P1, added 2026-10-24)** — scripts — rust-diff covers what the Rust debt PRs touch (A0)
+  - Surfaced by: TODOS.md items of PR 2's /ship review whose trigger is the first Rust debt PR (the floor; D11's coverage list)
+  - Files: scripts/rust-diff.sh, scripts/rust-diff/, web/tests/unit/rust-diff.test.ts
+  - Verify: unit tests for the floor, the tree check, serve, the time zone, the terminal and the config phase; base against base green on GitHub
+- [ ] **T21 (P1, added 2026-10-24)** — core, cli — The 30 Rust blocks nested over 4 (A2-A4)
+  - Surfaced by: re-measurement 2026-10-24 (Current violations; correction to S2a)
+  - Files: the files listed in Current violations
+  - Verify: clippy with `excessive-nesting-threshold = 4` in a scratch `clippy.toml` and a fresh target dir reports none; refactor-guard green
 - [ ] **T3 (P1, human: ~2 days / CC: ~1.5h)** — core, cli — Characterization tests for unreached branches
   - Surfaced by: Section 3 — T1 (D15): status.rs:129, query.rs, doctor.rs:259, refresh.rs:270,445,455, diff.rs:180,254, job.rs:155
   - Files: cli/tests/cli.rs, core/tests/queries.rs, core/tests/publish.rs
