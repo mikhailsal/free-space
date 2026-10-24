@@ -1623,7 +1623,7 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: TODO candidates — TD2 (D25): refresh.rs:402, walk.rs:392
   - Files: scripts/ (new script), .github/workflows/ci.yml
   - Verify: `sudo scripts/<script>.sh` passes locally; rust job green
-- [ ] **T5 (P1, human: ~6h / CC: ~40min)** — web tests — e2e for the six keys, Show more, cancel; mock hold-and-release; out-of-order e2e
+- [x] **T5 (P1, human: ~6h / CC: ~40min)** — web tests — e2e for the six keys, Show more, cancel; mock hold-and-release; out-of-order e2e
   - Surfaced by: Section 3 — T2 (D16); Outside voice — O1 (D19)
   - Files: web/tests/e2e/mock.ts, web/tests/e2e/browse.spec.ts, web/tests/e2e/find.spec.ts
   - Verify: `cd web && bunx playwright test` green on the unsplit App
@@ -1635,11 +1635,11 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: Section 2 — C2 (D11)
   - Files: core/src/refresh.rs, cli/src/install.rs, cli/src/query.rs, core/src/scan/walk.rs, core/src/scan/tree.rs (+ tests.rs submodules)
   - Verify: `wc -l` under 500; `cargo test -- --list` same names before and after
-- [ ] **T8 (P1, human: ~3 days / CC: ~4h)** — web — Split App by responsibility, one request coordinator
+- [x] **T8 (P1, human: ~3 days / CC: ~4h)** — web — Split App by responsibility, one request coordinator
   - Surfaced by: Problem; Outside voice — O1 (D19); Scope Challenge — S1 (App.notices), S2b (renderSummary)
   - Files: web/src/app.ts, web/src/ (new modules)
   - Verify: e2e green incl. out-of-order tests; refactor-guard pixel-diff 0 px
-- [ ] **T9 (P1, human: ~2h / CC: ~15min)** — web — Split app.css at its section comments
+- [x] **T9 (P1, human: ~2h / CC: ~15min)** — web — Split app.css at its section comments
   - Surfaced by: Section 2 — C3 (D12)
   - Files: web/src/app.css, web/src/main.ts
   - Verify: refactor-guard pixel-diff 0 px

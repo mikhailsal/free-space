@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { MockApi, url } from "./mock";
+import { aborted, allRead, DAY, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
+
+const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 
 test("typing sends nothing; Enter sends one search (D9)", async ({ page }) => {
   const api = await new MockApi().install(page);
@@ -57,6 +59,17 @@ test("bad values are flagged at the field and never sent", async ({ page }) => {
   expect(api.count("find")).toBe(0);
 });
 
+test("a pattern the server refuses is flagged at the name field", async ({ page }) => {
+  const api = await new MockApi().install(page);
+  await page.goto(url("/home/tass?mode=find"));
+  await expect(page.locator(".bodystate")).toContainText("Fill in a name pattern or a filter");
+  api.failWith = { status: 400, code: "USAGE", message: "bad pattern [" };
+  await page.locator("#f-name").fill("[");
+  await page.locator("#f-name").press("Enter");
+  await expect(page.locator("#f-name-err")).toHaveText("Invalid pattern.");
+  await expect(page.locator("#f-name")).toHaveAttribute("aria-invalid", "true");
+});
+
 test("Esc leaves Find for Browse and keeps the filters for next time", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
@@ -66,3 +79,84 @@ test("Esc leaves Find for Browse and keeps the filters for next time", async ({ 
   await page.keyboard.press("/");
   await expect(page.locator("#f-name")).toHaveValue("*.iso");
 });
+
+test("Show more asks for twice the rows and keeps the selection", async ({ page }) => {
+  const api = new MockApi();
+  const tass = api.node("/home/tass");
+  tass.children ??= [];
+  for (let i = 1; i <= 35; i++) tass.children.push(file(`part-${String(i).padStart(2, "0")}.bin`, (400 - 5 * i) * M, NOW - i * DAY));
+  await api.install(page);
+  await page.goto(url("/home/tass?mode=find&name=part-*&run=1"));
+  await expect(rows(page)).toHaveCount(30);
+  await expect(page.locator(".more")).toHaveText("Showing 30 of 35 · Show more");
+  await rows(page).nth(2).click();
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(rows(page)).toHaveCount(35);
+  await expect(page.locator(".more")).toBeHidden();
+  await expect(page).toHaveURL(/[?&]limit=60(&|$)/);
+  await expect(page.locator('table.grid tbody tr[aria-selected="true"]')).toContainText("part-03.bin");
+  const limits = api.requests.filter((r) => r.startsWith("/api/find")).map((r) => new URL(r, "http://mock").searchParams.get("limit"));
+  expect(limits).toEqual(["30", "60"]);
+});
+
+// As in browse.spec.ts: with the abort lost, the late answer arrives and only the count of loads drops it.
+for (const lost of [false, true]) {
+  test(`a search cancelled while it runs keeps the previous results, and its late answer changes nothing${lost ? ", even with the abort lost" : ""} (D19)`, async ({
+    page,
+  }) => {
+    if (lost) await loseAborts(page);
+    await watchAsks(page);
+    const api = await new MockApi().install(page);
+    await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
+    await expect(rows(page)).toHaveCount(1);
+    const slow = api.hold("find");
+    await page.locator("#f-name").fill("*.mp4");
+    await page.locator("#f-name").press("Enter");
+    const late = await slow.arrived;
+    await expect(page.locator(".summary")).toContainText("Searching… name filters can take a few seconds");
+    await page.getByRole("button", { name: "Cancel" }).click();
+    if (!lost) await expect.poll(() => aborted(page, late)).toBe(true);
+    await expect(page.locator(".toast")).toHaveText("Search cancelled");
+    await expect(page.locator(".summary")).toContainText("1 match · 5.0 G allocated");
+    await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
+    await slow.release();
+    // the page has read the late answer and the load it gave up on has run to its end before the checks below
+    await allRead(page);
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("Downloads/ubuntu.iso");
+    await expect(page.locator(".summary")).toContainText("1 match · 5.0 G allocated");
+    await expect(page.locator(".progress")).not.toHaveClass(/\bon\b/);
+  });
+}
+
+// A load that is no longer the latest leaves the busy state to the one that is: ending the search it gave up on must not
+// end the newer search's progress and its Cancel.
+for (const lost of [false, true]) {
+  test(`a search given up on for a newer one leaves the newer one busy and cancellable${lost ? ", even with the abort lost" : ""} (D19)`, async ({
+    page,
+  }) => {
+    if (lost) await loseAborts(page);
+    await watchAsks(page);
+    const api = await new MockApi().install(page);
+    await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
+    await expect(rows(page)).toHaveCount(1);
+    const first = api.hold("find", (q) => q.get("name") === "*.mp4");
+    const second = api.hold("find", (q) => q.get("name") === "*.log");
+    await page.locator("#f-name").fill("*.mp4");
+    await page.locator("#f-name").press("Enter");
+    const late = await first.arrived;
+    await page.locator("#f-name").fill("*.log");
+    await page.locator("#f-name").press("Enter");
+    const newer = await second.arrived;
+    if (!lost) await expect.poll(() => aborted(page, late)).toBe(true);
+    await first.release();
+    // the load given up on has run to its end before the checks below; the newer one still waits for its answer
+    await allRead(page, newer);
+    await expect(page.locator("main")).toHaveAttribute("aria-busy", "true");
+    await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await second.release();
+    await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("big.log");
+  });
+}

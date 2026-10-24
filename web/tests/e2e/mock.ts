@@ -1,7 +1,9 @@
 // A fake `/api/*` over an in-memory tree, answering with the same JSON shapes
 // as `freespace serve` (src/types.ts). Each test builds one and installs it on
-// its page; `requests` records every call for "no request while typing" checks.
-import type { Page, Route } from "@playwright/test";
+// its page; `requests` records every call for "no request while typing" checks,
+// and `hold` keeps one request unanswered until the test releases it (D19).
+// `watchAsks` watches the same requests from inside the page.
+import type { Page, Request, Route } from "@playwright/test";
 
 export const TOKEN = "e2etoken";
 export const NOW = 1_792_000_000; // 2026-10-15
@@ -73,6 +75,100 @@ function flatten(root: Node): Map<string, Flat> {
   return out;
 }
 
+/** A request `hold` keeps back: `arrived` once the page sent it; `release` answers it and resolves when that is done. */
+export interface Held {
+  arrived: Promise<Request>;
+  release: () => Promise<void>;
+}
+
+interface Hold {
+  endpoint: string;
+  match: (q: URLSearchParams) => boolean;
+  arrive: (r: Request) => void;
+  gate: Promise<void>;
+  done: () => void;
+}
+
+/**
+ * From here the page's AbortController.abort does nothing, so a request the page gives up on still gets its answer:
+ * the request coordinator must then drop it by its own count of loads (D19).
+ */
+export async function loseAborts(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    AbortController.prototype.abort = () => {};
+  });
+}
+
+interface Watched {
+  asks: string[];
+  unread: string[];
+  aborted: string[];
+}
+
+/**
+ * From here the page keeps, as `window` fields: `asks`, each request's URL path as it sends it; `unread`, the requests
+ * whose answer it has not read to the end (path and query); `aborted`, the ones it gave up on with an abort.
+ */
+export async function watchAsks(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as Watched;
+    w.asks = [];
+    w.unread = [];
+    w.aborted = [];
+    const send = window.fetch.bind(window);
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const u = new URL(input instanceof Request ? input.url : input, location.href);
+      const ask = u.pathname + u.search;
+      w.asks.push(u.pathname);
+      w.unread.push(ask);
+      let open = true;
+      // once per request, so a second read of one answer cannot take another request off the list
+      const read = () => {
+        if (open) w.unread.splice(w.unread.indexOf(ask), 1);
+        open = false;
+      };
+      return send(input, init).then(
+        (r) => {
+          // the page reads the body of a JSON answer, of any other only the head
+          if (!(r.headers.get("content-type") ?? "").includes("application/json")) read();
+          else {
+            const json = r.json.bind(r);
+            r.json = () => json().finally(read);
+          }
+          return r;
+        },
+        (e: unknown) => {
+          read();
+          if (e instanceof DOMException && e.name === "AbortError") w.aborted.push(ask);
+          throw e;
+        },
+      );
+    }) as typeof window.fetch;
+  });
+}
+
+const askOf = (r: Request) => {
+  const u = new URL(r.url());
+  return u.pathname + u.search;
+};
+
+/** The URL path of each request the page sent, in order (`watchAsks`). */
+export const asks = (page: Page) => page.evaluate(() => (window as unknown as Watched).asks);
+
+/** Whether the page gave up on `req` with an abort (`watchAsks`). */
+export const aborted = (page: Page, req: Request) =>
+  page.evaluate((ask) => (window as unknown as Watched).aborted.includes(ask), askOf(req));
+
+/**
+ * Wait until the page has read every answer it asked for but those to `held`, requests a test still holds (`watchAsks`).
+ * A load whose answers all came has then run to its end: what it does after its last read is promise callbacks, and
+ * they all run before the page does anything else, such as this check.
+ */
+export async function allRead(page: Page, ...held: Request[]): Promise<void> {
+  const keep = held.map(askOf).sort();
+  await page.waitForFunction((k) => JSON.stringify([...(window as unknown as Watched).unread].sort()) === JSON.stringify(k), keep);
+}
+
 function sizeArg(s: string | null): number {
   if (!s) return 0;
   const m = /^(\d+)([KMGT]?)$/i.exec(s.trim());
@@ -109,9 +205,17 @@ export class MockApi {
   /** Every request answers this error body. */
   failWith: { status: number; code: string; message: string; fix?: string } | null = null;
   requests: string[] = [];
+  private holds: Hold[] = [];
 
   private flat(tree = this.tree) {
     return flatten(tree);
+  }
+
+  /** The node at this path of the tree (a test changes it in place). */
+  node(path: string, tree = this.tree): Node {
+    const f = this.flat(tree).get(path);
+    if (!f) throw new Error(`mock: ${path} is not in the tree`);
+    return f.node;
   }
 
   header() {
@@ -213,10 +317,55 @@ export class MockApi {
     return (f?.node.children ?? []).map((c) => flat.get(path === "/" ? `/${c.name}` : `${path}/${c.name}`)!);
   }
 
+  /**
+   * Keep the next request to /api/<endpoint> whose query matches unanswered until `release`. The page may give up on it
+   * meanwhile (a newer load aborts the old one); the answer then goes nowhere, as a late answer from `freespace serve` would.
+   */
+  hold(endpoint: string, match: (q: URLSearchParams) => boolean = () => true): Held {
+    let arrive: (r: Request) => void = () => {};
+    let open = () => {};
+    let done = () => {};
+    const arrived = new Promise<Request>((r) => {
+      arrive = r;
+    });
+    const gate = new Promise<void>((r) => {
+      open = r;
+    });
+    const answered = new Promise<void>((r) => {
+      done = r;
+    });
+    this.holds.push({ endpoint, match, arrive, gate, done });
+    return {
+      arrived,
+      release: async () => {
+        open();
+        await answered;
+      },
+    };
+  }
+
+  private async serve(route: Route): Promise<void> {
+    const u = new URL(route.request().url());
+    this.requests.push(u.pathname + u.search);
+    // as `freespace serve` answers (cli/src/serve/api.rs), so a page that asks another way draws an error in the guard
+    if (!["GET", "HEAD"].includes(route.request().method())) {
+      return route.fulfill({ status: 405, contentType: "text/plain", body: "only GET" });
+    }
+    const i = this.holds.findIndex((x) => `/api/${x.endpoint}` === u.pathname && x.match(u.searchParams));
+    const held = i < 0 ? undefined : this.holds.splice(i, 1)[0];
+    if (!held) return this.handle(route);
+    held.arrive(route.request());
+    await held.gate;
+    try {
+      await this.handle(route);
+    } finally {
+      held.done();
+    }
+  }
+
   async handle(route: Route): Promise<void> {
     const req = route.request();
     const u = new URL(req.url());
-    this.requests.push(u.pathname + u.search);
     if (this.sessionGone || req.headers()["x-freespace-token"] !== TOKEN) {
       return route.fulfill({ status: 403, contentType: "text/plain", body: "forbidden\n" });
     }
@@ -360,7 +509,7 @@ export class MockApi {
   }
 
   async install(page: Page): Promise<this> {
-    await page.route("**/api/**", (r) => this.handle(r));
+    await page.route("**/api/**", (r) => this.serve(r));
     return this;
   }
 

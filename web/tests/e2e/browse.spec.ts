@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MockApi, url } from "./mock";
+import { aborted, allRead, DAY, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 const selected = (page: import("@playwright/test").Page) => page.locator('table.grid tbody tr[aria-selected="true"]');
@@ -38,6 +38,78 @@ test("keyboard moves, opens and goes up, keeping the place (Pass 6)", async ({ p
   await page.goBack();
   await expect(page.locator(".crumbs h1")).toHaveText("Downloads");
 });
+
+// The keys the test above does not press. /home/tass lists .cache, Downloads, old, projects, big.log (largest first),
+// then the part-NN.bin a test adds, each smaller than the one before; PageUp and PageDown move ten rows, or to the end.
+const KEYS: { key: string; from: string; parts?: number; folder: string; sel: string; at: string }[] = [
+  { key: "ArrowUp", from: "/home/tass?sel=/home/tass/old", folder: "tass", sel: "Downloads", at: "#/home/tass?sel=/home/tass/Downloads" },
+  { key: "ArrowRight", from: "/home/tass?sel=/home/tass/Downloads", folder: "Downloads", sel: "ubuntu.iso", at: "#/home/tass/Downloads" },
+  { key: "Home", from: "/home/tass?sel=/home/tass/big.log", folder: "tass", sel: ".cache", at: "#/home/tass?sel=/home/tass/.cache" },
+  {
+    key: "PageUp",
+    from: "/home/tass?sel=/home/tass/part-15.bin",
+    parts: 15,
+    folder: "tass",
+    sel: "part-05.bin",
+    at: "#/home/tass?sel=/home/tass/part-05.bin",
+  },
+  { key: "PageUp", from: "/home/tass?sel=/home/tass/big.log", folder: "tass", sel: ".cache", at: "#/home/tass?sel=/home/tass/.cache" },
+  { key: "PageDown", from: "/home/tass", parts: 15, folder: "tass", sel: "part-06.bin", at: "#/home/tass?sel=/home/tass/part-06.bin" },
+  { key: "PageDown", from: "/home/tass", folder: "tass", sel: "big.log", at: "#/home/tass?sel=/home/tass/big.log" },
+  { key: "Backspace", from: "/home/tass/Downloads", folder: "tass", sel: "Downloads", at: "#/home/tass?sel=/home/tass/Downloads" },
+];
+
+for (const k of KEYS) {
+  test(`${k.key} from ${k.from} lands on ${k.sel} in ${k.folder} (Pass 6)`, async ({ page }) => {
+    const api = new MockApi();
+    const tass = api.node("/home/tass");
+    for (let i = 1; i <= (k.parts ?? 0); i++)
+      tass.children?.push(file(`part-${String(i).padStart(2, "0")}.bin`, (400 - 5 * i) * M, NOW - i * DAY));
+    await api.install(page);
+    await page.goto(url(k.from));
+    await expect(rows(page).first()).toBeVisible();
+    await page.keyboard.press(k.key);
+    await expect(page.locator(".crumbs h1")).toHaveText(k.folder);
+    await expect(selected(page)).toContainText(k.sel);
+    await expect(page).toHaveURL((u) => u.hash === k.at);
+  });
+}
+
+// The request coordinator drops a late answer twice over: it aborts the request it gave up on, and a load that is no
+// longer the latest applies nothing. With the abort lost, the answer arrives and only the second keeps it off the screen,
+// rows or an error alike. The checks after the answer wait until the page has read it and that load has run to its end.
+for (const [lost, error] of [
+  [false, false],
+  [true, false],
+  [true, true],
+] as const) {
+  test(`a Browse answer that arrives after Top was chosen leaves Top on screen${lost ? ", even with the abort lost" : ""}${error ? " and an error for an answer" : ""} (D19)`, async ({
+    page,
+  }) => {
+    if (lost) await loseAborts(page);
+    await watchAsks(page);
+    const api = new MockApi();
+    // the page's own listing, not the one-row ls that Top asks for the folder's size
+    const browse = api.hold("ls", (q) => q.get("limit") !== "1");
+    await api.install(page);
+    await page.goto(url());
+    const late = await browse.arrived;
+    await page.keyboard.press("t");
+    if (!lost) await expect.poll(() => aborted(page, late)).toBe(true);
+    await expect(selected(page)).toContainText("model.safetensors");
+    // the held listing answers as for a folder gone from the snapshot
+    if (error) api.failWith = { status: 404, code: "PATH_NOT_FOUND", message: "/home/tass is not in the snapshot" };
+    await browse.release();
+    await allRead(page);
+    await expect(page.getByRole("tab", { name: "Top files" })).toHaveAttribute("aria-selected", "true");
+    await expect(page).toHaveURL(/mode=top/);
+    await expect(page.locator(".crumbs h1")).toHaveText("tass");
+    await expect(page.locator(".summary")).toContainText("files larger than 100 M");
+    await expect(page.locator("table.grid")).toHaveClass(/\bmode-top\b/);
+    await expect(selected(page)).toContainText("model.safetensors");
+    await expect(page.getByText("This folder is not in the snapshot.")).toHaveCount(0);
+  });
+}
 
 test("sorting by Modified asks the API and marks the header", async ({ page }) => {
   const api = await new MockApi().install(page);
@@ -99,6 +171,21 @@ test("Top files and Top folders follow the controls (D17, D18)", async ({ page }
   await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("a toast stays 6 s, then goes (Pass 6)", async ({ page }) => {
+  await page.clock.install({ time: NOW * 1000 });
+  await page.clock.pauseAt(NOW * 1000 + 1000);
+  await new MockApi().install(page);
+  await page.goto(url());
+  await expect(selected(page)).toContainText(".cache");
+  await page.keyboard.press("d");
+  const toast = page.locator(".toast");
+  await expect(toast).toHaveText("No previous snapshot to compare yet.");
+  await page.clock.runFor(5_999);
+  await expect(toast).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(toast).toHaveCount(0);
+});
+
 test("Changes is disabled without a previous snapshot", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto(url());
@@ -109,6 +196,21 @@ test("Changes is disabled without a previous snapshot", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("Changes the server cannot compare any more offer the way back to Browse", async ({ page }) => {
+  const api = new MockApi();
+  api.prevTree = structuredClone(api.tree);
+  await api.install(page);
+  await page.goto(url());
+  await expect(page.getByRole("tab", { name: "Changes" })).toHaveAttribute("aria-disabled", "false");
+  // the previous snapshot goes between the status that offered it and the diff
+  api.prevTree = null;
+  await page.keyboard.press("d");
+  await expect(page.locator(".bodystate")).toContainText("No previous snapshot to compare yet.");
+  await page.locator(".bodystate").getByRole("button", { name: "Browse" }).click();
+  await expect(page.getByRole("tab", { name: "Browse" })).toHaveAttribute("aria-selected", "true");
+  await expect(rows(page).first()).toContainText(".cache");
+});
+
 test("Changes lists growth and removals with glyphs, not color alone (D8)", async ({ page }) => {
   const api = new MockApi();
   api.prevTree = structuredClone(api.tree);
@@ -117,6 +219,8 @@ test("Changes lists growth and removals with glyphs, not color alone (D8)", asyn
   tass.children.push({ name: "new.bin", kind: "file", allocated: 2 ** 30 });
   await api.install(page);
   await page.goto(url());
+  // "d" before the status answer finds no previous snapshot yet and only shows a toast
+  await expect(page.getByRole("tab", { name: "Changes" })).toHaveAttribute("aria-disabled", "false");
   await page.keyboard.press("d");
   await expect(page.locator(".summary .context")).toContainText("depth 1 · files included");
   await expect(rows(page)).toHaveCount(2);

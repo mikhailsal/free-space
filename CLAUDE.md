@@ -5,9 +5,9 @@ Linux disk-usage tool: fast scan, cached SQLite snapshot, scheduled refresh, emb
 ## Checks
 
 Until the gates PR of `docs/designs/code-quality-gates.md`:
-- `web/biome.json`: the format is checked by the pre-gate's `web` guard, not yet by CI (`cd web && bunx biome format .`; `--write` fixes it). Its two lint rules (functions over 80 lines, cognitive complexity over 25) report 6 errors on purpose until the debt PRs land; the gates PR runs `biome ci --error-on-warnings` in CI and the pre-push hook.
+- `web/biome.json`: the format is checked by the pre-gate's `web` guard, not yet by CI (`cd web && bunx biome format .`; `--write` fixes it). Its two lint rules (functions over 80 lines, cognitive complexity over 25) report 4 errors on purpose until the debt PRs land; the gates PR runs `biome ci --error-on-warnings` in CI and the pre-push hook.
 - `/ship`'s pre-gate reads `.gstack/pregate.json`. Its runner `scripts/test-files.sh <test files>` runs each file with its own runner (bun, Playwright, the shots config, the guard config). A new e2e spec goes into every e2e list under `dependencies`; `web/tests/unit/test-files.test.ts` fails until it does.
-- A PR that intends no behavior change (every debt PR) carries the `refactor` label (title it `refactor:`; `.github/workflows/refactor-label.yml` fails a `refactor:` title or `refactor/` branch without it), so `.github/workflows/refactor-guard.yml` compares base and head on GitHub: CLI answers and the snapshot folder's files (`scripts/rust-diff.sh`; text byte for byte, `--json` as `jq` prints it), GUI shots as byte-identical PNGs (`web/tests/guard/views.spec.ts`), and per-function coverage of the touched Rust files. These heavy comparisons run on GitHub, not on this machine.
+- A PR that intends no behavior change (every debt PR) carries the `refactor` label (title it `refactor:`; `.github/workflows/refactor-label.yml` fails a `refactor:` title or `refactor/` branch without it), so `.github/workflows/refactor-guard.yml` compares base and head on GitHub: CLI answers and the snapshot folder's files (`scripts/rust-diff.sh`; text byte for byte, `--json` as `jq` prints it), GUI shots as byte-identical PNGs and the API requests behind each (`web/tests/guard/views.spec.ts`), and per-function coverage of the touched Rust files. These heavy comparisons run on GitHub, not on this machine.
 
 ## Skill routing
 
