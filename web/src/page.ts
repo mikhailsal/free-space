@@ -23,7 +23,7 @@ export interface View {
   idle?: boolean;
 }
 
-/** One per mode. It fetches through the request coordinator (load.ts), which applies the view; it never applies one itself (D19). */
+/** One per mode. The request coordinator (load.ts) calls fetch and applies the view it returns; a controller never applies one (D19). */
 export interface ViewController {
   fetch(r: Route, sid: string, signal: AbortSignal): Promise<View>;
   rows(v: View, scope: string): Row[];
