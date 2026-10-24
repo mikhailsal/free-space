@@ -60,15 +60,36 @@
       "web/tests/e2e/reload.spec.ts",
       "web/tests/e2e/states.spec.ts"
     ],
+    "web/tests/unit/fixtures/covprobe/**": [
+      "web/tests/unit/coverage-functions.test.ts"
+    ],
+    "web/tests/e2e/mock.ts": [
+      "web/tests/e2e/a11y.spec.ts",
+      "web/tests/e2e/browse.spec.ts",
+      "web/tests/e2e/find.spec.ts",
+      "web/tests/e2e/reload.spec.ts",
+      "web/tests/e2e/states.spec.ts",
+      "web/tests/guard/views.spec.ts",
+      "web/tests/shots/readme.spec.ts"
+    ],
+    "web/tests/shots/home.ts": [
+      "web/tests/guard/views.spec.ts",
+      "web/tests/shots/readme.spec.ts"
+    ],
     "web/tests/e2e/serve.ts": [
       "web/tests/e2e/a11y.spec.ts",
       "web/tests/e2e/browse.spec.ts",
       "web/tests/e2e/find.spec.ts",
       "web/tests/e2e/reload.spec.ts",
-      "web/tests/e2e/states.spec.ts"
+      "web/tests/e2e/states.spec.ts",
+      "web/tests/unit/test-files.test.ts"
     ],
     "web/playwright.shots.config.ts": [
       "web/tests/shots/readme.spec.ts",
+      "web/tests/unit/test-files.test.ts"
+    ],
+    "web/playwright.guard.config.ts": [
+      "web/tests/guard/views.spec.ts",
       "web/tests/unit/test-files.test.ts"
     ],
     "web/tests/e2e/*.spec.ts": [
@@ -87,6 +108,15 @@
     "clippy.toml": [],
     "dist-workspace.toml": [],
     "scripts/**": [],
+    "scripts/coverage-functions.sh": [
+      "web/tests/unit/coverage-functions.test.ts"
+    ],
+    "scripts/rust-diff.sh": [
+      "web/tests/unit/rust-diff.test.ts"
+    ],
+    "scripts/test-files.sh": [
+      "web/tests/unit/test-files.test.ts"
+    ],
     "install.sh": [],
     ".github/**": [],
     ".githooks/**": []
