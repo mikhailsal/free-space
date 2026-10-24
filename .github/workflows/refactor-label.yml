@@ -1,0 +1,29 @@
+# A pull request that calls itself a refactor, by its title (`refactor:` or
+# `refactor(scope):`, Conventional Commits) or its branch (`refactor/...`), in
+# any case, must carry the `refactor` label: the label is what starts
+# refactor-guard.yml, and a guard that never starts reports no failure.
+name: refactor-label
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: a refactor carries the refactor label
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BRANCH: ${{ github.head_ref }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'refactor') }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [ "$LABELED" != true ] || exit 0
+          if [[ ${TITLE,,} =~ ^refactor(\([^\)]*\))?!?: ]] || [[ ${BRANCH,,} == refactor/* ]]; then
+            echo "::error::This PR is a refactor by its title or branch but has no refactor label, so refactor-guard does not run. Add it: gh pr edit $PR --add-label refactor"
+            exit 1
+          fi
