@@ -1,7 +1,7 @@
 // refactor-guard's pixel-diff (D16, D23): every view and state the e2e mock reaches, at 1280, 700 and 360 px.
 // playwright.guard.config.ts keeps the shots in $GUARD_SHOTS: a run with --update-snapshots=all takes them from one
 // build, and the files of two builds (base and head) must be byte-identical. Next to each PNG goes what the page asked
-// of the API on the way (`<state>-<width>.requests.txt`), so a build that asks for other rows, drops a parameter or
+// of the API on the way (`<state>-<width>-requests.txt`), so a build that asks for other rows, drops a parameter or
 // asks twice differs too, though it draws the same picture.
 // Each state waits for what marks it, so a build that never reaches a state fails here, not in the picture.
 import { expect, type Page, test } from "@playwright/test";
@@ -431,8 +431,9 @@ for (const [width, height] of [
         // :hover late; the inspector's Biggest inside and a slow answer finish loading (aria-busy) after the state's mark
         await page.mouse.move(0, 0);
         await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
-        await expect(page).toHaveScreenshot(`${s.name}-${width}.png`, { fullPage: true });
-        expect(asked(api)).toMatchSnapshot(`${s.name}-${width}.requests.txt`);
+        // soft: a run against another build's files reports both differences, the picture and the requests
+        await expect.soft(page).toHaveScreenshot(`${s.name}-${width}.png`, { fullPage: true });
+        expect(asked(api)).toMatchSnapshot(`${s.name}-${width}-requests.txt`);
       });
     }
   });

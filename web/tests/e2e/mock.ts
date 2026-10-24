@@ -273,8 +273,6 @@ export class MockApi {
     await held.gate;
     try {
       await this.handle(route);
-    } catch {
-      // the page aborted the request while it was held
     } finally {
       held.done();
     }
