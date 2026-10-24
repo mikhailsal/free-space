@@ -1,20 +1,25 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2154 # $work, $tree and the like are scripts/rust-diff.sh's
 # How scripts/rust-diff.sh makes two answers comparable (D20), sourced by it:
-# drop or mask what changes from run to run (times, ids, live disk numbers,
-# the server's port and token) and nothing else.
+# mask what changes from run to run (times, ids, live disk numbers, the
+# server's port and token) and nothing else.
 
-# D20: drop snapshot_id, every time field and live filesystem numbers. A fresh
-# scan or a refresh stores its root's fs_used and fs_avail at that time, so
-# there they are live too ($fresh is true). A bound given as an age (`1y`) is
-# echoed back as now minus that age ($rel is true). ($fresh and $rel are jq's.)
+# D20: snapshot_id, every time field and live filesystem numbers keep their key,
+# and their value becomes its type ("<number>"), so a key that comes or goes
+# still shows. A fresh scan or a refresh stores its root's fs_used and fs_avail
+# at that time, so there they are live too ($fresh is true). A bound given as an
+# age (`1y`) is echoed back as now less that age ($rel is true): it becomes the
+# age again, in whole days. ($fresh and $rel are jq's.)
 # shellcheck disable=SC2016
-JQ_NORM='walk(if type == "object" then
-  with_entries(select(.key | test("^(snapshot_id|scanned_at|prev_scanned_at)$|_ts$|_seconds$") | not))
-  | (if (.fs | type) == "array" then .fs |= map(del(.total, .used, .avail)) else . end)
+JQ_NORM='def live: "<" + type + ">";
+def live_keys($re): with_entries(if (.key | test($re)) then .value |= live else . end);
+walk(if type == "object" then
+  live_keys("^(snapshot_id|scanned_at|prev_scanned_at)$|_ts$|_seconds$")
+  | (if (.fs | type) == "array" then .fs |= map(if type == "object" then live_keys("^(total|used|avail)$") else . end) else . end)
   | (if $fresh and (.roots | type) == "array"
-     then .roots |= map(if type == "object" then del(.fs_used, .fs_avail) else . end) else . end)
-  | (if $rel then del(.older_than, .newer_than) else . end)
+     then .roots |= map(if type == "object" then live_keys("^fs_(used|avail)$") else . end) else . end)
+  | (if $rel then with_entries(if (.key | test("^(older|newer)_than$")) and (.value | type) == "number"
+     then .value |= ((now - .) / 86400 | round) else . end) else . end)
 else . end)'
 
 normalize_json() { # <file> <fresh> [<rel>]: the JSON normalized, or the text as is

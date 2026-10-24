@@ -106,8 +106,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # -x: scripts/rust-diff.sh sources its parts in scripts/rust-diff/
-      - run: shellcheck -x install.sh scripts/*.sh scripts/rust-diff/*.sh
+      # .shellcheckrc lets it follow what scripts/rust-diff.sh sources from scripts/rust-diff/
+      - run: shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh
 
   # T36/T37/T44 on a real systemd VM: install.sh from a local release layout
   # (no TTY + no sudo → the escalation line; fresh install; rerun), first scan

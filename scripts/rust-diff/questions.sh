@@ -1,8 +1,9 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2034 # the lists are read by scripts/rust-diff.sh, which sources this file
-# What scripts/rust-diff.sh asks each build. @ is the tree of the phase; dates
-# are absolute or far from the tree's own, so the answers do not move with the
-# clock during a run.
+# What scripts/rust-diff.sh asks each build. @ is the tree of the phase. A date
+# bound is absolute; an age bound (`2w`) splits the files tree.sh dates by the
+# run's $epoch, far from either side, so the answers do not move with the clock
+# during a run.
 
 # Every question, run once as written and once with --json: on the fixture
 # snapshot, and again on the snapshot each build makes itself (the fresh phase).
@@ -30,7 +31,7 @@ QUERIES=(
   "find @ --newer-than 2024-06-01 --min-size 10K --kind file"
   "find @ --name *.log --limit 1"
   "find @/wide --name link* --sort mtime --limit 40"
-  "find @/wide --older-than 2w --kind dir --limit 5"
+  "find @/media --older-than 2w"
   "find @ --newer-than 3y --kind file --limit 8"
   "diff @"
   "diff @ --depth 3 --kind any"
@@ -81,9 +82,10 @@ COMMANDS=(ls top find diff gui serve status doctor scan refresh install-timer sk
 
 # refresh, in this order, after drift_tree: a changed folder (text) that holds a
 # third link of a file outside it, a folder gone from the disk (--json), a path
-# the snapshot does not have and a file (both refused). Asked of a copy of the
-# fixture snapshot, and of each build's own snapshot in the fresh phase. Then
-# AFTER_REFRESH, text and --json. None of it needs root.
+# the snapshot does not have and a file (both refused), and a folder of the wide
+# part with 4 walker threads. Asked of a copy of the fixture snapshot, and of
+# each build's own snapshot in the fresh phase. Then AFTER_REFRESH, text and
+# --json. None of it needs root.
 REFRESHES=(
   "refresh @/logs --workers 2"
   "refresh @/cache --workers 2 --json"
@@ -122,25 +124,56 @@ BAD_CONFIG_QUERIES=(
   "scan"
 )
 
-# The exit status base must give, by phase and question (--json and text alike);
-# any other question must answer 0. A question base no longer answers as listed
-# here (a renamed flag, a moved path) would compare equal in base and head while
-# it tests nothing, so the job stops as stale before head runs (exit 4).
+# The start phase, text and --json: with no snapshot folder at all (the first
+# run), with an empty one while a scan holds its lock (the first scan), and over
+# a copy of the fixture snapshot while a scan holds its lock. The lock holds what
+# a running scan writes into it (op, path, start, pid), at a fixed time.
+EMPTY_QUERIES=(
+  ""
+  "status"
+  "ls @"
+  "doctor"
+)
+FIRST_QUERIES=(
+  ""
+  "status"
+  "ls @"
+)
+BUSY_QUERIES=(
+  ""
+  "status"
+  "ls @"
+  "scan @ --workers 2"
+  "refresh @/logs --workers 2"
+)
+
+# The exit status base must give, by phase and question (--json and text alike),
+# and a few words its stderr must hold then; any other question must answer 0,
+# and its --json form with JSON. A question base no longer answers as listed
+# here (a renamed flag, a moved path, a refusal for another reason) would compare
+# equal in base and head while it tests nothing, so the job stops as stale
+# before head runs (exit 4).
 EXPECTED=(
-  "once|ls --no-such-flag|2"
-  "once|top @ --older-than 3x|2"
-  "once|install-timer --no-start|1"
-  "fixture|doctor|0 1"
-  "fixture|ls @/nope|2"
-  "fixture|ls @ --snapshot not-this-one|4"
-  "tty|status|0"
-  "refresh|refresh @/nope --workers 2|2"
-  "refresh|refresh @/top.bin --workers 2|2"
-  "fresh|doctor|0 1"
-  "fresh|ls @/nope|2"
-  "fresh|ls @ --snapshot not-this-one|4"
-  "config|diff @/media|3"
-  "config|find @ --name *.iso|2"
-  "badconfig|status|2"
-  "badconfig|scan|2"
+  "once|ls --no-such-flag|2|unexpected argument"
+  "once|top @ --older-than 3x|2|bad date"
+  "once|install-timer --no-start|1|needs root"
+  "fixture|doctor|0 1|"
+  "fixture|ls @/nope|2|is not in the snapshot"
+  "fixture|ls @ --snapshot not-this-one|4|was replaced"
+  "refresh|refresh @/nope --workers 2|2|is not in the snapshot"
+  "refresh|refresh @/top.bin --workers 2|2|is not a directory"
+  "empty|--json|8|no snapshot in"
+  "empty|status|8|no snapshot in"
+  "empty|ls @|8|no snapshot in"
+  "empty|doctor|1|"
+  "first|ls @|8|running since"
+  "busy|scan @ --workers 2|6|another scan is running"
+  "busy|refresh @/logs --workers 2|6|another scan is running"
+  "fresh|doctor|0 1|"
+  "fresh|ls @/nope|2|is not in the snapshot"
+  "fresh|ls @ --snapshot not-this-one|4|was replaced"
+  "config|diff @/media|3|no previous generation"
+  "config|find @ --name *.iso|2|outside the scanned roots"
+  "badconfig|status|2|keep_old"
+  "badconfig|scan|2|keep_old"
 )

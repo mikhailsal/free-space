@@ -15,32 +15,38 @@ blob() { # <path> <KiB> <mtime>: a file of that size, modified then
 
 # A fixed time in 2024 for a folder, from its path inside the tree, so that
 # folders differ in mtime (`--sort mtime` then orders by date, not only by its
-# tie-break) and keep their time while others come and go. Bash only: one
-# process per folder would cost more than the walk. The result is in $REPLY.
+# tie-break) and keep their time while others come and go: a djb2 hash of the
+# path below DIR_HASH_MOD, in steps of DIR_STEP seconds from DIR_EPOCH, so at
+# most 359 days in (1000002 x 31 s), still 2024. Bash only: a process per
+# folder would cost more than the walk. The result is in $REPLY.
+DIR_EPOCH=1704067200 # 2024-01-01 00:00 UTC
+DIR_HASH_MOD=1000003
+DIR_STEP=31
 dir_time() { # <relative path>
   local s=$1 h=5381 i c
   for ((i = 0; i < ${#s}; i++)); do
     printf -v c '%d' "'${s:i:1}"
-    h=$(((h * 33 + c) % 1000003))
+    h=$(((h * 33 + c) % DIR_HASH_MOD))
   done
-  REPLY=$((1704067200 + h * 31))
+  REPLY=$((DIR_EPOCH + h * DIR_STEP))
 }
 
-settle_dirs() { # every folder's own mtime, after its files changed
+settle_dirs() { # every folder's own mtime, after its files changed: one perl sets them all
   local d
   chmod 700 "$tree/locked" # find must enter it
   while IFS= read -r -d '' d; do
     dir_time "${d#"$tree"}"
-    touch -d "@$REPLY" "$d"
-  done < <(find "$tree" -type d -print0)
+    printf '%s\0%s\0' "$REPLY" "$d"
+  done < <(find "$tree" -type d -print0) |
+    perl -0e 'while (defined(my $t = <STDIN>)) { chomp $t; my $d = <STDIN>; chomp $d; utime $t, $t, $d or die "$d: $!\n" }'
   chmod 000 "$tree/locked"
 }
 
 # The wide part: RUST_DIFF_FAN folders in each folder, four levels deep (340
 # folders at the default 4), one to three files in each, sizes and dates from
-# the position, and every 37th file linked into the next folder over. Files
-# are written by the shell's printf and dated one touch per date, so the part
-# costs a few hundred processes, not thousands.
+# the position, and every file of every 37th folder linked into the folder
+# before it. Files are written by the shell's printf and dated one touch per
+# date, so the part costs a few hundred processes, not thousands.
 make_wide() {
   local fan=${RUST_DIFF_FAN:-4} level d n i k size f prev=
   local -a dirs=("$tree/wide") next dated0=() dated1=() dated2=() dated3=() dated4=()
@@ -91,6 +97,10 @@ make_tree() {
   # past UTC midnight in UTC+5:30 only: a date bound must be local midnight to tell them apart
   blob "$tree/media/edge-new.bin" 4 "2024-09-30 20:00 UTC"
   blob "$tree/media/edge-old.bin" 4 "2023-03-03 20:00 UTC"
+  # dated by age from the run's $epoch, days from any bound asked: 2w, 6mo, 400d and 1y split them
+  blob "$tree/media/new/week.mkv" 200 "@$((${epoch:?} - 5 * 86400))"
+  blob "$tree/media/new/season.mkv" 150 "@$((epoch - 100 * 86400))"
+  blob "$tree/media/new/last-year.mkv" 120 "@$((epoch - 500 * 86400))"
   blob "$tree/odd/$(printf 'bad\377name.bin')" 4 "2024-04-04 08:00 UTC"
   ln -s ../media "$tree/projects/media-link"
   touch -h -d "2024-06-06 06:00 UTC" "$tree/projects/media-link"

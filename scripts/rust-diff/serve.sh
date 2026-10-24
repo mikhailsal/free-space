@@ -7,6 +7,7 @@
 # body normalized like --json, what serve prints, its exit status, and the
 # snapshot folder afterwards. The page itself is asked for its status and
 # headers only: its bytes are the web bundle, which pixel-diff compares drawn.
+# curl reads no ~/.curlrc and takes no proxy from the environment.
 
 # label|endpoint|parameters (k=v, space-separated; @ is the tree)|HTTP status base must give
 SERVE_QUESTIONS=(
@@ -23,10 +24,12 @@ SERVE_QUESTIONS=(
   "an unknown endpoint|/api/nope||404"
 )
 
-http() { # <label> <want> <curl args...>: one request: its status, headers and body
-  local label=$1 want=$2 code
-  shift 2
-  code=$(curl -sS --max-time 30 -o "$work/body" -D "$work/headers" -w '%{http_code}' "$@" 2>"$work/curl.err") ||
+served=0
+http() { # <label> <want> <body: json or skip> <curl args...>: one request: its status, headers and body
+  local label=$1 want=$2 body=$3 code
+  shift 3
+  served=$((served + 1))
+  code=$(curl -q --noproxy '*' -sS --max-time 30 -o "$work/body" -D "$work/headers" -w '%{http_code}' "$@" 2>"$work/curl.err") ||
     code="curl failed: $(head -c 300 "$work/curl.err")"
   floor serve "$label" "$code" "$want"
   {
@@ -36,17 +39,18 @@ http() { # <label> <want> <curl args...>: one request: its status, headers and b
     tr -d '\r' <"$work/headers" | sed -n '2,$p' | sed -E '/^$/d; s/^([^:]+):/\L\1:/' |
       grep -vE '^(date|content-length):' | LC_ALL=C sort || true
     echo "-- body"
-    if [ "$label" = "the page" ]; then echo "(the web bundle: pixel-diff compares it)"; else normalize_json "$work/body" false; fi
+    if [ "$body" = skip ]; then echo "(the web bundle: pixel-diff compares it)"; else normalize_json "$work/body" false; fi
   } | mask
 }
 
 serve_answers() { # <bin>: serve the fixture snapshot, ask SERVE_QUESTIONS and the refusals, stop
   local bin=$1 argv pid i url='' addr token q label path params want p code=0
-  local -a args
+  local -a args ps
   run_prefix
   rm -f "$work/serve.err"
+  served=0
   (exec "${argv[@]}" "$bin" serve --port 0 >"$work/serve.out" 2>"$work/serve.err") &
-  pid=$!
+  pid=$! serving=$!
   for ((i = 0; i < 100; i++)); do
     url=$(grep -m1 -oE 'http://127\.0\.0\.1:[0-9]+/#t=[0-9a-f]+' "$work/serve.err" 2>/dev/null || true)
     if [ -n "$url" ] || ! kill -0 "$pid" 2>/dev/null; then break; fi
@@ -60,18 +64,21 @@ serve_answers() { # <bin>: serve the fixture snapshot, ask SERVE_QUESTIONS and t
     for q in "${SERVE_QUESTIONS[@]}"; do
       IFS='|' read -r label path params want <<<"$q"
       args=()
-      for p in $params; do args+=(--data-urlencode "${p/=@/=$tree}"); done
-      http "$label" "$want" -G -H "x-freespace-token: $token" "${args[@]}" "$addr$path"
+      read -ra ps <<<"$params"
+      for p in "${ps[@]}"; do args+=(--data-urlencode "${p/=@/=$tree}"); done
+      http "$label" "$want" json -G -H "x-freespace-token: $token" "${args[@]}" "$addr$path"
     done
-    http "no token" 403 "$addr/api/status"
-    http "a wrong token" 403 -H "x-freespace-token: 0$token" "$addr/api/status"
-    http "a foreign origin" 403 -H "x-freespace-token: $token" -H "Origin: http://evil.example" "$addr/api/status"
-    http "another host name" 403 -H "x-freespace-token: $token" -H "Host: evil.example" "$addr/api/status"
-    http "a POST" 405 -X POST -H "x-freespace-token: $token" "$addr/api/status"
-    http "the page" 200 "$addr/"
+    http "no token" 403 json "$addr/api/status"
+    http "a wrong token" 403 json -H "x-freespace-token: 0$token" "$addr/api/status"
+    http "a foreign origin" 403 json -H "x-freespace-token: $token" -H "Origin: http://evil.example" "$addr/api/status"
+    http "another host name" 403 json -H "x-freespace-token: $token" -H "Host: evil.example" "$addr/api/status"
+    http "a POST" 405 json -X POST -H "x-freespace-token: $token" "$addr/api/status"
+    http "the page" 200 skip "$addr/"
   fi
   kill -TERM "$pid" 2>/dev/null || true
   wait "$pid" || code=$?
+  # shellcheck disable=SC2034 # the EXIT trap of scripts/rust-diff.sh reads it
+  serving=
   {
     echo "== serve stopped by TERM"
     echo "exit $code"
