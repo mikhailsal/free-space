@@ -21,17 +21,24 @@ async function open(page: Page, hash?: string) {
 }
 
 /**
- * From here no timer the page sets runs: a toast hides after 6 s of real time, and a slow runner may take longer than
- * that to reach the shot. pauseAt only goes forward, and it runs the timers due on the way: a few seconds ahead of the
- * page's clock passes no poll (60 s) and leaves every age on the page as it reads at NOW.
+ * From here no timer the page sets runs. In real time a toast hides after 6 s, and the page polls every 5 s while it has
+ * no snapshot and every 10 s once the session ended; a slow runner may take longer than that to reach the shot, which
+ * would then lose the toast or record one poll more. pauseAt only goes forward, and it runs the timers due on the way:
+ * 5 s past NOW, before a load or after one (whose next poll is 60 s away), none is due yet.
  */
 async function stopTimers(page: Page) {
   await page.clock.install({ time: NOW * 1000 });
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 5000);
+  await page.clock.pauseAt(NOW * 1000 + 5000);
 }
 
-/** The API calls the page made, one per line and sorted: answers that race may come in either order. */
-const asked = (api: MockApi) => `${[...api.requests].sort().join("\n")}\n`;
+/** The API calls the page made, one per line: each query in name order, and the lines sorted, as answers may race. */
+const asked = (api: MockApi) => `${api.requests.map(inOrder).sort().join("\n")}\n`;
+
+function inOrder(request: string) {
+  const u = new URL(request, "http://mock");
+  u.searchParams.sort();
+  return u.pathname + u.search;
+}
 
 /** A nightly scan publishes snap-2; the page hears of it on the next focus poll. */
 async function newerSnapshot(page: Page, api: MockApi) {
@@ -355,6 +362,7 @@ const STATES: State[] = [
       a.lastError = { ts: NOW, op: "scan", message: "disk full" };
     }),
     go: async (p) => {
+      await stopTimers(p);
       await p.goto(url());
       await expect(heading(p)).toHaveText("No snapshot yet");
     },
@@ -366,6 +374,7 @@ const STATES: State[] = [
       a.scanning = { op: "scan", path: "/", pid: 42, since: NOW, elapsed_seconds: 48 };
     }),
     go: async (p) => {
+      await stopTimers(p);
       await p.goto(url());
       await expect(p.locator("#fp-scan")).toContainText("Scanning / · 48 s");
     },
@@ -373,6 +382,7 @@ const STATES: State[] = [
   {
     name: "session-ended",
     go: async (p) => {
+      await stopTimers(p);
       await p.goto("/#/home/tass");
       await expect(heading(p)).toHaveText("Session ended");
     },
@@ -381,6 +391,7 @@ const STATES: State[] = [
     name: "server-gone",
     go: async (p, api) => {
       await open(p);
+      await stopTimers(p);
       api.sessionGone = true;
       await p.keyboard.press("ArrowDown");
       await p.keyboard.press("Enter");

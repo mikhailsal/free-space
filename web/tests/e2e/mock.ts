@@ -2,7 +2,7 @@
 // as `freespace serve` (src/types.ts). Each test builds one and installs it on
 // its page; `requests` records every call for "no request while typing" checks,
 // and `hold` keeps one request unanswered until the test releases it (D19).
-import type { Page, Route } from "@playwright/test";
+import type { Page, Request, Route } from "@playwright/test";
 
 export const TOKEN = "e2etoken";
 export const NOW = 1_792_000_000; // 2026-10-15
@@ -76,16 +76,26 @@ function flatten(root: Node): Map<string, Flat> {
 
 /** A request `hold` keeps back: `arrived` once the page sent it; `release` answers it and resolves when that is done. */
 export interface Held {
-  arrived: Promise<void>;
+  arrived: Promise<Request>;
   release: () => Promise<void>;
 }
 
 interface Hold {
   endpoint: string;
   match: (q: URLSearchParams) => boolean;
-  arrive: () => void;
+  arrive: (r: Request) => void;
   gate: Promise<void>;
   done: () => void;
+}
+
+/**
+ * From here the page's AbortController.abort does nothing, so a request the page gives up on still gets its answer:
+ * the request coordinator must then drop it by its own count of loads (D19).
+ */
+export async function loseAborts(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    AbortController.prototype.abort = () => {};
+  });
 }
 
 function sizeArg(s: string | null): number {
@@ -241,10 +251,10 @@ export class MockApi {
    * meanwhile (a newer load aborts the old one); the answer then goes nowhere, as a late answer from `freespace serve` would.
    */
   hold(endpoint: string, match: (q: URLSearchParams) => boolean = () => true): Held {
-    let arrive = () => {};
+    let arrive: (r: Request) => void = () => {};
     let open = () => {};
     let done = () => {};
-    const arrived = new Promise<void>((r) => {
+    const arrived = new Promise<Request>((r) => {
       arrive = r;
     });
     const gate = new Promise<void>((r) => {
@@ -266,10 +276,14 @@ export class MockApi {
   private async serve(route: Route): Promise<void> {
     const u = new URL(route.request().url());
     this.requests.push(u.pathname + u.search);
+    // as `freespace serve` answers (cli/src/serve/api.rs), so a page that asks another way draws an error in the guard
+    if (!["GET", "HEAD"].includes(route.request().method())) {
+      return route.fulfill({ status: 405, contentType: "text/plain", body: "only GET" });
+    }
     const i = this.holds.findIndex((x) => `/api/${x.endpoint}` === u.pathname && x.match(u.searchParams));
     const held = i < 0 ? undefined : this.holds.splice(i, 1)[0];
     if (!held) return this.handle(route);
-    held.arrive();
+    held.arrive(route.request());
     await held.gate;
     try {
       await this.handle(route);

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MockApi, url } from "./mock";
+import { loseAborts, MockApi, url } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 const selected = (page: import("@playwright/test").Page) => page.locator('table.grid tbody tr[aria-selected="true"]');
@@ -62,23 +62,32 @@ for (const k of KEYS) {
   });
 }
 
-test("a Browse answer that arrives after Top was chosen leaves Top on screen (D19)", async ({ page }) => {
-  const api = new MockApi();
-  // the page's own listing, not the one-row ls that Top asks for the folder's size
-  const browse = api.hold("ls", (q) => q.get("limit") !== "1");
-  await api.install(page);
-  await page.goto(url());
-  await browse.arrived;
-  await page.keyboard.press("t");
-  await expect(selected(page)).toContainText("model.safetensors");
-  await browse.release();
-  await expect(page.getByRole("tab", { name: "Top files" })).toHaveAttribute("aria-selected", "true");
-  await expect(page).toHaveURL(/mode=top/);
-  await expect(page.locator(".crumbs h1")).toHaveText("tass");
-  await expect(page.locator(".summary")).toContainText("files larger than 100 M");
-  await expect(page.locator("table.grid")).toHaveClass(/\bmode-top\b/);
-  await expect(selected(page)).toContainText("model.safetensors");
-});
+// The request coordinator drops a late answer twice over: it aborts the request it gave up on, and a load that is no
+// longer the latest applies nothing. With the abort lost, the answer arrives and only the second keeps it off the screen.
+for (const lost of [false, true]) {
+  test(`a Browse answer that arrives after Top was chosen leaves Top on screen${lost ? ", even with the abort lost" : ""} (D19)`, async ({
+    page,
+  }) => {
+    if (lost) await loseAborts(page);
+    const api = new MockApi();
+    // the page's own listing, not the one-row ls that Top asks for the folder's size
+    const browse = api.hold("ls", (q) => q.get("limit") !== "1");
+    await api.install(page);
+    await page.goto(url());
+    const late = await browse.arrived;
+    await page.keyboard.press("t");
+    await expect(selected(page)).toContainText("model.safetensors");
+    await browse.release();
+    // the page has the late answer in full before the checks below
+    if (lost) await (await late.response())?.finished();
+    await expect(page.getByRole("tab", { name: "Top files" })).toHaveAttribute("aria-selected", "true");
+    await expect(page).toHaveURL(/mode=top/);
+    await expect(page.locator(".crumbs h1")).toHaveText("tass");
+    await expect(page.locator(".summary")).toContainText("files larger than 100 M");
+    await expect(page.locator("table.grid")).toHaveClass(/\bmode-top\b/);
+    await expect(selected(page)).toContainText("model.safetensors");
+  });
+}
 
 test("sorting by Modified asks the API and marks the header", async ({ page }) => {
   const api = await new MockApi().install(page);
