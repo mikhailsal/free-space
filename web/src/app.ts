@@ -417,7 +417,17 @@ export class App {
   }
 
   private noFilters(): Partial<Route> {
-    return { kind: undefined, min: undefined, untouched: undefined, name: undefined, icase: undefined, before: undefined, after: undefined, run: undefined, sort: undefined };
+    return {
+      kind: undefined,
+      min: undefined,
+      untouched: undefined,
+      name: undefined,
+      icase: undefined,
+      before: undefined,
+      after: undefined,
+      run: undefined,
+      sort: undefined,
+    };
   }
 
   up(): void {
@@ -624,7 +634,12 @@ export class App {
       history.replaceState(null, "", format(this.route));
     }
     await this.load();
-    const c = continuity(wanted, landed, landed === wanted ? sel : undefined, this.allRows.map((r) => r.path));
+    const c = continuity(
+      wanted,
+      landed,
+      landed === wanted ? sel : undefined,
+      this.allRows.map((r) => r.path),
+    );
     if (c.kind === "path-gone") toast(`“${c.from}” is gone in the new snapshot; showing ${c.to}`);
     else if (c.kind === "row-gone") toast(`“${c.name}” is no longer here`);
   }
@@ -654,7 +669,12 @@ export class App {
             "div",
             { class: "total" },
             h("p", null, "Searching… name filters can take a few seconds"),
-            h("p", { class: "muted" }, "Showing previous results. ", h("button", { type: "button", class: "link", onclick: () => this.cancel(), text: "Cancel" })),
+            h(
+              "p",
+              { class: "muted" },
+              "Showing previous results. ",
+              h("button", { type: "button", class: "link", onclick: () => this.cancel(), text: "Cancel" }),
+            ),
           ),
         );
       }
@@ -958,7 +978,14 @@ export class App {
           : err.code === "HASH_COLLISION"
             ? "Snapshot inconsistency detected. Rescan."
             : `freespace could not answer: ${err.message}`;
-      out.push({ id: "error", priority: 2, tone: "danger", body: [text], actions: [scan], extra: details(err.code, err.exit, err.message) });
+      out.push({
+        id: "error",
+        priority: 2,
+        tone: "danger",
+        body: [text],
+        actions: [scan],
+        extra: details(err.code, err.exit, err.message),
+      });
     }
     if (this.failure) {
       out.push({
@@ -1082,7 +1109,19 @@ export class App {
   private renderControls(): void {
     const ui = this.ui!;
     const r = this.route;
-    const key = JSON.stringify([r.mode, this.scope, r.kind, r.min, r.untouched, r.name, r.icase, r.before, r.after, r.run, this.fieldError]);
+    const key = JSON.stringify([
+      r.mode,
+      this.scope,
+      r.kind,
+      r.min,
+      r.untouched,
+      r.name,
+      r.icase,
+      r.before,
+      r.after,
+      r.run,
+      this.fieldError,
+    ]);
     if (key === this.formKey) return;
     this.formKey = key;
     if (r.mode === "find") {
@@ -1137,7 +1176,12 @@ export class App {
         this.field("before", "Modified before", r.before, "2025-01-01"),
         this.field("after", "Modified after", r.after, "2025-01-01"),
         this.field("min", "Min size", r.min, "100M"),
-        h("div", { class: "field" }, h("label", { for: "f-kind", text: "Kind" }), h("select", { id: "f-kind" }, opt("file", "files"), opt("dir", "folders"), opt("any", "any"))),
+        h(
+          "div",
+          { class: "field" },
+          h("label", { for: "f-kind", text: "Kind" }),
+          h("select", { id: "f-kind" }, opt("file", "files"), opt("dir", "folders"), opt("any", "any")),
+        ),
         h(
           "div",
           { class: "buttons" },
@@ -1148,7 +1192,17 @@ export class App {
             onclick: () => {
               this.fieldError = null;
               this.lastFind = {};
-              this.navigate({ name: undefined, icase: undefined, before: undefined, after: undefined, min: undefined, kind: undefined, run: undefined, sel: undefined, limit: undefined });
+              this.navigate({
+                name: undefined,
+                icase: undefined,
+                before: undefined,
+                after: undefined,
+                min: undefined,
+                kind: undefined,
+                run: undefined,
+                sel: undefined,
+                limit: undefined,
+              });
             },
             text: "Clear",
           }),
@@ -1209,7 +1263,9 @@ export class App {
       { id: "t-min", "aria-label": "Larger than" },
       TOP_SIZES.map((s) => h("option", { value: s, selected: s === min, text: s.replace(/([KMGT])$/, " $1") })),
     );
-    sizeSel.addEventListener("change", () => this.navigate({ min: sizeSel.value === "100M" ? undefined : sizeSel.value, sel: undefined, limit: undefined }));
+    sizeSel.addEventListener("change", () =>
+      this.navigate({ min: sizeSel.value === "100M" ? undefined : sizeSel.value, sel: undefined, limit: undefined }),
+    );
     const monthSel = h(
       "select",
       { id: "t-months", "aria-label": "Months untouched" },
@@ -1231,12 +1287,7 @@ export class App {
         " · larger than ",
         sizeSel,
       ),
-      h(
-        "label",
-        { class: "check", title: "Not modified since: mtime is modification, not last open" },
-        check,
-        " Untouched for ",
-      ),
+      h("label", { class: "check", title: "Not modified since: mtime is modification, not last open" }, check, " Untouched for "),
       monthSel,
       h("span", { text: " months" }),
     );
@@ -1245,7 +1296,12 @@ export class App {
   private chip(label: string, clear: Partial<Route>): HTMLElement {
     return h(
       "button",
-      { type: "button", class: "chip", "aria-label": `Remove filter ${label}`, onclick: () => this.navigate({ ...clear, sel: undefined, limit: undefined }) },
+      {
+        type: "button",
+        class: "chip",
+        "aria-label": `Remove filter ${label}`,
+        onclick: () => this.navigate({ ...clear, sel: undefined, limit: undefined }),
+      },
       label,
       h("span", { class: "x", "aria-hidden": "true", text: "×" }),
     );
@@ -1263,7 +1319,14 @@ export class App {
         h(
           "div",
           { class: "total" },
-          h("p", null, h("b", { class: "mono", text: fmt.count(f.total_count) }), ` ${noun} · `, h("b", { class: "mono", text: fmt.size(f.total_allocated) }), " allocated"),
+          h(
+            "p",
+            null,
+            h("b", { class: "mono", text: fmt.count(f.total_count) }),
+            ` ${noun} · `,
+            h("b", { class: "mono", text: fmt.size(f.total_allocated) }),
+            " allocated",
+          ),
           h(
             "p",
             { class: "muted" },
@@ -1277,7 +1340,10 @@ export class App {
       if (r.min) chips.push(this.chip(`min: ${r.min}`, { min: undefined, run: true }));
       if (r.before) chips.push(this.chip(`before: ${r.before}`, { before: undefined, run: true }));
       if (r.after) chips.push(this.chip(`after: ${r.after}`, { after: undefined, run: true }));
-      if (r.kind) chips.push(this.chip(`kind: ${r.kind === "dir" ? "folders" : r.kind === "file" ? "files" : "any"}`, { kind: undefined, run: true }));
+      if (r.kind)
+        chips.push(
+          this.chip(`kind: ${r.kind === "dir" ? "folders" : r.kind === "file" ? "files" : "any"}`, { kind: undefined, run: true }),
+        );
       if (chips.length) parts.push(h("div", { class: "chips", "aria-label": "Active filters" }, chips));
     } else if (v?.top) {
       const t = v.top;
@@ -1308,7 +1374,10 @@ export class App {
             "p",
             null,
             `vs ${fmt.dateTime(d.prev_scanned_at)} (gen ${d.prev_generation ?? "?"}) · depth 1 · files included · `,
-            h("span", { class: d.delta > 0 ? "grow" : d.delta < 0 ? "shrink" : "", text: `${d.delta > 0 ? "▲ " : d.delta < 0 ? "▼ " : ""}${fmt.delta(d.delta)}` }),
+            h("span", {
+              class: d.delta > 0 ? "grow" : d.delta < 0 ? "shrink" : "",
+              text: `${d.delta > 0 ? "▲ " : d.delta < 0 ? "▼ " : ""}${fmt.delta(d.delta)}`,
+            }),
             " here",
           ),
           d.partial
@@ -1318,7 +1387,9 @@ export class App {
                 text: `partial: ${d.refreshed.map((x) => x.path).join(", ")} rescanned after prev`,
               })
             : null,
-          d.roots_changed ? h("span", { class: "badge warn", title: "The scanned roots differ between the two scans", text: "roots changed" }) : null,
+          d.roots_changed
+            ? h("span", { class: "badge warn", title: "The scanned roots differ between the two scans", text: "roots changed" })
+            : null,
         ),
       );
     }
@@ -1370,7 +1441,16 @@ export class App {
         if (v.idle) return this.stateBox("Fill in a name pattern or a filter, then press Find.", null);
         return this.stateBox(`No matches within ${f.path}.`, {
           label: "Clear filters",
-          run: () => this.navigate({ name: undefined, icase: undefined, before: undefined, after: undefined, min: undefined, kind: undefined, run: true }),
+          run: () =>
+            this.navigate({
+              name: undefined,
+              icase: undefined,
+              before: undefined,
+              after: undefined,
+              min: undefined,
+              kind: undefined,
+              run: true,
+            }),
         });
       case "changes":
         return this.stateBox("Nothing changed here since the previous scan.", up);
@@ -1390,7 +1470,11 @@ export class App {
       th.appendChild(
         h(
           "button",
-          { type: "button", class: active ? "sorted" : "", onclick: () => this.navigate({ sort: c.sort === "allocated" ? undefined : c.sort, sel: this.selected?.path }) },
+          {
+            type: "button",
+            class: active ? "sorted" : "",
+            onclick: () => this.navigate({ sort: c.sort === "allocated" ? undefined : c.sort, sel: this.selected?.path }),
+          },
           c.label,
           active ? h("span", { "aria-hidden": "true", text: c.sort === "mtime" ? " ▴" : " ▾" }) : null,
         ),
@@ -1418,13 +1502,31 @@ export class App {
     ui.wrap.hidden = false;
     ui.body.hidden = true;
     replace(ui.body);
-    const thead = h("thead", null, h("tr", null, cols.map((c) => this.headerCell(c))));
+    const thead = h(
+      "thead",
+      null,
+      h(
+        "tr",
+        null,
+        cols.map((c) => this.headerCell(c)),
+      ),
+    );
     const tbody = h("tbody", null);
     this.rows.forEach((r, i) => {
-      const cls = [i === this.sel ? "sel" : "", r.kind === "dir" ? "dir" : "", r.status === "gone" ? "ghost" : "", r.hidden ? "hiddenrow" : ""]
+      const cls = [
+        i === this.sel ? "sel" : "",
+        r.kind === "dir" ? "dir" : "",
+        r.status === "gone" ? "ghost" : "",
+        r.hidden ? "hiddenrow" : "",
+      ]
         .filter(Boolean)
         .join(" ");
-      const tr = h("tr", { tabindex: i === this.sel ? "0" : "-1", "aria-selected": String(i === this.sel), class: cls, "data-i": String(i) });
+      const tr = h("tr", {
+        tabindex: i === this.sel ? "0" : "-1",
+        "aria-selected": String(i === this.sel),
+        class: cls,
+        "data-i": String(i),
+      });
       if (mode === "browse" && ctx.folderSize > 0 && !r.mount) {
         tr.style.setProperty("--w", `${Math.min(100, (r.allocated / ctx.folderSize) * 100).toFixed(2)}%`);
       }

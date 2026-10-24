@@ -34,9 +34,7 @@ function nameCell(r: Row, sub = false): Node {
       h("span", { class: "label", text: r.label }),
       sub && r.sub ? h("span", { class: "sub mono", text: r.sub }) : null,
     ),
-    lowerBound(r)
-      ? h("span", { class: "q", title: "Some folders inside could not be read: sizes are lower bounds", text: "?" })
-      : null,
+    lowerBound(r) ? h("span", { class: "q", title: "Some folders inside could not be read: sizes are lower bounds", text: "?" }) : null,
     r.nlink > 1 && r.kind === "file"
       ? h("span", {
           class: "link-ic",

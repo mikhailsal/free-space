@@ -1,8 +1,11 @@
 // README screenshots (T46): Browse and Changes on the made-up /home/alex.
-// Regenerate with `bun run shots`; writes docs/img/gui.png and gui-changes.png.
+// Regenerate with `bun run shots`; writes docs/img/gui.png and gui-changes.png ($SHOTS_DIR instead, when set).
+// animations: "disabled" ends the header disk bar's width transition, so two runs match pixel for pixel.
 import { expect, test } from "@playwright/test";
 import { NOW, url } from "../e2e/mock";
 import { ShotApi } from "./home";
+
+const out = process.env.SHOTS_DIR || "../docs/img";
 
 test.use({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 });
 
@@ -16,7 +19,7 @@ test("browse", async ({ page }) => {
   await page.goto(url("/home/alex"));
   await expect(page.locator("table.grid tbody tr").first()).toBeVisible();
   await expect(page.locator("aside .minirow").first()).toBeVisible();
-  await page.screenshot({ path: "../docs/img/gui.png" });
+  await page.screenshot({ path: `${out}/gui.png`, animations: "disabled" });
 });
 
 test("changes", async ({ page }) => {
@@ -24,5 +27,5 @@ test("changes", async ({ page }) => {
   await expect(page.locator("table.grid tbody tr").first()).toBeVisible();
   await page.keyboard.press("d");
   await expect(page.locator("table.grid tbody tr").filter({ hasText: ".ollama" })).toBeVisible();
-  await page.screenshot({ path: "../docs/img/gui-changes.png" });
+  await page.screenshot({ path: `${out}/gui-changes.png`, animations: "disabled" });
 });

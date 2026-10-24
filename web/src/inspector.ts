@@ -37,7 +37,11 @@ function cliLine(text: string): HTMLElement {
       "div",
       { class: "cmdline" },
       // one box per word: a long path may wrap inside, "--json" never splits
-      h("code", { class: "mono" }, text.split(" ").flatMap((w, i) => [i ? " " : "", h("span", { text: w })])),
+      h(
+        "code",
+        { class: "mono" },
+        text.split(" ").flatMap((w, i) => [i ? " " : "", h("span", { text: w })]),
+      ),
       h("button", { type: "button", class: "link", onclick: () => copy(text, "Command copied"), text: "Copy" }),
     ),
   );
@@ -77,17 +81,14 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
     : h(
         "div",
         { class: "big" },
-        h("span", { class: "v num", text: `${lowerBound(r) ? "≥ " : ""}${fmt.size(r.status === "gone" ? r.allocatedPrev ?? 0 : r.allocated)}` }),
+        h("span", {
+          class: "v num",
+          text: `${lowerBound(r) ? "≥ " : ""}${fmt.size(r.status === "gone" ? (r.allocatedPrev ?? 0) : r.allocated)}`,
+        }),
         h("span", { class: "of", text: r.status === "gone" ? "before it was removed" : `${share}apparent ${fmt.size(r.apparent)}` }),
       );
   out.push(
-    h(
-      "section",
-      { class: "head" },
-      h("div", { class: "title", text: r.name }),
-      sizeLine,
-      h("div", { class: "path mono", text: r.path }),
-    ),
+    h("section", { class: "head" }, h("div", { class: "title", text: r.name }), sizeLine, h("div", { class: "path mono", text: r.path })),
   );
 
   if (r.hidden) {
@@ -109,9 +110,7 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
     const used = m.used !== null && m.total !== null ? `, ${fmt.size(m.used)} of ${fmt.size(m.total)} used` : "";
     out.push(h("p", { class: "note", text: `Separate filesystem: ${m.fs_type}${used}. Not scanned here.` }));
     if (m.root) {
-      out.push(
-        h("button", { type: "button", class: "outline", onclick: () => host.open(r), text: "Open this filesystem" }),
-      );
+      out.push(h("button", { type: "button", class: "outline", onclick: () => host.open(r), text: "Open this filesystem" }));
     }
     out.push(actions(host, r, false));
     return out;

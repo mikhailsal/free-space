@@ -37,13 +37,13 @@ export function homeTree(unreadable = true): Node {
   return dir("/", [
     dir("home", [
       dir("tass", [
-        dir(".cache", [
-          dir("huggingface", [file("model.safetensors", 61 * G)]),
-          dir("pip", [file("wheels.tar", 22 * G, NOW - 300 * DAY)]),
-        ]),
+        dir(".cache", [dir("huggingface", [file("model.safetensors", 61 * G)]), dir("pip", [file("wheels.tar", 22 * G, NOW - 300 * DAY)])]),
         dir("Downloads", [file("ubuntu.iso", 5 * G, NOW - 400 * DAY), file("movie.mp4", 3 * G), file("notes.txt", 4096)]),
         dir("old", [file("backup.tar.gz", 2 * G, NOW - 700 * DAY)]),
-        dir("projects", [dir("app", [file("node.bin", 900 * M)]), ...(unreadable ? [{ name: "secret", kind: "dir" as const, denied: true, children: [] }] : [])]),
+        dir("projects", [
+          dir("app", [file("node.bin", 900 * M)]),
+          ...(unreadable ? [{ name: "secret", kind: "dir" as const, denied: true, children: [] }] : []),
+        ]),
         file("big.log", 700 * M, NOW - 2 * DAY),
       ]),
     ]),
@@ -246,11 +246,21 @@ export class MockApi {
         const older = cutoff(q.get("older_than"));
         const all = [...this.flat().values()]
           .filter((x) => x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`) && (x.node.kind ?? "dir") === kind)
-          .filter((x) => x.allocated >= min && (older === null || (kind === "dir" ? x.newest : x.node.mtime ?? 0) < older))
+          .filter((x) => x.allocated >= min && (older === null || (kind === "dir" ? x.newest : (x.node.mtime ?? 0)) < older))
           .sort((a, b) => b.allocated - a.allocated);
         const total = all.reduce((s, x) => s + x.allocated, 0);
         return route.fulfill({
-          json: { ...this.header(), path: f.path, kind, min_size: min, older_than: older, sort: "allocated", ...page(all.map((x) => this.entry(x))), total: { count: all.length, counted: all.length, allocated: total, apparent: total }, total_allocated: total },
+          json: {
+            ...this.header(),
+            path: f.path,
+            kind,
+            min_size: min,
+            older_than: older,
+            sort: "allocated",
+            ...page(all.map((x) => this.entry(x))),
+            total: { count: all.length, counted: all.length, allocated: total, apparent: total },
+            total_allocated: total,
+          },
         });
       }
       case "find": {
@@ -260,7 +270,15 @@ export class MockApi {
         const newer = cutoff(q.get("newer_than"));
         if (Number.isNaN(min)) return this.error(route, 400, "USAGE", `bad size "${q.get("min_size")}"`);
         if (Number.isNaN(older) || Number.isNaN(newer)) return this.error(route, 400, "USAGE", "bad date");
-        const re = name ? new RegExp(`^${name.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".")}$`, q.has("iname") ? "i" : "") : null;
+        const re = name
+          ? new RegExp(
+              `^${name
+                .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+                .replace(/\*/g, ".*")
+                .replace(/\?/g, ".")}$`,
+              q.has("iname") ? "i" : "",
+            )
+          : null;
         const kind = q.get("kind") ?? "any";
         const all = [...this.flat().values()]
           .filter((x) => x.path !== f.path && x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`))
@@ -270,7 +288,15 @@ export class MockApi {
           .sort((a, b) => b.allocated - a.allocated);
         const total = all.reduce((s, x) => s + x.allocated, 0);
         return route.fulfill({
-          json: { ...this.header(), path: f.path, kind, sort: "allocated", ...page(all.map((x) => ({ ...this.entry(x), nested: false }))), total: { count: all.length, counted: all.length, allocated: total, apparent: total }, total_allocated: total },
+          json: {
+            ...this.header(),
+            path: f.path,
+            kind,
+            sort: "allocated",
+            ...page(all.map((x) => ({ ...this.entry(x), nested: false }))),
+            total: { count: all.length, counted: all.length, allocated: total, apparent: total },
+            total_allocated: total,
+          },
         });
       }
       case "diff": {
@@ -281,17 +307,52 @@ export class MockApi {
         const rows = cur.map((c) => {
           const p = prevFlat.get(c.path);
           const delta = c.allocated - (p?.allocated ?? 0);
-          return { path: c.path, name: c.node.name, kind: c.node.kind ?? "dir", status: !p ? "new" : delta ? "changed" : "same", allocated: c.allocated, allocated_prev: p?.allocated ?? 0, delta, items: c.items, items_prev: p?.items ?? 0, mtime: c.node.mtime ?? 0, newest_mtime: c.newest };
+          return {
+            path: c.path,
+            name: c.node.name,
+            kind: c.node.kind ?? "dir",
+            status: !p ? "new" : delta ? "changed" : "same",
+            allocated: c.allocated,
+            allocated_prev: p?.allocated ?? 0,
+            delta,
+            items: c.items,
+            items_prev: p?.items ?? 0,
+            mtime: c.node.mtime ?? 0,
+            newest_mtime: c.newest,
+          };
         });
         for (const p of prev) {
           if (!cur.some((c) => c.path === p.path)) {
-            rows.push({ path: p.path, name: p.node.name, kind: p.node.kind ?? "dir", status: "gone", allocated: 0, allocated_prev: p.allocated, delta: -p.allocated, items: 0, items_prev: p.items, mtime: 0, newest_mtime: 0 });
+            rows.push({
+              path: p.path,
+              name: p.node.name,
+              kind: p.node.kind ?? "dir",
+              status: "gone",
+              allocated: 0,
+              allocated_prev: p.allocated,
+              delta: -p.allocated,
+              items: 0,
+              items_prev: p.items,
+              mtime: 0,
+              newest_mtime: 0,
+            });
           }
         }
         rows.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
         const pf = prevFlat.get(f.path);
         return route.fulfill({
-          json: { ...this.header(), path: f.path, prev_scanned_at: NOW - 31 * 3600, depth: 1, kind: "any", partial: false, refreshed: [], roots_changed: false, delta: f.allocated - (pf?.allocated ?? 0), ...page(rows) },
+          json: {
+            ...this.header(),
+            path: f.path,
+            prev_scanned_at: NOW - 31 * 3600,
+            depth: 1,
+            kind: "any",
+            partial: false,
+            refreshed: [],
+            roots_changed: false,
+            delta: f.allocated - (pf?.allocated ?? 0),
+            ...page(rows),
+          },
         });
       }
     }

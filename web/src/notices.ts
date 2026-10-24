@@ -63,10 +63,5 @@ export function renderNotices(slot: HTMLElement, list: Notice[], expanded: boole
 
 /** Raw API error under a collapsed disclosure (D7). */
 export function details(code: string, exit: number, message: string): HTMLElement {
-  return h(
-    "details",
-    { class: "raw" },
-    h("summary", null, "details"),
-    h("code", null, `${code} (exit ${exit}): ${message}`),
-  );
+  return h("details", { class: "raw" }, h("summary", null, "details"), h("code", null, `${code} (exit ${exit}): ${message}`));
 }

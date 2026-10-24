@@ -26,9 +26,7 @@ export class Hidden {
       const raw = localStorage.getItem(this.key);
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       if (Array.isArray(parsed)) {
-        this.items = parsed.filter(
-          (x): x is HiddenItem => typeof x?.path === "string" && typeof x?.allocated === "number",
-        );
+        this.items = parsed.filter((x): x is HiddenItem => typeof x?.path === "string" && typeof x?.allocated === "number");
       }
     } catch {
       this.items = [];

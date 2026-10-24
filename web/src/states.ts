@@ -80,12 +80,7 @@ function fixRow(fix: string): HTMLElement {
 }
 
 export function noAccess(e: ErrorDetail): HTMLElement {
-  return page(
-    "Cannot read the snapshot",
-    h("p", { text: e.message }),
-    e.fix ? fixRow(e.fix) : null,
-    details(e.code, e.exit, e.message),
-  );
+  return page("Cannot read the snapshot", h("p", { text: e.message }), e.fix ? fixRow(e.fix) : null, details(e.code, e.exit, e.message));
 }
 
 export function fatal(e: ErrorDetail): HTMLElement {
