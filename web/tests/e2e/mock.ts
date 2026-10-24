@@ -209,6 +209,8 @@ export class MockApi {
   /** Status only: generation null (first run). */
   noSnapshot = false;
   scanning: { op: string; path: string; pid: number; since: number; elapsed_seconds: number } | null = null;
+  /** Status only: the running scan's progress, left out of the answer when null. */
+  progress: { stage: string; entries_seen: number; entries_expected: number | null; percent: number | null } | null = null;
   lastError: { ts: number; op: string; message: string } | null = null;
   /** Every request answers 403 without JSON, like a restarted server. */
   sessionGone = false;
@@ -296,6 +298,7 @@ export class MockApi {
       last_success_ts: this.lastError ? this.lastError.ts - DAY : null,
       warnings: [],
       scanning: this.scanning,
+      progress: this.progress ?? undefined,
     };
   }
 
