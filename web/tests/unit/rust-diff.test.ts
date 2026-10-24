@@ -802,11 +802,13 @@ test(
 );
 
 // A base that holds its first call, the scan of the fixture tree: it says so in $STUB_HELD, then waits for $STUB_GO
-// (10 s at most, so a failed test cannot leave it running). The script is then past making its work dir and its tree.
+// (10 s at most, so a failed test cannot leave it running) and marks its end in $STUB_HELD.end. The script is then past
+// making its work dir and its tree.
 const HOLD = `#!/bin/sh
 : > "$STUB_HELD"
 n=0
 while [ ! -e "$STUB_GO" ] && [ $n -lt 500 ]; do sleep 0.02; n=$((n + 1)); done
+: > "$STUB_HELD.end"
 `;
 
 // A poll with a deadline of 10 s for something another process does; nothing to wait on but the file itself.
@@ -874,11 +876,10 @@ test("a Ctrl-C reaches the call in progress and ends the job at once", async () 
   });
   try {
     expect(await until(() => existsSync(held)), "the script reached its first scan").toBe(true);
-    const sent = Date.now();
     process.kill(-proc.pid, "SIGINT");
     expect(await proc.exited).toBe(130);
-    // the stub holds 10 s unless the signal reaches it
-    expect(Date.now() - sent).toBeLessThan(5_000);
+    // the call died of the signal: one the signal misses holds its 10 s, the job waits for it, and it marks its end
+    expect(existsSync(`${held}.end`)).toBe(false);
     expect(readdirSync(scratch)).toEqual([]);
   } finally {
     writeFileSync(go, "");
