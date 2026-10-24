@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loseAborts, MockApi, url } from "./mock";
+import { DAY, file, loseAborts, M, MockApi, NOW, url } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 const selected = (page: import("@playwright/test").Page) => page.locator('table.grid tbody tr[aria-selected="true"]');
@@ -39,20 +39,33 @@ test("keyboard moves, opens and goes up, keeping the place (Pass 6)", async ({ p
   await expect(page.locator(".crumbs h1")).toHaveText("Downloads");
 });
 
-// The keys the test above does not press. /home/tass lists .cache, Downloads, old, projects, big.log (largest first);
-// PageUp and PageDown move ten rows, so here they stop at the ends.
-const KEYS = [
+// The keys the test above does not press. /home/tass lists .cache, Downloads, old, projects, big.log (largest first),
+// then the part-NN.bin a test adds, each smaller than the one before; PageUp and PageDown move ten rows, or to the end.
+const KEYS: { key: string; from: string; parts?: number; folder: string; sel: string; at: string }[] = [
   { key: "ArrowUp", from: "/home/tass?sel=/home/tass/old", folder: "tass", sel: "Downloads", at: "#/home/tass?sel=/home/tass/Downloads" },
   { key: "ArrowRight", from: "/home/tass?sel=/home/tass/Downloads", folder: "Downloads", sel: "ubuntu.iso", at: "#/home/tass/Downloads" },
   { key: "Home", from: "/home/tass?sel=/home/tass/big.log", folder: "tass", sel: ".cache", at: "#/home/tass?sel=/home/tass/.cache" },
+  {
+    key: "PageUp",
+    from: "/home/tass?sel=/home/tass/part-15.bin",
+    parts: 15,
+    folder: "tass",
+    sel: "part-05.bin",
+    at: "#/home/tass?sel=/home/tass/part-05.bin",
+  },
   { key: "PageUp", from: "/home/tass?sel=/home/tass/big.log", folder: "tass", sel: ".cache", at: "#/home/tass?sel=/home/tass/.cache" },
+  { key: "PageDown", from: "/home/tass", parts: 15, folder: "tass", sel: "part-06.bin", at: "#/home/tass?sel=/home/tass/part-06.bin" },
   { key: "PageDown", from: "/home/tass", folder: "tass", sel: "big.log", at: "#/home/tass?sel=/home/tass/big.log" },
   { key: "Backspace", from: "/home/tass/Downloads", folder: "tass", sel: "Downloads", at: "#/home/tass?sel=/home/tass/Downloads" },
 ];
 
 for (const k of KEYS) {
   test(`${k.key} from ${k.from} lands on ${k.sel} in ${k.folder} (Pass 6)`, async ({ page }) => {
-    await new MockApi().install(page);
+    const api = new MockApi();
+    const tass = api.node("/home/tass");
+    for (let i = 1; i <= (k.parts ?? 0); i++)
+      tass.children?.push(file(`part-${String(i).padStart(2, "0")}.bin`, (400 - 5 * i) * M, NOW - i * DAY));
+    await api.install(page);
     await page.goto(url(k.from));
     await expect(rows(page).first()).toBeVisible();
     await page.keyboard.press(k.key);

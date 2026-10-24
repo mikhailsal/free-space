@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { MockApi, NOW, TOKEN, url } from "./mock";
 
 test("first run: the commands to make a snapshot (D7)", async ({ page }) => {
@@ -80,39 +80,60 @@ test("a folder that is not in the snapshot offers the way up", async ({ page }) 
   await expect(page.locator(".crumbs h1")).toHaveText("tass");
 });
 
-/** Keeps in the page each request it sends, at the moment it sends it. */
+/** Keeps in the page the path of each request it sends, at the moment it sends it. */
 function countAsks() {
   const w = window as unknown as { asks: string[] };
   w.asks = [];
   const send = window.fetch.bind(window);
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    w.asks.push(String(input));
+    w.asks.push(new URL(input instanceof Request ? input.url : input, location.href).pathname);
     return send(input, init);
   }) as typeof window.fetch;
 }
 
 const statusAsks = (page: Page) =>
-  page.evaluate(() => (window as unknown as { asks: string[] }).asks.filter((u) => u.startsWith("/api/status")).length);
+  page.evaluate(() => (window as unknown as { asks: string[] }).asks.filter((p) => p === "/api/status").length);
 
-// D10, D12: how often each page asks for status. The clock moves only in the steps below, and the page sends a poll in
-// its timer's callback, so right after a step the count shows whether a poll came due within it.
-const POLLS: { page: string; every: number; go: (page: Page) => Promise<unknown> }[] = [
+/** No poll within `every` - 1 ms of the page setting its next one, and one at `every`. */
+async function pollsAfter(page: Page, every: number) {
+  const asked = await statusAsks(page);
+  await page.clock.runFor(every - 1);
+  expect(await statusAsks(page)).toBe(asked);
+  await page.clock.runFor(1);
+  expect(await statusAsks(page)).toBe(asked + 1);
+}
+
+type Poll = {
+  page: string;
+  every: number;
+  api?: () => MockApi;
+  go: (page: Page) => Promise<unknown>;
+  /** Changes the next answer, and gives what the page shows once it drew it: it sets the poll after in the same task. */
+  next?: (page: Page, api: MockApi) => Locator;
+};
+
+// D10, D12: how often each page asks for status. The clock moves only in the steps of pollsAfter, and the page sends a
+// poll in its timer's callback, so right after a step the count shows whether a poll came due within it. The session
+// page draws nothing new from an answer, so there the test cannot tell when the page set the poll after next; it times
+// one poll, which proves the interval, and the others time two, which proves the page keeps polling.
+const POLLS: Poll[] = [
   {
     page: "no snapshot",
     every: 5_000,
+    api: () => Object.assign(new MockApi(), { noSnapshot: true }),
     go: async (page) => {
-      const api = new MockApi();
-      api.noSnapshot = true;
-      await api.install(page);
       await page.goto(url());
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("No snapshot yet");
+    },
+    next: (page, api) => {
+      api.scanning = { op: "scan", path: "/", pid: 42, since: NOW, elapsed_seconds: 48 };
+      return page.locator("#fp-scan");
     },
   },
   {
     page: "the session ended",
     every: 10_000,
     go: async (page) => {
-      await new MockApi().install(page);
       await page.goto("/#/home/tass");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Session ended");
     },
@@ -120,10 +141,15 @@ const POLLS: { page: string; every: number; go: (page: Page) => Promise<unknown>
   {
     page: "a snapshot",
     every: 60_000,
+    // no notice for unreadable paths, so the one for a newer snapshot shows
+    api: () => new MockApi(false),
     go: async (page) => {
-      await new MockApi().install(page);
       await page.goto(url());
       await expect(page.locator(".crumbs h1")).toHaveText("tass");
+    },
+    next: (page, api) => {
+      api.snapshotId = "snap-2";
+      return page.locator(".notice").filter({ hasText: "newer snapshot" });
     },
   },
 ];
@@ -133,12 +159,13 @@ for (const p of POLLS) {
     await page.addInitScript(countAsks);
     await page.clock.install({ time: NOW * 1000 });
     await page.clock.pauseAt(NOW * 1000 + 1000);
+    const api = await (p.api?.() ?? new MockApi()).install(page);
     // by the time the page shows its mark, it has set its next poll
     await p.go(page);
-    const asked = await statusAsks(page);
-    await page.clock.runFor(p.every - 1);
-    expect(await statusAsks(page)).toBe(asked);
-    await page.clock.runFor(1);
-    expect(await statusAsks(page)).toBe(asked + 1);
+    const drawn = p.next?.(page, api);
+    await pollsAfter(page, p.every);
+    if (!drawn) return;
+    await expect(drawn).toBeVisible();
+    await pollsAfter(page, p.every);
   });
 }
