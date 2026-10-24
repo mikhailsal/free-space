@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { MockApi, NOW, TOKEN, url } from "./mock";
+import { asks, MockApi, NOW, TOKEN, url, watchAsks } from "./mock";
 
 test("first run: the commands to make a snapshot (D7)", async ({ page }) => {
   const api = new MockApi();
@@ -80,19 +80,7 @@ test("a folder that is not in the snapshot offers the way up", async ({ page }) 
   await expect(page.locator(".crumbs h1")).toHaveText("tass");
 });
 
-/** Keeps in the page the path of each request it sends, at the moment it sends it. */
-function countAsks() {
-  const w = window as unknown as { asks: string[] };
-  w.asks = [];
-  const send = window.fetch.bind(window);
-  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    w.asks.push(new URL(input instanceof Request ? input.url : input, location.href).pathname);
-    return send(input, init);
-  }) as typeof window.fetch;
-}
-
-const statusAsks = (page: Page) =>
-  page.evaluate(() => (window as unknown as { asks: string[] }).asks.filter((p) => p === "/api/status").length);
+const statusAsks = async (page: Page) => (await asks(page)).filter((p) => p === "/api/status").length;
 
 /** No poll within `every` - 1 ms of the page setting its next one, and one at `every`. */
 async function pollsAfter(page: Page, every: number) {
@@ -156,7 +144,7 @@ const POLLS: Poll[] = [
 
 for (const p of POLLS) {
   test(`with ${p.page} the page asks for status every ${p.every / 1000} s, no sooner (D10, D12)`, async ({ page }) => {
-    await page.addInitScript(countAsks);
+    await watchAsks(page);
     await page.clock.install({ time: NOW * 1000 });
     await page.clock.pauseAt(NOW * 1000 + 1000);
     const api = await (p.api?.() ?? new MockApi()).install(page);

@@ -2,6 +2,7 @@
 // as `freespace serve` (src/types.ts). Each test builds one and installs it on
 // its page; `requests` records every call for "no request while typing" checks,
 // and `hold` keeps one request unanswered until the test releases it (D19).
+// `watchAsks` watches the same requests from inside the page.
 import type { Page, Request, Route } from "@playwright/test";
 
 export const TOKEN = "e2etoken";
@@ -96,6 +97,76 @@ export async function loseAborts(page: Page): Promise<void> {
   await page.addInitScript(() => {
     AbortController.prototype.abort = () => {};
   });
+}
+
+interface Watched {
+  asks: string[];
+  unread: string[];
+  aborted: string[];
+}
+
+/**
+ * From here the page keeps, as `window` fields: `asks`, each request's URL path as it sends it; `unread`, the requests
+ * whose answer it has not read to the end (path and query); `aborted`, the ones it gave up on with an abort.
+ */
+export async function watchAsks(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as Watched;
+    w.asks = [];
+    w.unread = [];
+    w.aborted = [];
+    const send = window.fetch.bind(window);
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const u = new URL(input instanceof Request ? input.url : input, location.href);
+      const ask = u.pathname + u.search;
+      w.asks.push(u.pathname);
+      w.unread.push(ask);
+      let open = true;
+      // once per request, so a second read of one answer cannot take another request off the list
+      const read = () => {
+        if (open) w.unread.splice(w.unread.indexOf(ask), 1);
+        open = false;
+      };
+      return send(input, init).then(
+        (r) => {
+          // the page reads the body of a JSON answer, of any other only the head
+          if (!(r.headers.get("content-type") ?? "").includes("application/json")) read();
+          else {
+            const json = r.json.bind(r);
+            r.json = () => json().finally(read);
+          }
+          return r;
+        },
+        (e: unknown) => {
+          read();
+          if (e instanceof DOMException && e.name === "AbortError") w.aborted.push(ask);
+          throw e;
+        },
+      );
+    }) as typeof window.fetch;
+  });
+}
+
+const askOf = (r: Request) => {
+  const u = new URL(r.url());
+  return u.pathname + u.search;
+};
+
+/** The URL path of each request the page sent, in order (`watchAsks`). */
+export const asks = (page: Page) => page.evaluate(() => (window as unknown as Watched).asks);
+
+/** Whether the page gave up on `req` with an abort (`watchAsks`). */
+export const aborted = (page: Page, req: Request) =>
+  page.evaluate((ask) => (window as unknown as Watched).aborted.includes(ask), askOf(req));
+
+/**
+ * Wait until the page has read every answer it asked for but those to `held`, requests a test still holds (`watchAsks`).
+ * A load whose answers all came has then run to its end: what it does after its last read is promise callbacks, and
+ * they all run before the page does anything else, such as this check.
+ */
+export async function allRead(page: Page, ...held: Request[]): Promise<void> {
+  const keep = held.map(askOf).sort();
+  await page.waitForFunction((k) => JSON.stringify([...(window as unknown as Watched).unread].sort()) === JSON.stringify(k), keep);
 }
 
 function sizeArg(s: string | null): number {

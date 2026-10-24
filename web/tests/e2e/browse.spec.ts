@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DAY, file, loseAborts, M, MockApi, NOW, url } from "./mock";
+import { aborted, allRead, DAY, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 const selected = (page: import("@playwright/test").Page) => page.locator('table.grid tbody tr[aria-selected="true"]');
@@ -77,7 +77,7 @@ for (const k of KEYS) {
 
 // The request coordinator drops a late answer twice over: it aborts the request it gave up on, and a load that is no
 // longer the latest applies nothing. With the abort lost, the answer arrives and only the second keeps it off the screen,
-// rows or an error alike.
+// rows or an error alike. The checks after the answer wait until the page has read it and that load has run to its end.
 for (const [lost, error] of [
   [false, false],
   [true, false],
@@ -87,6 +87,7 @@ for (const [lost, error] of [
     page,
   }) => {
     if (lost) await loseAborts(page);
+    await watchAsks(page);
     const api = new MockApi();
     // the page's own listing, not the one-row ls that Top asks for the folder's size
     const browse = api.hold("ls", (q) => q.get("limit") !== "1");
@@ -94,12 +95,12 @@ for (const [lost, error] of [
     await page.goto(url());
     const late = await browse.arrived;
     await page.keyboard.press("t");
+    if (!lost) await expect.poll(() => aborted(page, late)).toBe(true);
     await expect(selected(page)).toContainText("model.safetensors");
     // the held listing answers as for a folder gone from the snapshot
     if (error) api.failWith = { status: 404, code: "PATH_NOT_FOUND", message: "/home/tass is not in the snapshot" };
     await browse.release();
-    // the page has the late answer in full before the checks below
-    if (lost) await (await late.response())?.finished();
+    await allRead(page);
     await expect(page.getByRole("tab", { name: "Top files" })).toHaveAttribute("aria-selected", "true");
     await expect(page).toHaveURL(/mode=top/);
     await expect(page.locator(".crumbs h1")).toHaveText("tass");

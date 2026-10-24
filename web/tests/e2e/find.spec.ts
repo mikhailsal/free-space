@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DAY, file, loseAborts, M, MockApi, NOW, url } from "./mock";
+import { aborted, allRead, DAY, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 
@@ -94,6 +94,7 @@ for (const lost of [false, true]) {
     page,
   }) => {
     if (lost) await loseAborts(page);
+    await watchAsks(page);
     const api = await new MockApi().install(page);
     await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
     await expect(rows(page)).toHaveCount(1);
@@ -103,12 +104,13 @@ for (const lost of [false, true]) {
     const late = await slow.arrived;
     await expect(page.locator(".summary")).toContainText("Searching… name filters can take a few seconds");
     await page.getByRole("button", { name: "Cancel" }).click();
+    if (!lost) await expect.poll(() => aborted(page, late)).toBe(true);
     await expect(page.locator(".toast")).toHaveText("Search cancelled");
     await expect(page.locator(".summary")).toContainText("1 match · 5.0 G allocated");
     await expect(page.locator("main")).toHaveAttribute("aria-busy", "false");
     await slow.release();
-    // the page has the late answer in full before the checks below
-    if (lost) await (await late.response())?.finished();
+    // the page has read the late answer and the load it gave up on has run to its end before the checks below
+    await allRead(page);
     await expect(rows(page)).toHaveCount(1);
     await expect(rows(page)).toContainText("Downloads/ubuntu.iso");
     await expect(page.locator(".summary")).toContainText("1 match · 5.0 G allocated");
@@ -123,6 +125,7 @@ for (const lost of [false, true]) {
     page,
   }) => {
     if (lost) await loseAborts(page);
+    await watchAsks(page);
     const api = await new MockApi().install(page);
     await page.goto(url("/home/tass?mode=find&name=*.iso&run=1"));
     await expect(rows(page)).toHaveCount(1);
@@ -133,10 +136,11 @@ for (const lost of [false, true]) {
     const late = await first.arrived;
     await page.locator("#f-name").fill("*.log");
     await page.locator("#f-name").press("Enter");
-    await second.arrived;
+    const newer = await second.arrived;
+    if (!lost) await expect.poll(() => aborted(page, late)).toBe(true);
     await first.release();
-    // the page has the first answer in full before the checks below; with the abort working, it gave up on it at once
-    if (lost) await (await late.response())?.finished();
+    // the load given up on has run to its end before the checks below; the newer one still waits for its answer
+    await allRead(page, newer);
     await expect(page.locator("main")).toHaveAttribute("aria-busy", "true");
     await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
     await second.release();
