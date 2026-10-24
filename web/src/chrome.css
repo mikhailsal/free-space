@@ -1,0 +1,182 @@
+/* Around the work area: footer keys, toasts, the help overlay and the full-page
+   states (D7, D12). Last come the reduced-motion overrides; they must follow the
+   rules they override in every file. */
+
+/* ---- footer keys ---- */
+.keys {
+  flex: none;
+  height: 36px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 var(--s4);
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.keys b {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--fg);
+}
+
+/* ---- toasts ---- */
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: calc(100vw - 32px);
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: 10px var(--s4);
+  border-radius: var(--radius);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 14px;
+  line-height: 20px;
+  animation: fade 120ms ease-out;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+.toast .link {
+  color: var(--bg);
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+.offscreen {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  opacity: 0;
+}
+
+/* ---- help overlay ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+}
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(26 26 26 / 0.35);
+}
+.dialog {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: var(--s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  font-size: 14px;
+  line-height: 20px;
+}
+.dialog h2 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.dialog h3 {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.keys-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--s1) var(--s4);
+}
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  list-style: none;
+}
+.dialog a:visited {
+  color: var(--accent-visited);
+}
+.dialog .primary {
+  align-self: flex-end;
+}
+
+/* ---- full-page states (D7, D12) ---- */
+.fullpage {
+  min-height: 100%;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  padding: var(--s6) var(--s4);
+}
+.fp {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.fp h1 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.fp .lead {
+  font-size: 14px;
+}
+.cmdrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding: var(--s3);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.cmdrow code {
+  flex: 1;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.cmdrow .muted {
+  font-size: 13px;
+  width: 100%;
+}
+.alert {
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
+  padding: var(--s3);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fillline i {
+    transition: none;
+  }
+  .progress.on::after {
+    animation: none;
+    width: 100%;
+  }
+  .toast {
+    animation: none;
+  }
+}

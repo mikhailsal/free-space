@@ -65,14 +65,14 @@ test("text on the share tint stays readable (13 % rows, 22 % selected)", () => {
   for (const t of ["fg", "muted", "danger-fg"]) {
     expect(ratio(rgb(tok[t]!), row)).toBeGreaterThanOrEqual(4.5);
   }
-  // muted reaches only 4.3:1 on the selected tint: app.css turns it to fg there
+  // muted reaches only 4.3:1 on the selected tint: work.css turns it to fg there
   for (const t of ["fg", "danger-fg"]) {
     expect(ratio(rgb(tok[t]!), sel)).toBeGreaterThanOrEqual(4.5);
   }
   expect(ratio(rgb(tok.muted!), sel)).toBeLessThan(4.5);
 });
 
-test("app.css keeps muted text off the selected row", () => {
-  const app = readFileSync(new URL("../../src/app.css", import.meta.url), "utf8");
-  expect(app).toMatch(/tr\.sel td,\s*\.grid tbody tr\.sel \.k,\s*\.grid tbody tr\.sel \.badge \{\s*color: var\(--fg\)/);
+test("work.css keeps muted text off the selected row", () => {
+  const work = readFileSync(new URL("../../src/work.css", import.meta.url), "utf8");
+  expect(work).toMatch(/tr\.sel td,\s*\.grid tbody tr\.sel \.k,\s*\.grid tbody tr\.sel \.badge \{\s*color: var\(--fg\)/);
 });

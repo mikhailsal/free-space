@@ -1,0 +1,237 @@
+/* The work area: the summary, the results table, body states and Show more. */
+.work {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.results {
+  flex: 1 1 72%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.summary {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+  align-items: center;
+  justify-content: space-between;
+}
+.summary .total b {
+  font-weight: 500;
+}
+.summary .muted {
+  font-size: 13px;
+  line-height: 16px;
+}
+.summary .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.summary .context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+.grow {
+  color: var(--danger-fg);
+}
+.shrink {
+  color: var(--ok-fg);
+}
+
+.tablewrap {
+  flex: none;
+  overflow-x: auto;
+}
+.tablewrap.stale {
+  opacity: 0.55;
+}
+table.grid {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 14px;
+  line-height: 20px;
+}
+.grid th {
+  height: 36px;
+  padding: var(--s3) var(--s3) var(--s2);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 2;
+}
+.grid th button {
+  color: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+}
+.grid th button:hover,
+.grid th .sorted {
+  color: var(--fg);
+}
+.grid th.name,
+.grid td.name {
+  text-align: left;
+  padding-left: var(--s4);
+}
+.grid th.num {
+  width: 120px;
+}
+.grid th.share {
+  width: 72px;
+}
+.grid th.items {
+  width: 112px;
+}
+.grid th.date {
+  width: 112px;
+}
+.grid th.kind {
+  width: 88px;
+}
+.grid th.delta {
+  width: 132px;
+}
+.grid td {
+  padding: 0 var(--s3);
+  height: var(--row);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--line-soft);
+}
+.grid td.num,
+.grid td.date {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+.grid td.kind {
+  color: var(--muted);
+}
+.grid tbody tr {
+  cursor: default;
+  /* share row tint (mockup B): accent 13 % behind the row's share of the folder */
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 13%, transparent) var(--w, 0%), transparent var(--w, 0%));
+}
+.grid tbody tr:hover {
+  background-color: var(--hover);
+}
+.grid tbody tr:focus-visible {
+  outline-offset: -2px;
+}
+.grid tbody tr.sel {
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) var(--w, 0%), transparent var(--w, 0%)), var(--accent-bg);
+}
+.grid tbody tr.sel td {
+  box-shadow:
+    inset 0 1px 0 var(--accent),
+    inset 0 -1px 0 var(--accent);
+}
+.grid tbody tr.sel td:first-child {
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    inset 0 1px 0 var(--accent),
+    inset 0 -1px 0 var(--accent);
+}
+.grid tbody tr.sel .label {
+  font-weight: 500;
+}
+/* muted is 4.3:1 on the selected tint, below AA (tests/unit/contrast.test.ts) */
+.grid tbody tr.sel td,
+.grid tbody tr.sel .k,
+.grid tbody tr.sel .badge {
+  color: var(--fg);
+}
+.grid tr.ghost td {
+  color: var(--muted);
+}
+.grid tr.ghost .label {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.grid tr.hiddenrow td {
+  color: var(--muted);
+}
+.mode-top tbody td,
+.mode-find tbody td {
+  height: var(--row);
+}
+.mode-top tbody td {
+  height: var(--row-two);
+}
+.namecell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.namecell .k {
+  color: var(--muted);
+  display: inline-block;
+  width: 16px;
+  flex: none;
+  font-size: 11px;
+}
+.namecell .nm {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.namecell .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.namecell .sub {
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mode-top .namecell .label {
+  font-weight: 500;
+}
+.q {
+  color: var(--danger-fg);
+  font-weight: 500;
+  margin-left: 6px;
+  font-family: var(--font-mono);
+}
+.link-ic {
+  margin-left: 6px;
+  color: var(--muted);
+}
+
+.bodystate {
+  padding: var(--s6) var(--s4);
+}
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s3);
+  max-width: 560px;
+}
+.more {
+  padding: 10px var(--s4);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
