@@ -11,23 +11,26 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
   if (attrs) {
-    for (const [k, v] of Object.entries(attrs)) {
-      if (v === null || v === undefined || v === false) continue;
-      if (typeof v === "function") {
-        el.addEventListener(k.slice(2), v as EventListener);
-      } else if (k === "class") {
-        el.className = String(v);
-      } else if (k === "style" && typeof v === "object") {
-        for (const [p, s] of Object.entries(v)) el.style.setProperty(p, s);
-      } else if (k === "text") {
-        el.textContent = String(v);
-      } else {
-        el.setAttribute(k, v === true ? "" : String(v));
-      }
-    }
+    for (const [k, v] of Object.entries(attrs)) setAttr(el, k, v);
   }
   append(el, children);
   return el;
+}
+
+/** `on…` takes a listener, `class` and `text` set those properties, `style` takes a map; null, undefined and false set nothing. */
+function setAttr(el: HTMLElement, k: string, v: Attrs[string]): void {
+  if (v === null || v === undefined || v === false) return;
+  if (typeof v === "function") {
+    el.addEventListener(k.slice(2), v as EventListener);
+  } else if (k === "class") {
+    el.className = String(v);
+  } else if (k === "style" && typeof v === "object") {
+    for (const [p, s] of Object.entries(v)) el.style.setProperty(p, s);
+  } else if (k === "text") {
+    el.textContent = String(v);
+  } else {
+    el.setAttribute(k, v === true ? "" : String(v));
+  }
 }
 
 export function append(el: Node, children: (Child | Child[])[]): void {

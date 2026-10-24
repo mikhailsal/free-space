@@ -31,6 +31,9 @@ interface Flat {
   errors: number;
 }
 
+/** A paged answer's list cut to the request's `limit`. */
+type Pager = <T>(all: T[]) => { entries: T[]; total_count: number; truncated: boolean; limit: number };
+
 const dir = (name: string, children: Node[], mtime = NOW - 10 * DAY): Node => ({ name, kind: "dir", children, mtime });
 const file = (name: string, allocated: number, mtime = NOW - 40 * DAY): Node => ({ name, kind: "file", allocated, mtime });
 
@@ -378,134 +381,150 @@ export class MockApi {
     const snap = q.get("snapshot");
     if (snap && snap !== this.snapshotId) return this.error(route, 409, "ROTATED", "snapshot rotated");
     const limit = Number(q.get("limit") ?? 30);
-    const page = <T>(all: T[]) => ({ entries: all.slice(0, limit), total_count: all.length, truncated: all.length > limit, limit });
+    const page: Pager = (all) => ({ entries: all.slice(0, limit), total_count: all.length, truncated: all.length > limit, limit });
     const f = this.target(q, route);
     if (!f) return;
     switch (ep) {
-      case "ls": {
-        const sort = q.get("sort") ?? "allocated";
-        const kids = this.children(f.path).sort((a, b) =>
-          sort === "mtime" ? (a.node.mtime ?? 0) - (b.node.mtime ?? 0) : b.allocated - a.allocated,
-        );
-        return route.fulfill({ json: { ...this.header(), entry: this.entry(f), ...page(kids.map((k) => this.entry(k))), sort } });
-      }
-      case "top": {
-        const kind = q.get("kind") ?? "file";
-        const min = sizeArg(q.get("min_size"));
-        const older = cutoff(q.get("older_than"));
-        const all = [...this.flat().values()]
-          .filter((x) => x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`) && (x.node.kind ?? "dir") === kind)
-          .filter((x) => x.allocated >= min && (older === null || (kind === "dir" ? x.newest : (x.node.mtime ?? 0)) < older))
-          .sort((a, b) => b.allocated - a.allocated);
-        const total = all.reduce((s, x) => s + x.allocated, 0);
-        return route.fulfill({
-          json: {
-            ...this.header(),
-            path: f.path,
-            kind,
-            min_size: min,
-            older_than: older,
-            sort: "allocated",
-            ...page(all.map((x) => this.entry(x))),
-            total: { count: all.length, counted: all.length, allocated: total, apparent: total },
-            total_allocated: total,
-          },
-        });
-      }
-      case "find": {
-        const name = q.get("name") ?? q.get("iname");
-        const min = sizeArg(q.get("min_size"));
-        const older = cutoff(q.get("older_than"));
-        const newer = cutoff(q.get("newer_than"));
-        if (Number.isNaN(min)) return this.error(route, 400, "USAGE", `bad size "${q.get("min_size")}"`);
-        if (Number.isNaN(older) || Number.isNaN(newer)) return this.error(route, 400, "USAGE", "bad date");
-        const re = name
-          ? new RegExp(
-              `^${name
-                .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-                .replace(/\*/g, ".*")
-                .replace(/\?/g, ".")}$`,
-              q.has("iname") ? "i" : "",
-            )
-          : null;
-        const kind = q.get("kind") ?? "any";
-        const all = [...this.flat().values()]
-          .filter((x) => x.path !== f.path && x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`))
-          .filter((x) => kind === "any" || (x.node.kind ?? "dir") === kind)
-          .filter((x) => (!re || re.test(x.node.name)) && x.allocated >= min)
-          .filter((x) => (older === null || (x.node.mtime ?? 0) < older) && (newer === null || (x.node.mtime ?? 0) >= newer))
-          .sort((a, b) => b.allocated - a.allocated);
-        const total = all.reduce((s, x) => s + x.allocated, 0);
-        return route.fulfill({
-          json: {
-            ...this.header(),
-            path: f.path,
-            kind,
-            sort: "allocated",
-            ...page(all.map((x) => ({ ...this.entry(x), nested: false }))),
-            total: { count: all.length, counted: all.length, allocated: total, apparent: total },
-            total_allocated: total,
-          },
-        });
-      }
-      case "diff": {
-        if (!this.prevTree) return this.error(route, 404, "NO_PREV", "no previous snapshot");
-        const prevFlat = this.flat(this.prevTree);
-        const cur = this.children(f.path);
-        const prev = this.children(f.path, this.prevTree);
-        const rows = cur.map((c) => {
-          const p = prevFlat.get(c.path);
-          const delta = c.allocated - (p?.allocated ?? 0);
-          return {
-            path: c.path,
-            name: c.node.name,
-            kind: c.node.kind ?? "dir",
-            status: !p ? "new" : delta ? "changed" : "same",
-            allocated: c.allocated,
-            allocated_prev: p?.allocated ?? 0,
-            delta,
-            items: c.items,
-            items_prev: p?.items ?? 0,
-            mtime: c.node.mtime ?? 0,
-            newest_mtime: c.newest,
-          };
-        });
-        for (const p of prev) {
-          if (!cur.some((c) => c.path === p.path)) {
-            rows.push({
-              path: p.path,
-              name: p.node.name,
-              kind: p.node.kind ?? "dir",
-              status: "gone",
-              allocated: 0,
-              allocated_prev: p.allocated,
-              delta: -p.allocated,
-              items: 0,
-              items_prev: p.items,
-              mtime: 0,
-              newest_mtime: 0,
-            });
-          }
-        }
-        rows.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
-        const pf = prevFlat.get(f.path);
-        return route.fulfill({
-          json: {
-            ...this.header(),
-            path: f.path,
-            prev_scanned_at: NOW - 31 * 3600,
-            depth: 1,
-            kind: "any",
-            partial: false,
-            refreshed: [],
-            roots_changed: false,
-            delta: f.allocated - (pf?.allocated ?? 0),
-            ...page(rows),
-          },
+      case "ls":
+        return this.answerLs(route, q, f, page);
+      case "top":
+        return this.answerTop(route, q, f, page);
+      case "find":
+        return this.answerFind(route, q, f, page);
+      case "diff":
+        return this.answerDiff(route, f, page);
+    }
+    return this.error(route, 404, "USAGE", `unknown endpoint ${u.pathname}`);
+  }
+
+  /** A folder's children, by size or by date. */
+  private answerLs(route: Route, q: URLSearchParams, f: Flat, page: Pager): Promise<void> {
+    const sort = q.get("sort") ?? "allocated";
+    const kids = this.children(f.path).sort((a, b) =>
+      sort === "mtime" ? (a.node.mtime ?? 0) - (b.node.mtime ?? 0) : b.allocated - a.allocated,
+    );
+    return route.fulfill({ json: { ...this.header(), entry: this.entry(f), ...page(kids.map((k) => this.entry(k))), sort } });
+  }
+
+  /** The biggest files or folders under a folder. */
+  private answerTop(route: Route, q: URLSearchParams, f: Flat, page: Pager): Promise<void> {
+    const kind = q.get("kind") ?? "file";
+    const min = sizeArg(q.get("min_size"));
+    const older = cutoff(q.get("older_than"));
+    const all = [...this.flat().values()]
+      .filter((x) => x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`) && (x.node.kind ?? "dir") === kind)
+      .filter((x) => x.allocated >= min && (older === null || (kind === "dir" ? x.newest : (x.node.mtime ?? 0)) < older))
+      .sort((a, b) => b.allocated - a.allocated);
+    const total = all.reduce((s, x) => s + x.allocated, 0);
+    return route.fulfill({
+      json: {
+        ...this.header(),
+        path: f.path,
+        kind,
+        min_size: min,
+        older_than: older,
+        sort: "allocated",
+        ...page(all.map((x) => this.entry(x))),
+        total: { count: all.length, counted: all.length, allocated: total, apparent: total },
+        total_allocated: total,
+      },
+    });
+  }
+
+  /** Entries under a folder matching a name glob, a kind, a size and dates. */
+  private answerFind(route: Route, q: URLSearchParams, f: Flat, page: Pager): Promise<void> {
+    const name = q.get("name") ?? q.get("iname");
+    const min = sizeArg(q.get("min_size"));
+    const older = cutoff(q.get("older_than"));
+    const newer = cutoff(q.get("newer_than"));
+    if (Number.isNaN(min)) return this.error(route, 400, "USAGE", `bad size "${q.get("min_size")}"`);
+    if (Number.isNaN(older) || Number.isNaN(newer)) return this.error(route, 400, "USAGE", "bad date");
+    const re = name
+      ? new RegExp(
+          `^${name
+            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+            .replace(/\*/g, ".*")
+            .replace(/\?/g, ".")}$`,
+          q.has("iname") ? "i" : "",
+        )
+      : null;
+    const kind = q.get("kind") ?? "any";
+    const all = [...this.flat().values()]
+      .filter((x) => x.path !== f.path && x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`))
+      .filter((x) => kind === "any" || (x.node.kind ?? "dir") === kind)
+      .filter((x) => (!re || re.test(x.node.name)) && x.allocated >= min)
+      .filter((x) => (older === null || (x.node.mtime ?? 0) < older) && (newer === null || (x.node.mtime ?? 0) >= newer))
+      .sort((a, b) => b.allocated - a.allocated);
+    const total = all.reduce((s, x) => s + x.allocated, 0);
+    return route.fulfill({
+      json: {
+        ...this.header(),
+        path: f.path,
+        kind,
+        sort: "allocated",
+        ...page(all.map((x) => ({ ...this.entry(x), nested: false }))),
+        total: { count: all.length, counted: all.length, allocated: total, apparent: total },
+        total_allocated: total,
+      },
+    });
+  }
+
+  /** A folder's children against the previous snapshot, gone ones included. */
+  private answerDiff(route: Route, f: Flat, page: Pager): Promise<void> {
+    if (!this.prevTree) return this.error(route, 404, "NO_PREV", "no previous snapshot");
+    const prevFlat = this.flat(this.prevTree);
+    const cur = this.children(f.path);
+    const prev = this.children(f.path, this.prevTree);
+    const rows = cur.map((c) => {
+      const p = prevFlat.get(c.path);
+      const delta = c.allocated - (p?.allocated ?? 0);
+      return {
+        path: c.path,
+        name: c.node.name,
+        kind: c.node.kind ?? "dir",
+        status: !p ? "new" : delta ? "changed" : "same",
+        allocated: c.allocated,
+        allocated_prev: p?.allocated ?? 0,
+        delta,
+        items: c.items,
+        items_prev: p?.items ?? 0,
+        mtime: c.node.mtime ?? 0,
+        newest_mtime: c.newest,
+      };
+    });
+    for (const p of prev) {
+      if (!cur.some((c) => c.path === p.path)) {
+        rows.push({
+          path: p.path,
+          name: p.node.name,
+          kind: p.node.kind ?? "dir",
+          status: "gone",
+          allocated: 0,
+          allocated_prev: p.allocated,
+          delta: -p.allocated,
+          items: 0,
+          items_prev: p.items,
+          mtime: 0,
+          newest_mtime: 0,
         });
       }
     }
-    return this.error(route, 404, "USAGE", `unknown endpoint ${u.pathname}`);
+    rows.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
+    const pf = prevFlat.get(f.path);
+    return route.fulfill({
+      json: {
+        ...this.header(),
+        path: f.path,
+        prev_scanned_at: NOW - 31 * 3600,
+        depth: 1,
+        kind: "any",
+        partial: false,
+        refreshed: [],
+        roots_changed: false,
+        delta: f.allocated - (pf?.allocated ?? 0),
+        ...page(rows),
+      },
+    });
   }
 
   async install(page: Page): Promise<this> {

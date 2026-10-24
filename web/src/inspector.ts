@@ -6,7 +6,7 @@ import * as fmt from "./format";
 import { parentPlace, type Place, type Route } from "./router";
 import { isFolder, lowerBound, type Row } from "./rows";
 import { copy } from "./toast";
-import type { Entry } from "./types";
+import type { Entry, MountOut } from "./types";
 
 export interface InspectorHost {
   route: Route;
@@ -74,7 +74,17 @@ function biggestInside(host: InspectorHost, r: Row): HTMLElement {
 
 export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
   if (!r) return [h("p", { class: "muted empty", text: "Nothing selected." })];
-  const out: HTMLElement[] = [];
+  const out = [head(host, r), ...changeNotes(r)];
+  if (r.mount) return [...out, ...mountPanel(host, r, r.mount)];
+  out.push(...cautions(host, r));
+  const dl = facts(host, r);
+  if (dl.childElementCount) out.push(dl);
+  out.push(actions(host, r, true));
+  return out;
+}
+
+/** Name, size (none for a mount point) and path. */
+function head(host: InspectorHost, r: Row): HTMLElement {
   const share = host.folderSize > 0 && r.status !== "gone" ? `${fmt.pct(r.allocated, host.folderSize)} of ${base(host.scope)} · ` : "";
   const sizeLine = r.mount
     ? null
@@ -87,10 +97,18 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
         }),
         h("span", { class: "of", text: r.status === "gone" ? "before it was removed" : `${share}apparent ${fmt.size(r.apparent)}` }),
       );
-  out.push(
-    h("section", { class: "head" }, h("div", { class: "title", text: r.name }), sizeLine, h("div", { class: "path mono", text: r.path })),
+  return h(
+    "section",
+    { class: "head" },
+    h("div", { class: "title", text: r.name }),
+    sizeLine,
+    h("div", { class: "path mono", text: r.path }),
   );
+}
 
+/** Hidden, and the change since the previous snapshot. */
+function changeNotes(r: Row): HTMLElement[] {
+  const out: HTMLElement[] = [];
   if (r.hidden) {
     out.push(h("p", { class: "note", text: "Hidden until the next scan." }));
   }
@@ -104,17 +122,24 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
       ),
     );
   }
+  return out;
+}
 
-  if (r.mount) {
-    const m = r.mount;
-    const used = m.used !== null && m.total !== null ? `, ${fmt.size(m.used)} of ${fmt.size(m.total)} used` : "";
-    out.push(h("p", { class: "note", text: `Separate filesystem: ${m.fs_type}${used}. Not scanned here.` }));
-    if (m.root) {
-      out.push(h("button", { type: "button", class: "outline", onclick: () => host.open(r), text: "Open this filesystem" }));
-    }
-    out.push(actions(host, r, false));
-    return out;
+/** A mount point is another filesystem: what it is, the way into it, and actions without a CLI line. */
+function mountPanel(host: InspectorHost, r: Row, m: MountOut): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  const used = m.used !== null && m.total !== null ? `, ${fmt.size(m.used)} of ${fmt.size(m.total)} used` : "";
+  out.push(h("p", { class: "note", text: `Separate filesystem: ${m.fs_type}${used}. Not scanned here.` }));
+  if (m.root) {
+    out.push(h("button", { type: "button", class: "outline", onclick: () => host.open(r), text: "Open this filesystem" }));
   }
+  out.push(actions(host, r, false));
+  return out;
+}
+
+/** Unreadable as root, hardlinks, and the biggest children of a folder. */
+function cautions(host: InspectorHost, r: Row): HTMLElement[] {
+  const out: HTMLElement[] = [];
   if (r.denied) {
     out.push(
       h("p", { class: "note danger", text: "Could not be read as root; sizes below are lower bounds." }),
@@ -135,7 +160,11 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
   if (r.kind === "dir" && r.status !== "gone" && r.items > 0 && !r.denied) {
     out.push(biggestInside(host, r));
   }
+  return out;
+}
 
+/** Items, dates and unreadable paths; empty when none applies. */
+function facts(host: InspectorHost, r: Row): HTMLElement {
   const dl = h("dl", null);
   const row = (k: string, v: string | Node) => dl.append(h("dt", { text: k }), h("dd", null, v));
   if (r.kind === "dir") row("Items", h("span", { class: "num", text: `${lowerBound(r) ? "≥ " : ""}${fmt.count(r.items)}` }));
@@ -158,9 +187,7 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
       ),
     );
   }
-  if (dl.childElementCount) out.push(dl);
-  out.push(actions(host, r, true));
-  return out;
+  return dl;
 }
 
 function actions(host: InspectorHost, r: Row, withCli: boolean): HTMLElement {

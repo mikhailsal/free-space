@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { aborted, allRead, DAY, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
+import { aborted, allRead, DAY, dir, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 const selected = (page: import("@playwright/test").Page) => page.locator('table.grid tbody tr[aria-selected="true"]');
@@ -228,4 +228,73 @@ test("Changes lists growth and removals with glyphs, not color alone (D8)", asyn
   await expect(rows(page).filter({ hasText: "old" })).toContainText("gone");
   await expect(rows(page).filter({ hasText: "new.bin" })).toContainText("▲");
   await expect(rows(page).filter({ hasText: "new.bin" })).toContainText("new");
+});
+
+/** The mock with some entries' fields replaced, as `freespace ls` reports hardlinks and mount points. */
+class PatchedApi extends MockApi {
+  patch: Record<string, Record<string, unknown>> = {};
+
+  override entry(f: Parameters<MockApi["entry"]>[0]) {
+    return Object.assign(super.entry(f), this.patch[f.path]);
+  }
+}
+
+/** The details panel's parts in order, after the sheet's handle and Close button. */
+const parts = (page: import("@playwright/test").Page) =>
+  page
+    .locator("aside .panel > :not(.handle, .sheet-close)")
+    .evaluateAll((els) => els.map((e) => [e.tagName.toLowerCase(), ...e.classList].join(".")));
+
+// Value: protects=an unreadable folder's details warn that its sizes are lower bounds and offer the root scan, before its facts, with no Biggest inside;
+//   fails_when=the denied note, its Copy button or their place in the panel is lost, or Biggest inside opens for a folder that cannot be read;
+//   why_new=no test or guard state selects a denied row; seam=none;
+//   no_claim=the scan's permission handling (the mock marks projects/secret denied; the patch gives it items, so only `denied` keeps Biggest inside shut)
+test("an unreadable folder's details say its sizes are lower bounds and offer the root scan (D13)", async ({ page }) => {
+  const api = new PatchedApi();
+  api.patch = { "/home/tass/projects/secret": { items: 3 } };
+  await api.install(page);
+  await page.goto(url("/home/tass/projects?sel=/home/tass/projects/secret"));
+  await expect(page.locator("aside .title")).toHaveText("secret");
+  await expect(page.locator("aside .note.danger")).toHaveText("Could not be read as root; sizes below are lower bounds.");
+  await expect(page.locator("aside").getByRole("button", { name: "Copy: sudo freespace scan" })).toBeVisible();
+  expect(await parts(page)).toEqual(["section.head", "p.note.danger", "button.outline", "dl", "div.actions"]);
+  const asked = api.requests.map((r) => new URL(r, "http://mock").searchParams.get("path"));
+  expect(asked).not.toContain("/home/tass/projects/secret");
+});
+
+// Value: protects=a hardlinked file's details warn that rm may not free it, and an alias names the path its space is counted at;
+//   fails_when=the nlink > 1 note is lost or moves, or an alias reads as the counted path; why_new=the mock reports every entry with nlink 1;
+//   seam=none; no_claim=the scan's hardlink accounting (the mock reports the links)
+for (const c of [
+  { name: "movie.mp4", note: "Hardlinked (2 paths); space is counted once, here. rm here may not free it." },
+  { name: "notes.txt", note: "0 · counted at /home/tass/old/notes.txt. rm here may not free it." },
+]) {
+  test(`a hardlinked file's details say rm may not free it: ${c.name}`, async ({ page }) => {
+    const api = new PatchedApi();
+    api.patch = {
+      "/home/tass/Downloads/movie.mp4": { nlink: 2 },
+      "/home/tass/Downloads/notes.txt": { nlink: 2, hardlink_alias: true, hardlink_owner: "/home/tass/old/notes.txt" },
+    };
+    await api.install(page);
+    await page.goto(url(`/home/tass/Downloads?sel=/home/tass/Downloads/${c.name}`));
+    await expect(page.locator("aside .title")).toHaveText(c.name);
+    await expect(page.locator("aside .note")).toHaveText(c.note);
+    expect(await parts(page)).toEqual(["section.head", "p.note.muted", "dl", "div.actions"]);
+  });
+}
+
+// Value: protects=a mount point the snapshot does not cover names its filesystem, with no usage it lacks, no Open button and no CLI line;
+//   fails_when=the panel offers "Open this filesystem" with nowhere to go, prints null usage, or adds a size line or the CLI command;
+//   why_new=the guard's mount point has a root and usage; seam=none; no_claim=mount detection (the mock reports the mount)
+test("a mount point the snapshot does not cover offers no way in", async ({ page }) => {
+  const api = new PatchedApi();
+  api.tree.children![0]!.children![0]!.children!.push(dir("nas", []));
+  api.patch = { "/home/tass/nas": { kind: "mount", mount: { fs_type: "nfs4", used: null, total: null, root: null } } };
+  await api.install(page);
+  await page.goto(url("/home/tass?sel=/home/tass/nas"));
+  await expect(page.locator("aside .title")).toHaveText("nas");
+  await expect(page.locator("aside .note")).toHaveText("Separate filesystem: nfs4. Not scanned here.");
+  expect(await parts(page)).toEqual(["section.head", "p.note", "div.actions"]);
+  await expect(page.locator("aside .head .big")).toHaveCount(0);
+  await expect(page.locator("aside .cmd")).toHaveCount(0);
 });
