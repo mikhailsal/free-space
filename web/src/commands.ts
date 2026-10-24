@@ -141,14 +141,15 @@ export class Commands {
   selectPath(path: string | undefined): void {
     const rows = this.app.rows;
     const i = path ? rows.findIndex((r) => r.path === path) : -1;
-    this.app.sel = i >= 0 ? i : 0;
+    this.app.sel = Math.max(i, 0);
   }
 
   selectIdx(i: number, focus = true): void {
     const app = this.app;
-    if (app.rows.length === 0) return;
-    app.sel = Math.max(0, Math.min(app.rows.length - 1, i));
-    const r = app.rows[app.sel]!;
+    const sel = Math.max(0, Math.min(app.rows.length - 1, i));
+    const r = app.rows[sel];
+    if (!r) return;
+    app.sel = sel;
     app.route = { ...app.route, sel: r.path };
     history.replaceState(null, "", format(app.route));
     app.table.renderSelection(focus);
@@ -165,7 +166,8 @@ export class Commands {
     const i = app.sel;
     this.buildRows();
     app.sel = Math.max(0, Math.min(i, app.rows.length - 1));
-    if (app.rows[app.sel]) app.route = { ...app.route, sel: app.rows[app.sel]!.path };
+    const next = app.rows[app.sel];
+    if (next) app.route = { ...app.route, sel: next.path };
     history.replaceState(null, "", format(app.route));
     app.renderAll(true);
     toast("Hidden until the next scan", { label: "Undo", run: () => this.unhide(r.path) });

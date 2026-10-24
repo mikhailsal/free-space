@@ -7,6 +7,7 @@ import { h, replace } from "./dom";
 import * as fmt from "./format";
 import { openHelp, trapFocus } from "./help";
 import { controllers } from "./modes";
+import { must } from "./must";
 import { now } from "./page";
 import { ancestors, format, type Mode, type Place } from "./router";
 import * as pages from "./states";
@@ -99,7 +100,7 @@ export class Layout {
         type: "button",
         class: "help-btn",
         "aria-label": "Keyboard help",
-        onclick: () => openHelp(app.ui!.overlay),
+        onclick: () => openHelp(must(app.ui, "the main page").overlay),
         text: "?",
       }),
     );
@@ -139,7 +140,7 @@ export class Layout {
   private rootFor(path: string): RootOut | null {
     let best: RootOut | null = null;
     for (const r of this.app.status?.roots ?? []) {
-      const under = path === r.path || r.path === "/" || path.startsWith(r.path + "/");
+      const under = path === r.path || r.path === "/" || path.startsWith(`${r.path}/`);
       if (under && (!best || r.path.length > best.path.length)) best = r;
     }
     return best;
@@ -147,8 +148,8 @@ export class Layout {
 
   renderIdentity(): void {
     const app = this.app;
-    const ui = app.ui!;
-    const s = app.status!;
+    const ui = must(app.ui, "the main page");
+    const s = must(app.status, "the status");
     const live = app.latest ?? s;
     const ageS = (s.age_seconds ?? 0) + (now() - app.statusAt);
     const ageCls = ageS > 7 * 86400 ? "danger" : ageS > 36 * 3600 ? "warn" : "muted";
@@ -205,7 +206,7 @@ export class Layout {
 
   renderFolder(): void {
     const app = this.app;
-    const ui = app.ui!;
+    const ui = must(app.ui, "the main page");
     const chain = ancestors(app.place);
     const parts: Node[] = [];
     const link = (p: Place, label: string) =>
@@ -261,19 +262,19 @@ export class Layout {
   /** Draws the mode's form when what it shows changed; `force` draws it anyway (a field error). */
   renderControls(force = false): void {
     const app = this.app;
-    const ui = app.ui!;
     const r = app.route;
     if (force) this.formKey = "";
     const key = JSON.stringify([r.mode, app.scope, r.kind, r.min, r.untouched, r.name, r.icase, r.before, r.after, r.run, app.fieldError]);
     if (key === this.formKey) return;
     this.formKey = key;
+    const ui = must(app.ui, "the main page");
     const form = controllers[r.mode].form(app);
     ui.formrow.hidden = form === null;
     replace(ui.formrow, form);
   }
 
   renderSummary(): void {
-    const ui = this.app.ui!;
+    const ui = must(this.app.ui, "the main page");
     const v = this.app.view;
     const parts = v ? controllers[v.route.mode].summary(v, this.app) : [];
     replace(ui.summary, parts);

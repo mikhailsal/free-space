@@ -22,9 +22,9 @@ export function trapFocus(box: HTMLElement, e: KeyboardEvent): void {
   const f = [...box.querySelectorAll<HTMLElement>("button, [href], input, select, [tabindex='0']")].filter(
     (x) => !x.hasAttribute("disabled"),
   );
-  if (f.length === 0) return;
-  const first = f[0]!;
-  const last = f[f.length - 1]!;
+  const first = f[0];
+  const last = f[f.length - 1];
+  if (!first || !last) return;
   if (e.shiftKey && document.activeElement === first) {
     e.preventDefault();
     last.focus();

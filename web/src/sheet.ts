@@ -5,6 +5,7 @@ import * as api from "./api";
 import type { App } from "./app";
 import { h, replace } from "./dom";
 import { inspector, type InspectorHost } from "./inspector";
+import { must } from "./must";
 import { now } from "./page";
 import type { Entry, LsResponse } from "./types";
 
@@ -58,7 +59,7 @@ export class Sheet {
 
   render(): void {
     const app = this.app;
-    const ui = app.ui!;
+    const ui = must(app.ui, "the main page");
     const content = inspector(this.host(), app.view ? app.selected : null);
     const close = h("button", { type: "button", class: "sheet-close outline", onclick: () => this.close(true), text: "Close" });
     // <aside> stays the Details landmark; the panel inside is the sheet's dialog

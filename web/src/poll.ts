@@ -45,7 +45,7 @@ export class Poller {
     if (s.generation === null || s.snapshot_id === null) {
       app.status = s;
       app.statusAt = app.latestAt;
-      this.showNoSnapshot();
+      this.showNoSnapshot(s);
       return;
     }
     if (app.page !== "main") {
@@ -75,7 +75,11 @@ export class Poller {
       if (app.page === "main") app.notices.render();
       return;
     }
-    const d = e.detail!;
+    const d = e.detail;
+    if (!d) {
+      console.error(e);
+      return;
+    }
     switch (d.code) {
       case "NO_SNAPSHOT":
         void this.poll();
@@ -99,11 +103,11 @@ export class Poller {
     }
   }
 
-  private showNoSnapshot(): void {
+  private showNoSnapshot(s: Status): void {
     const app = this.app;
     app.page = "nosnap";
     app.ui = null;
-    app.root.replaceChildren(pages.noSnapshot(app.latest!, now(), app.latestAt));
+    app.root.replaceChildren(pages.noSnapshot(s, now(), app.latestAt));
   }
 
   showSession(): void {

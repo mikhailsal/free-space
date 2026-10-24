@@ -21,7 +21,7 @@ export class Hidden {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(PREFIX) && k !== this.key) localStorage.removeItem(k);
+        if (k?.startsWith(PREFIX) && k !== this.key) localStorage.removeItem(k);
       }
       const raw = localStorage.getItem(this.key);
       const parsed: unknown = raw ? JSON.parse(raw) : [];

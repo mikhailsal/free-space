@@ -32,7 +32,7 @@ export function scanningLine(s: Status, now: number, fetchedAt: number): string 
   const el = fmt.elapsed(sc.elapsed_seconds + tick);
   const p = s.progress;
   const what = sc.op === "refresh" ? "Refreshing" : "Scanning";
-  if (p && p.entries_expected) {
+  if (p?.entries_expected) {
     return `${what} ${sc.path} · ${fmt.bigCount(p.entries_seen)} of ~${fmt.bigCount(p.entries_expected)} files · ${p.percent ?? 0}% · ${el}`;
   }
   return `${what} ${sc.path} · ${el}`;
@@ -76,7 +76,7 @@ export function sessionEnded(lastPath: string): HTMLElement {
  * the server stops, whatever else binds the port answers on this origin. */
 function fixRow(fix: string): HTMLElement {
   const cmd = fix.replace(/^ask a human to run: /, "");
-  return /^(sudo )?freespace [a-z-]+( [^\x00-\x1f\x7f]*)?$/.test(cmd) ? cmdRow("Fix:", cmd) : h("p", { text: `Fix: ${fix}` });
+  return /^(sudo )?freespace [a-z-]+( [\s\S]*)?$/.test(cmd) && !fmt.hasControl(cmd) ? cmdRow("Fix:", cmd) : h("p", { text: `Fix: ${fix}` });
 }
 
 export function noAccess(e: ErrorDetail): HTMLElement {

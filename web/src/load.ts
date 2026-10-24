@@ -8,6 +8,7 @@ import type { App } from "./app";
 import { h, replace } from "./dom";
 import { WHEN_RE } from "./find";
 import { controllers } from "./modes";
+import { must } from "./must";
 import { stateBox } from "./page";
 import { format, parentOf, type Route } from "./router";
 import { continuity, nearestExisting } from "./snapshot";
@@ -31,7 +32,7 @@ export class Loader {
     this.abort = ac;
     this.setLoading(true);
     try {
-      const view = await controllers[route.mode].fetch(route, app.status!.snapshot_id!, ac.signal);
+      const view = await controllers[route.mode].fetch(route, must(app.status?.snapshot_id, "the snapshot"), ac.signal);
       if (seq !== this.seq) return;
       app.view = view;
       app.bodyState = null;
@@ -54,11 +55,11 @@ export class Loader {
 
   private loadError(e: unknown, route: Route): void {
     const app = this.app;
-    if (!(e instanceof ApiError) || e.kind !== "api") {
+    if (!(e instanceof ApiError) || e.kind !== "api" || !e.detail) {
       app.poller.onFailure(e);
       return;
     }
-    const d = e.detail!;
+    const d = e.detail;
     switch (d.code) {
       case "PATH_NOT_FOUND":
         app.view = null;

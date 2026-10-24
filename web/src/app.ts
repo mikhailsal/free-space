@@ -11,6 +11,7 @@ import { Hidden } from "./hidden";
 import { onKey } from "./keys";
 import { Layout, type Ui } from "./layout";
 import { Loader } from "./load";
+import { must } from "./must";
 import type { Page, View } from "./page";
 import { PageNotices } from "./page-notices";
 import { Poller } from "./poll";
@@ -83,9 +84,9 @@ export class App {
 
   /** The first status with a snapshot: draw the page, then load the route. */
   enterMain(): void {
-    const s = this.status!;
+    const s = must(this.status, "the status");
     this.page = "main";
-    this.hidden.load(s.host, s.snapshot_id!);
+    this.hidden.load(s.host, must(s.snapshot_id, "the snapshot"));
     this.layout.build();
     if (!this.route.path) {
       this.route.path = s.roots[0]?.path ?? "/";

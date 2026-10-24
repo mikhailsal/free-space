@@ -26,6 +26,20 @@ test("a running first scan shows progress and the page opens itself when it ends
   await expect(page.locator(".crumbs h1")).toHaveText("tass");
 });
 
+// Value: protects=a scan whose progress knows its total shows files seen of the expected and the percent;
+//   fails_when=the entries_expected test is inverted or dropped, or the line loses a part; why_new=no test or guard
+//   state reported progress, so only the elapsed-only line ran; seam=none; no_claim=the scanner's estimate (the mock reports it)
+test("a scan that knows its total shows the files seen and the percent", async ({ page }) => {
+  const api = new MockApi();
+  api.noSnapshot = true;
+  api.scanning = { op: "scan", path: "/", pid: 42, since: NOW, elapsed_seconds: 48 };
+  api.progress = { stage: "walk", entries_seen: 1_240_000, entries_expected: 2_100_000, percent: 59 };
+  await page.clock.install();
+  await api.install(page);
+  await page.goto(url());
+  await expect(page.locator("#fp-scan")).toHaveText("Scanning / · 1.2 M of ~2.1 M files · 59% · 48 s");
+});
+
 test("no token: session ended, with the command to start again", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto("/#/home/tass");
@@ -70,6 +84,24 @@ test("snapshot not readable by this user (DX D8)", async ({ page }) => {
   await page.goto(url());
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Cannot read the snapshot");
   await expect(page.locator(".cmdrow")).toContainText("sudo freespace install-timer");
+});
+
+// Value: protects=a server fix with a control character in its tail is shown as text, never as a copyable command;
+//   fails_when=the fix row drops its control check (a terminal escape would paste with the command); why_new=the
+//   readable-snapshot test passes a clean fix only; seam=none; no_claim=what the server puts in a fix (the mock sends it)
+test("a fix with a control character is not offered as a command", async ({ page }) => {
+  const api = new MockApi();
+  api.failWith = {
+    status: 403,
+    code: "SNAPSHOT_ACCESS",
+    message: "cannot read /var/lib/freespace/snapshot.db",
+    fix: "sudo freespace install-timer --user\x1b[8m",
+  };
+  await api.install(page);
+  await page.goto(url());
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Cannot read the snapshot");
+  await expect(page.locator(".cmdrow")).toHaveCount(0);
+  await expect(page.getByText("Fix: sudo freespace install-timer")).toBeVisible();
 });
 
 test("a folder that is not in the snapshot offers the way up", async ({ page }) => {

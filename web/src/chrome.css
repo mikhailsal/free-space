@@ -68,6 +68,9 @@
   display: grid;
   place-items: center;
 }
+.overlay[hidden] {
+  display: none;
+}
 .scrim {
   position: absolute;
   inset: 0;
