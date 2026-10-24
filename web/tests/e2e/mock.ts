@@ -228,6 +228,13 @@ export class MockApi {
     return at(this.flat(tree), path).node;
   }
 
+  /** The entries of the folder at this path, for a test to add to; throws when it is not a folder. */
+  kids(path: string): Node[] {
+    const c = this.node(path).children;
+    if (!c) throw new Error(`mock: ${path} is not a folder`);
+    return c;
+  }
+
   header() {
     const unknown = [...this.flat().values()].filter((f) => f.node.denied).map((f) => f.path);
     return {

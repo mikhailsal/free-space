@@ -62,9 +62,8 @@ const KEYS: { key: string; from: string; parts?: number; folder: string; sel: st
 for (const k of KEYS) {
   test(`${k.key} from ${k.from} lands on ${k.sel} in ${k.folder} (Pass 6)`, async ({ page }) => {
     const api = new MockApi();
-    const tass = api.node("/home/tass");
-    for (let i = 1; i <= (k.parts ?? 0); i++)
-      tass.children?.push(file(`part-${String(i).padStart(2, "0")}.bin`, (400 - 5 * i) * M, NOW - i * DAY));
+    const tass = api.kids("/home/tass");
+    for (let i = 1; i <= (k.parts ?? 0); i++) tass.push(file(`part-${String(i).padStart(2, "0")}.bin`, (400 - 5 * i) * M, NOW - i * DAY));
     await api.install(page);
     await page.goto(url(k.from));
     await expect(rows(page).first()).toBeVisible();
@@ -215,7 +214,7 @@ test("Changes lists growth and removals with glyphs, not color alone (D8)", asyn
   const api = new MockApi();
   api.prevTree = structuredClone(api.tree);
   const tass = api.node("/home/tass");
-  tass.children = (tass.children ?? []).filter((c) => c.name !== "old");
+  tass.children = api.kids("/home/tass").filter((c) => c.name !== "old");
   tass.children.push({ name: "new.bin", kind: "file", allocated: 2 ** 30 });
   await api.install(page);
   await page.goto(url());
@@ -288,7 +287,7 @@ for (const c of [
 //   why_new=the guard's mount point has a root and usage; seam=none; no_claim=mount detection (the mock reports the mount)
 test("a mount point the snapshot does not cover offers no way in", async ({ page }) => {
   const api = new PatchedApi();
-  api.node("/home/tass").children?.push(dir("nas", []));
+  api.kids("/home/tass").push(dir("nas", []));
   api.patch = { "/home/tass/nas": { kind: "mount", mount: { fs_type: "nfs4", used: null, total: null, root: null } } };
   await api.install(page);
   await page.goto(url("/home/tass?sel=/home/tass/nas"));
