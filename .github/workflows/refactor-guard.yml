@@ -17,8 +17,10 @@ permissions:
   contents: read
 
 # A new push or the refactor label starts the guard again and cancels the run in
-# progress. Any other label also fires `labeled`; that run does nothing (the jobs'
-# `if`), and a group of its own keeps it from cancelling a guard that is running.
+# progress. Any other label also fires `labeled` and runs the guard once more, in
+# a group of its own so it cannot cancel a guard that is running. Skipping its
+# jobs instead would not do: a skipped job reports success, and the latest run on
+# a commit is the one its checks show, so a label would hide a red guard.
 concurrency:
   group: refactor-guard-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'refactor' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
@@ -30,7 +32,7 @@ env:
 
 jobs:
   rust-diff:
-    if: contains(github.event.pull_request.labels.*.name, 'refactor') && (github.event.action != 'labeled' || github.event.label.name == 'refactor')
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -81,7 +83,7 @@ jobs:
           overwrite: true
 
   pixel-diff:
-    if: contains(github.event.pull_request.labels.*.name, 'refactor') && (github.event.action != 'labeled' || github.event.label.name == 'refactor')
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -146,7 +148,7 @@ jobs:
           overwrite: true
 
   coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'refactor') && (github.event.action != 'labeled' || github.event.label.name == 'refactor')
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     continue-on-error: true
