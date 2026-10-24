@@ -1620,7 +1620,7 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: Problem; Outside voice — O1 (D19); Scope Challenge — S1 (App.notices), S2b (renderSummary)
   - Files: web/src/app.ts, web/src/ (new modules)
   - Verify: e2e green incl. out-of-order tests; refactor-guard pixel-diff 0 px
-- [ ] **T9 (P1, human: ~2h / CC: ~15min)** — web — Split app.css at its section comments
+- [x] **T9 (P1, human: ~2h / CC: ~15min)** — web — Split app.css at its section comments
   - Surfaced by: Section 2 — C3 (D12)
   - Files: web/src/app.css, web/src/main.ts
   - Verify: refactor-guard pixel-diff 0 px

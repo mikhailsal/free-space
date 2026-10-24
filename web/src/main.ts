@@ -1,5 +1,9 @@
 import "./tokens.css";
 import "./app.css";
+import "./shell.css";
+import "./work.css";
+import "./inspector.css";
+import "./chrome.css";
 import "./responsive.css";
 import { App } from "./app";
 
