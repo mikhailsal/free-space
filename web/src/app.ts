@@ -95,6 +95,8 @@ export class App {
   private biggestCache = new Map<string, Promise<Entry[] | null>>();
   private formKey = "";
   private lastFind: Partial<Route> = {};
+  /** set by setMode("find"): the next apply puts the cursor in the name field once it draws the form */
+  private focusName = false;
   private animatedFill = false;
   private sheetOpen = false;
 
@@ -356,6 +358,8 @@ export class App {
   private apply(next: Route): void {
     const prev = this.route;
     this.route = next;
+    const focusName = this.focusName;
+    this.focusName = false;
     if (this.page !== "main") return;
     if (this.view && sameView(prev, next)) {
       this.selectPath(next.sel);
@@ -369,6 +373,7 @@ export class App {
     // the tab and the form follow the key press at once; rows follow the answer
     this.renderTabs();
     if (this.ui) this.renderControls();
+    if (focusName) document.getElementById("f-name")?.focus();
     void this.load();
   }
 
@@ -396,8 +401,9 @@ export class App {
       after: undefined,
       run: undefined,
     };
+    // a timer could run before the hashchange that draws the form, so apply focuses it
+    this.focusName = m === "find";
     this.navigate(m === "find" ? { ...clean, ...this.lastFind } : clean);
-    if (m === "find") window.setTimeout(() => document.getElementById("f-name")?.focus(), 0);
   }
 
   open(r: Row): void {

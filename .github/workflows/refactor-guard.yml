@@ -1,0 +1,185 @@
+# A pull request labeled `refactor` promises no change in behavior (every debt PR
+# of docs/designs/code-quality-gates.md carries the label, D23). These jobs hold
+# it to that on GitHub's runners, base against head, where base is where the PR
+# branched off its base branch:
+#   rust-diff   both CLI builds give the same answers (scripts/rust-diff.sh)
+#   pixel-diff  both GUI builds draw every view and state alike, to the byte of
+#               each PNG shot
+#   coverage    head's line coverage, per function for the Rust files the PR
+#               touches; it informs and never fails the PR
+name: refactor-guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refactor-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  rust-diff:
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: base checkout
+        run: git worktree add --detach "$RUNNER_TEMP/base" "$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+      # All three jobs run head's harness. A refactor PR that changes it is judged
+      # by the harness it changed, so the PR shows which of its files those are.
+      - name: harness files this PR changes
+        run: |
+          git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA" -- \
+            .github/workflows/refactor-guard.yml scripts/rust-diff.sh scripts/coverage-functions.sh \
+            web/playwright.guard.config.ts web/tests/guard web/tests/e2e/mock.ts web/tests/e2e/serve.ts web/tests/shots/home.ts |
+            while read -r f; do
+              echo "::warning file=$f::This refactor PR changes the guard's own harness, which then judges the PR. Review this file first."
+            done
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # build.rs bundles web/ with bun (eng D5)
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      # Base builds in its own checkout, with its own .cargo and toolchain files,
+      # and into a target dir of its own. In head's, cargo would take head's
+      # freespace-core as base's: workspace members are hashed by their path
+      # under the workspace root, and base's sources are older than that build.
+      - name: build head and base
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cargo build --release --locked --bin freespace
+          cp target/release/freespace "$RUNNER_TEMP/bin/head"
+          (cd "$RUNNER_TEMP/base" && cargo build --release --locked --bin freespace --target-dir "$RUNNER_TEMP/base-target")
+          cp "$RUNNER_TEMP/base-target/release/freespace" "$RUNNER_TEMP/bin/base"
+      - name: base and head answer alike
+        run: scripts/rust-diff.sh "$RUNNER_TEMP/bin/base" "$RUNNER_TEMP/bin/head" "$RUNNER_TEMP/rust-diff"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-diff
+          path: ${{ runner.temp }}/rust-diff
+          retention-days: 14
+          # a re-run of the job uploads under the same name
+          overwrite: true
+
+  pixel-diff:
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: base checkout
+        run: git worktree add --detach "$RUNNER_TEMP/base" "$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: build head and base
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          cd "$RUNNER_TEMP/base/web"
+          bun install --frozen-lockfile
+          bun run build
+      # head's spec, mock and Playwright drive both builds. Each run only takes
+      # the shots, into a dir of its own; the verdict compares the PNG files byte
+      # for byte, as Playwright's own comparison skips pixels it takes for
+      # anti-aliasing (pixelmatch's includeAA is off and cannot be set).
+      - run: bunx playwright install --with-deps chromium
+      - name: shoot base, base again and head
+        run: |
+          for take in base base-again head; do
+            dist=$RUNNER_TEMP/base/web/dist
+            [ "$take" != head ] || dist=$PWD/dist
+            GUARD_DIST=$dist GUARD_SHOTS=$RUNNER_TEMP/shots/$take bunx playwright test -c playwright.guard.config.ts --update-snapshots=all --reporter=list
+          done
+      - name: base again matches base, or the comparison is unreliable
+        run: diff -rq "$RUNNER_TEMP/shots/base" "$RUNNER_TEMP/shots/base-again"
+      - name: head matches base
+        run: |
+          diff -rq "$RUNNER_TEMP/shots/base" "$RUNNER_TEMP/shots/head" && exit 0
+          # Draw what differs: head against base's shots, a diff image per shot
+          # Playwright sees differ (none for a change in anti-aliased pixels only).
+          GUARD_DIST="$PWD/dist" GUARD_SHOTS="$RUNNER_TEMP/shots/base" bunx playwright test -c playwright.guard.config.ts --reporter=list --output="$RUNNER_TEMP/diff" || true
+          exit 1
+      # shots/: every shot of each take; diff/: before, after and diff of each shot Playwright sees differ
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pixel-diff
+          path: |
+            ${{ runner.temp }}/shots
+            ${{ runner.temp }}/diff
+          retention-days: 14
+          # a re-run of the job uploads under the same name
+          overwrite: true
+
+  coverage:
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: cargo llvm-cov
+        run: |
+          mkdir -p coverage
+          cargo llvm-cov --workspace --locked --lcov --output-path coverage/lcov.info
+          cargo llvm-cov report --json --output-path coverage/llvm-cov.json
+      - name: lines per function of the touched Rust files
+        run: |
+          mapfile -t touched < <(git diff --name-only --diff-filter=d "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA" -- '*.rs')
+          {
+            echo "### Line coverage per function of the Rust files this PR touches"
+            if [ "${#touched[@]}" -eq 0 ]; then
+              echo "This PR touches no Rust file."
+            else
+              scripts/coverage-functions.sh coverage/llvm-cov.json "${touched[@]}" > coverage/functions.tsv
+              echo "| file | line | function | lines | covered |"
+              echo "|---|---:|---|---:|---:|"
+              # a | in a name would end its table cell
+              awk -F '\t' '{ for (i = 1; i <= NF; i++) gsub(/\|/, "\\|", $i); printf "| %s | %s | `%s` | %s | %s |\n", $1, $2, $3, $4, $5 }' coverage/functions.tsv
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 14
+          # a re-run of the job uploads under the same name
+          overwrite: true

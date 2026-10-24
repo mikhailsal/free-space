@@ -1,6 +1,7 @@
 // scripts/test-files.sh, the pre-gate runner: each test file goes to its own runner in web/, a failing runner's
-// status is the script's, shots render into a temp dir, and bad input exits 2 before anything runs.
-// Stub bun and bunx stand in for the real runners; they record argv, cwd, $SHOTS_DIR, $E2E_PORT and an open fd 9.
+// status is the script's, shots and guard shots render into a temp dir, and bad input exits 2 before anything runs.
+// Stub bun and bunx stand in for the real runners; they record argv, cwd, $SHOTS_DIR, $E2E_PORT, an open fd 9 and
+// $GUARD_SHOTS.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import {
   chmodSync,
@@ -20,14 +21,19 @@ import { dirname, join } from "node:path";
 const repo = realpathSync(join(import.meta.dir, "../../.."));
 const web = join(repo, "web");
 
-// `bun -e` (the script's free-port pick) prints PORT. Any other call appends "name|cwd|argv|$SHOTS_DIR|$E2E_PORT|fd9"
+// `bun -e` (the script's free-port pick) prints PORT. Any other call appends "name|cwd|argv|$SHOTS_DIR|$E2E_PORT|fd9|$GUARD_SHOTS"
 // to $STUB_LOG (fd9 is "open" when the script's lock reached the runner); if $STUB_GO is set, waits until that file
-// exists (10 s at most) and appends "released". Exits with $STUB_EXIT (default 0).
+// exists (10 s at most) and appends "released". With $STUB_SHOT and $GUARD_SHOTS set it takes a shot: view.png holds
+// $STUB_SHOT, or the stub's pid if that is "pid". Exits with $STUB_EXIT (default 0).
 const PORT = "41730";
 const stub = `#!/bin/sh
 if [ "$1" = -e ]; then echo ${PORT}; exit 0; fi
 fd9=; [ ! -e /proc/self/fd/9 ] || fd9=open
-printf '%s|%s|%s|%s|%s|%s\\n' "\${0##*/}" "$(pwd -P)" "$*" "\${SHOTS_DIR:-}" "\${E2E_PORT:-}" "$fd9" >> "$STUB_LOG"
+printf '%s|%s|%s|%s|%s|%s|%s\\n' "\${0##*/}" "$(pwd -P)" "$*" "\${SHOTS_DIR:-}" "\${E2E_PORT:-}" "$fd9" "\${GUARD_SHOTS:-}" >> "$STUB_LOG"
+if [ -n "\${STUB_SHOT:-}" ] && [ -n "\${GUARD_SHOTS:-}" ]; then
+  shot=$STUB_SHOT; [ "$shot" != pid ] || shot=$$
+  printf '%s' "$shot" > "$GUARD_SHOTS/view.png"
+fi
 n=0
 [ -z "\${STUB_GO:-}" ] || { while [ ! -e "$STUB_GO" ] && [ $n -lt 500 ]; do sleep 0.02; n=$((n + 1)); done; echo released >> "$STUB_LOG"; }
 exit "\${STUB_EXIT:-0}"
@@ -63,7 +69,8 @@ afterAll(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-// The environment of one script run: the stubs first on PATH, a fresh call log, and no inherited $SHOTS_DIR or $E2E_PORT.
+// The environment of one script run: the stubs first on PATH, a fresh call log, and no inherited $SHOTS_DIR, $E2E_PORT
+// or $GUARD_SHOTS.
 function stubEnv(stubExit = 0, extra: Record<string, string> = {}) {
   const log = join(tmp, `${runs++}.log`);
   const env: Record<string, string | undefined> = {
@@ -75,6 +82,7 @@ function stubEnv(stubExit = 0, extra: Record<string, string> = {}) {
   };
   delete env.SHOTS_DIR;
   delete env.E2E_PORT;
+  delete env.GUARD_SHOTS;
   return { log, env };
 }
 
@@ -82,8 +90,8 @@ function stubEnv(stubExit = 0, extra: Record<string, string> = {}) {
 function readCalls(log: string) {
   const lines = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : [];
   return lines.map((l) => {
-    const [name, cwd, argv, shotsDir, port, fd9] = l.split("|") as [string, string, string, string, string, string];
-    return { name, cwd, argv, shotsDir, port, fd9 };
+    const [name, cwd, argv, shotsDir, port, fd9, guardDir] = l.split("|") as [string, string, string, string, string, string, string];
+    return { name, cwd, argv, shotsDir, port, fd9, guardDir };
   });
 }
 
@@ -101,6 +109,7 @@ const testFiles = [
   "web/tests/e2e/browse.spec.ts",
   "web/tests/shots/readme.spec.ts",
   "web/tests/shots/b.spec.ts",
+  "web/tests/guard/views.spec.ts",
 ];
 const unit = "web/tests/unit/format.test.ts";
 const e2e = "web/tests/e2e/find.spec.ts";
@@ -108,6 +117,9 @@ const shots = "web/tests/shots/readme.spec.ts";
 const unitCall = ["bun", "test ./tests/unit/format.test.ts"];
 const e2eCall = ["bunx", "playwright test tests/e2e/find.spec.ts"];
 const shotsCall = ["bunx", "playwright test -c playwright.shots.config.ts tests/shots/readme.spec.ts"];
+const guard = "web/tests/guard/views.spec.ts";
+const guardCall = ["bunx", "playwright test -c playwright.guard.config.ts --update-snapshots=all tests/guard/views.spec.ts"];
+const guardCalls = [guardCall, guardCall];
 
 type Row = { name: string; args: string[]; calls: string[][]; code?: number; stubExit?: number; stderr?: string };
 
@@ -119,6 +131,16 @@ const rows: Row[] = [
     name: "one call with all three kinds runs unit, e2e, then shots, whatever the argument order",
     args: [shots, e2e, unit],
     calls: [unitCall, e2eCall, shotsCall],
+  },
+  {
+    name: "a guard file takes the shots twice with the guard config, each time into a dir of its own",
+    args: [guard],
+    calls: guardCalls,
+  },
+  {
+    name: "all four kinds run unit, e2e, shots, then the guard, whatever the argument order",
+    args: [guard, shots, e2e, unit],
+    calls: [unitCall, e2eCall, shotsCall, ...guardCalls],
   },
   {
     name: "two files of each kind: one call per runner, the files in argument order",
@@ -138,6 +160,13 @@ const rows: Row[] = [
   },
   { name: "a failing e2e runner stops the shots runner", args: [shots, e2e], stubExit: 3, code: 3, calls: [e2eCall] },
   { name: "a failing shots runner's status is the script's status", args: [shots], stubExit: 3, code: 3, calls: [shotsCall] },
+  {
+    name: "a guard run that fails taking the shots is the script's status, and the second does not start",
+    args: [guard],
+    stubExit: 3,
+    code: 3,
+    calls: [guardCall],
+  },
   { name: "no arguments: usage on stderr, exit 2, nothing runs", args: [], code: 2, stderr: "usage:", calls: [] },
   {
     name: "a path no runner owns: exit 2, nothing runs",
@@ -196,11 +225,48 @@ test("shots render into a fresh temp dir, never docs/img, and the dir is gone af
   expect(existsSync(dir)).toBe(false);
 });
 
-test("e2e and shots get the free port the script picked, unit tests get none", () => {
+test("the two guard runs shoot into two dirs of one fresh temp dir, gone afterwards, with the port and without the lock", () => {
+  const got = run([unit, shots, guard]);
+  expect(got.code).toBe(0);
+  const [first, second] = got.calls.slice(2);
+  expect(first?.guardDir).toMatch(/^\/.*\/guard-a$/);
+  expect(second?.guardDir).toBe(`${dirname(first?.guardDir ?? "")}/guard-b`);
+  expect(got.calls.slice(0, 2).map((c) => c.guardDir)).toEqual(["", ""]);
+  expect(first?.guardDir.startsWith(repo)).toBe(false);
+  expect(existsSync(dirname(first?.guardDir ?? ""))).toBe(false);
+  expect(got.calls.map((c) => c.port)).toEqual(["", PORT, PORT, PORT]);
+  expect(got.calls.map((c) => c.fd9)).toEqual(["", "", "", ""]);
+});
+
+// Value: protects=the guard's verdict is the byte comparison of the two runs' shots, as refactor-guard's on GitHub;
+//   fails_when=the diff is dropped or its status lost (two different takes pass), or it compares one dir with itself;
+//   why_new=Playwright's own comparison skips pixels it takes for anti-aliasing, so the runs now only take shots;
+//   seam=none; no_claim=real PNGs (the stub writes text)
+test("the guard passes when both runs take the same shots, and fails naming the shot when they differ", () => {
+  const same = stubEnv(0, { STUB_SHOT: "same" });
+  const ok = Bun.spawnSync(["sh", script, guard], { cwd: tmp, env: same.env });
+  expect(ok.exitCode, ok.stderr.toString()).toBe(0);
+  const differ = stubEnv(0, { STUB_SHOT: "pid" });
+  const bad = Bun.spawnSync(["sh", script, guard], { cwd: tmp, env: differ.env });
+  expect(bad.exitCode).toBe(1);
+  expect(bad.stderr.toString()).toMatch(/guard-a\/view\.png.*guard-b\/view\.png.*differ/);
+  expect(bad.stderr.toString()).toContain("two runs of one build took different shots");
+  expect(readCalls(differ.log)).toHaveLength(2);
+});
+
+// Value: protects=guard files run alone get the free port and no inherited lock, as e2e and shots files do (one block);
+//   fails_when=$guard leaves the lock-and-port condition: the guard then builds web/dist unlocked and browses on 4174;
+//   why_new=the other port checks pass a shots file beside the guard, and that file's own entry masks a missing one;
+//   seam=none; no_claim=the lock itself (the wait test below uses e2e and shots files)
+test("e2e, shots and guard get the free port the script picked, unit tests get none", () => {
   const got = run([shots, e2e, unit]);
   expect(got.code).toBe(0);
   expect(got.calls.map((c) => c.port)).toEqual(["", PORT, PORT]);
   expect(run([shots]).calls.map((c) => c.port)).toEqual([PORT]);
+  expect(run([guard]).calls.map((c) => [c.port, c.fd9])).toEqual([
+    [PORT, ""],
+    [PORT, ""],
+  ]);
 });
 
 // Only bunx is stubbed here, so `bun -e` is the real free-port pick.
@@ -234,6 +300,88 @@ console.log(JSON.stringify([base, shots].map(show)));`;
     const config = [`http://127.0.0.1:${want}`, `http://127.0.0.1:${want}/`, `bun run build && PORT=${want} bun tests/e2e/serve.ts`, reuse];
     expect(JSON.parse(done.stdout.toString()), `E2E_PORT=${port}`).toEqual([config, config]);
   }
+});
+
+// The guard serves the build in $GUARD_DIST, or builds web/dist first, on $E2E_PORT (else 4174) and never on a server
+// already there. Its shots are stable: no retry, animations off, and partial raster off (with it on, one build repainted
+// a form field's border one level apart on 3 of 6 runs). Its own comparison only draws the differences (the verdict
+// compares the PNG files), as strictly as Playwright allows: no differing pixel, no colour tolerance.
+test("the guard config serves the build it is given, shoots stably and compares as strictly as Playwright allows", () => {
+  const read = `const c = (await import("./playwright.guard.config.ts")).default;
+const { baseURL, launchOptions } = c.use;
+const { url, command, reuseExistingServer } = c.webServer;
+console.log(JSON.stringify([baseURL, url, command, reuseExistingServer, c.snapshotPathTemplate, c.testDir, c.retries,
+  c.expect.toHaveScreenshot, launchOptions.args]));`;
+  const strict = [0, { maxDiffPixels: 0, threshold: 0, animations: "disabled", caret: "hide" }, ["--disable-partial-raster"]];
+  for (const [vars, want] of [
+    [
+      { E2E_PORT: "41732", GUARD_DIST: "/tmp/base/web/dist", GUARD_SHOTS: "/tmp/guard" },
+      ["41732", "PORT=41732 bun tests/e2e/serve.ts", "/tmp/guard/{arg}{ext}"],
+    ],
+    [{}, ["4174", "bun run build && PORT=4174 bun tests/e2e/serve.ts", "guard-shots/{arg}{ext}"]],
+  ] as const) {
+    const env: Record<string, string | undefined> = { ...process.env, ...vars };
+    for (const k of ["E2E_PORT", "GUARD_DIST", "GUARD_SHOTS"]) if (!(k in vars)) delete env[k];
+    const done = Bun.spawnSync([process.execPath, "-e", read], { cwd: web, env });
+    expect(done.exitCode, done.stderr.toString()).toBe(0);
+    const [port, command, template] = want;
+    const url = `http://127.0.0.1:${port}`;
+    expect(JSON.parse(done.stdout.toString())).toEqual([url, `${url}/`, command, false, template, "tests/guard", ...strict]);
+  }
+});
+
+// A copy of tests/e2e/serve.ts sits in tmp/serve/tests/e2e/, so its default build folder (dist/ two levels up) is
+// tmp/serve/dist, never the real web/dist. Starts it on a free port with `env` added, answers one GET, stops it.
+async function served(env: Record<string, string>, path: string) {
+  const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+  const port = probe.port;
+  await probe.stop(true);
+  const inherited: Record<string, string | undefined> = { ...process.env, PORT: String(port) };
+  delete inherited.GUARD_DIST;
+  const p = Bun.spawn([process.execPath, join(tmp, "serve/tests/e2e/serve.ts")], {
+    cwd: join(tmp, "serve"),
+    env: { ...inherited, ...env },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  try {
+    const out = p.stdout.getReader();
+    let said = "";
+    while (!said.includes("ready")) {
+      const chunk = await out.read();
+      if (chunk.done) throw new Error(`serve.ts did not start: ${await new Response(p.stderr).text()}`);
+      said += new TextDecoder().decode(chunk.value);
+    }
+    const res = await fetch(`http://127.0.0.1:${port}${path}`);
+    return { status: res.status, csp: res.headers.get("content-security-policy") ?? "", body: await res.text() };
+  } finally {
+    p.kill();
+    await p.exited;
+  }
+}
+
+// Value: protects=serve.ts serves the build in $GUARD_DIST (absolute or relative), else the dist/ beside tests/; the guard's
+//   base shots are taken from it; fails_when=$GUARD_DIST is ignored or loses its trailing slash, or an empty value beats
+//   the default: pixel-diff then compares head with itself; why_new=the config test reads only the server command, no
+//   test starts serve.ts with $GUARD_DIST set; seam=none; no_claim=Playwright driving it; a copy of serve.ts stands in
+test("serve.ts serves the build in $GUARD_DIST, absolute or relative, else the dist/ beside tests/", async () => {
+  mkdirSync(join(tmp, "serve/tests/e2e"), { recursive: true });
+  copyFileSync(join(web, "tests/e2e/serve.ts"), join(tmp, "serve/tests/e2e/serve.ts"));
+  mkdirSync(join(tmp, "serve/dist"));
+  writeFileSync(join(tmp, "serve/dist/index.html"), "default build");
+  mkdirSync(join(tmp, "other"));
+  writeFileSync(join(tmp, "other/only.js"), "only in other");
+
+  const fallback = await served({}, "/");
+  expect([fallback.status, fallback.body]).toEqual([200, "default build"]);
+  expect(fallback.csp).toContain("default-src 'self'");
+  expect((await served({}, "/only.js")).status).toBe(404);
+  for (const dist of [join(tmp, "other"), "../other", "../other/"]) {
+    const got = await served({ GUARD_DIST: dist }, "/only.js");
+    expect([dist, got.status, got.body]).toEqual([dist, 200, "only in other"]);
+    expect(got.csp).toBe(fallback.csp);
+  }
+  expect((await served({ GUARD_DIST: "" }, "/")).body).toBe("default build");
 });
 
 // The children of `pid` that run `name` (Linux /proc).
@@ -342,19 +490,22 @@ const e2eInputs = [
   "web/bun.lock",
   "web/tsconfig.json",
   "web/playwright.config.ts",
+  "web/tests/e2e/mock.ts",
   "web/tests/e2e/serve.ts",
 ];
 
 // .gstack/pregate.json lists test paths literally (no globs), so a new e2e spec must be added to every list by hand.
+// A list may name other tests besides (serve.ts also selects the test of its $GUARD_DIST).
 test("every pregate dependency that selects e2e specs selects all of them, and every listed test exists", () => {
   const config = JSON.parse(readFileSync(join(repo, ".gstack/pregate.json"), "utf8")) as { dependencies: Record<string, string[]> };
   const specs = readdirSync(join(web, "tests/e2e"))
     .filter((f) => f.endsWith(".spec.ts"))
     .map((f) => `web/tests/e2e/${f}`)
     .sort();
+  const e2e = (tests: string[]) => tests.filter((t) => t.startsWith("web/tests/e2e/")).sort();
   for (const [glob, tests] of Object.entries(config.dependencies)) {
     for (const t of tests) expect(existsSync(join(repo, t)), `${glob} lists ${t}`).toBe(true);
-    if (tests.some((t) => t.startsWith("web/tests/e2e/"))) expect([...tests].sort(), glob).toEqual(specs);
+    if (tests.some((t) => t.startsWith("web/tests/e2e/"))) expect(e2e(tests), glob).toEqual(specs);
   }
-  for (const input of e2eInputs) expect([...(config.dependencies[input] ?? [])].sort(), input).toEqual(specs);
+  for (const input of e2eInputs) expect(e2e(config.dependencies[input] ?? []), input).toEqual(specs);
 });

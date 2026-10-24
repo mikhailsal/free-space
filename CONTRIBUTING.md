@@ -34,6 +34,8 @@ bunx playwright test
 
 `bunx biome format --write .` fixes the formatting (Biome 2.6.2, line width 140, two-space indent).
 
+`bun test tests/unit` also runs `scripts/rust-diff.sh` and `scripts/coverage-functions.sh` on made-up input, so `jq` and `c++filt` (from binutils) must be installed.
+
 A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh` must be clean.
 
 Scanning your whole disk while developing is slow; point commands at a small tree with a private snapshot instead:
@@ -54,7 +56,15 @@ cargo run -- ls ~/some/folder
 
 ## Pull requests
 
-One topic per PR, with tests. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). Add a line to `CHANGELOG.md` under Unreleased for anything a user would notice.
+One topic per PR, with tests. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`). Add a line to `CHANGELOG.md` under Unreleased for anything a user would notice.
+
+A PR that should change no behavior (a refactor, a file split) carries the `refactor` label. The label starts `.github/workflows/refactor-guard.yml`, which compares the PR against the commit it branched from:
+
+- `rust-diff`: both CLI builds answer the same questions alike, once times, ids, live disk numbers and each binary's own version are masked; text byte for byte, `--json` as `jq` prints it (so JSON layout and escapes are not compared). The questions: `status`, `ls`, `top`, `find`, `diff`, `doctor`, text and `--json`, on one fixture snapshot and on a fresh scan; `refresh` on a copy of the fixture, and questions after it; and, once each, the bare run, `--version`, every `--help`, a usage error, `completions`, `schema` and `skill print`. After each, the snapshot folder and its files, with their modes, must match too. A call still running after 5 minutes is stopped and answers exit 124. Locally: `scripts/rust-diff.sh <base-binary> <head-binary> <out-dir>`; `doctor` reads this host's timer and installed binary and skill, so on a machine with freespace installed a local run can differ where CI's does not.
+- `pixel-diff`: both page builds draw every view and state of the e2e mock at 1280, 700 and 360 px into byte-identical PNG files. The spec is `web/tests/guard/views.spec.ts`; the artifact holds every shot of each build, to compare by hand, and a diff PNG for each shot whose difference Playwright's own comparison sees (it skips pixels it takes for anti-aliasing, so a byte difference can come without one).
+- `coverage`: line coverage per function of the Rust files the PR touches, in the job summary. It never fails the PR.
+
+Each comparison first runs base against itself; if that differs, the job fails as unreliable before it looks at the PR. The jobs run head's harness (the scripts, the spec, the mock and the workflow), so a refactor PR that changes one of those files gets a warning on it: the guard then judges the PR with the harness the PR changed. A PR titled `refactor:` (or `refactor(scope):`) or on a `refactor/` branch fails `.github/workflows/refactor-label.yml` until it carries the label.
 
 ## Releases
 

@@ -4,6 +4,10 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+
+- In the GUI, `/` or the Find tab sometimes opened Find without the cursor in the name field: the field was focused from a timer that could run before the form was drawn. It is now focused right after the form is drawn.
+
 ## [0.1.1] - 2026-10-23
 
 ### Fixed

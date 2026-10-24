@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["src/**", "tests/**", "playwright.config.ts", "playwright.shots.config.ts"]
+    "includes": ["src/**", "tests/**", "playwright.config.ts", "playwright.shots.config.ts", "playwright.guard.config.ts"]
   },
   "formatter": {
     "enabled": true,
