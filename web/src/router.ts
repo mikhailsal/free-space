@@ -151,7 +151,7 @@ export function ancestors(p: Place): Place[] {
     return out;
   }
   const segs = p.path === "/" || p.path === "" ? [] : p.path.split("/").slice(1);
-  segs.forEach((_, i) => out.push({ path: "/" + segs.slice(0, i + 1).join("/") }));
+  out.push(...segs.map((_, i) => ({ path: `/${segs.slice(0, i + 1).join("/")}` })));
   return out;
 }
 
@@ -173,9 +173,9 @@ export function join(dir: string, name: string): string {
 /** Path of `p` relative to `scope` ("Downloads/ubuntu.iso"). */
 export function relative(p: string, scope: string): string {
   if (scope === "/") return p.slice(1);
-  return p.startsWith(scope + "/") ? p.slice(scope.length + 1) : p;
+  return p.startsWith(`${scope}/`) ? p.slice(scope.length + 1) : p;
 }
 
 export function isUnder(p: string, dir: string): boolean {
-  return p === dir || (dir === "/" ? p.startsWith("/") : p.startsWith(dir + "/"));
+  return p === dir || (dir === "/" ? p.startsWith("/") : p.startsWith(`${dir}/`));
 }

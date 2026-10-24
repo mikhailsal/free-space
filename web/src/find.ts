@@ -63,8 +63,8 @@ function clearButton(app: App): HTMLElement {
 function submit(app: App, form: HTMLFormElement): void {
   const val = (id: string) => (form.querySelector<HTMLInputElement>(`#f-${id}`)?.value ?? "").trim();
   const v = { name: val("name"), before: val("before"), after: val("after"), min: val("min") };
-  const kindV = form.querySelector<HTMLSelectElement>("#f-kind")!.value;
-  const icase = form.querySelector<HTMLInputElement>("#f-icase")!.checked;
+  const kindV = form.querySelector<HTMLSelectElement>("#f-kind")?.value ?? "any";
+  const icase = form.querySelector<HTMLInputElement>("#f-icase")?.checked ?? false;
   let err: { field: string; text: string } | null = null;
   if (v.min && !SIZE_RE.test(v.min)) err = { field: "min", text: "Not a size. Try 100M or 2G." };
   for (const f of ["after", "before"] as const) {

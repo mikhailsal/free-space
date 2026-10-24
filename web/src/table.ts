@@ -5,6 +5,7 @@ import type { App } from "./app";
 import { h, replace } from "./dom";
 import * as fmt from "./format";
 import { controllers } from "./modes";
+import { must } from "./must";
 import { narrow, now, stateBox } from "./page";
 import { topKind } from "./top";
 import { type Column, columns } from "./views";
@@ -54,7 +55,7 @@ export class Table {
 
   render(focus = false): void {
     const app = this.app;
-    const ui = app.ui!;
+    const ui = must(app.ui, "the main page");
     const mode = app.route.mode;
     const cols = columns(mode, topKind(app.route));
     const ctx = { now: now(), folderSize: app.view?.folder.allocated ?? 0 };
@@ -131,12 +132,12 @@ export class Table {
 
   renderMore(): void {
     const app = this.app;
-    const ui = app.ui!;
+    const ui = must(app.ui, "the main page");
     const v = app.view;
     const resp = v?.ls ?? v?.top ?? v?.find ?? v?.diff;
     // a diff page that already reached unchanged rows holds every change
     const allChanges = v?.diff?.entries.at(-1)?.status === "same";
-    if (!resp || !resp.truncated || app.rows.length === 0 || allChanges) {
+    if (!resp?.truncated || app.rows.length === 0 || allChanges) {
       replace(ui.more);
       ui.more.hidden = true;
       return;
