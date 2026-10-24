@@ -21,6 +21,20 @@ test("typing sends nothing; Enter sends one search (D9)", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Find" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("/ puts the cursor in the name field when hashchange comes after a 0 ms timer", async ({ page }) => {
+  // Chromium does not order the hashchange that draws the form against timers; make it late
+  await page.addInitScript(() => {
+    const add = window.addEventListener.bind(window);
+    window.addEventListener = ((type: string, fn: EventListener, opts?: boolean | AddEventListenerOptions) =>
+      add(type, type === "hashchange" ? (e: Event) => setTimeout(() => fn(e), 50) : fn, opts)) as typeof window.addEventListener;
+  });
+  await new MockApi().install(page);
+  await page.goto(url());
+  await expect(page.locator(".crumbs h1")).toHaveText("tass");
+  await page.keyboard.press("/");
+  await expect(page.locator("#f-name")).toBeFocused();
+});
+
 test("filter chips remove one filter each", async ({ page }) => {
   await new MockApi().install(page);
   await page.goto(url("/home/tass?mode=find&name=*.mp4&min=1G&run=1"));
