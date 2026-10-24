@@ -60,7 +60,7 @@ pub fn sentence(s: &Summary) -> String {
         parts.push(format!("snapshot {} old", format::age(age)));
     }
     if let Some((path, d)) = &s.growth {
-        parts.push(format!("{} since prev in {path}", format::delta(*d)));
+        parts.push(format!("{} since prev In {path}", format::delta(*d)));
     }
     if let Some(sc) = &r.scanning {
         parts.push(scanning_line(sc, None, false));
