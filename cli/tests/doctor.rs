@@ -82,10 +82,15 @@ impl Env {
 
     /// state.json with a failed `op` a minute after the last success.
     fn failed(&self, op: &str, message: &str) {
+        self.failed_at(60, op, message);
+    }
+
+    /// state.json with a failed `op`, `after` seconds past the last success.
+    fn failed_at(&self, after: i64, op: &str, message: &str) {
         let dir = SnapshotDir::new(self.snap());
         let mut st = state::read(&dir).unwrap().unwrap();
         st.last_error = Some(LastError {
-            ts: st.last_success_ts.unwrap() + 60,
+            ts: st.last_success_ts.unwrap() + after,
             op: op.into(),
             message: message.into(),
         });
@@ -196,6 +201,15 @@ fn a_failed_run_names_its_step_and_its_fix() {
         "free space, or set keep_previous = false / move snapshot_dir in {}, then sudo freespace install-timer",
         e.config().display()
     );
+    assert_eq!(fix, Some(room.clone()));
+    // the same step under another op name: the same fix
+    e.failed("reserve", "disk full while reserving");
+    let (ok, detail, fix) = e.check("last_error");
+    assert!(!ok);
+    assert!(
+        detail.ends_with(" reserve: disk full while reserving"),
+        "{detail}"
+    );
     assert_eq!(fix, Some(room));
     e.failed("write", "disk full");
     let (ok, detail, fix) = e.check("last_error");
@@ -211,4 +225,42 @@ fn a_failed_run_names_its_step_and_its_fix() {
         "{detail}"
     );
     assert_eq!(fix.as_deref(), Some("sudo freespace install-timer"));
+}
+
+#[test]
+fn a_failed_first_run_has_no_success_to_compare_with() {
+    let e = Env::new();
+    fs::create_dir_all(e.snap()).unwrap();
+    let st = state::State {
+        last_error: Some(LastError {
+            ts: 1_700_000_000,
+            op: "scan".into(),
+            message: "no roots to scan".into(),
+        }),
+        ..Default::default()
+    };
+    state::write(&SnapshotDir::new(e.snap()), &st).unwrap();
+    let (ok, detail, fix) = e.check("last_error");
+    assert!(!ok);
+    assert!(detail.ends_with(" scan: no roots to scan"), "{detail}");
+    assert_eq!(fix.as_deref(), Some(JOURNAL));
+    // with no snapshot to read, status stops at that (exit 8), with no hint
+    let o = e.cmd(&["status"]).output().unwrap();
+    assert_eq!(o.status.code(), Some(8));
+    assert!(o.stdout.is_empty());
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.starts_with("freespace: no snapshot in "), "{err}");
+}
+
+#[test]
+fn an_error_older_than_the_last_success_is_history() {
+    let e = Env::scanned();
+    e.failed_at(-60, "write", "disk full");
+    assert_eq!(
+        e.check("last_error"),
+        (true, "none since the last successful scan".into(), None)
+    );
+    let o = e.cmd(&["status"]).output().unwrap();
+    let t = String::from_utf8_lossy(&o.stdout);
+    assert!(!t.contains("Run: freespace doctor"), "{t}");
 }

@@ -593,7 +593,8 @@ fn status_says_a_root_is_not_mounted_now_when_its_path_is_gone() {
     e.scan(0);
     fs::rename(e.root(), e.tmp.path().join("moved")).unwrap();
     let t = e.ok(&["status"]);
-    let (_, rows) = sentence_and_rows(&t);
+    let (first, rows) = sentence_and_rows(&t);
+    assert!(first.starts_with("? free"), "{t}");
     assert!(row(&rows, "root").ends_with(", not mounted now"), "{t}");
 }
 
@@ -605,9 +606,9 @@ fn a_hardlink_with_no_owner_in_the_snapshot_says_so() {
     // both links carry the alias flag, so no row is the one that counts the inode
     let db = rusqlite::Connection::open(e.snap().join("snapshot.db")).unwrap();
     db.execute(
-        "UPDATE entries SET flags = flags | 2 \
+        "UPDATE entries SET flags = flags | ?1 \
          WHERE name IN (CAST('top.bin' AS BLOB), CAST('top-link.bin' AS BLOB))",
-        [],
+        [i64::from(freespace_core::scan::tree::flags::ALIAS)],
     )
     .unwrap();
     drop(db);
@@ -616,12 +617,72 @@ fn a_hardlink_with_no_owner_in_the_snapshot_says_so() {
 }
 
 #[test]
-fn ls_says_a_socket_is_a_special_file() {
+fn ls_says_a_fifo_is_a_special_file() {
     let e = Env::new();
     e.tree(0);
-    let _listener = std::os::unix::net::UnixListener::bind(e.root().join("sock")).unwrap();
+    // a FIFO, not a socket: a socket's path may not be longer than 107 bytes
+    let made = Command::new("mkfifo")
+        .arg(e.root().join("fifo"))
+        .status()
+        .unwrap();
+    assert!(made.success());
     e.scan(0);
-    let t = e.ok(&["ls", &e.p("sock")]);
-    let note = format!("{} is a special file, not a folder.\n", e.p("sock"));
+    let t = e.ok(&["ls", &e.p("fifo")]);
+    let note = format!("{} is a special file, not a folder.\n", e.p("fifo"));
     assert!(t.ends_with(&note), "{t}");
+}
+
+/// One and five unreadable folders are named in full, with no "and N more".
+#[test]
+fn a_few_unreadable_folders_are_named_in_full() {
+    for k in [1, 5] {
+        let e = Env::new();
+        // as root every folder is readable, so none is named
+        let n = if locked() > 0 { k } else { 0 };
+        e.tree(n);
+        e.scan(n);
+        let t = e.ok(&["status"]);
+        let (_, rows) = sentence_and_rows(&t);
+        if n == 0 {
+            assert!(!rows.iter().any(|(label, _)| label == "incomplete"), "{t}");
+            continue;
+        }
+        let list: Vec<String> = (1..=n).map(|i| e.p(&format!("locked{i}"))).collect();
+        let list = list.join(", ");
+        let noun = if n == 1 { "directory" } else { "directories" };
+        assert_eq!(
+            row(&rows, "warning"),
+            format!("{n} {noun} could not be read, sizes under them are unknown: {list}")
+        );
+        assert_eq!(
+            row(&rows, "incomplete"),
+            format!("unreadable, sizes unknown: {list}")
+        );
+        let err = e.run(&["ls", &e.p("")]).stderr;
+        assert_eq!(
+            String::from_utf8_lossy(&err),
+            format!(
+                "warning: incomplete snapshot, sizes under these folders are unknown: {list}\n"
+            )
+        );
+    }
+}
+
+/// Two roots: the free space in the first line is for the first one, and each has its row.
+#[test]
+fn status_names_the_root_its_free_space_is_for_when_there_are_two() {
+    let e = Env::new();
+    e.tree(0);
+    let q = e.tmp.path().join("q");
+    fs::create_dir(&q).unwrap();
+    e.ok(&["scan", &e.p(""), q.to_str().unwrap()]);
+    let t = e.ok(&["status"]);
+    let (first, rows) = sentence_and_rows(&t);
+    assert!(first.contains(&format!(" free on {}", e.p(""))), "{t}");
+    let roots: Vec<&String> = rows
+        .iter()
+        .filter(|(label, _)| label == "root")
+        .map(|(_, value)| value)
+        .collect();
+    assert_eq!(roots.len(), 2, "{t}");
 }
