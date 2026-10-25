@@ -1,6 +1,7 @@
 // Static server for the e2e suite: dist/ with the same CSP as `freespace
 // serve`, so a style or script the CSP would block fails here too. /api/* is
 // answered by the mock in each test (page.route), never by this server.
+import { fstatSync } from "node:fs";
 import { resolve } from "node:path";
 
 // $GUARD_DIST serves another build: refactor-guard shoots base's and head's with one harness.
@@ -22,3 +23,12 @@ Bun.serve({
   },
 });
 console.log("e2e static server ready");
+
+// Playwright starts this server detached, with a pipe (a socket pair) on its stdin. A runner killed outright
+// (SIGKILL) never stops the server, but its end of that pipe closes, so the server stops at the end of its input.
+// A terminal or /dev/null on stdin is not watched.
+const stdin = fstatSync(0);
+if (stdin.isFIFO() || stdin.isSocket()) {
+  process.stdin.on("end", () => process.exit(0));
+  process.stdin.resume();
+}

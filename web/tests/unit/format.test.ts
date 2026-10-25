@@ -54,3 +54,11 @@ test("shell quoting", () => {
   expect(fmt.shellWord("a\u202eb")).toBe("$'a\\xe2\\x80\\xaeb'");
   expect(fmt.shellWord("it's\x7f")).toBe("$'it\\x27s\\x7f'");
 });
+
+// Value: protects=hasControl is true for C0 and DEL and false for space, ~, C1, bidi and letters; fails_when=a range
+//   end moves (0x1f, 0x20, 0x7f, 0x80) or bidi is folded in; why_new=shell quoting checks one control of each kind;
+//   seam=none (shellWord and the fix row call it); no_claim=none beyond protects
+test("control characters: C0 and DEL, nothing else", () => {
+  for (const c of ["\x00", "\x1f", "\x7f", "\n"]) expect(fmt.hasControl(`a${c}b`)).toBe(true);
+  for (const s of ["", " ", "~", "\x80", "\u202e", "é"]) expect(fmt.hasControl(s)).toBe(false);
+});

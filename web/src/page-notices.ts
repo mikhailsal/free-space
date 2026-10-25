@@ -6,6 +6,7 @@ import type { App } from "./app";
 import { SCAN_COMMAND } from "./cli";
 import { h } from "./dom";
 import * as fmt from "./format";
+import { must } from "./must";
 import { type Action, details, type Notice, renderNotices } from "./notices";
 import { now } from "./page";
 import { copy } from "./toast";
@@ -27,11 +28,11 @@ export class PageNotices {
     const s = this.app.status;
     const live = this.app.latest;
     const newer = !!(s && live?.snapshot_id && live.snapshot_id !== s.snapshot_id);
-    return (newer && this.app.dismissedNewer !== live!.snapshot_id) || this.app.rotated;
+    return (newer && this.app.dismissedNewer !== live?.snapshot_id) || this.app.rotated;
   }
 
   private list(): Notice[] {
-    const s = this.app.status!;
+    const s = must(this.app.status, "the status");
     const live = this.app.latest ?? s;
     const scan = { label: `Copy: ${SCAN_COMMAND}`, run: () => void copy(SCAN_COMMAND, "Command copied") };
     const all = [this.incomplete(s, scan), this.lastError(s, live, scan), this.error(scan), this.failure(), this.newer(s, live)];

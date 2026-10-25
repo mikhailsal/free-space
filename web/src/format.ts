@@ -93,15 +93,24 @@ export function bigCount(n: number): string {
   return count(n);
 }
 
-// C0 controls, DEL and bidi overrides: invisible in the page, live in a terminal
-const UNSAFE = /[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]/;
+// bidi overrides and isolates: they reorder what the page shows
+const BIDI = /[\u202a-\u202e\u2066-\u2069]/;
+
+/** A C0 control or DEL: invisible in the page, live in a terminal. */
+export function hasControl(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return true;
+  }
+  return false;
+}
 
 /** Single-quote for a POSIX shell unless the word is plain. File names are
  * chosen by anyone who can write a file, so control characters never reach
  * the clipboard raw: such words use bash `$'\xHH'`. */
 export function shellWord(s: string): string {
-  if (/^[A-Za-z0-9_\/.,:=+@%-]+$/.test(s)) return s;
-  if (UNSAFE.test(s)) return ansiC(new TextEncoder().encode(s));
+  if (/^[A-Za-z0-9_/.,:=+@%-]+$/.test(s)) return s;
+  if (hasControl(s) || BIDI.test(s)) return ansiC(new TextEncoder().encode(s));
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 

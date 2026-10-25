@@ -266,6 +266,15 @@ details.raw pre {
   font-size: 14px;
   line-height: 20px;
 }
+.topform {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+}
+.topform p b {
+  font-weight: 400;
+}
 .findform .scope {
   color: var(--muted);
   margin-bottom: var(--s2);
@@ -352,15 +361,6 @@ details.raw pre {
 .buttons {
   display: flex;
   gap: var(--s2);
-}
-.topform {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s2) var(--s3);
-}
-.topform p b {
-  font-weight: 400;
 }
 .seg {
   display: inline-flex;

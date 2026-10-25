@@ -99,18 +99,6 @@
 .minirow .num {
   text-align: right;
 }
-.inspector dl {
-  display: grid;
-  grid-template-columns: 104px 1fr;
-  row-gap: 2px;
-}
-.inspector dt {
-  color: var(--muted);
-}
-.inspector dd .link {
-  margin-left: var(--s2);
-  font-size: 13px;
-}
 .cmd {
   border-top: 1px solid var(--line);
   padding-top: var(--s3);
@@ -141,6 +129,18 @@
 .cmdline .link {
   font-size: 13px;
   text-decoration: none;
+}
+.inspector dl {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  row-gap: 2px;
+}
+.inspector dt {
+  color: var(--muted);
+}
+.inspector dd .link {
+  margin-left: var(--s2);
+  font-size: 13px;
 }
 .inspector .actions {
   margin-top: auto;
