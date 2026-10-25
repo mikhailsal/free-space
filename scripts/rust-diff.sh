@@ -39,8 +39,8 @@
 # otherwise the harness is stale (exit 4) before head runs: a question both
 # builds refuse alike would test nothing.
 # Not as root: install-timer would install the build on this host.
-# A call that runs past RUST_DIFF_TIMEOUT seconds (300) is stopped and answers
-# exit 124, so a hang shows up as the question that hung.
+# A call that runs past RUST_DIFF_TIMEOUT seconds (300, a whole number from 1)
+# is stopped and answers exit 124, so a hang shows up as the question that hung.
 # Answers are normalized (D20, rust-diff/normalize.sh) and compared byte for
 # byte: base against base first (a difference there means the comparison
 # itself is unreliable: exit 3), then base against head (exit 1 on any
@@ -64,6 +64,11 @@ for b in "$base" "$head"; do
   if [ ! -f "$b" ] || [ ! -x "$b" ]; then echo "$0: not an executable file: $b" >&2; exit 2; fi
 done
 if [[ ! ${RUST_DIFF_FAN:-4} =~ ^[1-9]$ ]]; then echo "$0: RUST_DIFF_FAN must be 1 to 9, not ${RUST_DIFF_FAN}" >&2; exit 2; fi
+# timeout takes 0 as no bound at all, and a word as an error on every call
+if [[ ! ${RUST_DIFF_TIMEOUT:-300} =~ ^[1-9][0-9]*$ ]]; then
+  echo "$0: RUST_DIFF_TIMEOUT must be whole seconds from 1, not ${RUST_DIFF_TIMEOUT}" >&2
+  exit 2
+fi
 for tool in jq curl script flock perl sqlite3; do
   command -v "$tool" >/dev/null || { echo "$0: $tool is required" >&2; exit 2; }
 done

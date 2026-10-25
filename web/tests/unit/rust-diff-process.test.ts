@@ -19,19 +19,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { guard, HOLD, STUB_ENV, scanFails, script, stub, until, writeStub } from "./rust-diff-stub";
+import { gone, guard, HOLD, STUB_ENV, scanFails, script, stub, until, writeStub } from "./rust-diff-stub";
 
 let tmp = "";
 
-// Whether a process is gone (a zombie still counts as there, until its parent reaps it).
-const gone = (pid: number) => {
-  try {
-    process.kill(pid, 0);
-    return false;
-  } catch {
-    return true;
-  }
-};
 // The parent of a process (Linux /proc).
 const parent = (pid: number) => {
   const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
@@ -70,10 +61,11 @@ test("a base that cannot make the fixture snapshot stops the job at once and sho
   }
 }, 30_000);
 
-// Value: protects=no arguments, a build that is not an executable file, or a width of the trees outside 1 to 9 exit 2
-//   before anything runs (no out dir, no work dir); fails_when=a check goes (a width of 0 then makes no wide part, and
-//   the job dies midway) or moves past the work dir; why_new=RUST_DIFF_FAN was taken as given (red team of A0's /ship);
-//   seam=none; no_claim=none
+// Value: protects=no arguments, a build that is not an executable file, a width of the trees outside 1 to 9 or a bound
+//   on a call that is not whole seconds from 1 exit 2 before anything runs (no out dir, no work dir); fails_when=a
+//   check goes (a width of 0 then makes no wide part, and the job dies midway; a bound of 0 lets a hang run forever, a
+//   word fails every call) or moves past the work dir; why_new=RUST_DIFF_FAN was taken as given (red team of A0's
+//   /ship), and RUST_DIFF_TIMEOUT too (testing review of A0b); seam=none; no_claim=none
 test("bad input exits 2 before anything runs", async () => {
   const none = Bun.spawnSync([script], { stderr: "pipe" });
   expect(none.exitCode).toBe(2);
@@ -89,6 +81,13 @@ test("bad input exits 2 before anything runs", async () => {
     const r = await guard(tmp, "base", "base", { RUST_DIFF_FAN: fan });
     expect(r.code, fan).toBe(2);
     expect(r.stderr).toContain(`RUST_DIFF_FAN must be 1 to 9, not ${fan}`);
+    expect(existsSync(r.out)).toBe(false);
+    expect(r.left, "no work dir").toEqual([]);
+  }
+  for (const bound of ["0", "1.5", "x"]) {
+    const r = await guard(tmp, "base", "base", { RUST_DIFF_TIMEOUT: bound });
+    expect(r.code, bound).toBe(2);
+    expect(r.stderr).toContain(`RUST_DIFF_TIMEOUT must be whole seconds from 1, not ${bound}`);
     expect(existsSync(r.out)).toBe(false);
     expect(r.left, "no work dir").toEqual([]);
   }

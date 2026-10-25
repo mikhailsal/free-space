@@ -26,7 +26,7 @@ export const script = join(repo, "scripts/rust-diff.sh");
 // age (`1y`) as now less the age in seconds (live), in text as the date it stands for.
 export type Refusal = { exit: number; message: string };
 export type StubOptions = { entries?: number; refusal?: Refusal; version?: string; sh?: string; early?: string };
-export const REFUSAL: Refusal = { exit: 2, message: "is not in the snapshot" };
+const REFUSAL: Refusal = { exit: 2, message: "is not in the snapshot" };
 
 // Refusals by the words asked, before any state is read.
 const refusals = (refusal: Refusal, version: string) => `case "$*" in
@@ -182,7 +182,7 @@ export const stub = ({ entries = 3, refusal = REFUSAL, version = "0.1.0", sh = "
 // address into XDG_RUNTIME_DIR (mode GUI_MODE, 600), hands it to xdg-open, says so when that fails, and removes the file
 // on the first request with the token, and stops with GUI_TERM_EXIT (0) on TERM. The address line of serve, and of gui
 // here, comes in two writes. FRAME is its x-frame-options; ALLOW_POST lets a POST through.
-export const SERVE_JS = `
+const SERVE_JS = `
 const fs = require("node:fs");
 const token = "ab".repeat(32);
 const frame = process.env.FRAME ?? "DENY";
@@ -278,6 +278,16 @@ export async function until(done: () => boolean, ms = 10_000): Promise<boolean> 
   return done();
 }
 
+// Whether a process is gone (a zombie still counts as there, until its parent reaps it).
+export const gone = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch {
+    return true;
+  }
+};
+
 export const writeStub = (dir: string, name: string, body: string) => {
   writeFileSync(join(dir, name), body);
   chmodSync(join(dir, name), 0o755);
@@ -285,7 +295,7 @@ export const writeStub = (dir: string, name: string, body: string) => {
 
 // Every run: the stub's server needs bun and its code; one folder per level keeps the wide part of the trees small; the
 // caller's proxy and XDG folders, which the script keeps from curl and from the CLI.
-export const NO_SUCH_PROXY = "http://127.0.0.1:9";
+const NO_SUCH_PROXY = "http://127.0.0.1:9";
 export const STUB_ENV = {
   BUN: process.execPath,
   // bun's transpiler cache stays out of the $HOME the job lists

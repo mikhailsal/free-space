@@ -10,7 +10,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
-import { guard, type Run, repo, stub, writeStub } from "./rust-diff-stub";
+import { gone, guard, type Run, repo, stub, writeStub } from "./rust-diff-stub";
 
 // One pass of the questions is about 310 stub calls and 29 requests, each normalized, and a full run makes three (base,
 // base again, head). The fourteen runs start together in beforeAll, four of them full, the others stopped after one or
@@ -64,7 +64,7 @@ beforeAll(() => {
   const need = '[ "$1" != doctor ] || need="1.0 G"';
   const leak = '[ ! -f "$dir/id" ] || { chmod 666 "$dir/id"; : > "$dir/leftover.tmp"; }';
   const home = '[ "$1" != status ] || { : > "$HOME/.leak"; : > "$FREESPACE_UNIT_DIR/x.service"; }';
-  const hang = '[ "$1 $#" != "diff 2" ] || case "$dir $2" in */snap" "*/tree) exec sleep 30 ;; esac';
+  const hang = '[ "$1 $#" != "diff 2" ] || case "$dir $2" in */snap" "*/tree) echo $$ >>"$STUB_HUNG"; exec sleep 30 ;; esac';
   const index = `SCHEMA_EXTRA="CREATE INDEX IF NOT EXISTS calls_command ON calls(command); UPDATE calls SET command = 'SCAN' WHERE id = 1;"`;
   const crlf = `[ "$1" != completions ] || { printf '# completions for %s\\r\\n' "$2"; exit 0; }`;
   write("unlike", stub({ early: [index, crlf].join("\n"), sh: [need, "fails=1", leak, home, hang].join("\n") }));
@@ -107,7 +107,7 @@ beforeAll(() => {
     ["flaky", "flaky", "same"],
     ["other", "base", "other"],
     // a hang waits out this bound, not the stub's 30 s
-    ["unlike", "base", "unlike", { RUST_DIFF_TIMEOUT: "15" }],
+    ["unlike", "base", "unlike", { RUST_DIFF_TIMEOUT: "15", STUB_HUNG: join(tmp, "unlike.hung") }],
     // on a terminal, as a run from a shell is: no call may take it (gui would start, not refuse: 15 s, then exit 124)
     ["stale", "stale", "base", { RUST_DIFF_TIMEOUT: "15" }, { tty: true }],
     ["noserve", "noserve", "base"],
@@ -397,14 +397,21 @@ test(
 );
 
 // Value: protects=a call that hangs is stopped after RUST_DIFF_TIMEOUT seconds and answers exit 124, so the job names
-//   the question; fails_when=run() loses its timeout (each hang then waits out the stub's 30 s sleep, past RUN_MS);
-//   why_new=nothing bounded a call; seam=RUST_DIFF_TIMEOUT; no_claim=the 300 s default on CI
+//   the question, and the call is killed: no process and no work dir outlive the job; fails_when=run() loses its
+//   timeout (each hang then waits out the stub's 30 s sleep, past RUN_MS), timeout stops only what the call started, or
+//   the work dir stays in TMPDIR; why_new=nothing bounded a call, and nothing looked for the hung call or the work dir
+//   after it (state-machine review of A0b); seam=RUST_DIFF_TIMEOUT; no_claim=the 300 s default on CI
 test(
-  "a head that hangs on a question is stopped, and that question answers exit 124",
+  "a head that hangs on a question is stopped and killed, and that question answers exit 124",
   async () => {
     const r = await pending.unlike;
     expect(r.code).toBe(1);
     expect(r.stdout).toContain(" == diff @\n-exit 0\n+exit 124\n");
+    // the call was killed, not left behind, and so was the work dir
+    const hung = readFileSync(join(tmp, "unlike.hung"), "utf8").trim().split("\n").map(Number);
+    expect(hung.length, "the stub hung").toBeGreaterThan(0);
+    for (const pid of hung) expect(gone(pid), `the hung call ${pid}`).toBe(true);
+    expect(r.left, "the work dir, removed").toEqual([]);
   },
   RUN_MS,
 );
@@ -440,6 +447,11 @@ test(
   RUN_MS,
 );
 
+// Value: protects=a base whose two runs answer differently stops the job as unreliable (exit 3) before head runs, with
+//   the difference on stdout, and the job removes its work dir; fails_when=base no longer runs twice, the comparison of
+//   base and base2 is dropped or its status ignored, head runs anyway, or the work dir stays in TMPDIR; why_new=the
+//   test said what it checks but not what it guards (testing review of A0b); seam=none; no_claim=which answers a real
+//   base gives differently
 test(
   "a base that answers two runs differently is unreliable: exit 3, and head never runs",
   async () => {

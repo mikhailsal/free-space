@@ -8,6 +8,8 @@
 
 # The columns a scan fills from the clock, the disk or the run (table.column):
 # each shows as its type ("<integer>"), so a value that turns NULL still shows.
+# Their order is lost too (a scan stamps each folder as it walks it, so two runs
+# differ): core/tests/queries.rs checks which rows a refresh stamps.
 # A hard link's inode shows as the first entry that has it: the fresh phase
 # makes its tree anew, inodes and all, but the links that share an inode must
 # still share it.
