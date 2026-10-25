@@ -27,6 +27,12 @@ jobs:
       # T10: precheck and a disk that fills up mid-write, on a real tmpfs
       - name: fault injection on a full filesystem
         run: sudo scripts/fault-fs.sh target/debug/freespace
+      # refactor-guard's questions against head itself, on every PR: base must answer each as the harness expects, so a
+      # PR that moves the CLI on must move scripts/rust-diff/questions.sh too, not leave it to the next refactor PR
+      - name: rust-diff, head against itself
+        run: |
+          command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq sqlite3; }
+          scripts/rust-diff.sh target/debug/freespace target/debug/freespace "$RUNNER_TEMP/rust-diff"
 
   # The page: types, unit tests (format, router, hidden, contrast) and the
   # Playwright suite against a mocked /api at 1280, 700 and 360 px with axe.
@@ -42,6 +48,8 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
+      # tests/unit runs scripts/rust-diff.sh on stub builds, which needs sqlite3 as well
+      - run: command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq sqlite3; }
       - run: bun test tests/unit
       - run: bunx playwright install --with-deps chromium
       - run: bunx playwright test

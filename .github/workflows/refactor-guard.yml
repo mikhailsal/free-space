@@ -72,7 +72,9 @@ jobs:
           (cd "$RUNNER_TEMP/base" && cargo build --release --locked --bin freespace --target-dir "$RUNNER_TEMP/base-target")
           cp "$RUNNER_TEMP/base-target/release/freespace" "$RUNNER_TEMP/bin/base"
       - name: base and head answer alike
-        run: scripts/rust-diff.sh "$RUNNER_TEMP/bin/base" "$RUNNER_TEMP/bin/head" "$RUNNER_TEMP/rust-diff"
+        run: |
+          command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq sqlite3; }
+          scripts/rust-diff.sh "$RUNNER_TEMP/bin/base" "$RUNNER_TEMP/bin/head" "$RUNNER_TEMP/rust-diff"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

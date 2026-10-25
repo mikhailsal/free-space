@@ -9,11 +9,13 @@
 # each answer, one after the other (the questions are in rust-diff/questions.sh,
 # the trees in rust-diff/tree.sh):
 #   - on the fixture snapshot: ONCE and `<command> --help`, as written (the
-#     binary's own texts); QUERIES, text and --json; TZ_QUERIES in another time
-#     zone; TTY_QUERIES on a terminal; the serve phase (rust-diff/serve.sh);
-#     REFRESHES on a copy of the snapshot (the tree has moved on since), then
-#     AFTER_REFRESH on the copy. refresh needs no root while
-#     FREESPACE_SNAPSHOT_DIR is a folder of ours;
+#     binary's own texts); QUERIES and GLOB_QUERIES, text and --json;
+#     CWD_QUERIES from inside the tree and PATH_QUERIES as given; TZ_QUERIES in
+#     another time zone; TTY_QUERIES on a terminal; the serve phase
+#     (rust-diff/serve.sh) and the gui phase (rust-diff/gui.sh); REFRESHES on a
+#     copy of the snapshot (the tree has moved on since), then AFTER_REFRESH on
+#     the copy. refresh needs no root while FREESPACE_SNAPSHOT_DIR is a folder of
+#     ours;
 #   - start: EMPTY_QUERIES with no snapshot folder, FIRST_QUERIES with an empty
 #     one while a scan holds its lock, BUSY_QUERIES on a copy of the fixture
 #     snapshot while a scan holds its lock;
@@ -21,9 +23,11 @@
 #     changes it and scans again, then QUERIES; moves it on, REFRESHES and
 #     AFTER_REFRESH, all on the snapshot it made itself;
 #   - config: a config file with two roots and no previous snapshot; `scan`
-#     without a root, CONFIG_QUERIES; then a config with an unknown key;
+#     without a root, CONFIG_QUERIES; GONE_QUERIES once one root is gone from
+#     the disk; then a config with an unknown key;
 #   - after each part, the files the CLI keeps (the snapshot folder, $HOME, the
-#     unit dir): name, type and mode, and state.json normalized.
+#     unit dir): name, type and mode, state.json normalized, and each
+#     database's schema, user_version and rows per table.
 # Each run starts from the same files: a copy of the fixture snapshot, an empty
 # $HOME and unit dir.
 # No command may change a tree it reads: each tree is listed (names, types,
@@ -42,9 +46,9 @@
 # difference). A version bump alone is no difference: each binary's own version
 # (from its --version) is masked in its answers. The normalized answers stay in
 # <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
-# Needs jq, curl, script and flock (util-linux) and perl. JSON is compared as jq
-# prints it, keys in the CLI's order. RUST_DIFF_FAN (4) sets the wide part of
-# the trees.
+# Needs jq, curl, script and flock (util-linux), perl and sqlite3. JSON is
+# compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4) sets the
+# wide part of the trees.
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 
@@ -54,7 +58,7 @@ base=$1 head=$2 out=$3
 for b in "$base" "$head"; do
   if [ ! -f "$b" ] || [ ! -x "$b" ]; then echo "$0: not an executable file: $b" >&2; exit 2; fi
 done
-for tool in jq curl script flock perl; do
+for tool in jq curl script flock perl sqlite3; do
   command -v "$tool" >/dev/null || { echo "$0: $tool is required" >&2; exit 2; }
 done
 if [ "$(id -u)" = 0 ]; then echo "$0: run it as a user, not root: install-timer would install a build on this host" >&2; exit 2; fi
@@ -67,6 +71,8 @@ here=$(dirname "$(realpath "$0")")
 . "$here/rust-diff/normalize.sh"
 # shellcheck source=rust-diff/serve.sh
 . "$here/rust-diff/serve.sh"
+# shellcheck source=rust-diff/gui.sh
+. "$here/rust-diff/gui.sh"
 base=$(realpath "$base") head=$(realpath "$head")
 mkdir -p "$out"
 out=$(realpath "$out")
@@ -184,7 +190,15 @@ ask_tty() { # <bin> <query>: the text a terminal shows, under script(1)
   } | mask
 }
 
-files() { # <dir>: a folder the CLI keeps, by name, type and mode; state.json in it, normalized
+db_of() { # <db>: its schema, user_version and rows per table, read-only (a rollback journal: opening it writes nothing)
+  echo "-- ${1##*/}"
+  sqlite3 -readonly "$1" '.schema' "SELECT 'user_version ' || user_version FROM pragma_user_version"
+  sqlite3 -readonly "$1" "SELECT 'SELECT ''' || name || ' rows '' || count(*) FROM \"' || name || '\";'
+    FROM sqlite_master WHERE type = 'table' ORDER BY name" | sqlite3 -readonly "$1"
+}
+
+files() { # <dir>: a folder the CLI keeps, by name, type and mode; state.json in it, normalized; its databases
+  local db
   {
     echo "== files in $1"
     if [ ! -d "$1" ]; then
@@ -196,6 +210,7 @@ files() { # <dir>: a folder the CLI keeps, by name, type and mode; state.json in
       echo "-- state.json"
       normalize_json "$1/state.json" true
     fi
+    for db in "$1"/*.db; do [ ! -f "$db" ] || db_of "$db"; done
   } | mask
 }
 
@@ -226,6 +241,16 @@ refreshes() { # <bin>: REFRESHES on the snapshot in FREESPACE_SNAPSHOT_DIR, then
   ask_all "$1" true "${AFTER_REFRESH[@]}"
 }
 
+paths_answers() { # <bin>: CWD_QUERIES from inside the tree, PATH_QUERIES, and the tree's odd/ as --path-raw hex
+  local hex
+  phase=cwd
+  echo "== in @/projects"
+  (cd "$tree/projects" && ask_all "$1" false "${CWD_QUERIES[@]}")
+  phase=paths
+  hex=$(printf '%s' "$tree/odd" | od -An -v -tx1 | tr -d ' \n')
+  ask_all "$1" false "${PATH_QUERIES[@]}" "ls --path-raw $hex"
+}
+
 fixture_answers() { # <bin>: what it says of the fixture snapshot and a copy it refreshes
   local q tz
   FREESPACE_SNAPSHOT_DIR=$work/snap
@@ -235,12 +260,16 @@ fixture_answers() { # <bin>: what it says of the fixture snapshot and a copy it 
   ask_each "$1" false "${ONCE[@]}" "${COMMANDS[@]/%/ --help}"
   phase=fixture
   ask_all "$1" false "${QUERIES[@]}"
+  phase=glob
+  ask_all "$1" false "${GLOB_QUERIES[@]}"
+  paths_answers "$1"
   tz=$TZ_OTHER phase=tz
   echo "== TZ=$tz"
   ask_all "$1" false "${TZ_QUERIES[@]}"
   tz=
   for q in "${TTY_QUERIES[@]}"; do ask_tty "$1" "$q"; done
   serve_answers "$1"
+  gui_answers "$1"
   kept "$work/snap"
   # one path for every binary, so the answers read the same; a new copy for each
   rm -rf "$work/refreshed"
@@ -302,7 +331,7 @@ fresh_answers() { # <bin>: its own tree, scanned twice, asked, moved on and refr
   tree_check "$1" "its refreshes"
 }
 
-config_answers() { # <bin>: roots, workers and keep_previous from a config file; then a bad one; in the fresh phase's tree
+config_answers() { # <bin>: roots, workers and keep_previous from a config file; a root gone; then a bad config; in the fresh phase's tree
   local tree=$work/ftree config=$work/config.toml
   [ -d "$tree" ] || { echo "$0: the config phase needs the tree of the fresh phase, and there is none" >&2; exit 1; }
   rm -rf "$work/conf"
@@ -310,6 +339,13 @@ config_answers() { # <bin>: roots, workers and keep_previous from a config file;
   printf 'roots = ["%s/projects", "%s/media"]\nkeep_previous = false\nworkers = 3\n' "$tree" "$tree" >"$config"
   tree_mark
   ask_each "$1" true "${CONFIG_QUERIES[@]}"
+  kept "$work/conf"
+  tree_check "$1" "the config phase"
+  # the last questions of the run in this tree: the next run's fresh phase makes it anew
+  rm -rf "${tree:?}/media"
+  tree_mark
+  phase=gone
+  ask_each "$1" true "${GONE_QUERIES[@]}"
   kept "$work/conf"
   printf 'roots = ["%s"]\nkeep_old = true\n' "$tree" >"$config"
   phase=badconfig
@@ -371,7 +407,8 @@ if ! same base head; then
   echo "$0: head answers differently from base (normalized answers in $out)" >&2
   exit 1
 fi
-echo "$0: head answers ${#QUERIES[@]} queries x 2 forms x 2 snapshots, ${#TZ_QUERIES[@]} in another time zone," \
-  "${#TTY_QUERIES[@]} on a terminal, $((${#ONCE[@]} + ${#COMMANDS[@]})) questions once, $served requests to serve," \
+echo "$0: head answers ${#QUERIES[@]} queries x 2 forms x 2 snapshots, ${#GLOB_QUERIES[@]} globs and" \
+  "$((${#CWD_QUERIES[@]} + ${#PATH_QUERIES[@]} + 1)) paths as typed x 2 forms, ${#TZ_QUERIES[@]} in another time zone," \
+  "${#TTY_QUERIES[@]} on a terminal, $((${#ONCE[@]} + ${#COMMANDS[@]})) questions once, $served requests to serve and gui," \
   "$((${#EMPTY_QUERIES[@]} + ${#FIRST_QUERIES[@]} + ${#BUSY_QUERIES[@]})) x 2 forms before and during a scan," \
-  "${#REFRESHES[@]} refreshes x 2 snapshots and a config file exactly like base"
+  "${#REFRESHES[@]} refreshes x 2 snapshots and a config file whose root goes, exactly like base"

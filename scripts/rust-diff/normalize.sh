@@ -38,7 +38,8 @@ text_of() { # <file>
 # snapshot), the scan's durations; the work dir, so the answers read the same
 # anywhere; the server's port and token; a terminal's carriage returns; and the
 # binary's own version, which a release bump changes (the exact version, as a
-# word, not any number that looks like one).
+# word, not any number that looks like one); gui's port in its ssh line, and
+# its pid in the redirect file's name.
 snap_id=
 ver_re=
 mask() {
@@ -49,6 +50,8 @@ mask() {
     -e "${ver_re:+s/\\<$ver_re\\>/<version>/g}" \
     -e 's/127\.0\.0\.1:[0-9]+/127.0.0.1:<port>/g' \
     -e 's/-L [0-9]+:127/-L <port>:127/g' \
+    -e 's/, port [0-9]+\. Open:/, port <port>. Open:/' \
+    -e 's/freespace-gui-[0-9]+\.html/freespace-gui-<pid>.html/g' \
     -e 's/t=[0-9a-f]{64}/t=<token>/g' \
     -e 's/[0-9]+ (s|min|h|d) old/<age> old/g' \
     -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2})?/<time>/g' \

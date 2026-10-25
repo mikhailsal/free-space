@@ -4,8 +4,9 @@
 # on the folder in $tree, which the caller sets (a `local tree=...` reaches the
 # functions it calls). The trees hold what a scan meets on a real disk: hard
 # links (inside one folder, across folders and across the folder refresh
-# rewalks), a sparse file, a symlink, a name that is not UTF-8, an empty folder,
-# one nobody may read, and a wide, deep part for several walker threads.
+# rewalks), a sparse file, a symlink, a file and a folder whose names are not
+# UTF-8, an empty folder, one nobody may read, and a wide, deep part for several
+# walker threads.
 
 blob() { # <path> <KiB> <mtime>: a file of that size, modified then
   mkdir -p "$(dirname "$1")"
@@ -13,32 +14,24 @@ blob() { # <path> <KiB> <mtime>: a file of that size, modified then
   touch -d "$3" "$1"
 }
 
-# A fixed time in 2024 for a folder, from its path inside the tree, so that
-# folders differ in mtime (`--sort mtime` then orders by date, not only by its
-# tie-break) and keep their time while others come and go: a djb2 hash of the
-# path below DIR_HASH_MOD, in steps of DIR_STEP seconds from DIR_EPOCH, so at
-# most 359 days in (1000002 x 31 s), still 2024. Bash only: a process per
-# folder would cost more than the walk. The result is in $REPLY.
+# Every folder its own mtime, fixed in 2024, from its path inside the tree, so
+# that folders differ in mtime (`--sort mtime` then orders by date, not only by
+# its tie-break) and keep their time while others come and go: a djb2 hash of
+# the path's bytes below DIR_HASH_MOD, in steps of DIR_STEP seconds from
+# DIR_EPOCH, so at most 359 days in (1000002 x 31 s), still 2024. One perl sets
+# them all, after the files changed.
 DIR_EPOCH=1704067200 # 2024-01-01 00:00 UTC
 DIR_HASH_MOD=1000003
 DIR_STEP=31
-dir_time() { # <relative path>
-  local s=$1 h=5381 i c
-  for ((i = 0; i < ${#s}; i++)); do
-    printf -v c '%d' "'${s:i:1}"
-    h=$(((h * 33 + c) % DIR_HASH_MOD))
-  done
-  REPLY=$((DIR_EPOCH + h * DIR_STEP))
-}
-
-settle_dirs() { # every folder's own mtime, after its files changed: one perl sets them all
-  local d
+settle_dirs() {
   chmod 700 "$tree/locked" # find must enter it
-  while IFS= read -r -d '' d; do
-    dir_time "${d#"$tree"}"
-    printf '%s\0%s\0' "$REPLY" "$d"
-  done < <(find "$tree" -type d -print0) |
-    perl -0e 'while (defined(my $t = <STDIN>)) { chomp $t; my $d = <STDIN>; chomp $d; utime $t, $t, $d or die "$d: $!\n" }'
+  find "$tree" -type d -print0 |
+    TREE=$tree EPOCH=$DIR_EPOCH MOD=$DIR_HASH_MOD STEP=$DIR_STEP perl -0ne '
+      chomp;
+      my $h = 5381;
+      $h = ($h * 33 + ord) % $ENV{MOD} for split //, substr($_, length $ENV{TREE});
+      my $t = $ENV{EPOCH} + $h * $ENV{STEP};
+      utime $t, $t, $_ or die "$_: $!\n";'
   chmod 000 "$tree/locked"
 }
 
@@ -102,6 +95,7 @@ make_tree() {
   blob "$tree/media/new/season.mkv" 150 "@$((epoch - 100 * 86400))"
   blob "$tree/media/new/last-year.mkv" 120 "@$((epoch - 500 * 86400))"
   blob "$tree/odd/$(printf 'bad\377name.bin')" 4 "2024-04-04 08:00 UTC"
+  blob "$tree/odd/$(printf 'dir\376')/inner.bin" 2 "2024-04-05 08:00 UTC"
   ln -s ../media "$tree/projects/media-link"
   touch -h -d "2024-06-06 06:00 UTC" "$tree/projects/media-link"
   mkdir -p "$tree/empty" "$tree/locked/inside"
@@ -120,11 +114,16 @@ change_tree() { # what the second scan sees: growth, a new file, a removal
   settle_dirs
 }
 
-drift_tree() { # what refresh finds, after both scans: a folder changed, one gone
+drift_tree() { # what refresh finds, after both scans: a folder changed, one gone, one now a file, one under a symlink
   blob "$tree/logs/app.log" 120 "2024-10-23 08:00 UTC"
   blob "$tree/logs/new.log" 24 "2024-10-23 09:00 UTC"
   rm "$tree/logs/old.log"
   rm -r "$tree/cache"
+  rmdir "$tree/empty"
+  blob "$tree/empty" 1 "2024-10-23 10:00 UTC"
+  mv "$tree/projects/app" "$tree/projects/app.real"
+  ln -s app.real "$tree/projects/app"
+  touch -h -d "2024-10-23 11:00 UTC" "$tree/projects/app"
   settle_dirs
 }
 
