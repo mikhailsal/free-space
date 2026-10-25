@@ -54,8 +54,9 @@ afterAll(() => {
 // Value: protects=a base that cannot make the fixture snapshot stops the job at once and says why: exit 1, the base's own
 //   output, then the message naming the scan (the first, or the second after the tree changed), and nothing answered (no
 //   base/ or head/ in the out dir); fails_when=the `if !` around the scan is dropped (set -e ends the job with the scan's
-//   status 7 and no message), the scan's output is not shown, or the step number is not the scan's; why_new=every base so
-//   far scanned fine; seam=none; no_claim=what the real scan prints when it fails (a stub says it is on fire)
+//   status 7 and no message), the scan's output is not shown, the step number is not the scan's, or the work dir stays
+//   in TMPDIR; why_new=every base so far scanned fine; seam=none; no_claim=what the real scan prints when it fails (a
+//   stub says it is on fire)
 test("a base that cannot make the fixture snapshot stops the job at once and shows why", async () => {
   for (const step of [1, 2]) {
     const r = await guard(tmp, `noscan${step}`, "base");
@@ -65,12 +66,14 @@ test("a base that cannot make the fixture snapshot stops the job at once and sho
     );
     expect(existsSync(join(r.out, "head"))).toBe(false);
     expect(readdirSync(r.out)).toEqual([]);
+    expect(r.left, "the work dir, removed").toEqual([]);
   }
 }, 30_000);
 
 // Value: protects=no arguments, a build that is not an executable file, or a width of the trees outside 1 to 9 exit 2
-//   before anything runs; fails_when=a check goes (a width of 0 then makes no wide part, and the job dies midway);
-//   why_new=RUST_DIFF_FAN was taken as given (red team of A0's /ship); seam=none; no_claim=none
+//   before anything runs (no out dir, no work dir); fails_when=a check goes (a width of 0 then makes no wide part, and
+//   the job dies midway) or moves past the work dir; why_new=RUST_DIFF_FAN was taken as given (red team of A0's /ship);
+//   seam=none; no_claim=none
 test("bad input exits 2 before anything runs", async () => {
   const none = Bun.spawnSync([script], { stderr: "pipe" });
   expect(none.exitCode).toBe(2);
@@ -80,12 +83,14 @@ test("bad input exits 2 before anything runs", async () => {
     expect(r.code).toBe(2);
     expect(r.stderr).toContain(`not an executable file: ${join(tmp, bad)}`);
     expect(existsSync(r.out)).toBe(false);
+    expect(r.left, "no work dir").toEqual([]);
   }
   for (const fan of ["0", "10", "x"]) {
     const r = await guard(tmp, "base", "base", { RUST_DIFF_FAN: fan });
     expect(r.code, fan).toBe(2);
     expect(r.stderr).toContain(`RUST_DIFF_FAN must be 1 to 9, not ${fan}`);
     expect(existsSync(r.out)).toBe(false);
+    expect(r.left, "no work dir").toEqual([]);
   }
 });
 
@@ -111,10 +116,11 @@ test("from a relative TMPDIR the work dir is absolute", async () => {
 });
 
 // Value: protects=a command of the harness's own that fails (here a copy of the fixture snapshot that is gone) stops the
-//   job with exit 5 and names the command and its line, apart from exit 1 (head differs); fails_when=the ERR trap goes
-//   (set -e ends the job with the command's own status, 1, the status of a difference) or is not inherited by functions
-//   (set -E); why_new=a harness error read as a difference (red team of A0's /ship); seam=none; no_claim=which commands
-//   of the harness can fail on a runner
+//   job with exit 5 and names the command and its line, apart from exit 1 (head differs), and the work dir goes;
+//   fails_when=the ERR trap goes (set -e ends the job with the command's own status, 1, the status of a difference), is
+//   not inherited by functions (set -E), or the EXIT trap no longer removes the work dir after it; why_new=a harness
+//   error read as a difference (red team of A0's /ship); seam=none; no_claim=which commands of the harness can fail on
+//   a runner
 test("a command of the harness that fails stops the job with exit 5, naming it", async () => {
   // a base that removes the fixture snapshot the harness copies for each run, at its first question
   const gone = 'case "$1 $dir" in "status "*/snap) rm -rf "${dir%/snap}/pristine" ;; esac';
@@ -123,7 +129,30 @@ test("a command of the harness that fails stops the job with exit 5, naming it",
   expect(r.code).toBe(5);
   expect(r.stderr).toMatch(/: harness error: rust-diff\.sh line \d+: cp -a "\$work\/pristine" "\$work\/refreshed" exited 1\n/);
   expect(existsSync(join(r.out, "head"))).toBe(false);
+  expect(r.left, "the work dir, removed").toEqual([]);
 }, 180_000);
+
+// Value: protects=a diff that cannot compare (exit 2, as on a file it cannot read) is a harness error, exit 5 naming what
+//   it compared, both for two runs' answers and for the tree's listings, and not a difference (exit 1) or an unreliable
+//   base (exit 3); fails_when=same() or tree_check takes any status of diff for a difference again; why_new=both run
+//   diff under `if !`, where the ERR trap is off, so its exit 2 read as exit 3 or 1 (state-machine review of A0b);
+//   seam=PATH (a diff that fails on one comparison); no_claim=why a real diff fails
+test("a diff that cannot compare is a harness error, exit 5", async () => {
+  const real = Bun.which("diff") ?? "diff";
+  for (const [name, args, said] of [
+    ["listing", '*"--label before --label after"*', "the diff of the tree's listing exited 2"],
+    ["answers", '*"/fixture.txt "*', "the diff of base/fixture.txt and base2/fixture.txt exited 2"],
+  ]) {
+    const dir = join(tmp, `no-diff-${name}`);
+    mkdirSync(dir, { recursive: true });
+    writeStub(dir, "diff", `#!/bin/sh\ncase "$*" in ${args}) echo "diff: cannot read" >&2; exit 2 ;; esac\nexec ${real} "$@"\n`);
+    const r = await guard(tmp, "base", "base", { PATH: `${dir}:${process.env.PATH}` });
+    expect(r.code, name).toBe(5);
+    expect(r.stderr, name).toContain(`: harness error: ${said}\n`);
+    expect(existsSync(join(r.out, "head")), name).toBe(false);
+    expect(r.left, `${name}: the work dir, removed`).toEqual([]);
+  }
+}, 240_000);
 
 // Value: protects=a missing tool, any of the six, missing time zones, or a run as root stops the job before anything
 //   runs: exit 2, no out dir; fails_when=a tool leaves the check (the job then dies midway at a command not found), the
@@ -301,4 +330,28 @@ test("a TERM while gui waits to start ends the job at once and stops gui and its
     proc.kill();
     for (const p of [pid, terminal]) if (p && !gone(p)) process.kill(p, "SIGKILL");
   }
+}, 180_000);
+
+// Value: protects=a script(1) that runs with no child listed (a kernel without CONFIG_PROC_CHILDREN) is a harness error:
+//   exit 5 naming script(1), not a wait for a gui nobody can stop, and the work dir goes though gui still runs;
+//   fails_when=the empty-children check in gui_run goes (the job then hangs at the TERM that reaches nothing, or reports
+//   a difference), or reports exit 1; why_new=gui_run TERMed `${child%% *}` unchecked, so an empty list became
+//   `kill -TERM ""` and a wait without end (A0b); seam=PATH (a script(1) that prints an address and sleeps, with no
+//   child); no_claim=a real kernel without /proc children (the stub has none)
+test("a script(1) with no child listed is a harness error, exit 5", async () => {
+  const dir = join(tmp, "no-child");
+  mkdirSync(dir, { recursive: true });
+  const real = Bun.which("script") ?? "script";
+  // the gui call prints an address and a token, then is the sleep itself (no child); every other call is the real script(1)
+  const token = "ab".repeat(32);
+  writeStub(
+    dir,
+    "script",
+    `#!/bin/sh\ncase "$*" in *" gui --port"*) echo "http://127.0.0.1:1/#t=${token}"; exec sleep 300 ;; esac\nexec ${real} "$@"\n`,
+  );
+  const r = await guard(tmp, "base", "base", { PATH: `${dir}:${process.env.PATH}` });
+  expect(r.code).toBe(5);
+  expect(r.stderr).toMatch(/: harness error: no child of script\(1\) in \/proc\/\d+\/task\/\d+\/children: gui cannot be stopped\n/);
+  expect(existsSync(join(r.out, "head"))).toBe(false);
+  expect(r.left, "the work dir, removed").toEqual([]);
 }, 180_000);

@@ -33,14 +33,16 @@ text_of() { # <file>
   [ -z "$(tail -c 1 "$1")" ] || printf '\n\\ no newline at end\n'
 }
 
-# The same values in text: the snapshot id, ages, clock times, live free and
-# used space (not the space the next scan needs: doctor works it out from the
-# snapshot), the scan's durations; the work dir, so the answers read the same
-# anywhere; the server's port and token; and the binary's own version, which a
-# release bump changes (the exact version, as a word, not any number that looks
-# like one); gui's port in its ssh line, and its pid in the redirect file's
-# name. A carriage return stays: on a terminal the harness turns off the CR a
-# terminal adds to each line end (stty -onlcr), so one that shows is the CLI's.
+# The same values in text: the snapshot id, ages, clock times (in their shape:
+# the separator and whether seconds show stay; a file's date has no clock and
+# stays as it is), live free and used space (not the space the next scan needs:
+# doctor works it out from the snapshot), the scan's durations; the work dir,
+# so the answers read the same anywhere; the server's port and token; and the
+# binary's own version, which a release bump changes (the exact version, as a
+# word, not any number that looks like one); gui's port in its ssh line, and
+# its pid in the redirect file's name. A carriage return stays: on a terminal
+# the harness turns off the CR a terminal adds to each line end (stty -onlcr),
+# so one that shows is the CLI's.
 snap_id=
 ver_re=
 mask() {
@@ -54,7 +56,8 @@ mask() {
     -e 's/freespace-gui-[0-9]+\.html/freespace-gui-<pid>.html/g' \
     -e 's/t=[0-9a-f]{64}/t=<token>/g' \
     -e 's/[0-9]+ (s|min|h|d) old/<age> old/g' \
-    -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2})?/<time>/g' \
+    -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}([ T])[0-9]{2}:[0-9]{2}:[0-9]{2}/<date>\1<hh:mm:ss>/g' \
+    -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}([ T])[0-9]{2}:[0-9]{2}/<date>\1<hh:mm>/g' \
     -e '/needs [0-9]+(\.[0-9])? [BKMGTPE] free/!s/[0-9]+(\.[0-9])? [BKMGTPE] free/<size> free/g' \
     -e 's/[0-9]+(\.[0-9])? [BKMGTPE] available/<size> available/g' \
     -e 's/used of [0-9]+(\.[0-9])? [BKMGTPE]/used of <size>/g' \

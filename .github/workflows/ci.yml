@@ -5,6 +5,11 @@ on:
     branches: [master]
   pull_request:
 
+# the jobs read the code and nothing else; the token stays out of .git/config, so the code a pull request runs
+# (rust-diff, the tests) cannot read it there
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -15,6 +20,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -30,11 +37,15 @@ jobs:
       - name: fault injection on a full filesystem
         run: sudo scripts/fault-fs.sh target/debug/freespace
       # refactor-guard's questions against head itself, on every PR: base must answer each as the harness expects, so a
-      # PR that moves the CLI on must move scripts/rust-diff/questions.sh too, not leave it to the next refactor PR
+      # PR that moves the CLI on must move scripts/rust-diff/questions.sh too, not leave it to the next refactor PR. Two
+      # copies in two files, as refactor-guard runs them: an answer that holds the binary's own path shows here
       - name: rust-diff, head against itself
         run: |
           command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq sqlite3; }
-          scripts/rust-diff.sh target/debug/freespace target/debug/freespace "$RUNNER_TEMP/rust-diff"
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp target/debug/freespace "$RUNNER_TEMP/bin/base"
+          cp target/debug/freespace "$RUNNER_TEMP/bin/head"
+          scripts/rust-diff.sh "$RUNNER_TEMP/bin/base" "$RUNNER_TEMP/bin/head" "$RUNNER_TEMP/rust-diff"
 
   # The page: types, unit tests (format, router, hidden, contrast) and the
   # Playwright suite against a mocked /api at 1280, 700 and 360 px with axe.
@@ -47,6 +58,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
@@ -69,6 +82,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.88
       - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
@@ -82,6 +97,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-musl
@@ -97,6 +114,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: build fails with the bun install hint
@@ -110,6 +129,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -118,6 +139,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       # .shellcheckrc lets it follow what scripts/rust-diff.sh sources from scripts/rust-diff/
       - run: shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh
 
@@ -129,6 +152,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-musl

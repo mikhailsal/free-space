@@ -1,6 +1,6 @@
 // The stub freespace that stands in for both builds in the tests of scripts/rust-diff.sh (rust-diff*.test.ts), and what
 // those tests share: one run of the job, a base that holds its first call, a poll with a deadline.
-import { chmodSync, existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const repo = realpathSync(join(import.meta.dir, "../../.."));
@@ -113,6 +113,8 @@ INSERT OR REPLACE INTO hardlinks VALUES (1, 7, $$), (2, 7, $$), (3, 7, $$ + 1);"
 fi
 if [ "$1" = refresh ]; then echo "$2" >> "$dir/refreshed"; fi
 id=0; [ ! -f "$dir/id" ] || read -r id < "$dir/id"
+# --json has no id with no snapshot, as the CLI has none then
+sid=null; [ ! -f "$dir/id" ] || sid="\\"$id\\""
 r=0; if [ -f "$dir/refreshed" ]; then while read -r _; do r=$((r + 1)); done < "$dir/refreshed"; fi
 if [ "$1" = status ]; then echo x >> "$HOME/.visits"; [ ! -d "$dir" ] || echo x >> "$dir/visits"; fi
 v=$(cat "$HOME/.visits" "$dir/visits" 2>/dev/null | wc -l)
@@ -141,7 +143,7 @@ const reply = (
 ) => `if [ "$1" = scan ] || [ "$1" = refresh ]; then printf '{"last_success_ts":%s,"consecutive_failures":%s}\\n' "$t" "$fails" > "$dir/state.json"; fi
 case " $* " in
   *" --json "*)
-    printf '{"snapshot_id":"%s","scanned_at":%s,"prev_scanned_at":%s,"age_seconds":%s,"last_success_ts":%s,' "$id" "$s" "$s" "$n" "$s"
+    printf '{"snapshot_id":%s,"scanned_at":%s,"prev_scanned_at":%s,"age_seconds":%s,"last_success_ts":%s,' "$sid" "$s" "$s" "$n" "$s"
     printf '"walk_seconds":0.%s,"fs":[{"path":"/","fs_type":"ext4","total":%s,"used":%s,"avail":%s}],' "$n" "$n" "$n" "$n"
     printf '"roots":[{"path":"/","allocated":1024,"fs_used":%s,"fs_avail":%s}],' "\${id#?????????????}" "\${id#??????????????}"
     printf '"version":"${version}","refreshed":%s,"detail":"generation 2 · %s min old"%s,"entries":${entries}}\\n' "$r" "$n" "$bound" ;;
@@ -286,17 +288,20 @@ export const writeStub = (dir: string, name: string, body: string) => {
 export const NO_SUCH_PROXY = "http://127.0.0.1:9";
 export const STUB_ENV = {
   BUN: process.execPath,
+  // bun's transpiler cache stays out of the $HOME the job lists
+  BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
   SERVE_JS,
   RUST_DIFF_FAN: "1",
   ...{ http_proxy: NO_SUCH_PROXY, HTTP_PROXY: NO_SUCH_PROXY, ALL_PROXY: NO_SUCH_PROXY, no_proxy: "", NO_PROXY: "" },
   ...{ XDG_CONFIG_HOME: "/nonexistent/config", XDG_RUNTIME_DIR: "/nonexistent/runtime" },
 };
 
-export type Run = { out: string; code: number; stdout: string; stderr: string };
+export type Run = { out: string; code: number; stdout: string; stderr: string; left: string[] };
 let runs = 0;
 // One run of the job in TMP, base and head named by their stub files there; the out dir is new for each run. With
 // `tty`, the job runs under script(1), its stdin a terminal as from a shell, its stdout and stderr in files beside the
-// out dir.
+// out dir. The job's TMPDIR is a folder of the run's own: `left` is what the job left in it (its work dir, if it did
+// not remove it).
 export async function guard(
   tmp: string,
   base: string,
@@ -305,6 +310,8 @@ export async function guard(
   how: { tty?: boolean } = {},
 ): Promise<Run> {
   const out = join(tmp, `out-${runs++}`);
+  const scratch = `${out}.tmp`;
+  mkdirSync(scratch);
   const argv = [script, join(tmp, base), join(tmp, head), out];
   if (how.tty) {
     const q = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
@@ -313,17 +320,17 @@ export async function guard(
       stdin: "ignore",
       stdout: "ignore",
       stderr: "pipe",
-      env: { ...process.env, ...STUB_ENV, ...env, SHELL: Bun.which("bash") ?? "/bin/bash" },
+      env: { ...process.env, ...STUB_ENV, TMPDIR: scratch, ...env, SHELL: Bun.which("bash") ?? "/bin/bash" },
     });
     const [said, code] = await Promise.all([new Response(p.stderr).text(), p.exited]);
     const file = (f: string) => (existsSync(f) ? readFileSync(f, "utf8") : `(no ${f}; script said: ${said})`);
-    return { out, code, stdout: file(`${out}.stdout`), stderr: file(`${out}.stderr`) };
+    return { out, code, stdout: file(`${out}.stdout`), stderr: file(`${out}.stderr`), left: readdirSync(scratch) };
   }
   const p = Bun.spawn(argv, {
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, ...STUB_ENV, ...env },
+    env: { ...process.env, ...STUB_ENV, TMPDIR: scratch, ...env },
   });
   const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
-  return { out, code, stdout, stderr };
+  return { out, code, stdout, stderr, left: readdirSync(scratch) };
 }

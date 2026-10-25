@@ -51,8 +51,9 @@ gui_run() { # <bin> <label> <ssh, opens or fails> [<folder>]
   else
     echo "== gui $label"
     if [ "$browser" != ssh ]; then
+      # the redirect file as it is, among the files there
       files "$work/runtime"
-      { echo "-- xdg-open got"; text_of "$work/browser.log"; echo "-- the redirect file"; text_of "$file"; } | mask
+      { echo "-- xdg-open got"; text_of "$work/browser.log"; } | mask
     fi
     http status 200 json -H "x-freespace-token: $token" "$addr/api/status"
     [ "$browser" = ssh ] || files "$work/runtime"

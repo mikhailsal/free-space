@@ -26,8 +26,9 @@
 #     without a root, CONFIG_QUERIES; GONE_QUERIES once one root is gone from
 #     the disk; then a config with an unknown key;
 #   - after each part, the files the CLI keeps (the snapshot folder, $HOME, the
-#     unit dir): name, type and mode, state.json normalized, and each database
-#     row by row (rust-diff/kept.sh).
+#     unit dir): name, type and mode (a symlink's target), state.json
+#     normalized, every other file as it is, and each database row by row
+#     (rust-diff/kept.sh).
 # Each run starts from the same files: a copy of the fixture snapshot, an empty
 # $HOME and unit dir.
 # No command may change a tree it reads: each tree is listed (names, types,
@@ -44,9 +45,9 @@
 # byte: base against base first (a difference there means the comparison
 # itself is unreliable: exit 3), then base against head (exit 1 on any
 # difference). A command of the harness's own that fails is a harness error,
-# not a difference: exit 5, naming the command. A version bump alone is no
-# difference: each binary's own version (from its --version) is masked in its
-# answers. The normalized answers stay in
+# not a difference: exit 5, naming the command (a diff that cannot compare
+# too). A version bump alone is no difference: each binary's own version (from
+# its --version) is masked in its answers. The normalized answers stay in
 # <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
 # Needs jq, curl, script and flock (util-linux), perl, sqlite3 and tzdata. JSON
 # is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4, from
@@ -153,7 +154,7 @@ floor() { # <phase> <question> <got> [<wanted, space-separated>]
 }
 
 ask() { # <bin> <fresh> <query words...>: one answer, normalized; no words: the bare run
-  local bin=$1 fresh=$2 w args=() json=false rel=false code=0 q s
+  local bin=$1 fresh=$2 w args=() json=false rel=false code=0 q s id
   shift 2
   for w in "$@"; do
     args+=("${w/#@/$tree}")
@@ -161,8 +162,9 @@ ask() { # <bin> <fresh> <query words...>: one answer, normalized; no words: the 
     [[ ! $w =~ ^[0-9]+(d|w|mo|y)$ ]] || rel=true
   done
   run "$bin" "${args[@]}" >"$work/stdout" 2>"$work/stderr" || code=$?
-  # a scan and a refresh publish a new snapshot with a new id
-  case "${1:-}" in scan | refresh) snap_id=$(current_id) ;; esac
+  # a scan and a refresh publish a new snapshot with a new id; one refused under a config base cannot read leaves the
+  # last id standing (status is refused too then)
+  case "${1:-}" in scan | refresh) id=$(current_id); [ -z "$id" ] || snap_id=$id ;; esac
   q="$*"
   floor "$phase" "${q% --json}" "$code"
   # JSON: one value at least (blank output is none)
@@ -217,12 +219,18 @@ current_id() { # the snapshot id in $FREESPACE_SNAPSHOT_DIR, as base reads it
 }
 
 tree_mark() { tree_listing >"$work/listing"; }
-tree_check() { # <bin> <what it did>: stop at once if the tree changed under it
-  if ! tree_listing | diff -u --label before --label after "$work/listing" - >"$work/listing.diff"; then
-    head -n 50 "$work/listing.diff" >&2
-    echo "$0: $1 changed the tree it read ($tree) during $2" >&2
-    exit 1
-  fi
+tree_check() { # <bin> <what it did>: stop at once if the tree changed under it; a diff that fails is a harness error
+  local s=0
+  tree_listing | diff -u --label before --label after "$work/listing" - >"$work/listing.diff" || s=$?
+  case $s in
+    0) ;;
+    1)
+      head -n 50 "$work/listing.diff" >&2
+      echo "$0: $1 changed the tree it read ($tree) during $2" >&2
+      exit 1
+      ;;
+    *) echo "$0: harness error: the diff of the tree's listing exited $s" >&2; exit 5 ;;
+  esac
 }
 
 refreshes() { # <bin>: REFRESHES on the snapshot in FREESPACE_SNAPSHOT_DIR, then AFTER_REFRESH
@@ -325,7 +333,10 @@ fresh_answers() { # <bin>: its own tree, scanned twice, asked, moved on and refr
 
 config_answers() { # <bin>: roots, workers and keep_previous from a config file; a root gone; then a bad config; in the fresh phase's tree
   local tree=$work/ftree config=$work/config.toml
-  [ -d "$tree" ] || { echo "$0: the config phase needs the tree of the fresh phase, and there is none" >&2; exit 1; }
+  if [ ! -d "$tree" ]; then
+    echo "$0: harness error: the config phase needs the tree of the fresh phase, and there is none" >&2
+    exit 5
+  fi
   rm -rf "$work/conf"
   FREESPACE_SNAPSHOT_DIR=$work/conf phase=config
   printf 'roots = ["%s/projects", "%s/media"]\nkeep_previous = false\nworkers = 3\n' "$tree" "$tree" >"$config"
@@ -361,10 +372,17 @@ answers() { # <bin> <label>: every phase, each into its own file, from the same 
   config_answers "$1" >"$dir/config.txt"
 }
 
-same() { # <label-a> <label-b>: identical, or the differences on stdout
-  local f ok=0
+# It runs under `if !`, where no ERR trap fires: a diff that fails (exit 2, not 1) says so itself.
+same() { # <label-a> <label-b>: identical, or the differences on stdout (200 lines a phase)
+  local f ok=0 s
   for f in "${PHASES[@]}"; do
-    diff -u --label "$1/$f.txt" --label "$2/$f.txt" "$out/$1/$f.txt" "$out/$2/$f.txt" | head -n 200 || ok=1
+    s=0
+    diff -u --label "$1/$f.txt" --label "$2/$f.txt" "$out/$1/$f.txt" "$out/$2/$f.txt" >"$work/answers.diff" || s=$?
+    case $s in
+      0) ;;
+      1) ok=1; head -n 200 "$work/answers.diff" ;;
+      *) echo "$0: harness error: the diff of $1/$f.txt and $2/$f.txt exited $s" >&2; exit 5 ;;
+    esac
   done
   return "$ok"
 }
