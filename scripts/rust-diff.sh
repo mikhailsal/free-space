@@ -6,27 +6,56 @@
 #
 # Base scans a made-up tree twice (with changes in between, so `diff` has
 # something to show) into one fixture snapshot. Then base, base again and head
-# each answer, one after the other:
-#   - QUERIES on that snapshot, text and --json;
-#   - ONCE and `<command> --help`, as written: the binary's own texts (version,
-#     help, completions, schema, the skill, usage errors, the bare run);
-#   - REFRESHES on a copy of that snapshot (the tree has moved on since: one
-#     folder changed, one gone), then AFTER_REFRESH on the copy. refresh needs
-#     no root while FREESPACE_SNAPSHOT_DIR is a folder of ours; this is the only
-#     way a refactor of core/src/refresh.rs shows up in an answer;
-#   - QUERIES again on a fresh scan of the tree the binary makes itself;
-#   - after each of the three, the files in that snapshot folder: name, type and
-#     mode, so a stray file or a wider mode is a difference too.
-# A call that runs past RUST_DIFF_TIMEOUT seconds (300) is stopped and answers
-# exit 124, so a hang shows up as the question that hung.
-# Answers are normalized (D20, see normalize_json and mask) and compared byte
-# for byte: base against base first (a difference there means the comparison
+# each answer, one after the other (the questions are in rust-diff/questions.sh,
+# the trees in rust-diff/tree.sh):
+#   - on the fixture snapshot: ONCE and `<command> --help`, as written (the
+#     binary's own texts); QUERIES and GLOB_QUERIES, text and --json;
+#     CWD_QUERIES from inside the tree and PATH_QUERIES as given; TZ_QUERIES in
+#     another time zone; TTY_QUERIES on a terminal; the serve phase
+#     (rust-diff/serve.sh) and the gui phase (rust-diff/gui.sh); REFRESHES on a
+#     copy of the snapshot (the tree has moved on since), then AFTER_REFRESH on
+#     the copy. refresh needs no root while FREESPACE_SNAPSHOT_DIR is a folder of
+#     ours;
+#   - start: EMPTY_QUERIES with no snapshot folder, FIRST_QUERIES with an empty
+#     one while a scan holds its lock, BUSY_QUERIES on a copy of the fixture
+#     snapshot while a scan holds its lock;
+#   - fresh: the build makes a tree of its own, scans it with 8 walker threads,
+#     changes it and scans again, then QUERIES; moves it on, REFRESHES and
+#     AFTER_REFRESH, all on the snapshot it made itself;
+#   - config: a config file with two roots and no previous snapshot; `scan`
+#     without a root, CONFIG_QUERIES; GONE_QUERIES once one root is gone from
+#     the disk; then a config with an unknown key;
+#   - after each part, the files the CLI keeps (the snapshot folder, $HOME, the
+#     unit dir): name, type and mode (a symlink's target), state.json
+#     normalized, every other file as it is, and each database row by row
+#     (rust-diff/kept.sh).
+# Each run starts from the same files: a copy of the fixture snapshot, an empty
+# $HOME and unit dir.
+# No command may change a tree it reads: each tree is listed (names, types,
+# modes, sizes, links, mtimes) before and after the commands that read it, and
+# any change stops the job at once (exit 1).
+# Base must answer every question with the exit status EXPECTED lists (0 when
+# it lists none), a refusal with the words it lists, and --json with JSON;
+# otherwise the harness is stale (exit 4) before head runs: a question both
+# builds refuse alike would test nothing.
+# Not as root: install-timer would install the build on this host.
+# A call that runs past RUST_DIFF_TIMEOUT seconds (300, a whole number from 1)
+# is stopped and answers exit 124, so a hang shows up as the question that hung.
+# Answers are normalized (D20, rust-diff/normalize.sh) and compared byte for
+# byte: base against base first (a difference there means the comparison
 # itself is unreliable: exit 3), then base against head (exit 1 on any
-# difference). A version bump alone is no difference: each binary's own version
-# (from its --version) is masked in its answers. The normalized answers stay in
-# <out-dir>/{base,base2,head}/{fixture,fresh}.txt.
-# Needs jq. JSON is compared as jq prints it, keys in the CLI's order.
-set -euo pipefail
+# difference). A command of the harness's own that fails is a harness error,
+# not a difference: exit 5, naming the command (a diff that cannot compare
+# too). A version bump alone is no difference: each binary's own version (from
+# its --version) is masked in its answers. The normalized answers stay in
+# <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
+# Needs jq, curl, script and flock (util-linux), perl, sqlite3 and tzdata. JSON
+# is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4, from
+# 1 to 9) sets the wide part of the trees.
+# shellcheck source-path=SCRIPTDIR
+set -Eeuo pipefail
+# -E: in a function, a subshell or a $(...) too; a subshell's exit 5 then fails its caller, which names itself as well
+trap 'echo "$0: harness error: ${BASH_SOURCE[0]##*/} line $LINENO: $BASH_COMMAND exited $?" >&2; exit 5' ERR
 
 usage() { echo "usage: $0 <base-bin> <head-bin> <out-dir>" >&2; exit 2; }
 [ "$#" -eq 3 ] || usage
@@ -34,14 +63,49 @@ base=$1 head=$2 out=$3
 for b in "$base" "$head"; do
   if [ ! -f "$b" ] || [ ! -x "$b" ]; then echo "$0: not an executable file: $b" >&2; exit 2; fi
 done
-command -v jq >/dev/null || { echo "$0: jq is required" >&2; exit 2; }
+if [[ ! ${RUST_DIFF_FAN:-4} =~ ^[1-9]$ ]]; then echo "$0: RUST_DIFF_FAN must be 1 to 9, not ${RUST_DIFF_FAN}" >&2; exit 2; fi
+# timeout takes 0 as no bound at all, and a word as an error on every call
+if [[ ! ${RUST_DIFF_TIMEOUT:-300} =~ ^[1-9][0-9]*$ ]]; then
+  echo "$0: RUST_DIFF_TIMEOUT must be whole seconds from 1, not ${RUST_DIFF_TIMEOUT}" >&2
+  exit 2
+fi
+for tool in jq curl script flock perl sqlite3; do
+  command -v "$tool" >/dev/null || { echo "$0: $tool is required" >&2; exit 2; }
+done
+if [ "$(id -u)" = 0 ]; then echo "$0: run it as a user, not root: install-timer would install a build on this host" >&2; exit 2; fi
+here=$(dirname "$(realpath "$0")")
+# shellcheck source=rust-diff/tree.sh
+. "$here/rust-diff/tree.sh"
+# shellcheck source=rust-diff/questions.sh
+. "$here/rust-diff/questions.sh"
+# shellcheck source=rust-diff/normalize.sh
+. "$here/rust-diff/normalize.sh"
+# shellcheck source=rust-diff/serve.sh
+. "$here/rust-diff/serve.sh"
+# shellcheck source=rust-diff/gui.sh
+. "$here/rust-diff/gui.sh"
+# shellcheck source=rust-diff/kept.sh
+. "$here/rust-diff/kept.sh"
+# without the zone (no tzdata) the C library falls back to UTC, and TZ_QUERIES test nothing
+if [ "$(TZ=$TZ_OTHER date -d @1704067200 +%z)" != +0530 ]; then
+  echo "$0: tzdata is required: TZ=$TZ_OTHER must be UTC+05:30" >&2
+  exit 2
+fi
 base=$(realpath "$base") head=$(realpath "$head")
 mkdir -p "$out"
 out=$(realpath "$out")
 
-work=$(mktemp -d)
-# chmod first: the tree holds a folder nobody may read
-trap 'chmod -R u+rwx "$work" 2>/dev/null; rm -rf "$work"' EXIT
+# absolute, also from a relative TMPDIR: the cwd questions run from inside the tree
+work=$(realpath "$(mktemp -d)")
+work_re=$(printf '%s' "$work" | sed 's/[][\.*^$#]/\\&/g')
+# as SQLite prints the paths a database holds (rust-diff/kept.sh)
+work_hex=$(printf '%s' "$work" | od -An -v -tx1 | tr -d ' \n' | tr a-f A-F)
+# the dates tree.sh gives by age, the same for every tree of the run
+epoch=$(date +%s)
+# a server still running (rust-diff/serve.sh) goes too; the trees hold a folder nobody may read
+serving=
+# (no ERR trap there: the job's own exit status stands)
+trap 'trap - ERR; [ -z "$serving" ] || kill "$serving" 2>/dev/null || true; chmod -R u+rwx "$work" 2>/dev/null || true; rm -rf "$work"' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -54,227 +118,104 @@ ln -s "$base" "$work/bin/base/freespace"
 ln -s "$head" "$work/bin/head/freespace"
 base=$work/bin/base/freespace head=$work/bin/head/freespace
 
-# Every question, run once as written and once with --json; @ is the tree.
-# Ages are absolute dates, so the answers do not move with the clock.
-QUERIES=(
-  "status"
-  "doctor"
-  "ls @"
-  "ls @ --sort apparent"
-  "ls @ --sort mtime --limit 3"
-  "ls @/projects/app"
-  "ls @/odd"
-  "ls @/nope"
-  "ls @ --snapshot not-this-one"
-  "top @"
-  "top @ --min-size 100K --sort mtime"
-  "top @ --older-than 2024-06-01"
-  "top @ --kind dir"
-  "top @ --kind dir --older-than 2024-06-01 --limit 2"
-  "find @ --name *.iso"
-  "find @ --iname NODE_MODULES --kind dir"
-  "find @ --newer-than 2024-06-01 --min-size 10K --kind file"
-  "find @ --name *.log --limit 1"
-  "diff @"
-  "diff @ --depth 3 --kind any"
-  "diff @ --kind file --limit 2"
-)
-
-# Questions asked once, as written, on the fixture snapshot: a --json twin would
-# mean nothing for texts, and the snapshot makes no difference to them (the
-# bare run reads it, so it is here). The empty one is the bare run; --json is
-# its summary. A usage error has a --json form of its own, listed too.
-ONCE=(
-  ""
-  "--json"
-  "--version"
-  "--help"
-  "ls --no-such-flag"
-  "ls --no-such-flag --json"
-  "completions bash"
-  "completions zsh"
-  "completions fish"
-  "schema"
-  "skill print"
-)
-# `<command> --help` is asked of each of these (the list in `freespace --help`).
-COMMANDS=(ls top find diff gui serve status doctor scan refresh install-timer skill schema completions)
-
-# refresh, in this order, on a copy of the fixture snapshot, after drift_tree:
-# a changed folder (text), a folder gone from the disk (--json), a path the
-# snapshot does not have and a file (both refused). AFTER_REFRESH, text and
-# --json, then ask what the copy holds. None of it needs root.
-REFRESHES=(
-  "refresh @/logs --workers 2"
-  "refresh @/cache --workers 2 --json"
-  "refresh @/nope --workers 2"
-  "refresh @/top.bin --workers 2 --json"
-)
-AFTER_REFRESH=(
-  "status"
-  "ls @"
-  "ls @/logs"
-  "top @"
-  "top @ --kind dir"
-  "find @ --name *.log"
-  "diff @"
-)
-
-# The CLI's environment: this host's config, units and $HOME stay out. doctor
-# still reads the host (the systemd timer, an installed binary on PATH, the
-# skill in the passwd home), alike for both builds on a clean CI runner; on a
-# dev machine with freespace installed a local run can differ where CI's won't.
+# The CLI's environment: this host's config, units, $HOME and XDG folders stay
+# out, and so do its display and its terminal (stdin is /dev/null: given a
+# terminal, `gui` would start, not refuse); $tz and $config, when a phase sets
+# them, replace UTC and the missing config file. doctor still reads the host
+# (the systemd timer, an installed binary on PATH, the skill in the passwd
+# home), alike for both builds on a clean CI runner; on a dev machine with
+# freespace installed a local run can differ where CI's won't. timeout stays in
+# the job's process group (--foreground), so a Ctrl-C reaches the call in
+# progress too.
+run_prefix() { # sets argv: the command line a call starts with
+  argv=(env -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_RUNTIME_DIR -u DISPLAY -u WAYLAND_DISPLAY
+    TZ="${tz:-UTC}" LC_ALL=C HOME="$work/home" FREESPACE_CONFIG="${config:-$work/none.toml}"
+    FREESPACE_UNIT_DIR="$work/units" timeout --foreground -k 10 "${RUST_DIFF_TIMEOUT:-300}")
+}
 run() { # <bin> <args...>
-  env TZ=UTC LC_ALL=C HOME="$work/home" FREESPACE_CONFIG="$work/none.toml" \
-    FREESPACE_UNIT_DIR="$work/units" timeout -k 10 "${RUST_DIFF_TIMEOUT:-300}" "$@"
+  local argv
+  run_prefix
+  "${argv[@]}" "$@" </dev/null
 }
 
-blob() { # <path> <KiB> <mtime>: a file of that size, modified then
-  mkdir -p "$(dirname "$1")"
-  head -c "$(($2 * 1024))" /dev/zero >"$1"
-  touch -d "$3" "$1"
-}
-
-settle_dirs() { # every folder's own mtime, after its files changed
-  chmod 700 "$tree/locked" # find must enter it
-  find "$tree" -depth -type d -exec touch -d "2024-03-01 00:00:00 UTC" {} +
-  chmod 000 "$tree/locked"
-}
-
-make_tree() {
-  blob "$tree/projects/app/src/main.rs" 12 "2024-09-10 08:00 UTC"
-  blob "$tree/projects/app/node_modules/pkg/index.js" 64 "2024-02-01 08:00 UTC"
-  blob "$tree/projects/old-site/node_modules/lib/big.js" 180 "2023-05-05 08:00 UTC"
-  blob "$tree/projects/old-site/index.html" 8 "2023-05-05 08:00 UTC"
-  blob "$tree/media/iso/debian.iso" 400 "2024-01-20 08:00 UTC"
-  ln "$tree/media/iso/debian.iso" "$tree/media/iso/debian-copy.iso"
-  truncate -s 50M "$tree/media/sparse.img"
-  touch -d "2024-07-01 08:00 UTC" "$tree/media/sparse.img"
-  blob "$tree/logs/app.log" 40 "2024-10-01 08:00 UTC"
-  blob "$tree/logs/old.log" 16 "2022-12-31 08:00 UTC"
-  blob "$tree/top.bin" 100 "2021-03-04 08:00 UTC"
-  blob "$tree/odd/$(printf 'bad\377name.bin')" 4 "2024-04-04 08:00 UTC"
-  ln -s ../media "$tree/projects/media-link"
-  mkdir -p "$tree/empty" "$tree/locked/inside"
-  blob "$tree/locked/inside/secret.bin" 8 "2024-05-05 08:00 UTC"
-  settle_dirs
-}
-
-change_tree() { # what the second scan sees: growth, a new file, a removal
-  blob "$tree/media/iso/ubuntu.iso" 300 "2024-10-20 08:00 UTC"
-  blob "$tree/logs/app.log" 90 "2024-10-21 08:00 UTC"
-  blob "$tree/cache/blob.bin" 32 "2024-10-22 08:00 UTC"
-  rm -r "$tree/projects/old-site"
-  settle_dirs
-}
-
-drift_tree() { # what refresh finds, after both scans: a folder changed, one gone
-  blob "$tree/logs/app.log" 120 "2024-10-23 08:00 UTC"
-  blob "$tree/logs/new.log" 24 "2024-10-23 09:00 UTC"
-  rm "$tree/logs/old.log"
-  rm -r "$tree/cache"
-  settle_dirs
-}
-
-# D20: drop snapshot_id, every time field and live filesystem numbers. A fresh
-# scan or a refresh stores its root's fs_used and fs_avail at that time, so
-# there they are live too ($fresh is true). ($fresh is jq's, not the shell's.)
-# shellcheck disable=SC2016
-JQ_NORM='walk(if type == "object" then
-  with_entries(select(.key | test("^(snapshot_id|scanned_at|prev_scanned_at)$|_ts$|_seconds$") | not))
-  | (if (.fs | type) == "array" then .fs |= map(del(.total, .used, .avail)) else . end)
-  | (if $fresh and (.roots | type) == "array"
-     then .roots |= map(if type == "object" then del(.fs_used, .fs_avail) else . end) else . end)
-else . end)'
-
-normalize_json() { # <file> <fresh>: the JSON normalized, or the text as is
-  jq --argjson fresh "$2" "$JQ_NORM" "$1" 2>/dev/null || cat "$1"
-}
-
-# The same values in text: the snapshot id, ages, clock times, live free and
-# used space (not the space the next scan needs: doctor works it out from the
-# snapshot), the scan's durations; the work dir, so the answers read the same
-# anywhere; and the binary's own version, which a release bump changes (the
-# exact version, as a word, not any number that looks like one).
-snap_id=
-ver_re=
-work_re=$(printf '%s' "$work" | sed 's/[][\.*^$#]/\\&/g')
-mask() {
-  sed -E \
-    -e "s#$work_re#<work>#g" \
-    -e "${snap_id:+s/$snap_id/<snapshot_id>/g}" \
-    -e "${ver_re:+s/\\<$ver_re\\>/<version>/g}" \
-    -e 's/[0-9]+ (s|min|h|d) old/<age> old/g' \
-    -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}(:[0-9]{2})?/<time>/g' \
-    -e '/needs [0-9]+(\.[0-9])? [BKMGTPE] free/!s/[0-9]+(\.[0-9])? [BKMGTPE] free/<size> free/g' \
-    -e 's/[0-9]+(\.[0-9])? [BKMGTPE] available/<size> available/g' \
-    -e 's/used of [0-9]+(\.[0-9])? [BKMGTPE]/used of <size>/g' \
-    -e 's/filesystem [0-9]+(\.[0-9])? [BKMGTPE] used/filesystem <size> used/g' \
-    -e 's/[0-9]+\.[0-9]+ s\b/<seconds>/g'
-}
-
-version_re() { # <bin>: its version from its own --version, as a regex ("freespace 0.1.1" gives 0\.1\.1)
-  local v
-  v=$(run "$1" --version 2>/dev/null | sed -nE '1s/^.* ([0-9]+(\.[0-9]+)+([-+][0-9A-Za-z.+-]+)?)$/\1/p') || true
-  printf '%s' "$v" | sed 's/[.+]/\\&/g'
+# The floor: while $checking (base's first run), an exit status EXPECTED does not
+# list for this phase and question goes to $work/stale, and so does a status it
+# lists given without the words EXPECTED says stderr ($work/stderr) holds then.
+checking=false phase=
+floor() { # <phase> <question> <got> [<wanted, space-separated>]
+  $checking || return 0
+  local want=${4-} says='' e
+  if [ -z "$want" ]; then
+    want=0
+    for e in "${EXPECTED[@]}"; do
+      case $e in "$1|$2|"*) e=${e#"$1|$2|"} want=${e%%|*} says=${e#*|} ;; esac
+    done
+  fi
+  case " $want " in
+    *" $3 "*) [ -z "$says" ] || grep -qF -- "$says" "$work/stderr" ||
+      echo "$1: $2: answered $3 without \"$says\" on stderr" >>"$work/stale" ;;
+    *) echo "$1: $2: answered $3, the harness expects $want" >>"$work/stale" ;;
+  esac
 }
 
 ask() { # <bin> <fresh> <query words...>: one answer, normalized; no words: the bare run
-  local bin=$1 fresh=$2 w args=() json=false code=0
+  local bin=$1 fresh=$2 w args=() json=false rel=false code=0 q s id
   shift 2
   for w in "$@"; do
     args+=("${w/#@/$tree}")
     [ "$w" = --json ] && json=true
+    [[ ! $w =~ ^[0-9]+(d|w|mo|y)$ ]] || rel=true
   done
   run "$bin" "${args[@]}" >"$work/stdout" 2>"$work/stderr" || code=$?
-  # a scan and a refresh publish a new snapshot with a new id
-  case "${1:-}" in scan | refresh) snap_id=$(current_id) ;; esac
+  # a scan and a refresh publish a new snapshot with a new id; one refused under a config base cannot read leaves the
+  # last id standing (status is refused too then)
+  case "${1:-}" in scan | refresh) id=$(current_id); [ -z "$id" ] || snap_id=$id ;; esac
+  q="$*"
+  floor "$phase" "${q% --json}" "$code"
+  # JSON: one value at least (blank output is none)
+  if $checking && $json && [ "$code" = 0 ] && ! jq -en '[inputs] | length > 0' "$work/stdout" >/dev/null 2>&1; then
+    echo "$phase: $q: answered 0 without JSON" >>"$work/stale"
+  fi
   echo "== ${*:-(no arguments)}"
   echo "exit $code"
+  # an age bound's date in text is today's less the age, so it moves at midnight
   for s in stdout stderr; do
     echo "-- $s"
-    if $json; then normalize_json "$work/$s" "$fresh"; else cat "$work/$s"; fi
-  done | mask
+    if $json; then normalize_json "$work/$s" "$fresh" "$rel"; else text_of "$work/$s"; fi
+  done | if $rel; then sed -E 's/ since [0-9]{4}-[0-9]{2}-[0-9]{2}\b/ since <date>/g'; else cat; fi | mask
 }
 
-ask_all() { # <bin> <fresh> <queries...>: each, text then --json
+ask_each() { # <bin> <fresh> <queries...>: each as written
   local bin=$1 fresh=$2 q words
   shift 2
   for q in "$@"; do
     read -ra words <<<"$q"
     ask "$bin" "$fresh" "${words[@]}"
-    ask "$bin" "$fresh" "${words[@]}" --json
   done
 }
 
-ask_once() { # <bin>: the questions asked as written, no --json twin
-  local q words c
-  for q in "${ONCE[@]}"; do
-    read -ra words <<<"$q"
-    ask "$1" false "${words[@]}"
-  done
-  for c in "${COMMANDS[@]}"; do ask "$1" false "$c" --help; done
+ask_all() { # <bin> <fresh> <queries...>: each, text then --json
+  local bin=$1 fresh=$2 q
+  shift 2
+  for q in "$@"; do ask_each "$bin" "$fresh" "$q" "$q --json"; done
 }
 
-ask_refreshed() { # <bin>: refresh on a copy of the fixture snapshot, then ask the copy
-  local q words
-  # one path for every binary, so the answers read the same; a new copy for each
-  rm -rf "$work/refreshed"
-  cp -a "$work/snap" "$work/refreshed"
-  FREESPACE_SNAPSHOT_DIR=$work/refreshed
-  # true: a refresh stores the root's live fs_used and fs_avail, as a scan does
-  for q in "${REFRESHES[@]}"; do
-    read -ra words <<<"$q"
-    ask "$1" true "${words[@]}"
-  done
-  ask_all "$1" true "${AFTER_REFRESH[@]}"
-  files "$work/refreshed"
-}
-
-files() { # <dir>: that snapshot folder and what the CLI keeps in it, by name, type and mode
+ask_tty() { # <bin> <query>: the text a terminal shows, under script(1)
+  local bin=$1 argv code=0 cmd w
+  local -a words
+  read -ra words <<<"$2"
+  run_prefix
+  printf -v cmd '%q ' "${argv[@]}" "$bin"
+  for w in "${words[@]}"; do printf -v cmd '%s%q ' "$cmd" "${w/#@/$tree}"; done
+  # the terminal passes line ends as written (no CR added): a CR the CLI writes shows
+  script -qec "stty -onlcr; $cmd" /dev/null </dev/null >"$work/stdout" 2>&1 || code=$?
+  # the floor looks for its words in $work/stderr: on a terminal both streams are one
+  cp "$work/stdout" "$work/stderr"
+  floor tty "$2" "$code"
   {
-    echo "== files in $1"
-    (cd "$1" && find . -printf '%p %y %m\n') | LC_ALL=C sort
+    echo "== on a terminal: ${2:-(no arguments)}"
+    echo "exit $code"
+    text_of "$work/stdout"
   } | mask
 }
 
@@ -282,32 +223,171 @@ current_id() { # the snapshot id in $FREESPACE_SNAPSHOT_DIR, as base reads it
   run "$base" status --json 2>/dev/null | jq -r '.snapshot_id // empty' | grep -E '^[0-9A-Za-z_-]+$' || true
 }
 
-answers() { # <bin> <label>: the fixture snapshot's answers, then a fresh scan's
-  local dir=$out/$2
-  mkdir -p "$dir"
-  export FREESPACE_SNAPSHOT_DIR=$work/snap
-  snap_id=$(current_id)
-  ver_re=$(version_re "$1")
-  {
-    ask_once "$1"
-    ask_all "$1" false "${QUERIES[@]}"
-    files "$work/snap"
-    ask_refreshed "$1"
-  } >"$dir/fixture.txt"
-  rm -rf "$work/fresh"
-  FREESPACE_SNAPSHOT_DIR=$work/fresh
-  {
-    ask "$1" true scan @ --workers 2 --json
-    ask "$1" true scan @ --workers 2
-    ask_all "$1" true "${QUERIES[@]}"
-    files "$work/fresh"
-  } >"$dir/fresh.txt"
+tree_mark() { tree_listing >"$work/listing"; }
+tree_check() { # <bin> <what it did>: stop at once if the tree changed under it; a diff that fails is a harness error
+  local s=0
+  tree_listing | diff -u --label before --label after "$work/listing" - >"$work/listing.diff" || s=$?
+  case $s in
+    0) ;;
+    1)
+      head -n 50 "$work/listing.diff" >&2
+      echo "$0: $1 changed the tree it read ($tree) during $2" >&2
+      exit 1
+      ;;
+    *) echo "$0: harness error: the diff of the tree's listing exited $s" >&2; exit 5 ;;
+  esac
 }
 
-same() { # <label-a> <label-b>: identical, or the differences on stdout
-  local f ok=0
-  for f in fixture fresh; do
-    diff -u --label "$1/$f.txt" --label "$2/$f.txt" "$out/$1/$f.txt" "$out/$2/$f.txt" | head -n 200 || ok=1
+refreshes() { # <bin>: REFRESHES on the snapshot in FREESPACE_SNAPSHOT_DIR, then AFTER_REFRESH
+  phase=refresh
+  # true: a refresh stores the root's live fs_used and fs_avail, as a scan does
+  ask_each "$1" true "${REFRESHES[@]}"
+  phase=after
+  ask_all "$1" true "${AFTER_REFRESH[@]}"
+}
+
+paths_answers() { # <bin>: CWD_QUERIES from inside the tree, PATH_QUERIES, and the tree's odd/ as --path-raw hex
+  local hex
+  phase=cwd
+  echo "== in @/projects"
+  (cd "$tree/projects" && ask_all "$1" false "${CWD_QUERIES[@]}")
+  phase=paths
+  hex=$(printf '%s' "$tree/odd" | od -An -v -tx1 | tr -d ' \n')
+  ask_all "$1" false "${PATH_QUERIES[@]}" "ls --path-raw $hex"
+}
+
+fixture_answers() { # <bin>: what it says of the fixture snapshot and a copy it refreshes
+  local q tz
+  FREESPACE_SNAPSHOT_DIR=$work/snap
+  snap_id=$(current_id)
+  tree_mark
+  phase=once
+  ask_each "$1" false "${ONCE[@]}" "${COMMANDS[@]/%/ --help}"
+  phase=fixture
+  ask_all "$1" false "${QUERIES[@]}"
+  phase=glob
+  ask_all "$1" false "${GLOB_QUERIES[@]}"
+  paths_answers "$1"
+  tz=$TZ_OTHER phase=tz
+  echo "== TZ=$tz"
+  ask_all "$1" false "${TZ_QUERIES[@]}"
+  tz=
+  for q in "${TTY_QUERIES[@]}"; do ask_tty "$1" "$q"; done
+  serve_answers "$1"
+  gui_answers "$1"
+  kept "$work/snap"
+  # one path for every binary, so the answers read the same; a new copy for each
+  rm -rf "$work/refreshed"
+  cp -a "$work/pristine" "$work/refreshed"
+  FREESPACE_SNAPSHOT_DIR=$work/refreshed
+  refreshes "$1"
+  kept "$work/refreshed"
+  tree_check "$1" "the fixture phase"
+}
+
+hold_lock() { # <dir>: a scan of $tree runs, as its lock says (at a fixed time, 2024-01-01 00:00 UTC); the fd in $locked
+  mkdir -p "$1"
+  printf '{"op":"scan","path":"%s","started_at":1704067200,"pid":4242}' "$tree" >"$1/.lock"
+  exec {locked}>>"$1/.lock"
+  flock -x "$locked"
+}
+
+start_answers() { # <bin>: before the first snapshot, during the first scan, and during a scan over the fixture snapshot
+  local locked
+  rm -rf "$work/empty" "$work/first" "$work/busy"
+  tree_mark
+  FREESPACE_SNAPSHOT_DIR=$work/empty phase=empty snap_id=
+  ask_all "$1" false "${EMPTY_QUERIES[@]}"
+  kept "$work/empty"
+  FREESPACE_SNAPSHOT_DIR=$work/first phase=first
+  hold_lock "$work/first"
+  ask_all "$1" false "${FIRST_QUERIES[@]}"
+  exec {locked}>&-
+  kept "$work/first"
+  cp -a "$work/pristine" "$work/busy"
+  FREESPACE_SNAPSHOT_DIR=$work/busy phase=busy
+  snap_id=$(current_id)
+  hold_lock "$work/busy"
+  ask_all "$1" false "${BUSY_QUERIES[@]}"
+  exec {locked}>&-
+  kept "$work/busy"
+  tree_check "$1" "the start phase"
+}
+
+fresh_answers() { # <bin>: its own tree, scanned twice, asked, moved on and refreshed
+  local tree=$work/ftree
+  remove_tree
+  make_tree
+  rm -rf "$work/fresh"
+  FREESPACE_SNAPSHOT_DIR=$work/fresh phase=fresh
+  tree_mark
+  ask "$1" true scan @ --workers 8 --json
+  tree_check "$1" "its first scan"
+  change_tree
+  tree_mark
+  ask "$1" true scan @ --workers 8
+  ask_all "$1" true "${QUERIES[@]}"
+  kept "$work/fresh"
+  tree_check "$1" "its second scan and the questions"
+  drift_tree
+  tree_mark
+  refreshes "$1"
+  kept "$work/fresh"
+  tree_check "$1" "its refreshes"
+}
+
+config_answers() { # <bin>: roots, workers and keep_previous from a config file; a root gone; then a bad config; in the fresh phase's tree
+  local tree=$work/ftree config=$work/config.toml
+  if [ ! -d "$tree" ]; then
+    echo "$0: harness error: the config phase needs the tree of the fresh phase, and there is none" >&2
+    exit 5
+  fi
+  rm -rf "$work/conf"
+  FREESPACE_SNAPSHOT_DIR=$work/conf phase=config
+  printf 'roots = ["%s/projects", "%s/media"]\nkeep_previous = false\nworkers = 3\n' "$tree" "$tree" >"$config"
+  tree_mark
+  ask_each "$1" true "${CONFIG_QUERIES[@]}"
+  kept "$work/conf"
+  tree_check "$1" "the config phase"
+  # the last questions of the run in this tree: the next run's fresh phase makes it anew
+  rm -rf "${tree:?}/media"
+  tree_mark
+  phase=gone
+  ask_each "$1" true "${GONE_QUERIES[@]}"
+  kept "$work/conf"
+  printf 'roots = ["%s"]\nkeep_old = true\n' "$tree" >"$config"
+  phase=badconfig
+  ask_each "$1" true "${BAD_CONFIG_QUERIES[@]}"
+  kept "$work/conf"
+  tree_check "$1" "the config phase"
+}
+
+PHASES=(fixture start fresh config)
+answers() { # <bin> <label>: every phase, each into its own file, from the same files as every other run
+  local dir=$out/$2
+  mkdir -p "$dir"
+  rm -rf "${work:?}/snap" "${work:?}/home" "${work:?}/units"
+  cp -a "$work/pristine" "$work/snap"
+  mkdir -p "$work/home" "$work/units"
+  export FREESPACE_SNAPSHOT_DIR=$work/snap
+  ver_re=$(version_re "$1")
+  fixture_answers "$1" >"$dir/fixture.txt"
+  start_answers "$1" >"$dir/start.txt"
+  fresh_answers "$1" >"$dir/fresh.txt"
+  config_answers "$1" >"$dir/config.txt"
+}
+
+# It runs under `if !`, where no ERR trap fires: a diff that fails (exit 2, not 1) says so itself.
+same() { # <label-a> <label-b>: identical, or the differences on stdout (200 lines a phase)
+  local f ok=0 s
+  for f in "${PHASES[@]}"; do
+    s=0
+    diff -u --label "$1/$f.txt" --label "$2/$f.txt" "$out/$1/$f.txt" "$out/$2/$f.txt" >"$work/answers.diff" || s=$?
+    case $s in
+      0) ;;
+      1) ok=1; head -n 200 "$work/answers.diff" ;;
+      *) echo "$0: harness error: the diff of $1/$f.txt and $2/$f.txt exited $s" >&2; exit 5 ;;
+    esac
   done
   return "$ok"
 }
@@ -315,7 +395,7 @@ same() { # <label-a> <label-b>: identical, or the differences on stdout
 mkdir -p "$work/home" "$work/units"
 make_tree
 for step in 1 2; do
-  if ! FREESPACE_SNAPSHOT_DIR=$work/snap run "$base" scan "$tree" --workers 2 >"$work/scan.log" 2>&1; then
+  if ! FREESPACE_SNAPSHOT_DIR=$work/pristine run "$base" scan "$tree" --workers 2 >"$work/scan.log" 2>&1; then
     cat "$work/scan.log" >&2
     echo "$0: base could not make the fixture snapshot (scan $step)" >&2
     exit 1
@@ -324,7 +404,14 @@ for step in 1 2; do
 done
 drift_tree
 
+checking=true
 answers "$base" base
+checking=false
+if [ -s "$work/stale" ]; then
+  cat "$work/stale" >&2
+  echo "$0: base no longer answers these questions as the harness expects: the harness is stale" >&2
+  exit 4
+fi
 answers "$base" base2
 if ! same base base2; then
   echo "$0: base gives different answers on two runs: the comparison is unreliable" >&2
@@ -335,5 +422,8 @@ if ! same base head; then
   echo "$0: head answers differently from base (normalized answers in $out)" >&2
   exit 1
 fi
-echo "$0: head answers ${#QUERIES[@]} queries x 2 forms x 2 snapshots, $((${#ONCE[@]} + ${#COMMANDS[@]})) questions once" \
-  "and ${#REFRESHES[@]} refreshes exactly like base"
+echo "$0: head answers ${#QUERIES[@]} queries x 2 forms x 2 snapshots, ${#GLOB_QUERIES[@]} globs and" \
+  "$((${#CWD_QUERIES[@]} + ${#PATH_QUERIES[@]} + 1)) paths as typed x 2 forms, ${#TZ_QUERIES[@]} in another time zone," \
+  "${#TTY_QUERIES[@]} on a terminal, $((${#ONCE[@]} + ${#COMMANDS[@]})) questions once, $served requests to serve and gui," \
+  "$((${#EMPTY_QUERIES[@]} + ${#FIRST_QUERIES[@]} + ${#BUSY_QUERIES[@]})) x 2 forms before and during a scan," \
+  "${#REFRESHES[@]} refreshes x 2 snapshots and a config file whose root goes, exactly like base"

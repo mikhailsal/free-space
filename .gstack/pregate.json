@@ -112,7 +112,19 @@
       "web/tests/unit/coverage-functions.test.ts"
     ],
     "scripts/rust-diff.sh": [
-      "web/tests/unit/rust-diff.test.ts"
+      "web/tests/unit/rust-diff.test.ts",
+      "web/tests/unit/rust-diff-process.test.ts",
+      "web/tests/unit/rust-diff-tree.test.ts"
+    ],
+    "scripts/rust-diff/**": [
+      "web/tests/unit/rust-diff.test.ts",
+      "web/tests/unit/rust-diff-process.test.ts",
+      "web/tests/unit/rust-diff-tree.test.ts"
+    ],
+    "web/tests/unit/rust-diff-stub.ts": [
+      "web/tests/unit/rust-diff.test.ts",
+      "web/tests/unit/rust-diff-process.test.ts",
+      "web/tests/unit/rust-diff-tree.test.ts"
     ],
     "scripts/test-files.sh": [
       "web/tests/unit/test-files.test.ts"
@@ -153,7 +165,7 @@
         "install.sh",
         ".githooks/**"
       ],
-      "command": "shellcheck install.sh scripts/*.sh",
+      "command": "shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh",
       "fix": "fix the shellcheck finding"
     }
   ],
@@ -161,5 +173,9 @@
     "allow": [
       ".gstack"
     ]
-  }
+  },
+  "serial_patterns": [
+    "**/*.serial.test.*",
+    "web/tests/unit/rust-diff*.test.ts"
+  ]
 }

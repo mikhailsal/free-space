@@ -563,6 +563,53 @@ fn refresh_refolds_newest_mtime_on_ancestors() {
     assert!(st.refreshed.iter().any(|r| r.path == f.s("rf/a")));
 }
 
+/// A refresh stamps the subtree it walks again with its own time, and only that
+/// subtree, and the age a query reports is the oldest stamp under its path.
+/// scripts/rust-diff.sh cannot compare these stamps (a scan stamps each folder
+/// as it walks it, so two runs differ), so a refresh that stamps the wrong rows
+/// shows here.
+#[test]
+fn refresh_stamps_only_the_subtree_it_walks() {
+    let f = fx();
+    let now = now_secs();
+    f.file("rf/a/f", 8192, now - DAY);
+    f.file("sib/h", 8192, now - DAY);
+    f.scan(false);
+    // the refresh starts in a later second than every stamp of the scan
+    let scanned = now_secs();
+    while now_secs() <= scanned {
+        // gstack-timing-ok: waits for the clock's next second; only the order of the stamps is asserted
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    f.refresh("rf");
+    // a folder's own stamp and its children's
+    let stamps = |rel: &str| {
+        let ls = f.ls(rel);
+        let mut s = vec![ls.entry.scanned_at];
+        s.extend(ls.entries.iter().map(|e| e.scanned_at));
+        s
+    };
+    for rel in ["rf", "rf/a"] {
+        assert!(
+            stamps(rel).iter().all(|&t| t > scanned),
+            "{rel}: stamped by the refresh"
+        );
+    }
+    assert!(stamps("")[0] <= scanned, "the root keeps the scan's stamp");
+    assert!(
+        stamps("sib").iter().all(|&t| t <= scanned),
+        "sib keeps the scan's stamps"
+    );
+    let before = now_secs();
+    let (root, rf) = (f.ls("").header.age_seconds, f.ls("rf").header.age_seconds);
+    let after = now_secs();
+    assert!(
+        root >= before - scanned,
+        "the root's age is the scan's: {root}"
+    );
+    assert!(rf < after - scanned, "rf's age is the refresh's: {rf}");
+}
+
 #[test]
 fn refresh_keeps_hardlinks_counted_once() {
     let f = fx();
