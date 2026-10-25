@@ -585,3 +585,43 @@ fn diff_notes_a_refreshed_folder_and_other_roots() {
     let changed = "roots changed: the two scans covered different folders";
     assert_eq!(t.lines().nth(1), Some(changed), "{t}");
 }
+
+#[test]
+fn status_says_a_root_is_not_mounted_now_when_its_path_is_gone() {
+    let e = Env::new();
+    e.tree(0);
+    e.scan(0);
+    fs::rename(e.root(), e.tmp.path().join("moved")).unwrap();
+    let t = e.ok(&["status"]);
+    let (_, rows) = sentence_and_rows(&t);
+    assert!(row(&rows, "root").ends_with(", not mounted now"), "{t}");
+}
+
+#[test]
+fn a_hardlink_with_no_owner_in_the_snapshot_says_so() {
+    let e = Env::new();
+    e.tree(0);
+    e.scan(0);
+    // both links carry the alias flag, so no row is the one that counts the inode
+    let db = rusqlite::Connection::open(e.snap().join("snapshot.db")).unwrap();
+    db.execute(
+        "UPDATE entries SET flags = flags | 2 \
+         WHERE name IN (CAST('top.bin' AS BLOB), CAST('top-link.bin' AS BLOB))",
+        [],
+    )
+    .unwrap();
+    drop(db);
+    let t = e.ok(&["ls", &e.p("")]);
+    line_ending(&t, "  top.bin  [hardlink, counted elsewhere]");
+}
+
+#[test]
+fn ls_says_a_socket_is_a_special_file() {
+    let e = Env::new();
+    e.tree(0);
+    let _listener = std::os::unix::net::UnixListener::bind(e.root().join("sock")).unwrap();
+    e.scan(0);
+    let t = e.ok(&["ls", &e.p("sock")]);
+    let note = format!("{} is a special file, not a folder.\n", e.p("sock"));
+    assert!(t.ends_with(&note), "{t}");
+}

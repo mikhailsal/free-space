@@ -119,7 +119,9 @@ fn without_a_snapshot_it_says_how_to_make_one() {
 fn a_stale_snapshot_and_too_little_space_for_the_next_scan() {
     let e = Env::scanned();
     // three days old, and as many entries as no disk has room for three times
-    e.sql("UPDATE meta SET scanned_at = scanned_at - 3 * 86400, entries = 1000000000000");
+    e.sql(
+        "UPDATE meta SET scanned_at = scanned_at - 3 * 86400, entries = 1024 * 1024 * 1024 * 1024",
+    );
     let (ok, detail, fix) = e.check("freshness");
     assert!(!ok);
     assert_eq!(detail, "snapshot is 3 d old (generation 1)");
