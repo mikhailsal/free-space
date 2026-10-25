@@ -12,7 +12,7 @@
 #   scripts/test-files.sh web/tests/unit/format.test.ts web/tests/e2e/find.spec.ts
 # Each runner runs in the background while the script waits for it, so a HUP, INT or TERM sent to the script alone
 # reaches it too: the script passes it on as TERM, waits for the runner to exit, then exits 128 + the signal number.
-# A run waiting for another one's lock says so every $TEST_FILES_HEARTBEAT seconds (default 30).
+# A run waiting for another one's lock says so every $TEST_FILES_HEARTBEAT seconds (a whole number, default 30).
 set -eu
 unset CDPATH
 
@@ -39,9 +39,16 @@ for f in "$@"; do
   # A runner given a missing file next to others runs the others and passes.
   [ -f "$root/$f" ] || { say "$0: no such test file $f"; exit 2; }
 done
-if [ -n "$e2e$shots$guard" ] && ! command -v flock >/dev/null 2>&1; then
-  say "$0: flock not found (util-linux); it keeps two e2e runs in one checkout apart"
-  exit 2
+if [ -n "$e2e$shots$guard" ]; then
+  if ! command -v flock >/dev/null 2>&1; then
+    say "$0: flock not found (util-linux); it keeps two e2e runs in one checkout apart"
+    exit 2
+  fi
+  # The wait counts in whole seconds: 0 would spin, and sh arithmetic takes neither 0.5 nor 08.
+  beat=${TEST_FILES_HEARTBEAT:-30}
+  case $beat in
+    *[!0-9]* | 0*) say "$0: TEST_FILES_HEARTBEAT is whole seconds from 1, not $beat"; exit 2 ;;
+  esac
 fi
 
 cd "$root/web"
@@ -75,7 +82,6 @@ if [ -n "$e2e$shots$guard" ]; then
   # Runs of this script in one checkout share web/dist, test-results (Playwright empties it at start) and
   # pregate-shots, so a second run waits for the first; the pre-gate's stall timeout bounds the wait.
   exec 9<.
-  beat=${TEST_FILES_HEARTBEAT:-30}
   status=0
   flock -n 9 || status=$?
   [ "$status" -ne 1 ] || say "$0: waiting for another e2e run in $(pwd)"

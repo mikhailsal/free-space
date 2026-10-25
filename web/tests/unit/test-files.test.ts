@@ -376,6 +376,19 @@ test("without flock, or with one that fails, an e2e run exits 2 naming it; a uni
   }
 });
 
+// Value: protects=a heartbeat the wait cannot count in stops a run that needs the lock before any runner, naming it;
+//   fails_when=the check goes (0 spins printing "still waiting", 0.5 and 08 break the sh arithmetic mid-wait) or comes
+//   after the unit runner; seam=TEST_FILES_HEARTBEAT; no_claim=a heartbeat in a run that needs no lock
+test("a heartbeat that is not whole seconds from 1 stops an e2e run before any runner", () => {
+  for (const beat of ["0", "0.5", "08", "x"]) {
+    const { log, env } = stubEnv(0, { TEST_FILES_HEARTBEAT: beat });
+    const done = Bun.spawnSync(["sh", script, unit, e2e], { cwd: tmp, env });
+    expect(done.exitCode, beat).toBe(2);
+    expect(done.stderr.toString()).toContain(`TEST_FILES_HEARTBEAT is whole seconds from 1, not ${beat}`);
+    expect(readCalls(log)).toEqual([]);
+  }
+});
+
 // Both configs build their URLs and the server command from $E2E_PORT and never reuse a server already on that port
 // (it belongs to someone else); unset or empty, they fall back to 4173 and, outside CI, reuse a running server.
 test("the Playwright configs serve and browse on $E2E_PORT", () => {
@@ -577,6 +590,7 @@ test("a run waiting for the lock stops at once on a TERM, its flock gone and its
     const sent = Date.now();
     queued.kill("SIGTERM");
     expect(await queued.exited).toBe(143);
+    // gstack-timing-ok: the regression waits out the 30 s heartbeat; 2 s is 15 times below it, and a trap and a reap take ms
     expect(Date.now() - sent).toBeLessThan(2000);
     await waitFor(() => !existsSync(`/proc/${flock}`), "the queued run's flock to end", 1000);
     writeFileSync(go, "");
