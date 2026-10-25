@@ -17,11 +17,12 @@ afterAll(() => {
 });
 
 // Value: protects=the made-up trees hold what CONTRIBUTING says they hold, after each change too: every folder its own
-//   date, the wide part's 340 folders, hard links inside a folder, across folders and into the folder refresh rewalks,
-//   a sparse file, a file and a folder whose names are not UTF-8, a folder nobody may read; after drift_tree a folder
-//   that is a file and one under a symlink; and the listing that tree_check compares sees a change of mtime, mode, size
-//   or link count; fails_when=settle_dirs gives folders one date (`--sort mtime` then compares only tie-breaks), make_wide
-//   loses a level or its links, a blob stops being sparse, drift_tree loses a change, or tree_listing drops a field;
+//   date, the wide part's 340 folders with files on both sides of 6mo ago, hard links inside a folder, across folders
+//   and into the folder refresh rewalks, a sparse file, a file and a folder whose names are not UTF-8, a folder nobody
+//   may read; after drift_tree a folder that is a file and one under a symlink; and the listing that tree_check compares
+//   sees a change of mtime, mode, size or link count; fails_when=settle_dirs gives folders one date (`--sort mtime` then
+//   compares only tie-breaks), make_wide loses a level, its links or its dates by age (`--older-than 6mo` then keeps
+//   every folder of it), a blob stops being sparse, drift_tree loses a change, or tree_listing drops a field;
 //   why_new=the guard runs use one folder per level and assert answers, not the tree; seam=none; no_claim=what the CLI
 //   makes of the tree (the guard runs compare that)
 // The tree at the default width, made, changed and drifted: a few seconds.
@@ -31,6 +32,8 @@ test("the trees hold distinct folder dates, hard links, a sparse file, odd names
 dates() { echo "$1 dirs $(find "$tree" -type d 2>/dev/null | wc -l) dates $(find "$tree" -type d -printf '%T@\\n' 2>/dev/null | sort -u | wc -l)"; }
 make_tree; dates made
 echo "wide $(find "$tree/wide" -mindepth 1 -type d | wc -l)"
+cut=@$((epoch - 180 * 86400))
+echo "wide since 6mo $(find "$tree/wide" -type f -newermt "$cut" | wc -l) before $(find "$tree/wide" -type f ! -newermt "$cut" | wc -l)"
 echo "iso links $(stat -c %h "$tree/media/iso/debian.iso") $(stat -c %h "$tree/logs/debian.link")"
 echo "wide links $(find "$tree/wide" -name 'link*.dat' -links 2 | wc -l)"
 echo "sparse $(stat -c '%s %b' "$tree/media/sparse.img")"
@@ -60,6 +63,9 @@ remove_tree; [ -e "$tree" ] || echo removed`;
     expect(dates, `every folder its own date after ${step}`).toBe(dirs);
   }
   expect(out).toContain("\nwide 340\n");
+  const [, since, before] = out.match(/^wide since 6mo (\d+) before (\d+)$/m) ?? [];
+  expect(Number(since), "files in the wide part newer than 6mo").toBeGreaterThan(0);
+  expect(Number(before), "and older").toBeGreaterThan(0);
   expect(out).toContain("\niso links 3 3\n");
   expect(Number(out.match(/^wide links (\d+)$/m)?.[1])).toBeGreaterThan(0);
   expect(out).toContain("\nsparse 52428800 0\n");

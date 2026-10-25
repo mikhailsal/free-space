@@ -37,8 +37,9 @@ http() { # <label> <want> <body: json, page or none> <curl args...>: one request
   served=$((served + 1))
   : >"$work/body" # a request curl cannot make leaves no body and no headers, not the last request's
   : >"$work/headers"
+  # curl's words, but not the port or the time it names
   code=$(curl -q --noproxy '*' -sS --max-time "$CURL_SECONDS" -o "$work/body" -D "$work/headers" -w '%{http_code}' "$@" 2>"$work/curl.err") ||
-    code="curl failed: $(head -c 300 "$work/curl.err")"
+    code="curl failed: $(head -c 300 "$work/curl.err" | sed -E 's/ port [0-9]+/ port <port>/g; s/ after [0-9]+ ms/ after <n> ms/g')"
   floor "$http_phase" "$label" "$code" "$want"
   {
     echo "== $http_phase: $label"
@@ -110,6 +111,8 @@ stopped() { # <pid> <pid to TERM> <what> <stdout> [<stderr>]: TERM the one, wait
   local code=0
   kill -TERM "$2" 2>/dev/null || true
   wait "$1" || code=$?
+  # base must stop on TERM with exit 0
+  floor "$3" stop "$code"
   # shellcheck disable=SC2034 # the EXIT trap of scripts/rust-diff.sh reads it
   serving=
   {

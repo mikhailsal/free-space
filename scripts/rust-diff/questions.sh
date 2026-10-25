@@ -15,7 +15,7 @@ QUERIES=(
   "ls @ --sort mtime --limit 3"
   "ls @/projects/app"
   "ls @/odd"
-  "ls @/wide/d2 --sort mtime"
+  "ls @/wide/d0 --sort mtime"
   "ls @/nope"
   "ls @ --snapshot not-this-one"
   "top @"
@@ -32,7 +32,7 @@ QUERIES=(
   "find @ --name *.log --limit 1"
   "find @/wide --name link* --sort mtime --limit 40"
   "find @/media --older-than 2w"
-  "find @ --newer-than 3y --kind file --limit 8"
+  "find @ --newer-than 2y --kind file --limit 8"
   "diff @"
   "diff @ --depth 3 --kind any"
   "diff @ --kind file --limit 2"
@@ -181,8 +181,9 @@ BAD_CONFIG_QUERIES=(
 
 # The start phase, text and --json: with no snapshot folder at all (the first
 # run), with an empty one while a scan holds its lock (the first scan), and over
-# a copy of the fixture snapshot while a scan holds its lock. The lock holds what
-# a running scan writes into it (op, path, start, pid), at a fixed time.
+# a copy of the fixture snapshot while a scan holds its lock (the first scan's
+# questions again). The lock holds what a running scan writes into it (op,
+# path, start, pid), at a fixed time.
 EMPTY_QUERIES=(
   ""
   "status"
@@ -197,13 +198,7 @@ FIRST_QUERIES=(
   "scan @ --workers 2"
   "refresh @/logs --workers 2"
 )
-BUSY_QUERIES=(
-  ""
-  "status"
-  "ls @"
-  "scan @ --workers 2"
-  "refresh @/logs --workers 2"
-)
+BUSY_QUERIES=("${FIRST_QUERIES[@]}")
 
 # The exit status base must give, by phase and question (--json and text alike),
 # and a few words its stderr must hold then; any other question must answer 0,

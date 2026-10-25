@@ -1,7 +1,8 @@
 // How scripts/rust-diff.sh starts and stops, on stub builds (rust-diff-stub.ts): bad input, a missing tool, missing
 // time zones and root exit 2 before anything runs; a base that cannot make the fixture snapshot stops the job at once
-// and shows why; a HUP, INT or TERM ends the job with 128 + the signal number and removes its work dir, a Ctrl-C ends
-// the call in progress too, and a server or a gui still running goes with the job.
+// and shows why; a command of the harness's own that fails stops it with exit 5; the work dir is absolute from a
+// relative TMPDIR too; a HUP, INT or TERM ends the job with 128 + the signal number and removes its work dir, a Ctrl-C
+// ends the call in progress too, and a server or a gui still running goes with the job.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import {
   chmodSync,
@@ -67,6 +68,9 @@ test("a base that cannot make the fixture snapshot stops the job at once and sho
   }
 }, 30_000);
 
+// Value: protects=no arguments, a build that is not an executable file, or a width of the trees outside 1 to 9 exit 2
+//   before anything runs; fails_when=a check goes (a width of 0 then makes no wide part, and the job dies midway);
+//   why_new=RUST_DIFF_FAN was taken as given (red team of A0's /ship); seam=none; no_claim=none
 test("bad input exits 2 before anything runs", async () => {
   const none = Bun.spawnSync([script], { stderr: "pipe" });
   expect(none.exitCode).toBe(2);
@@ -77,7 +81,49 @@ test("bad input exits 2 before anything runs", async () => {
     expect(r.stderr).toContain(`not an executable file: ${join(tmp, bad)}`);
     expect(existsSync(r.out)).toBe(false);
   }
+  for (const fan of ["0", "10", "x"]) {
+    const r = await guard(tmp, "base", "base", { RUST_DIFF_FAN: fan });
+    expect(r.code, fan).toBe(2);
+    expect(r.stderr).toContain(`RUST_DIFF_FAN must be 1 to 9, not ${fan}`);
+    expect(existsSync(r.out)).toBe(false);
+  }
 });
+
+// Value: protects=the work dir is absolute when TMPDIR is relative: the CLI gets absolute folders (the cwd questions run
+//   from inside the tree, where a relative one would point elsewhere); fails_when=the realpath of the work dir goes;
+//   why_new=QA of A0's /ship ran the job with a relative TMPDIR and it died midway; seam=TMPDIR; no_claim=none
+test("from a relative TMPDIR the work dir is absolute", async () => {
+  const dir = join(tmp, "relative");
+  mkdirSync(join(dir, "scratch"), { recursive: true });
+  // a base that records the folders it is given, and fails its first scan: the job ends there
+  writeStub(dir, "records", `#!/bin/sh\necho "$FREESPACE_SNAPSHOT_DIR $HOME" > "$STUB_SEEN"\nexit 7\n`);
+  const seen = join(dir, "seen");
+  const p = Bun.spawn([script, "records", "records", "out"], {
+    cwd: dir,
+    env: { ...process.env, ...STUB_ENV, TMPDIR: "scratch", STUB_SEEN: seen },
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  expect(await p.exited).toBe(1);
+  const [snapshots, home] = readFileSync(seen, "utf8").trim().split(" ");
+  for (const path of [snapshots, home]) expect(path).toStartWith(`${join(dir, "scratch")}/`);
+  expect(readdirSync(join(dir, "scratch"))).toEqual([]);
+});
+
+// Value: protects=a command of the harness's own that fails (here a copy of the fixture snapshot that is gone) stops the
+//   job with exit 5 and names the command and its line, apart from exit 1 (head differs); fails_when=the ERR trap goes
+//   (set -e ends the job with the command's own status, 1, the status of a difference) or is not inherited by functions
+//   (set -E); why_new=a harness error read as a difference (red team of A0's /ship); seam=none; no_claim=which commands
+//   of the harness can fail on a runner
+test("a command of the harness that fails stops the job with exit 5, naming it", async () => {
+  // a base that removes the fixture snapshot the harness copies for each run, at its first question
+  const gone = 'case "$1 $dir" in "status "*/snap) rm -rf "${dir%/snap}/pristine" ;; esac';
+  writeStub(tmp, "unpristine", stub({ early: gone }));
+  const r = await guard(tmp, "unpristine", "base");
+  expect(r.code).toBe(5);
+  expect(r.stderr).toMatch(/: harness error: rust-diff\.sh line \d+: cp -a "\$work\/pristine" "\$work\/refreshed" exited 1\n/);
+  expect(existsSync(join(r.out, "head"))).toBe(false);
+}, 180_000);
 
 // Value: protects=a missing tool, any of the six, missing time zones, or a run as root stops the job before anything
 //   runs: exit 2, no out dir; fails_when=a tool leaves the check (the job then dies midway at a command not found), the

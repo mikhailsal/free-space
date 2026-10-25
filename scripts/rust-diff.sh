@@ -26,8 +26,8 @@
 #     without a root, CONFIG_QUERIES; GONE_QUERIES once one root is gone from
 #     the disk; then a config with an unknown key;
 #   - after each part, the files the CLI keeps (the snapshot folder, $HOME, the
-#     unit dir): name, type and mode, state.json normalized, and each
-#     database's schema, user_version and rows per table.
+#     unit dir): name, type and mode, state.json normalized, and each database
+#     row by row (rust-diff/kept.sh).
 # Each run starts from the same files: a copy of the fixture snapshot, an empty
 # $HOME and unit dir.
 # No command may change a tree it reads: each tree is listed (names, types,
@@ -43,14 +43,18 @@
 # Answers are normalized (D20, rust-diff/normalize.sh) and compared byte for
 # byte: base against base first (a difference there means the comparison
 # itself is unreliable: exit 3), then base against head (exit 1 on any
-# difference). A version bump alone is no difference: each binary's own version
-# (from its --version) is masked in its answers. The normalized answers stay in
+# difference). A command of the harness's own that fails is a harness error,
+# not a difference: exit 5, naming the command. A version bump alone is no
+# difference: each binary's own version (from its --version) is masked in its
+# answers. The normalized answers stay in
 # <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
 # Needs jq, curl, script and flock (util-linux), perl, sqlite3 and tzdata. JSON
-# is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4) sets
-# the wide part of the trees.
+# is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4, from
+# 1 to 9) sets the wide part of the trees.
 # shellcheck source-path=SCRIPTDIR
-set -euo pipefail
+set -Eeuo pipefail
+# -E: in a function, a subshell or a $(...) too; a subshell's exit 5 then fails its caller, which names itself as well
+trap 'echo "$0: harness error: ${BASH_SOURCE[0]##*/} line $LINENO: $BASH_COMMAND exited $?" >&2; exit 5' ERR
 
 usage() { echo "usage: $0 <base-bin> <head-bin> <out-dir>" >&2; exit 2; }
 [ "$#" -eq 3 ] || usage
@@ -58,6 +62,7 @@ base=$1 head=$2 out=$3
 for b in "$base" "$head"; do
   if [ ! -f "$b" ] || [ ! -x "$b" ]; then echo "$0: not an executable file: $b" >&2; exit 2; fi
 done
+if [[ ! ${RUST_DIFF_FAN:-4} =~ ^[1-9]$ ]]; then echo "$0: RUST_DIFF_FAN must be 1 to 9, not ${RUST_DIFF_FAN}" >&2; exit 2; fi
 for tool in jq curl script flock perl sqlite3; do
   command -v "$tool" >/dev/null || { echo "$0: $tool is required" >&2; exit 2; }
 done
@@ -73,6 +78,8 @@ here=$(dirname "$(realpath "$0")")
 . "$here/rust-diff/serve.sh"
 # shellcheck source=rust-diff/gui.sh
 . "$here/rust-diff/gui.sh"
+# shellcheck source=rust-diff/kept.sh
+. "$here/rust-diff/kept.sh"
 # without the zone (no tzdata) the C library falls back to UTC, and TZ_QUERIES test nothing
 if [ "$(TZ=$TZ_OTHER date -d @1704067200 +%z)" != +0530 ]; then
   echo "$0: tzdata is required: TZ=$TZ_OTHER must be UTC+05:30" >&2
@@ -82,13 +89,17 @@ base=$(realpath "$base") head=$(realpath "$head")
 mkdir -p "$out"
 out=$(realpath "$out")
 
-work=$(mktemp -d)
+# absolute, also from a relative TMPDIR: the cwd questions run from inside the tree
+work=$(realpath "$(mktemp -d)")
 work_re=$(printf '%s' "$work" | sed 's/[][\.*^$#]/\\&/g')
+# as SQLite prints the paths a database holds (rust-diff/kept.sh)
+work_hex=$(printf '%s' "$work" | od -An -v -tx1 | tr -d ' \n' | tr a-f A-F)
 # the dates tree.sh gives by age, the same for every tree of the run
 epoch=$(date +%s)
 # a server still running (rust-diff/serve.sh) goes too; the trees hold a folder nobody may read
 serving=
-trap '[ -z "$serving" ] || kill "$serving" 2>/dev/null || true; chmod -R u+rwx "$work" 2>/dev/null; rm -rf "$work"' EXIT
+# (no ERR trap there: the job's own exit status stands)
+trap 'trap - ERR; [ -z "$serving" ] || kill "$serving" 2>/dev/null || true; chmod -R u+rwx "$work" 2>/dev/null || true; rm -rf "$work"' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -154,7 +165,8 @@ ask() { # <bin> <fresh> <query words...>: one answer, normalized; no words: the 
   case "${1:-}" in scan | refresh) snap_id=$(current_id) ;; esac
   q="$*"
   floor "$phase" "${q% --json}" "$code"
-  if $checking && $json && [ "$code" = 0 ] && ! { [ -s "$work/stdout" ] && jq empty "$work/stdout" 2>/dev/null; }; then
+  # JSON: one value at least (blank output is none)
+  if $checking && $json && [ "$code" = 0 ] && ! jq -en '[inputs] | length > 0' "$work/stdout" >/dev/null 2>&1; then
     echo "$phase: $q: answered 0 without JSON" >>"$work/stale"
   fi
   echo "== ${*:-(no arguments)}"
@@ -188,43 +200,16 @@ ask_tty() { # <bin> <query>: the text a terminal shows, under script(1)
   run_prefix
   printf -v cmd '%q ' "${argv[@]}" "$bin"
   for w in "${words[@]}"; do printf -v cmd '%s%q ' "$cmd" "${w/#@/$tree}"; done
-  script -qec "$cmd" /dev/null </dev/null >"$work/stdout" 2>&1 || code=$?
+  # the terminal passes line ends as written (no CR added): a CR the CLI writes shows
+  script -qec "stty -onlcr; $cmd" /dev/null </dev/null >"$work/stdout" 2>&1 || code=$?
+  # the floor looks for its words in $work/stderr: on a terminal both streams are one
+  cp "$work/stdout" "$work/stderr"
   floor tty "$2" "$code"
   {
     echo "== on a terminal: ${2:-(no arguments)}"
     echo "exit $code"
     text_of "$work/stdout"
   } | mask
-}
-
-db_of() { # <db>: its schema, user_version and rows per table, read-only (a rollback journal: opening it writes nothing)
-  echo "-- ${1##*/}"
-  sqlite3 -readonly "$1" '.schema' "SELECT 'user_version ' || user_version FROM pragma_user_version"
-  sqlite3 -readonly "$1" "SELECT 'SELECT ''' || name || ' rows '' || count(*) FROM \"' || name || '\";'
-    FROM sqlite_master WHERE type = 'table' ORDER BY name" | sqlite3 -readonly "$1"
-}
-
-files() { # <dir>: a folder the CLI keeps, by name, type and mode; state.json in it, normalized; its databases
-  local db
-  {
-    echo "== files in $1"
-    if [ ! -d "$1" ]; then
-      echo "(missing)"
-    else
-      (cd "$1" && find . -printf '%p %y %m\n') | LC_ALL=C sort
-    fi
-    if [ -f "$1/state.json" ]; then
-      echo "-- state.json"
-      normalize_json "$1/state.json" true
-    fi
-    for db in "$1"/*.db; do [ ! -f "$db" ] || db_of "$db"; done
-  } | mask
-}
-
-kept() { # <dir>: the snapshot folder, then $HOME and the unit dir, which no command should fill
-  files "$1"
-  files "$work/home"
-  files "$work/units"
 }
 
 current_id() { # the snapshot id in $FREESPACE_SNAPSHOT_DIR, as base reads it

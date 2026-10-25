@@ -27,8 +27,8 @@ gui_run() { # <bin> <label> <ssh, opens or fails> [<folder>]
   [ -z "${4-}" ] || call+=("${4/#@/$tree}")
   run_prefix
   printf -v cmd '%q ' "${argv[@]}" "${call[@]}"
-  # bash runs the command: %q may quote a byte that is not UTF-8 as $'...'
-  (SHELL=$BASH exec script -qfec "exec $cmd" /dev/null </dev/null >"$work/gui.out" 2>&1) &
+  # bash runs the command: %q may quote a byte that is not UTF-8 as $'...'; line ends as written, as in ask_tty
+  (SHELL=$BASH exec script -qfec "stty -onlcr; exec $cmd" /dev/null </dev/null >"$work/gui.out" 2>&1) &
   # shellcheck disable=SC2034 # the EXIT trap of scripts/rust-diff.sh reads it
   pid=$! serving=$!
   case $browser in
@@ -58,8 +58,13 @@ gui_run() { # <bin> <label> <ssh, opens or fails> [<folder>]
     [ "$browser" = ssh ] || files "$work/runtime"
     listening "${addr##*:}" | mask
   fi
-  # TERM goes to gui (the child of script), so its own exit status is the one script gives back
+  # TERM goes to gui (the child of script), so its own exit status is the one script gives back; a script(1) that runs
+  # with no child listed (a kernel without CONFIG_PROC_CHILDREN) would wait for a gui nobody stops
   child=$(cat "/proc/$pid/task/$pid/children" 2>/dev/null || true)
+  if [ -z "$child" ] && kill -0 "$pid" 2>/dev/null; then
+    echo "$0: harness error: no child of script(1) in /proc/$pid/task/$pid/children: gui cannot be stopped" >&2
+    exit 5
+  fi
   stopped "$pid" "${child%% *}" "gui $label" "$work/gui.out"
   # shellcheck disable=SC2034 # as above
   http_phase=serve

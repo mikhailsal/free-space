@@ -45,7 +45,10 @@ settle_dirs() {
 # folders at the default 4), one to three files in each, sizes and dates from
 # the position, and every file of every 37th folder linked into the folder
 # before it. Files are written by the shell's printf and dated one touch per
-# date, so the part costs a few hundred processes, not thousands.
+# date, so the part costs a few hundred processes, not thousands. Two of the
+# five dates are fixed and three are ages from the run's $epoch (40, 250 and
+# 1300 days, weeks from any age bound asked), so `--older-than 6mo` keeps some
+# folders and drops others, and does so in any year.
 make_wide() {
   local fan=${RUST_DIFF_FAN:-4} level d n i k size f prev=
   local -a dirs=("$tree/wide") next dated0=() dated1=() dated2=() dated3=() dated4=()
@@ -71,11 +74,11 @@ make_wide() {
       n=$((n + 1))
     done
   done
-  [ "${#dated0[@]}" -eq 0 ] || touch -d "2022-02-02 02:00 UTC" "${dated0[@]}"
+  [ "${#dated0[@]}" -eq 0 ] || touch -d "@$((${epoch:?} - 40 * 86400))" "${dated0[@]}"
   [ "${#dated1[@]}" -eq 0 ] || touch -d "2023-03-03 03:00 UTC" "${dated1[@]}"
-  [ "${#dated2[@]}" -eq 0 ] || touch -d "2024-04-04 04:00 UTC" "${dated2[@]}"
+  [ "${#dated2[@]}" -eq 0 ] || touch -d "@$((epoch - 250 * 86400))" "${dated2[@]}"
   [ "${#dated3[@]}" -eq 0 ] || touch -d "2024-08-08 08:00 UTC" "${dated3[@]}"
-  [ "${#dated4[@]}" -eq 0 ] || touch -d "2024-10-10 10:00 UTC" "${dated4[@]}"
+  [ "${#dated4[@]}" -eq 0 ] || touch -d "@$((epoch - 1300 * 86400))" "${dated4[@]}"
 }
 
 make_tree() {
@@ -96,7 +99,7 @@ make_tree() {
   # past UTC midnight in UTC+5:30 only: a date bound must be local midnight to tell them apart
   blob "$tree/media/edge-new.bin" 4 "2024-09-30 20:00 UTC"
   blob "$tree/media/edge-old.bin" 4 "2023-03-03 20:00 UTC"
-  # dated by age from the run's $epoch, days from any bound asked: 2w, 6mo, 400d and 1y split them
+  # dated by age from the run's $epoch, days from any bound asked: 2w, 6mo, 400d, 1y and 2y split them
   blob "$tree/media/new/week.mkv" 200 "@$((${epoch:?} - 5 * 86400))"
   blob "$tree/media/new/season.mkv" 150 "@$((epoch - 100 * 86400))"
   blob "$tree/media/new/last-year.mkv" 120 "@$((epoch - 500 * 86400))"

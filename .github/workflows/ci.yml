@@ -40,7 +40,7 @@ jobs:
   # Playwright suite against a mocked /api at 1280, 700 and 360 px with axe.
   web:
     runs-on: ubuntu-latest
-    # tests/unit runs scripts/rust-diff.sh on stub builds, fourteen times
+    # tests/unit runs scripts/rust-diff.sh on stub builds, some twenty times (rust-diff*.test.ts)
     timeout-minutes: 45
     defaults:
       run:

@@ -16,7 +16,8 @@ export const script = join(repo, "scripts/rust-diff.sh");
 // CLI's status and words, the config phase's included; with no snapshot a question is refused with exit 8 (doctor fails
 // with 1), and while the lock is held (a scan running) status still answers and scan and refresh are refused with exit
 // 6; `serve` and `gui` are a small server of the same rules (SERVE_JS). A scan and a refresh say on stderr what they
-// see in the folder they walk, and add a row to snapshot.db.
+// see in the folder they walk, and add a row to snapshot.db, whose other tables hold what the real one makes live: the
+// time and the version that wrote it, the path walked (a BLOB), and three hard links whose inode is the stub's pid.
 // SH is shell code run before the answer; it may set NEED, the space the next scan needs (a figure, not live), FAILS,
 // the count a scan or a refresh writes to state.json beside its live time, and BOUND, what --json echoes before the
 // entries. EARLY runs before anything else; it may set SCHEMA_EXTRA, SQL a scan runs on snapshot.db. A text answer
@@ -99,9 +100,16 @@ esac
 
 // What a call leaves: a scan and a refresh a new id, a row in snapshot.db and what they saw; a refresh its count; status
 // its visits. Then the bound the question gives, as the CLI echoes it.
-const BOOKKEEPING = `if [ "$1" = scan ] || [ "$1" = refresh ]; then
+const bookkeeping = (version: string) => `if [ "$1" = scan ] || [ "$1" = refresh ]; then
   mkdir -p "$dir"; echo "$t" > "$dir/id"; echo "sees $(ls "$2" 2>/dev/null | tr '\\n' ' ')" >&2
-  sqlite3 "$dir/snapshot.db" "CREATE TABLE IF NOT EXISTS calls(id INTEGER PRIMARY KEY, command TEXT); \${SCHEMA_EXTRA-} INSERT INTO calls(command) VALUES ('$1');"
+  sqlite3 "$dir/snapshot.db" "CREATE TABLE IF NOT EXISTS calls(id INTEGER PRIMARY KEY, command TEXT);
+CREATE TABLE IF NOT EXISTS meta(scanned_at INTEGER NOT NULL, freespace_version TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS roots(entry_id INTEGER PRIMARY KEY, path BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS hardlinks(entry_id INTEGER PRIMARY KEY, dev INTEGER NOT NULL, ino INTEGER NOT NULL);
+\${SCHEMA_EXTRA-} INSERT INTO calls(command) VALUES ('$1');
+DELETE FROM meta; INSERT INTO meta VALUES ($s, '${version}');
+INSERT OR REPLACE INTO roots VALUES (0, CAST('$2' AS BLOB));
+INSERT OR REPLACE INTO hardlinks VALUES (1, 7, $$), (2, 7, $$), (3, 7, $$ + 1);"
 fi
 if [ "$1" = refresh ]; then echo "$2" >> "$dir/refreshed"; fi
 id=0; [ ! -f "$dir/id" ] || read -r id < "$dir/id"
@@ -159,7 +167,7 @@ export const stub = ({ entries = 3, refusal = REFUSAL, version = "0.1.0", sh = "
     'held=false; [ ! -e "$dir/.lock" ] || flock -n -s "$dir/.lock" true || held=true',
     refusals(refusal, version),
     commands(version, entries),
-    BOOKKEEPING,
+    bookkeeping(version),
     sh,
     reply(version, entries),
   ].join("\n");

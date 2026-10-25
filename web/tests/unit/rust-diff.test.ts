@@ -14,9 +14,9 @@ import { guard, type Run, stub, writeStub } from "./rust-diff-stub";
 
 // One pass of the questions is about 310 stub calls and 29 requests, each normalized, and a full run makes three (base,
 // base again, head). The fourteen runs start together in beforeAll, four of them full, the others stopped after one or
-// two passes: about 2.5 min in all at nice 19 on 8 threads, 3 min beside another job, and longer in proportion on fewer
-// threads (GitHub's runner has 4), so the bound grows as they shrink. afterAll waits for them all, so it gets the same
-// bound: a filtered run (-t) must not leave tmp behind.
+// two passes: about 3 min in all at nice 19 on 8 threads (174 s since each database is listed row by row), more beside
+// another job, and longer in proportion on fewer threads (GitHub's runner has 4), so the bound grows as they shrink.
+// afterAll waits for them all, so it gets the same bound: a filtered run (-t) must not leave tmp behind.
 const RUN_MS = Math.max(300_000, Math.ceil(2_400_000 / availableParallelism()));
 let tmp = "";
 type RunName =
@@ -57,24 +57,29 @@ beforeAll(() => {
   // answers, one run for all
   const others = "FRAME=SAMEORIGIN GUI_MODE=644 GUI_TERM_EXIT=3; export FRAME GUI_MODE GUI_TERM_EXIT";
   write("other", stub({ refusal: { exit: 5, message: "nothing at" }, early: others }));
-  // differences no mask may hide, in one head so the suite pays for one more run, not seven: the space doctor says the
+  // differences no mask may hide, in one head so the suite pays for one more run, not nine: the space doctor says the
   // next scan needs, a count in state.json, a wider mode and a stray file in the snapshot folder, a file in $HOME and
-  // one in the unit dir, an index more in snapshot.db, and the first `diff @` (text, of the fixture snapshot) hanging
+  // one in the unit dir, an index more in snapshot.db and another value in a row of it, line ends in CRLF, and the
+  // first `diff @` (text, of the fixture snapshot) hanging
   const need = '[ "$1" != doctor ] || need="1.0 G"';
   const leak = '[ ! -f "$dir/id" ] || { chmod 666 "$dir/id"; : > "$dir/leftover.tmp"; }';
   const home = '[ "$1" != status ] || { : > "$HOME/.leak"; : > "$FREESPACE_UNIT_DIR/x.service"; }';
   const hang = '[ "$1 $#" != "diff 2" ] || case "$dir $2" in */snap" "*/tree) exec sleep 30 ;; esac';
-  const index = 'SCHEMA_EXTRA="CREATE INDEX IF NOT EXISTS calls_command ON calls(command);"';
-  write("unlike", stub({ early: index, sh: [need, "fails=1", leak, home, hang].join("\n") }));
+  const index = `SCHEMA_EXTRA="CREATE INDEX IF NOT EXISTS calls_command ON calls(command); UPDATE calls SET command = 'SCAN' WHERE id = 1;"`;
+  const crlf = `[ "$1" != completions ] || { printf '# completions for %s\\r\\n' "$2"; exit 0; }`;
+  write("unlike", stub({ early: [index, crlf].join("\n"), sh: [need, "fails=1", leak, home, hang].join("\n") }));
   // a base whose CLI has moved on from the harness: a flag it no longer takes, a refusal it no longer makes, one it
-  // makes for another reason, a --json answer that is not JSON, and a server that takes a POST
+  // makes for another reason, a --json answer that is none and one that is blank, a server that takes a POST, and a gui
+  // that stops on TERM with exit 3
   const moved = [
     `case " $* " in *" --min-size "*) echo "error: unexpected argument '--min-size'" >&2; exit 2 ;; *" install-timer --no-start"*) exit 0 ;; esac`,
     `case "$*" in "ls "*/nope*) echo "error: unexpected argument" >&2; exit 2 ;; "doctor --json") exit 0 ;; esac`,
-    "ALLOW_POST=1; export ALLOW_POST",
+    `case "$*" in "ls "*" --sort apparent --json") printf '  \\n\\n'; exit 0 ;; esac`,
+    "ALLOW_POST=1 GUI_TERM_EXIT=3; export ALLOW_POST GUI_TERM_EXIT",
   ];
   write("stale", stub({ early: moved.join("\n") }));
-  write("noserve", stub({ early: '[ "$1" != serve ] || exit 1' }));
+  // a server that ends at once, and a gui that does on a terminal (without one, `gui` must still refuse)
+  write("noserve", stub({ early: '[ "$1" != serve ] || exit 1\n[ "$1" != gui ] || [ ! -t 1 ] || exit 1' }));
   // a server that prints an address nobody answers on (port 9, closed), and stays up until the TERM
   const dead = `echo "freespace serve: http://127.0.0.1:9/#t=${"ab".repeat(32)}" >&2; exec sleep 60`;
   write("deadserve", stub({ early: `[ "$1" != serve ] || { ${dead}; }` }));
@@ -176,7 +181,7 @@ test(
       ["top @/media --older-than 400d --limit 3", '"older_than": 400,'],
       ["find @/media --older-than 2w", '"older_than": 14,'],
       ["top @/wide --kind dir --older-than 6mo --limit 6", '"older_than": 180,'],
-      ["find @ --newer-than 3y --kind file --limit 8", '"newer_than": 1095,'],
+      ["find @ --newer-than 2y --kind file --limit 8", '"newer_than": 730,'],
     ]) {
       expect(answer(`${q} --json`)).toContain(days);
       expect(answer(q)).toContain("\nuntouched since <date>\n");
@@ -444,14 +449,16 @@ test(
 );
 
 // Value: protects=the floor: base must give the exit status the harness expects for every question (0 unless EXPECTED
-//   lists another), a refusal with the words EXPECTED lists for it, a --json answer of 0 in JSON, and each request to
-//   serve its HTTP status, or the job stops as stale (exit 4) after base's first run, naming each question, before base
-//   again or head run; fails_when=floor() is dropped or not called from ask or http, the EXPECTED lookup takes the wrong
-//   phase, the words or the JSON go unchecked, the check runs after head, or a call takes the job's stdin (this run has
-//   a terminal there: gui would start instead of refusing, then answer 124); why_new=a flag both builds refuse alike
-//   compared equal and tested nothing (adversarial review of PR 2: 10 exit 2 blocks, job green), exit 2 stands for a
-//   usage error as much as a refusal (adversarial review of A0), and every run had no terminal (red team of A0);
-//   seam=script(1) for the terminal; no_claim=which flags a future CLI renames
+//   lists another), a refusal with the words EXPECTED lists for it, a --json answer of 0 in JSON (blank output is none),
+//   each request to serve its HTTP status, and gui exit 0 on TERM, or the job stops as stale (exit 4) after base's first
+//   run, naming each question, before base again or head run; fails_when=floor() is dropped or not called from ask, http
+//   or stopped, the EXPECTED lookup takes the wrong phase, the words or the JSON go unchecked (or blank passes for JSON
+//   again), the check runs after head, or a call takes the job's stdin (this run has a terminal there: gui would start
+//   instead of refusing, then answer 124); why_new=a flag both builds refuse alike compared equal and tested nothing
+//   (adversarial review of PR 2: 10 exit 2 blocks, job green), exit 2 stands for a usage error as much as a refusal
+//   (adversarial review of A0), every run had no terminal (red team of A0), and blank output passed for JSON and no
+//   stop status was checked (Codex and red team of A0's /ship); seam=script(1) for the terminal; no_claim=which flags a
+//   future CLI renames
 test(
   "a base that refuses a question the harness asks, or answers one it should refuse, stops the job as stale",
   async () => {
@@ -463,7 +470,11 @@ test(
       "once: install-timer --no-start: answered 0, the harness expects 1",
       'fixture: ls @/nope: answered 2 without "is not in the snapshot" on stderr',
       "fixture: doctor --json: answered 0 without JSON",
+      "fixture: ls @ --sort apparent --json: answered 0 without JSON",
+      "fresh: ls @ --sort apparent --json: answered 0 without JSON",
       "serve: a POST: answered 200, the harness expects 405",
+      "gui over ssh: stop: answered 3, the harness expects 0",
+      "gui here, no browser: stop: answered 3, the harness expects 0",
     ]) {
       expect(r.stderr).toContain(`${line}\n`);
     }
@@ -475,18 +486,28 @@ test(
   RUN_MS,
 );
 
-// Value: protects=a base whose server never prints its address stops the job as stale, and the answers say so;
-//   fails_when=the wait for the address or its floor goes; why_new=every stub served (testing review of A0); seam=none;
+// Value: protects=a base whose server or gui never prints its address stops the job as stale, and the answers say so,
+//   with the status each ended with; fails_when=the wait for the address or its floor goes, in serve or in gui, or the
+//   stop status leaves the floor; why_new=every stub served, and every gui started (testing reviews of A0); seam=none;
 //   no_claim=why a real server fails to start
 test(
-  "a base whose server does not start stops the job as stale",
+  "a base whose server or gui does not start stops the job as stale",
   async () => {
     const r = await pending.noserve;
     expect(r.code).toBe(4);
-    expect(r.stderr).toContain("serve: start: answered no address, the harness expects an address\n");
-    expect(readFileSync(join(r.out, "base/fixture.txt"), "utf8")).toContain(
-      "== serve did not print its address\n== serve stopped by TERM\nexit 1\n",
-    );
+    for (const line of [
+      "serve: start: answered no address, the harness expects an address",
+      "serve: stop: answered 1, the harness expects 0",
+      ...["over ssh", "here, a browser opens", "here, no browser"].flatMap((mode) => [
+        `gui: ${mode}: answered no address, the harness expects an address`,
+        `gui ${mode}: stop: answered 1, the harness expects 0`,
+      ]),
+    ]) {
+      expect(r.stderr).toContain(`${line}\n`);
+    }
+    const fixture = read(r, "base/fixture.txt");
+    expect(fixture).toContain("== serve did not print its address\n== serve stopped by TERM\nexit 1\n");
+    expect(fixture).toContain("== gui over ssh did not start\n== gui over ssh stopped by TERM\nexit 1\n");
   },
   RUN_MS,
 );
@@ -599,9 +620,10 @@ test(
 );
 
 // Value: protects=the date questions are asked again in a time zone at a half-hour offset, and the terminal questions
-//   on a terminal (script), text only, with no carriage returns; fails_when=$tz does not reach the CLI's TZ, ask_tty runs
-//   the CLI without a terminal, or the CR mask is dropped; why_new=every answer ran in UTC and none on a terminal (D11);
-//   seam=none; no_claim=the real CLI's local-midnight rule and its terminal output (the stub prints TZ and the terminal)
+//   on a terminal (script), text only, with the line ends the CLI wrote (no CR from the terminal); fails_when=$tz does
+//   not reach the CLI's TZ, ask_tty or gui runs the CLI without a terminal, or the terminal adds its CRs again (stty
+//   -onlcr dropped); why_new=every answer ran in UTC and none on a terminal (D11); seam=none; no_claim=the real CLI's
+//   local-midnight rule and its terminal output (the stub prints TZ and the terminal)
 test(
   "date questions run in another time zone too, and terminal questions on a terminal",
   async () => {
@@ -678,9 +700,10 @@ test(
 );
 
 // Value: protects=a base whose server prints an address nobody answers on stops the job as stale, with curl's own
-//   words in the answer; fails_when=the `|| code="curl failed..."` fallback goes (set -e then ends the job at the first
-//   request, with no message), or curl's error leaves the answer; why_new=every stub's server answered (testing review
-//   of A0); seam=none; no_claim=why a real server stops answering
+//   words in the answer, the port it names masked; fails_when=the `|| code="curl failed..."` fallback goes (set -e then
+//   ends the job at the first request, with no message), curl's error leaves the answer, or its port is no longer
+//   masked; why_new=every stub's server answered (testing review of A0), and curl names the port (red team of A0's
+//   /ship); seam=none; no_claim=why a real server stops answering
 test(
   "a base whose server prints an address nobody answers on stops the job as stale",
   async () => {
@@ -688,6 +711,8 @@ test(
     expect(r.code).toBe(4);
     expect(r.stderr).toMatch(/^serve: status: answered curl failed: curl: \(7\) .+, the harness expects 200$/m);
     expect(read(r, "base/fixture.txt")).toContain("== serve: status\nhttp curl failed: curl: (7) ");
+    expect(read(r, "base/fixture.txt")).toContain(" 127.0.0.1 port <port>");
+    expect(read(r, "base/fixture.txt")).not.toContain(" port 9");
     expect(readdirSync(r.out)).toEqual(["base"]);
   },
   RUN_MS,
@@ -758,21 +783,69 @@ test(
   RUN_MS,
 );
 
-// Value: protects=each database in a folder the CLI keeps is listed by schema, user_version and rows per table, read
-//   only, after each part; fails_when=db_of() is dropped or opens the database for writing (a journal would then show in
-//   the next listing); why_new=only names, types and modes were listed (Red Team of A0); seam=none; no_claim=the real
-//   snapshot.db's tables (a stub keeps one)
+// Value: protects=each database in a folder the CLI keeps is listed whole, read only, after each part: schema,
+//   user_version, each table's row count and its rows, sorted; a live column (the time a scan wrote) as its type, the
+//   version that wrote it masked, a BLOB in hex with the work dir masked, a hard link's inode as the first entry that
+//   has it; fails_when=db_of() is dropped, counts rows again instead of listing them, opens the database for writing (a
+//   journal would then show in the next listing), or loses a mask (base against itself differs: exit 3; or head, of
+//   another version, against base: exit 1); why_new=only row counts were compared, so a head that wrote other values
+//   passed (Codex and red team of A0's /ship); seam=none; no_claim=the real snapshot.db's tables (a stub keeps four)
 test(
-  "each database the CLI keeps is listed: schema, user_version and rows per table",
+  "each database the CLI keeps is listed row by row, its live values masked",
   async () => {
     const r = await pending.same;
+    expect(r.code).toBe(0);
     const fresh = read(r, "head/fresh.txt");
-    const db = (rows: number) =>
-      `-- snapshot.db\nCREATE TABLE calls(id INTEGER PRIMARY KEY, command TEXT);\nuser_version 0\ncalls rows ${rows}\n`;
-    // two scans, then four refreshes that work
-    expect(fresh).toContain(db(2));
-    expect(fresh).toContain(db(6));
+    const hex = (path: string) => Buffer.from(path).toString("hex").toUpperCase();
+    const db = (commands: string[], walked: string) =>
+      "-- snapshot.db\nCREATE TABLE calls(id INTEGER PRIMARY KEY, command TEXT);\n" +
+      "CREATE TABLE meta(scanned_at INTEGER NOT NULL, freespace_version TEXT NOT NULL);\n" +
+      "CREATE TABLE roots(entry_id INTEGER PRIMARY KEY, path BLOB NOT NULL);\n" +
+      "CREATE TABLE hardlinks(entry_id INTEGER PRIMARY KEY, dev INTEGER NOT NULL, ino INTEGER NOT NULL);\n" +
+      `user_version 0\ncalls rows ${commands.length}\n` +
+      commands.map((command, i) => `calls: id=${i + 1} command='${command}'\n`).join("") +
+      "hardlinks rows 3\n" +
+      "hardlinks: entry_id=1 dev=7 ino=<the inode of entry 1>\nhardlinks: entry_id=2 dev=7 ino=<the inode of entry 1>\n" +
+      "hardlinks: entry_id=3 dev=7 ino=<the inode of entry 3>\n" +
+      "meta rows 1\nmeta: scanned_at=<integer> freespace_version='<version>'\n" +
+      `roots rows 1\nroots: entry_id=0 path=X'<work>${hex(walked)}'\n`;
+    // two scans, then four refreshes that work, the last of @/projects
+    expect(fresh).toContain(db(["scan", "scan"], "/ftree"));
+    expect(fresh).toContain(db(["scan", "scan", ...Array(4).fill("refresh")], "/ftree/projects"));
     expect(fresh).not.toMatch(/-journal /);
+  },
+  RUN_MS,
+);
+
+// Value: protects=a head that writes other values into its database, as many rows as base, fails the job; fails_when=
+//   db_of() counts rows again; why_new=only row counts were compared (Codex and red team of A0's /ship); seam=none;
+//   no_claim=the real writer's rows
+test(
+  "a head whose database holds other values in as many rows fails",
+  async () => {
+    const r = await pending.unlike;
+    expect(r.code).toBe(1);
+    for (const [side, command] of [
+      ["base", "scan"],
+      ["head", "SCAN"],
+    ]) {
+      expect(read(r, `${side}/fresh.txt`), side).toContain(`calls rows 2\ncalls: id=1 command='${command}'\ncalls: id=2 command='scan'\n`);
+    }
+  },
+  RUN_MS,
+);
+
+// Value: protects=a head whose lines end in CRLF fails the job: no mask takes a carriage return; fails_when=a mask strips
+//   CRs from every answer again; why_new=the mask stripped a CR before every line end, for the terminal's sake, and hid a
+//   CLI that wrote CRLF (Codex of A0's /ship); seam=none; no_claim=which outputs of the real CLI could take a CR
+test(
+  "a head that ends its lines in CRLF fails",
+  async () => {
+    const r = await pending.unlike;
+    expect(r.code).toBe(1);
+    const answer = (side: string) => section(read(r, `${side}/fixture.txt`), "== completions bash", "== completions zsh");
+    expect(answer("base")).toContain("-- stdout\n# completions for bash\n-- stderr\n");
+    expect(answer("head")).toContain("-- stdout\n# completions for bash\r\n-- stderr\n");
   },
   RUN_MS,
 );
