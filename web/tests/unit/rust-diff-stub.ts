@@ -1,6 +1,6 @@
 // The stub freespace that stands in for both builds in the tests of scripts/rust-diff.sh (rust-diff*.test.ts), and what
 // those tests share: one run of the job, a base that holds its first call, a poll with a deadline.
-import { chmodSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const repo = realpathSync(join(import.meta.dir, "../../.."));
@@ -286,10 +286,32 @@ export const STUB_ENV = {
 
 export type Run = { out: string; code: number; stdout: string; stderr: string };
 let runs = 0;
-// One run of the job in TMP, base and head named by their stub files there; the out dir is new for each run.
-export async function guard(tmp: string, base: string, head: string, env: Record<string, string> = {}): Promise<Run> {
+// One run of the job in TMP, base and head named by their stub files there; the out dir is new for each run. With
+// `tty`, the job runs under script(1), its stdin a terminal as from a shell, its stdout and stderr in files beside the
+// out dir.
+export async function guard(
+  tmp: string,
+  base: string,
+  head: string,
+  env: Record<string, string> = {},
+  how: { tty?: boolean } = {},
+): Promise<Run> {
   const out = join(tmp, `out-${runs++}`);
-  const p = Bun.spawn([script, join(tmp, base), join(tmp, head), out], {
+  const argv = [script, join(tmp, base), join(tmp, head), out];
+  if (how.tty) {
+    const q = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
+    const cmd = `exec ${argv.map(q).join(" ")} >${q(`${out}.stdout`)} 2>${q(`${out}.stderr`)}`;
+    const p = Bun.spawn(["script", "-qec", cmd, "/dev/null"], {
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "pipe",
+      env: { ...process.env, ...STUB_ENV, ...env, SHELL: Bun.which("bash") ?? "/bin/bash" },
+    });
+    const [said, code] = await Promise.all([new Response(p.stderr).text(), p.exited]);
+    const file = (f: string) => (existsSync(f) ? readFileSync(f, "utf8") : `(no ${f}; script said: ${said})`);
+    return { out, code, stdout: file(`${out}.stdout`), stderr: file(`${out}.stderr`) };
+  }
+  const p = Bun.spawn(argv, {
     stdout: "pipe",
     stderr: "pipe",
     env: { ...process.env, ...STUB_ENV, ...env },

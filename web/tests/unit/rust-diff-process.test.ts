@@ -1,7 +1,7 @@
-// How scripts/rust-diff.sh starts and stops, on stub builds (rust-diff-stub.ts): bad input, a missing tool and root
-// exit 2 before anything runs; a base that cannot make the fixture snapshot stops the job at once and shows why; a HUP,
-// INT or TERM ends the job with 128 + the signal number and removes its work dir, a Ctrl-C ends the call in progress
-// too, and a server still running goes with the job.
+// How scripts/rust-diff.sh starts and stops, on stub builds (rust-diff-stub.ts): bad input, a missing tool, missing
+// time zones and root exit 2 before anything runs; a base that cannot make the fixture snapshot stops the job at once
+// and shows why; a HUP, INT or TERM ends the job with 128 + the signal number and removes its work dir, a Ctrl-C ends
+// the call in progress too, and a server or a gui still running goes with the job.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import {
   chmodSync,
@@ -21,6 +21,21 @@ import { join } from "node:path";
 import { guard, HOLD, STUB_ENV, scanFails, script, stub, until, writeStub } from "./rust-diff-stub";
 
 let tmp = "";
+
+// Whether a process is gone (a zombie still counts as there, until its parent reaps it).
+const gone = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch {
+    return true;
+  }
+};
+// The parent of a process (Linux /proc).
+const parent = (pid: number) => {
+  const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  return Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
+};
 
 beforeAll(() => {
   tmp = realpathSync(mkdtempSync(join(tmpdir(), "rust-diff-process-")));
@@ -64,25 +79,32 @@ test("bad input exits 2 before anything runs", async () => {
   }
 });
 
-// Value: protects=a missing tool, any of the six, or a run as root stops the job before anything runs: exit 2, no out
-//   dir; fails_when=a tool leaves the check (the job then dies midway at a command not found) or the root check goes
+// Value: protects=a missing tool, any of the six, missing time zones, or a run as root stops the job before anything
+//   runs: exit 2, no out dir; fails_when=a tool leaves the check (the job then dies midway at a command not found), the
+//   zone check goes (without tzdata the C library takes UTC and TZ_QUERIES test nothing), or the root check goes
 //   (install-timer would install the build on this host); why_new=nothing ran these checks, then only one tool was left
-//   out (testing review of A0); seam=PATH; no_claim=a real run as root (a stub `id` says 0)
-test("a missing tool or a run as root stops the job before anything runs", () => {
+//   out (testing review of A0), and no zone was checked (red team of A0); seam=PATH, TZDIR; no_claim=a real run as root
+//   (a stub `id` says 0) or a host without tzdata (an empty TZDIR stands in)
+test("a missing tool, missing time zones or a run as root stop the job before anything runs", () => {
   const tools = ["jq", "curl", "script", "flock", "perl", "sqlite3"];
-  const cases = tools.map((tool) => {
+  // each case links the other five: one missing here would make the case fail for the wrong tool
+  for (const tool of tools) expect(Bun.which(tool), `${tool} on this host`).not.toBeNull();
+  const cases: [Record<string, string>, string][] = tools.map((tool) => {
     const dir = join(tmp, `path-without-${tool}`);
     mkdirSync(dir, { recursive: true });
     for (const other of tools.filter((t) => t !== tool)) symlinkSync(Bun.which(other) ?? other, join(dir, other));
-    return [dir, `${tool} is required`] as const;
+    return [{ PATH: dir }, `${tool} is required`];
   });
   const root = join(tmp, "path-root");
   mkdirSync(root, { recursive: true });
   writeStub(root, "id", "#!/bin/sh\necho 0\n");
-  for (const [PATH, said] of [...cases, [`${root}:${process.env.PATH}`, "run it as a user, not root"] as const]) {
+  const zones = join(tmp, "no-zones");
+  mkdirSync(zones, { recursive: true });
+  cases.push([{ TZDIR: zones }, "tzdata is required"], [{ PATH: `${root}:${process.env.PATH}` }, "run it as a user, not root"]);
+  for (const [extra, said] of cases) {
     const out = join(tmp, `checked-${said.split(" ")[0]}`);
     const r = Bun.spawnSync([Bun.which("bash") ?? "bash", script, join(tmp, "base"), join(tmp, "base"), out], {
-      env: { ...process.env, PATH },
+      env: { ...process.env, ...extra },
       stderr: "pipe",
     });
     expect(r.exitCode, said).toBe(2);
@@ -91,7 +113,6 @@ test("a missing tool or a run as root stops the job before anything runs", () =>
   }
 });
 
-// bash runs a trap when the foreground command ends, so the signal is sent first and the stub released after it.
 // bash runs a trap when the foreground command ends, so the signal is sent first and the stub released after it.
 // Value: protects=a HUP, INT or TERM ends rust-diff.sh with 129, 130 or 143 and removes its work dir, the folder nobody
 //   may read in it too; fails_when=a `trap 'exit N' SIG` line is dropped or changed, or the EXIT trap loses its chmod and
@@ -162,18 +183,20 @@ test("a Ctrl-C reaches the call in progress and ends the job at once", async () 
   }
 }, 30_000);
 
-// Value: protects=a server still running when the job ends goes with it: the EXIT trap TERMs the serve call, and timeout
-//   passes that on to the build; fails_when=the trap's kill of $serving is dropped, or serve_answers stops setting it (the
-//   server then outlives the job, holding a port and a token); why_new=no test ended the job while serve ran (testing
-//   and state-machine reviews of A0); seam=none; no_claim=GitHub's job cancellation, and a TERM during any other call
-//   (bash runs the trap once that call ends)
-test("a TERM while serve waits to start ends the job and stops the server too", async () => {
+// Value: protects=a TERM while serve waits to start ends the job at once, and the server goes with it: the EXIT trap
+//   TERMs the serve call, and timeout passes that on to the build; fails_when=the trap's kill of $serving is dropped,
+//   serve_answers stops setting it (the server then outlives the job, holding a port and a token), or the address wait
+//   runs in a $(...) again (bash then runs the trap when the wait is over, a minute on); why_new=no test ended the job
+//   while serve ran (testing and state-machine reviews of A0), then a held server that ended by itself within the wait
+//   passed with $serving unset (QA of A0); seam=none; no_claim=GitHub's job cancellation, and a TERM during any other
+//   call (bash runs the trap once that call ends)
+test("a TERM while serve waits to start ends the job at once and stops the server too", async () => {
   const dir = join(tmp, "serve-signal");
   mkdirSync(dir, { recursive: true });
   const [held, served] = [join(dir, "held"), join(dir, "serve.pid")];
-  // a server that never prints its address: the job is in its wait for it (serve --port 0 only: `serve --help`, asked
-  // before, is a call the job waits out, and its sleep would end by itself)
-  const serving = '[ "$*" != "serve --port 0" ] || { echo $$ > "$STUB_SERVE_PID"; : > "$STUB_HELD"; exec sleep 60; }';
+  // a server that never prints its address, and outlasts the job's wait for it (serve --port 0 only: `serve --help`,
+  // asked before, is a call the job waits out)
+  const serving = '[ "$*" != "serve --port 0" ] || { echo $$ > "$STUB_SERVE_PID"; : > "$STUB_HELD"; exec sleep 300; }';
   writeStub(dir, "serving", stub({ early: serving }));
   const env = { ...process.env, ...STUB_ENV, STUB_HELD: held, STUB_SERVE_PID: served };
   const proc = Bun.spawn([script, join(dir, "serving"), join(dir, "serving"), join(dir, "out")], {
@@ -182,23 +205,54 @@ test("a TERM while serve waits to start ends the job and stops the server too", 
     stderr: "ignore",
   });
   let pid = 0;
-  const gone = () => {
-    try {
-      process.kill(pid, 0);
-      return false;
-    } catch {
-      return true;
-    }
-  };
   try {
     expect(await until(() => existsSync(held), 120_000), "the script reached serve").toBe(true);
     pid = Number(readFileSync(served, "utf8"));
-    expect(gone(), "the server runs").toBe(false);
+    expect(gone(pid), "the server runs").toBe(false);
     proc.kill("SIGTERM");
+    // the wait for the address is a minute
+    expect(await until(() => proc.exitCode !== null, 20_000), "the job ended at the TERM").toBe(true);
     expect(await proc.exited).toBe(143);
-    expect(await until(gone), "the server stopped with the job").toBe(true);
+    expect(await until(() => gone(pid)), "the server stopped with the job").toBe(true);
   } finally {
     proc.kill();
-    if (pid && !gone()) process.kill(pid, "SIGKILL");
+    if (pid && !gone(pid)) process.kill(pid, "SIGKILL");
   }
-}, 150_000);
+}, 180_000);
+
+// Value: protects=a TERM while gui waits to start ends the job at once, and gui goes with it, so does the script(1) it
+//   runs under: the EXIT trap TERMs script(1) ($serving), which passes the TERM on to the build, through timeout;
+//   fails_when=gui_run stops setting $serving, the trap TERMs a process that does not pass the TERM on (the gui then
+//   outlives the job with its port and its token), or the address wait runs in a $(...) again; why_new=only serve was
+//   ended with the job (state-machine review of A0); seam=none; no_claim=GitHub's job cancellation
+test("a TERM while gui waits to start ends the job at once and stops gui and its script(1) too", async () => {
+  const dir = join(tmp, "gui-signal");
+  mkdirSync(dir, { recursive: true });
+  const [held, started] = [join(dir, "held"), join(dir, "gui.pid")];
+  // a gui that never prints its address, and outlasts the job's wait for it (`gui --port 0` only: the bare `gui` the job
+  // asks before must still refuse)
+  const holding = '[ "$1 $2" != "gui --port" ] || { echo $$ > "$STUB_GUI_PID"; : > "$STUB_HELD"; exec sleep 300; }';
+  writeStub(dir, "holding", stub({ early: holding }));
+  const env = { ...process.env, ...STUB_ENV, STUB_HELD: held, STUB_GUI_PID: started };
+  const proc = Bun.spawn([script, join(dir, "holding"), join(dir, "holding"), join(dir, "out")], {
+    env,
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  let [pid, terminal] = [0, 0];
+  try {
+    expect(await until(() => existsSync(held), 120_000), "the script reached gui").toBe(true);
+    pid = Number(readFileSync(started, "utf8"));
+    // gui runs under timeout, under script(1)
+    terminal = parent(parent(pid));
+    expect(readFileSync(`/proc/${terminal}/comm`, "utf8")).toBe("script\n");
+    proc.kill("SIGTERM");
+    expect(await until(() => proc.exitCode !== null, 20_000), "the job ended at the TERM").toBe(true);
+    expect(await proc.exited).toBe(143);
+    expect(await until(() => gone(pid)), "gui stopped with the job").toBe(true);
+    expect(await until(() => gone(terminal)), "its script(1) too").toBe(true);
+  } finally {
+    proc.kill();
+    for (const p of [pid, terminal]) if (p && !gone(p)) process.kill(p, "SIGKILL");
+  }
+}, 180_000);

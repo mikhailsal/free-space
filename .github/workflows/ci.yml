@@ -11,6 +11,8 @@ env:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    # each rust-diff call has its own 300 s bound, not the job: a hang on every call would hold the runner for hours
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -38,6 +40,8 @@ jobs:
   # Playwright suite against a mocked /api at 1280, 700 and 360 px with axe.
   web:
     runs-on: ubuntu-latest
+    # tests/unit runs scripts/rust-diff.sh on stub builds, fourteen times
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: web

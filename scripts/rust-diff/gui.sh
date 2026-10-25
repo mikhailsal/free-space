@@ -15,7 +15,7 @@
 
 gui_run() { # <bin> <label> <ssh, opens or fails> [<folder>]
   local bin=$1 label=$2 browser=$3 argv cmd pid child seen addr token file
-  local -a call=(env -u DISPLAY -u WAYLAND_DISPLAY)
+  local -a call=(env) # run_prefix has dropped the host's display already
   rm -rf "$work/runtime" "$work/browser.log" "$work/gui.out"
   mkdir -m 700 "$work/runtime"
   case $browser in
@@ -32,13 +32,13 @@ gui_run() { # <bin> <label> <ssh, opens or fails> [<folder>]
   # shellcheck disable=SC2034 # the EXIT trap of scripts/rust-diff.sh reads it
   pid=$! serving=$!
   case $browser in
-    ssh) seen=$(wait_for '[#?&]t=[0-9a-f]{64}' "$work/gui.out" "$pid") ;;
-    opens) seen=$(wait_for 'freespace-gui-[0-9]+\.html' "$work/browser.log" "$pid") ;;
-    *) seen=$(wait_for 'no browser opened' "$work/gui.out" "$pid") ;;
+    ssh) wait_for seen '[#?&]t=[0-9a-f]{64}' "$work/gui.out" "$pid" ;;
+    opens) wait_for seen 'freespace-gui-[0-9]+\.html' "$work/browser.log" "$pid" ;;
+    *) wait_for seen 'no browser opened' "$work/gui.out" "$pid" ;;
   esac
   # script(1) may relay the address a moment after xdg-open logs, and part of a line at a time: up to the / after the
   # port, or a port cut short would pass
-  addr=$(wait_for 'http://127\.0\.0\.1:[0-9]+/' "$work/gui.out" "$pid")
+  wait_for addr 'http://127\.0\.0\.1:[0-9]+/' "$work/gui.out" "$pid"
   addr=${addr%/}
   file=$(head -n 1 "$work/browser.log" 2>/dev/null || true)
   # the redirect file holds the address twice (refresh and link): the first token only

@@ -25,8 +25,9 @@ SERVE_QUESTIONS=(
   "an unknown endpoint|/api/nope||404"
 )
 
-# How long a server may take to print its address (ticks of 0.1 s), and a request to answer (s).
-SERVE_WAIT_TICKS=100
+# How long a server may take to print its address (ticks of 0.1 s; a loaded runner can take seconds, and the wait ends
+# as soon as the address shows or the server dies), and a request to answer (s).
+SERVE_WAIT_TICKS=600
 CURL_SECONDS=30
 
 served=0 http_phase=serve
@@ -54,16 +55,17 @@ http() { # <label> <want> <body: json, page or none> <curl args...>: one request
   } | mask
 }
 
-wait_for() { # <pattern> <file> <pid>: the first match of the ERE in the file, once it shows or the process ends
-  # (the file may hold half a line: a pattern must end where the text it wants ends)
+wait_for() { # <var> <ERE> <file> <pid>: into var, the first match in the file, once it shows or the process ends
+  # (the file may hold half a line: a pattern must end where the text it wants ends). It waits in this shell, not in a
+  # $(...): bash runs a trap once the foreground command ends, and a TERM must not wait for the whole wait.
   local i got=''
   for ((i = 0; i < SERVE_WAIT_TICKS; i++)); do
-    got=$(grep -m1 -oE "$1" "$2" 2>/dev/null || true)
-    if [ -n "$got" ] || ! kill -0 "$3" 2>/dev/null; then break; fi
+    got=$(grep -m1 -oE "$2" "$3" 2>/dev/null || true)
+    if [ -n "$got" ] || ! kill -0 "$4" 2>/dev/null; then break; fi
     sleep 0.1
   done
-  [ -n "$got" ] || got=$(grep -m1 -oE "$1" "$2" 2>/dev/null || true)
-  printf '%s' "$got"
+  [ -n "$got" ] || got=$(grep -m1 -oE "$2" "$3" 2>/dev/null || true)
+  printf -v "$1" '%s' "$got"
 }
 
 listening() { # <port>: the addresses a socket listens on at that port (IPv4 dotted, IPv6 as /proc writes it)
@@ -132,7 +134,7 @@ serve_answers() { # <bin>: serve the fixture snapshot, ask SERVE_QUESTIONS and t
   # shellcheck disable=SC2034 # the EXIT trap of scripts/rust-diff.sh reads it
   pid=$! serving=$!
   # the whole address: a line half written must not pass for a shorter port or token
-  url=$(wait_for 'http://127\.0\.0\.1:[0-9]+/#t=[0-9a-f]{64}' "$work/serve.err" "$pid")
+  wait_for url 'http://127\.0\.0\.1:[0-9]+/#t=[0-9a-f]{64}' "$work/serve.err" "$pid"
   if [ -z "$url" ]; then
     floor serve start "no address" "an address"
     echo "== serve did not print its address"

@@ -8,15 +8,16 @@
 // input, a missing tool, root, signals) is in rust-diff-process.test.ts; the made-up trees in rust-diff-tree.test.ts.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
 import { guard, type Run, stub, writeStub } from "./rust-diff-stub";
 
 // One pass of the questions is about 310 stub calls and 29 requests, each normalized, and a full run makes three (base,
 // base again, head). The fourteen runs start together in beforeAll, four of them full, the others stopped after one or
-// two passes: about 2.5 min in all at nice 19 on 8 threads, 3 min beside another job. afterAll waits for them all, so it
-// gets the same bound: a filtered run (-t) must not leave tmp behind.
-const RUN_MS = 300_000;
+// two passes: about 2.5 min in all at nice 19 on 8 threads, 3 min beside another job, and longer in proportion on fewer
+// threads (GitHub's runner has 4), so the bound grows as they shrink. afterAll waits for them all, so it gets the same
+// bound: a filtered run (-t) must not leave tmp behind.
+const RUN_MS = Math.max(300_000, Math.ceil(2_400_000 / availableParallelism()));
 let tmp = "";
 type RunName =
   | "same"
@@ -93,14 +94,15 @@ beforeAll(() => {
   write("midstart", stub({ early: '[ "$1" != ls ] || case "$dir" in */busy) chmod 640 "$2/top.bin" ;; esac' }));
   write("midscan", stub({ early: 'case "$1 $2" in "scan "*/ftree) touch -d "2020-01-01 00:00 UTC" "$2/top.bin" ;; esac' }));
   write("midrefresh", stub({ early: `case "$1 $2" in "refresh "*/ftree/logs) : > "\${2%/logs}/stray" ;; esac` }));
-  const runs: [RunName, string, string, Record<string, string>?][] = [
+  const runs: [RunName, string, string, Record<string, string>?, { tty?: boolean }?][] = [
     ["same", "base", "same"],
     ["byte", "base", "byte"],
     ["flaky", "flaky", "same"],
     ["other", "base", "other"],
     // a hang waits out this bound, not the stub's 30 s
     ["unlike", "base", "unlike", { RUST_DIFF_TIMEOUT: "15" }],
-    ["stale", "stale", "base"],
+    // on a terminal, as a run from a shell is: no call may take it (gui would start, not refuse: 15 s, then exit 124)
+    ["stale", "stale", "base", { RUST_DIFF_TIMEOUT: "15" }, { tty: true }],
     ["noserve", "noserve", "base"],
     ["deadserve", "deadserve", "base"],
     ["tamper", "base", "tamper"],
@@ -110,7 +112,7 @@ beforeAll(() => {
     ["midscan", "midscan", "base"],
     ["midrefresh", "midrefresh", "base"],
   ];
-  for (const [name, base, head, env] of runs) pending[name] = guard(tmp, base, head, env);
+  for (const [name, base, head, env, how] of runs) pending[name] = guard(tmp, base, head, env, how);
 });
 
 afterAll(async () => {
@@ -118,10 +120,6 @@ afterAll(async () => {
   rmSync(tmp, { recursive: true, force: true });
 }, RUN_MS);
 
-// Value: protects=a question the CLI refuses is answered as it is: exit status and plain-text stderr recorded, in the
-//   --json form too, and the run goes on; fails_when=`|| code=$?` or the `|| cat` fallback of normalize_json is dropped
-//   (the job aborts at ls @/nope) or the status is not written; why_new=the stub never refused anything, so no test
-//   ran those paths; seam=none; no_claim=the real CLI's wording and codes (a stub refuses /nope as the CLI does)
 // Value: protects=a live value keeps its key and becomes its type, so a key that comes or goes still shows; an age
 //   bound's echoed time becomes the age in days and its date in text is masked, while a date bound stays as given;
 //   state.json's times are masked, its other fields compared; the CLI gets no XDG folder of the caller's, a $HOME of
@@ -190,7 +188,19 @@ test(
     expect(fixture).toMatch(/^== files in <work>\/snap\n\. d \d+\n\.\/id f \d+\n/m);
     expect(fixture).toMatch(/^== files in <work>\/refreshed\n\. d \d+\n\.\/id f \d+\n\.\/refreshed f \d+\n/m);
     expect(text).toMatch(/^== files in <work>\/fresh\n\. d \d+\n\.\/id f \d+\n/m);
-    // a refused question: the status and the stderr are recorded, in plain text also under --json, and the job goes on
+  },
+  RUN_MS,
+);
+
+// Value: protects=a question the CLI refuses is answered as it is: exit status and plain-text stderr recorded, in the
+//   --json form too, and the run goes on; fails_when=`|| code=$?` or the `|| cat` fallback of normalize_json is dropped
+//   (the job aborts at ls @/nope) or the status is not written; why_new=the stub never refused anything, so no test
+//   ran those paths; seam=none; no_claim=the real CLI's wording and codes (a stub refuses /nope as the CLI does)
+test(
+  "a question the CLI refuses is answered with its status and stderr, also under --json, and the run goes on",
+  async () => {
+    const r = await pending.same;
+    expect(r.code).toBe(0);
     const refused = (json: string) => (tree: string) =>
       `== ls @/nope${json}\nexit 2\n-- stdout\n${json ? '{\n  "error": {\n    "code": "NOT_FOUND",\n    "exit": 2\n  }\n}\n' : ""}` +
       `-- stderr\nfreespace: is not in the snapshot: ls <work>/${tree}/nope${json}\nfix: freespace scan\n`;
@@ -301,8 +311,9 @@ test(
     expect(fixture).toContain("== refresh @/projects/app/src --workers 2 --json\nexit 2\n");
     expect(fixture).toContain("== refresh @/projects/media-link --workers 2\nexit 2\n");
     expect(fixture).toContain("== refresh @/projects --workers 2 --json\nexit 0\n");
-    // an id of a snapshot is 19 digits here: none is left in any answer
-    for (const text of [fixture, fresh]) expect(text).not.toMatch(/\d{19}/);
+    // an id of a snapshot is 19 digits here: none is left in any answer (a path in hex, as --path-raw and gui's raw=
+    // take it, may hold 19 digits in a row, among other hex digits)
+    for (const text of [fixture, fresh]) expect(text).not.toMatch(/(?<![0-9a-f])\d{19}(?![0-9a-f])/);
     // the fresh phase refreshes the snapshot the build made itself, of its own tree
     expect(fresh).toContain("== refresh @/logs --workers 2\nexit 0\n-- stdout\nargs refresh <work>/ftree/logs --workers 2\n");
     // each scan and refresh walks the tree as the phase left it: the first scan before change_tree, the second after
@@ -436,9 +447,11 @@ test(
 //   lists another), a refusal with the words EXPECTED lists for it, a --json answer of 0 in JSON, and each request to
 //   serve its HTTP status, or the job stops as stale (exit 4) after base's first run, naming each question, before base
 //   again or head run; fails_when=floor() is dropped or not called from ask or http, the EXPECTED lookup takes the wrong
-//   phase, the words or the JSON go unchecked, or the check runs after head; why_new=a flag both builds refuse alike
-//   compared equal and tested nothing (adversarial review of PR 2: 10 exit 2 blocks, job green), and exit 2 stands for
-//   a usage error as much as a refusal (adversarial review of A0); seam=none; no_claim=which flags a future CLI renames
+//   phase, the words or the JSON go unchecked, the check runs after head, or a call takes the job's stdin (this run has
+//   a terminal there: gui would start instead of refusing, then answer 124); why_new=a flag both builds refuse alike
+//   compared equal and tested nothing (adversarial review of PR 2: 10 exit 2 blocks, job green), exit 2 stands for a
+//   usage error as much as a refusal (adversarial review of A0), and every run had no terminal (red team of A0);
+//   seam=script(1) for the terminal; no_claim=which flags a future CLI renames
 test(
   "a base that refuses a question the harness asks, or answers one it should refuse, stops the job as stale",
   async () => {
@@ -455,6 +468,8 @@ test(
       expect(r.stderr).toContain(`${line}\n`);
     }
     expect(r.stderr).toContain("the harness is stale");
+    // the gui question refused, though the job ran on a terminal
+    expect(r.stderr).not.toContain("once: gui:");
     expect(readdirSync(r.out)).toEqual(["base"]);
   },
   RUN_MS,

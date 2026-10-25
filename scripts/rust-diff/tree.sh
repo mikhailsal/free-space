@@ -8,9 +8,15 @@
 # UTF-8, an empty folder, one nobody may read, and a wide, deep part for several
 # walker threads.
 
-blob() { # <path> <KiB> <mtime>: a file of that size, modified then
+blob() { # <path> <KiB> <mtime>: a file of that size, modified then, its blocks taken at once
   mkdir -p "$(dirname "$1")"
-  head -c "$(($2 * 1024))" /dev/zero >"$1"
+  # Blocks a write leaves for the kernel to place at writeback can land in more than four extents on a fragmented
+  # disk, and ext4 then takes one block more for the extent tree: the same file reads 4 K larger after writeback than
+  # before (base against itself differs, exit 3). Preallocated, it is one extent with its size fixed; the zeros are
+  # then written in place (the same inode when the file grows; no truncate on the write).
+  : >"$1"
+  fallocate -l "$(($2 * 1024))" "$1" 2>/dev/null || true
+  head -c "$(($2 * 1024))" /dev/zero 1<>"$1"
   touch -d "$3" "$1"
 }
 

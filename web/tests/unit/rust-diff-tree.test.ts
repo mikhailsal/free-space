@@ -1,5 +1,6 @@
 // The made-up trees of scripts/rust-diff.sh (scripts/rust-diff/tree.sh), at the default width: what CONTRIBUTING says
-// they hold, after each change too, and that the listing tree_check compares sees a change.
+// they hold, after each change too, that the listing tree_check compares sees a change, and that a file's blocks are
+// final once it is written.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -75,4 +76,33 @@ remove_tree; [ -e "$tree" ] || echo removed`;
     expect(out).toMatch(changed);
   }
   expect(out.endsWith("removed\n")).toBe(true);
+}, 60_000);
+
+// Value: protects=a blob's allocation is final once it is written, the same before and after the kernel writes it back
+//   and the same for every blob of a size, however fragmented the disk, also for a blob written again larger;
+//   fails_when=blob writes through the page cache without taking its blocks first (on a fragmented ext4 a file past four
+//   extents takes one block more at writeback, so the real CLI's base differed from itself, exit 3, in QA of A0 on an 83%
+//   full disk: 8 of 60 such files); why_new=the trees were checked for their shape, not their blocks; seam=none;
+//   no_claim=a disk without one free extent of 400 K (a clean CI disk passes either way: the regression shows on a
+//   fragmented one)
+test("a blob takes its blocks as it is written: one allocation per size, before and after writeback", async () => {
+  const sh = `. "$1/scripts/rust-diff/tree.sh"
+dir=$2
+mkdir -p "$dir"
+for i in $(seq 1 40); do blob "$dir/f$i" 400 "2024-01-20 08:00 UTC"; done
+for i in $(seq 1 10); do blob "$dir/g$i" 40 "2024-10-01 08:00 UTC"; blob "$dir/g$i" 120 "2024-10-23 08:00 UTC"; done
+blocks() { stat -c '%s %b' "$dir"/* | sort | uniq -c | awk -v when="$1" '{ print when, $1, $2, $3 }'; }
+blocks before; sync -f "$dir"; blocks after`;
+  const p = Bun.spawn(["bash", "-c", `set -euo pipefail\n${sh}`, "blocks", repo, join(tmp, "blocks")], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+  expect(err).toBe("");
+  expect(code).toBe(0);
+  const lines = out.trim().split("\n");
+  const at = (when: string) => lines.filter((l) => l.startsWith(`${when} `)).map((l) => l.slice(when.length + 1));
+  // one line per size: every blob of it has the same blocks
+  expect(at("before").map((l) => l.split(" ").slice(0, 2).join(" "))).toEqual(["10 122880", "40 409600"]);
+  expect(at("after")).toEqual(at("before"));
 }, 60_000);

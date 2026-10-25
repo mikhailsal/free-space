@@ -46,9 +46,9 @@
 # difference). A version bump alone is no difference: each binary's own version
 # (from its --version) is masked in its answers. The normalized answers stay in
 # <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
-# Needs jq, curl, script and flock (util-linux), perl and sqlite3. JSON is
-# compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4) sets the
-# wide part of the trees.
+# Needs jq, curl, script and flock (util-linux), perl, sqlite3 and tzdata. JSON
+# is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4) sets
+# the wide part of the trees.
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 
@@ -73,6 +73,11 @@ here=$(dirname "$(realpath "$0")")
 . "$here/rust-diff/serve.sh"
 # shellcheck source=rust-diff/gui.sh
 . "$here/rust-diff/gui.sh"
+# without the zone (no tzdata) the C library falls back to UTC, and TZ_QUERIES test nothing
+if [ "$(TZ=$TZ_OTHER date -d @1704067200 +%z)" != +0530 ]; then
+  echo "$0: tzdata is required: TZ=$TZ_OTHER must be UTC+05:30" >&2
+  exit 2
+fi
 base=$(realpath "$base") head=$(realpath "$head")
 mkdir -p "$out"
 out=$(realpath "$out")
@@ -97,21 +102,23 @@ ln -s "$head" "$work/bin/head/freespace"
 base=$work/bin/base/freespace head=$work/bin/head/freespace
 
 # The CLI's environment: this host's config, units, $HOME and XDG folders stay
-# out; $tz and $config, when a phase sets them, replace UTC and the missing
-# config file. doctor still reads the host (the systemd timer, an installed
-# binary on PATH, the skill in the passwd home), alike for both builds on a
-# clean CI runner; on a dev machine with freespace installed a local run can
-# differ where CI's won't. timeout stays in the job's process group
-# (--foreground), so a Ctrl-C reaches the call in progress too.
+# out, and so do its display and its terminal (stdin is /dev/null: given a
+# terminal, `gui` would start, not refuse); $tz and $config, when a phase sets
+# them, replace UTC and the missing config file. doctor still reads the host
+# (the systemd timer, an installed binary on PATH, the skill in the passwd
+# home), alike for both builds on a clean CI runner; on a dev machine with
+# freespace installed a local run can differ where CI's won't. timeout stays in
+# the job's process group (--foreground), so a Ctrl-C reaches the call in
+# progress too.
 run_prefix() { # sets argv: the command line a call starts with
-  argv=(env -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_RUNTIME_DIR
+  argv=(env -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_RUNTIME_DIR -u DISPLAY -u WAYLAND_DISPLAY
     TZ="${tz:-UTC}" LC_ALL=C HOME="$work/home" FREESPACE_CONFIG="${config:-$work/none.toml}"
     FREESPACE_UNIT_DIR="$work/units" timeout --foreground -k 10 "${RUST_DIFF_TIMEOUT:-300}")
 }
 run() { # <bin> <args...>
   local argv
   run_prefix
-  "${argv[@]}" "$@"
+  "${argv[@]}" "$@" </dev/null
 }
 
 # The floor: while $checking (base's first run), an exit status EXPECTED does not
@@ -135,7 +142,7 @@ floor() { # <phase> <question> <got> [<wanted, space-separated>]
 }
 
 ask() { # <bin> <fresh> <query words...>: one answer, normalized; no words: the bare run
-  local bin=$1 fresh=$2 w args=() json=false rel=false code=0 q
+  local bin=$1 fresh=$2 w args=() json=false rel=false code=0 q s
   shift 2
   for w in "$@"; do
     args+=("${w/#@/$tree}")
