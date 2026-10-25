@@ -36,6 +36,8 @@ bunx playwright test
 
 `bun test tests/unit` also runs `scripts/rust-diff.sh` and `scripts/coverage-functions.sh` on made-up input, so `jq` and `c++filt` (from binutils) must be installed.
 
+The unit tests of `scripts/test-files.sh`, the pre-gate runner, need `flock` and `setsid` from util-linux, as the runner itself needs `flock` for e2e, shots and guard files.
+
 A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh` must be clean.
 
 Scanning your whole disk while developing is slow; point commands at a small tree with a private snapshot instead:
