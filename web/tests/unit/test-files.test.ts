@@ -83,8 +83,8 @@ afterAll(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-// The environment of one script run: the stubs first on PATH, a fresh call log, and no inherited $SHOTS_DIR, $E2E_PORT
-// or $GUARD_SHOTS.
+// The environment of one script run: the stubs first on PATH, a fresh call log, no inherited $SHOTS_DIR, $E2E_PORT,
+// $GUARD_SHOTS or $TEST_FILES_HEARTBEAT, then `extra`.
 function stubEnv(stubExit = 0, extra: Record<string, string> = {}) {
   const log = join(tmp, `${runs++}.log`);
   const env: Record<string, string | undefined> = {
@@ -92,12 +92,9 @@ function stubEnv(stubExit = 0, extra: Record<string, string> = {}) {
     PATH: `${join(tmp, "bin")}:${process.env.PATH}`,
     STUB_LOG: log,
     STUB_EXIT: String(stubExit),
-    ...extra,
   };
-  delete env.SHOTS_DIR;
-  delete env.E2E_PORT;
-  delete env.GUARD_SHOTS;
-  return { log, env };
+  for (const name of ["SHOTS_DIR", "E2E_PORT", "GUARD_SHOTS", "TEST_FILES_HEARTBEAT"]) delete env[name];
+  return { log, env: { ...env, ...extra } };
 }
 
 type StubLine = [string, string, string, string, string, string, string, string];
@@ -506,8 +503,13 @@ test("serve.ts serves the build in $GUARD_DIST, absolute or relative, else the d
 //   (a socket pair, as Bun's here), a terminal on stdin
 test("serve.ts stops when its stdin pipe closes, and stays up on /dev/null", async () => {
   const piped = await startServe({}, "pipe");
-  piped.p.stdin.end();
-  expect(await Promise.race([piped.p.exited, Bun.sleep(3000).then(() => "still up")])).toBe(0);
+  try {
+    piped.p.stdin.end();
+    expect(await Promise.race([piped.p.exited, Bun.sleep(3000).then(() => "still up")])).toBe(0);
+  } finally {
+    // a server that missed the end of its input must not outlive the test
+    piped.p.kill();
+  }
   const { p, port } = await startServe({}, "ignore");
   try {
     expect(await Promise.race([p.exited, Bun.sleep(500).then(() => "still up")])).toBe("still up");
