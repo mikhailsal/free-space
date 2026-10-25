@@ -38,7 +38,7 @@ bunx playwright test
 
 The unit tests of `scripts/test-files.sh`, the pre-gate runner, need `flock` and `setsid` from util-linux, as the runner itself needs `flock` for e2e, shots and guard files.
 
-A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh` must be clean (`.shellcheckrc` lets it follow sourced files).
+A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, `sudo scripts/mount-fs.sh target/debug/freespace` mounts one inside a scanned root and refreshes around it, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh` must be clean (`.shellcheckrc` lets it follow sourced files).
 
 Scanning your whole disk while developing is slow; point commands at a small tree with a private snapshot instead:
 

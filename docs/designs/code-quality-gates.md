@@ -1,6 +1,6 @@
 # Code quality gates
 
-Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Lane B is merged (B0-B4 as #15-#19, B5 as #20); in lane A, A0 is in review and A1-A4 are open. Date: 2026-10-23.
+Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Lane B is merged (B0-B4 as #15-#19, B5 as #20); in lane A, A0 is merged (#21), A1's D0 tests and mount script are in review, and the rest of A1 (`install-timer` as root in rust-diff) and A2-A4 are open. Date: 2026-10-23.
 
 ## Problem
 
@@ -1617,13 +1617,13 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: re-measurement 2026-10-24 (Current violations; correction to S2a)
   - Files: the files listed in Current violations
   - Verify: clippy with `excessive-nesting-threshold = 4` in a scratch `clippy.toml` and a fresh target dir reports none; refactor-guard green
-- [ ] **T3 (P1, human: ~2 days / CC: ~1.5h)** — core, cli — Characterization tests for unreached branches
+- [x] **T3 (P1, human: ~2 days / CC: ~1.5h)** — core, cli — Characterization tests for unreached branches
   - Surfaced by: Section 3 — T1 (D15): status.rs:129, query.rs, doctor.rs:259, refresh.rs:270,445,455, diff.rs:180,254, job.rs:155
-  - Files: cli/tests/cli.rs, core/tests/queries.rs, core/tests/publish.rs
+  - Files: cli/tests/text.rs, cli/tests/doctor.rs, core/tests/edges.rs (new files: core/tests/queries.rs has 978 of its 1000 lines)
   - Verify: `cargo test --workspace` green on master before any split; `cargo llvm-cov` shows those lines reached
-- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — scripts, CI — Mount-point test under sudo
+- [x] **T4 (P1, human: ~2h / CC: ~15min)** — scripts, CI — Mount-point test under sudo
   - Surfaced by: TODO candidates — TD2 (D25): refresh.rs:402, walk.rs:392
-  - Files: scripts/ (new script), .github/workflows/ci.yml
+  - Files: scripts/mount-fs.sh, .github/workflows/ci.yml
   - Verify: `sudo scripts/<script>.sh` passes locally; rust job green
 - [x] **T5 (P1, human: ~6h / CC: ~40min)** — web tests — e2e for the six keys, Show more, cancel; mock hold-and-release; out-of-order e2e
   - Surfaced by: Section 3 — T2 (D16); Outside voice — O1 (D19)

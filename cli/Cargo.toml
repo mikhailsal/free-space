@@ -35,4 +35,6 @@ mimalloc = { version = "0.1.52", features = ["override"] }
 
 [dev-dependencies]
 jsonschema = { version = "0.60.0", default-features = false }
+# tests/doctor.rs ages and empties a snapshot the way time and old versions do
+rusqlite.workspace = true
 tempfile = "3"
