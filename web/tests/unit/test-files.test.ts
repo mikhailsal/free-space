@@ -1,7 +1,8 @@
 // scripts/test-files.sh, the pre-gate runner: each test file goes to its own runner in web/, a failing runner's
-// status is the script's, shots and guard shots render into a temp dir, and bad input exits 2 before anything runs.
-// Stub bun and bunx stand in for the real runners; they record argv, cwd, $SHOTS_DIR, $E2E_PORT, an open fd 9 and
-// $GUARD_SHOTS.
+// status is the script's, shots and guard shots render into web/pregate-shots (cleared under the lock, gone at exit),
+// a signal reaches the running runner before the script exits, and bad input exits 2 before anything runs.
+// Stub bun and bunx stand in for the real runners; they record argv, cwd, $SHOTS_DIR, $E2E_PORT, an open fd 9,
+// $GUARD_SHOTS and what web/pregate-shots holds when they start.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import {
   chmodSync,
@@ -13,6 +14,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,21 +23,29 @@ import { dirname, join } from "node:path";
 const repo = realpathSync(join(import.meta.dir, "../../.."));
 const web = join(repo, "web");
 
-// `bun -e` (the script's free-port pick) prints PORT. Any other call appends "name|cwd|argv|$SHOTS_DIR|$E2E_PORT|fd9|$GUARD_SHOTS"
-// to $STUB_LOG (fd9 is "open" when the script's lock reached the runner); if $STUB_GO is set, waits until that file
-// exists (10 s at most) and appends "released". With $STUB_SHOT and $GUARD_SHOTS set it takes a shot: view.png holds
-// $STUB_SHOT, or the stub's pid if that is "pid". Exits with $STUB_EXIT (default 0).
+// `bun -e` (the script's free-port pick) prints PORT. Any other call appends
+// "name|cwd|argv|$SHOTS_DIR|$E2E_PORT|fd9|$GUARD_SHOTS|left" to $STUB_LOG (fd9 is "open" when the script's lock reached
+// the runner; left lists what web/pregate-shots holds as the runner starts). If $STUB_GO is set, it waits until that
+// file exists (10 s at most) and appends a "released" line; a TERM meanwhile appends a "stopped" line after 0.3 s, as a
+// runner tearing down, and exits 143. With $STUB_SHOT and $GUARD_SHOTS set it takes a shot: view.png holds $STUB_SHOT,
+// or the stub's pid if that is "pid". Exits with $STUB_EXIT (default 0).
 const PORT = "41730";
 const stub = `#!/bin/sh
 if [ "$1" = -e ]; then echo ${PORT}; exit 0; fi
+# set before the call is logged: a test signals as soon as it sees the call
+[ -z "\${STUB_GO:-}" ] || trap 'trap "" TERM; sleep 0.3; echo "stopped|||||||" >> "$STUB_LOG"; exit 143' TERM
 fd9=; [ ! -e /proc/self/fd/9 ] || fd9=open
-printf '%s|%s|%s|%s|%s|%s|%s\\n' "\${0##*/}" "$(pwd -P)" "$*" "\${SHOTS_DIR:-}" "\${E2E_PORT:-}" "$fd9" "\${GUARD_SHOTS:-}" >> "$STUB_LOG"
+left=$(find pregate-shots -mindepth 1 2>/dev/null | sort | paste -sd, -)
+printf '%s|%s|%s|%s|%s|%s|%s|%s\\n' "\${0##*/}" "$(pwd -P)" "$*" "\${SHOTS_DIR:-}" "\${E2E_PORT:-}" "$fd9" "\${GUARD_SHOTS:-}" "$left" >> "$STUB_LOG"
 if [ -n "\${STUB_SHOT:-}" ] && [ -n "\${GUARD_SHOTS:-}" ]; then
   shot=$STUB_SHOT; [ "$shot" != pid ] || shot=$$
   printf '%s' "$shot" > "$GUARD_SHOTS/view.png"
 fi
-n=0
-[ -z "\${STUB_GO:-}" ] || { while [ ! -e "$STUB_GO" ] && [ $n -lt 500 ]; do sleep 0.02; n=$((n + 1)); done; echo released >> "$STUB_LOG"; }
+if [ -n "\${STUB_GO:-}" ]; then
+  n=0
+  while [ ! -e "$STUB_GO" ] && [ $n -lt 500 ]; do sleep 0.02; n=$((n + 1)); done
+  echo "released|||||||" >> "$STUB_LOG"
+fi
 exit "\${STUB_EXIT:-0}"
 `;
 
@@ -45,11 +55,14 @@ let runs = 0;
 // this checkout. The test files it is given exist there, empty.
 let script = "";
 let stubWeb = "";
+// Where the copy's runs shoot: web/pregate-shots of tmp/repo.
+let shotsRoot = "";
 
 beforeAll(() => {
   tmp = realpathSync(mkdtempSync(join(tmpdir(), "test-files-")));
   script = join(tmp, "repo/scripts/test-files.sh");
   stubWeb = join(tmp, "repo/web");
+  shotsRoot = join(stubWeb, "pregate-shots");
   mkdirSync(join(tmp, "repo/scripts"), { recursive: true });
   mkdirSync(stubWeb);
   copyFileSync(join(repo, "scripts/test-files.sh"), script);
@@ -63,6 +76,7 @@ beforeAll(() => {
     writeFileSync(join(tmp, path), stub);
     chmodSync(join(tmp, path), 0o755);
   }
+  serveCopy();
 });
 
 afterAll(() => {
@@ -86,12 +100,16 @@ function stubEnv(stubExit = 0, extra: Record<string, string> = {}) {
   return { log, env };
 }
 
-// The stub calls in order.
+type StubLine = [string, string, string, string, string, string, string, string];
+
+// The stub's lines in order: its calls, and the "released" and "stopped" lines (empty but for the name).
 function readCalls(log: string) {
   const lines = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : [];
   return lines.map((l) => {
-    const [name, cwd, argv, shotsDir, port, fd9, guardDir] = l.split("|") as [string, string, string, string, string, string, string];
-    return { name, cwd, argv, shotsDir, port, fd9, guardDir };
+    const fields = l.split("|");
+    if (fields.length !== 8) throw new Error(`stub line with ${fields.length} fields: ${l}`);
+    const [name, cwd, argv, shotsDir, port, fd9, guardDir, left] = fields as StubLine;
+    return { name, cwd, argv, shotsDir, port, fd9, guardDir, left };
   });
 }
 
@@ -102,13 +120,43 @@ function run(args: string[], stubExit = 0) {
   return { code: done.exitCode, stderr: done.stderr.toString(), calls: readCalls(log) };
 }
 
+// Starts the script on `args` in the background, from outside the repo, with its stderr piped; `sh` is the command
+// before the script.
+function start(args: string[], env: Record<string, string | undefined>, sh = ["sh"]) {
+  return Bun.spawn([...sh, script, ...args], { cwd: tmp, env, stderr: "pipe" });
+}
+
+// Polls `cond` every 20 ms; throws when `ms` pass without it.
+async function waitFor(cond: () => boolean, what: string, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await Bun.sleep(20);
+  }
+}
+
+// Reads `stream` until what it has read holds `text`, or it ends; returns what it read.
+async function readUntil(stream: ReadableStream<Uint8Array>, text: string) {
+  const reader = stream.getReader();
+  let said = "";
+  while (!said.includes(text)) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    said += new TextDecoder().decode(chunk.value);
+  }
+  reader.releaseLock();
+  return said;
+}
+
 const testFiles = [
   "web/tests/unit/format.test.ts",
   "web/tests/unit/contrast.test.ts",
+  "web/tests/unit/helper.ts",
   "web/tests/e2e/find.spec.ts",
   "web/tests/e2e/browse.spec.ts",
   "web/tests/shots/readme.spec.ts",
   "web/tests/shots/b.spec.ts",
+  "web/tests/shots/home.ts",
   "web/tests/guard/views.spec.ts",
 ];
 const unit = "web/tests/unit/format.test.ts";
@@ -189,6 +237,14 @@ const rows: Row[] = [
     stderr: "no such test file web/tests/unit/gone.test.ts",
     calls: [],
   },
+  // A runner given a helper finds no test in it and passes ("0 pass").
+  ...["web/tests/unit/helper.ts", "web/tests/shots/home.ts"].map((f) => ({
+    name: `a helper that exists, ${f}, after a valid file: exit 2, nothing runs`,
+    args: [unit, f],
+    code: 2,
+    stderr: `not a test file ${f}`,
+    calls: [],
+  })),
   // The runner lists are split on spaces and glob-expanded, so a path with any of these would reach a runner changed.
   ...[" ", "*", "?", "[", ";", "$", "`"].map((c) => ({
     name: `a path with ${JSON.stringify(c)} after a valid one: exit 2, nothing runs`,
@@ -197,6 +253,14 @@ const rows: Row[] = [
     stderr: `unsafe test path web/tests/e2e/a${c}b.spec.ts`,
     calls: [],
   })),
+  // `echo` would turn the backslash escape into an ESC byte, which clears a terminal showing the log.
+  {
+    name: "a rejected path is printed as given, its backslash escapes left as text",
+    args: [unit, "web/tests/e2e/a\\033[2Jb.spec.ts"],
+    code: 2,
+    stderr: "unsafe test path web/tests/e2e/a\\033[2Jb.spec.ts",
+    calls: [],
+  },
   {
     name: "a path that climbs out of web/tests: exit 2, nothing runs",
     args: ["web/tests/unit/../../../x.test.ts"],
@@ -216,24 +280,20 @@ for (const row of rows) {
   });
 }
 
-test("shots render into a fresh temp dir, never docs/img, and the dir is gone afterwards", () => {
+// The copy's own web/pregate-shots, not merely some dir outside the real checkout: a script that shot into
+// $root/docs/img would fail here (and its EXIT trap would have deleted that dir).
+test("shots render into web/pregate-shots/shots, never docs/img, and the dir is gone afterwards", () => {
   const got = run([unit, shots]);
   expect(got.code).toBe(0);
-  expect(got.calls.map((c) => c.shotsDir)).toEqual(["", expect.stringMatching(/^\//)]);
-  const dir = got.calls[1]?.shotsDir ?? "";
-  expect(dir.startsWith(repo)).toBe(false);
-  expect(existsSync(dir)).toBe(false);
+  expect(got.calls.map((c) => c.shotsDir)).toEqual(["", join(shotsRoot, "shots")]);
+  expect(existsSync(shotsRoot)).toBe(false);
 });
 
-test("the two guard runs shoot into two dirs of one fresh temp dir, gone afterwards, with the port and without the lock", () => {
+test("the two guard runs shoot into pregate-shots/guard-a and guard-b, gone afterwards, with the port and without the lock", () => {
   const got = run([unit, shots, guard]);
   expect(got.code).toBe(0);
-  const [first, second] = got.calls.slice(2);
-  expect(first?.guardDir).toMatch(/^\/.*\/guard-a$/);
-  expect(second?.guardDir).toBe(`${dirname(first?.guardDir ?? "")}/guard-b`);
-  expect(got.calls.slice(0, 2).map((c) => c.guardDir)).toEqual(["", ""]);
-  expect(first?.guardDir.startsWith(repo)).toBe(false);
-  expect(existsSync(dirname(first?.guardDir ?? ""))).toBe(false);
+  expect(got.calls.map((c) => c.guardDir)).toEqual(["", "", join(shotsRoot, "guard-a"), join(shotsRoot, "guard-b")]);
+  expect(existsSync(shotsRoot)).toBe(false);
   expect(got.calls.map((c) => c.port)).toEqual(["", PORT, PORT, PORT]);
   expect(got.calls.map((c) => c.fd9)).toEqual(["", "", "", ""]);
 });
@@ -280,6 +340,38 @@ test("the real free-port pick hands Playwright a port number", () => {
   expect(Number(port)).toBeLessThanOrEqual(65535);
 });
 
+// Value: protects=the script finds the repo from its own path whatever the caller's CDPATH; fails_when=`cd` follows a
+//   CDPATH entry that holds scripts/ (root becomes two lines and every file "no such test file"); seam=none;
+//   no_claim=shells other than sh
+test("a CDPATH entry holding a scripts/ dir does not move the repo root", () => {
+  mkdirSync(join(tmp, "cdpath/scripts"), { recursive: true });
+  const { log, env } = stubEnv(0, { CDPATH: join(tmp, "cdpath") });
+  const done = Bun.spawnSync(["sh", "scripts/test-files.sh", unit], { cwd: join(tmp, "repo"), env });
+  expect(done.exitCode, done.stderr.toString()).toBe(0);
+  expect(readCalls(log).map((c) => [c.name, c.argv, c.cwd])).toEqual([[...unitCall, stubWeb]]);
+});
+
+// Value: protects=without flock (util-linux) a run that needs the lock exits 2 naming it before anything runs, where it
+//   used to say "waiting" and run unlocked; a unit run takes no lock and still runs; fails_when=the `command -v flock`
+//   check goes or covers unit runs too; seam=PATH (the stubs and the tools they use, no flock); no_claim=a flock that
+//   fails otherwise (status 2 and up: "flock failed")
+test("without flock an e2e run exits 2 naming it, and a unit run still runs", () => {
+  const bin = join(tmp, "no-flock");
+  mkdirSync(bin);
+  for (const tool of ["dirname", "find", "sort", "paste", "sleep"]) symlinkSync(Bun.which(tool) ?? tool, join(bin, tool));
+  const path = `${join(tmp, "bin")}:${bin}`;
+  for (const [args, code, calls] of [
+    [[e2e], 2, []],
+    [[unit], 0, [unitCall]],
+  ] as const) {
+    const { log, env } = stubEnv(0, { PATH: path });
+    const done = Bun.spawnSync(["/bin/sh", script, ...args], { cwd: tmp, env });
+    expect(done.exitCode, done.stderr.toString()).toBe(code);
+    expect(readCalls(log).map((c) => [c.name, c.argv])).toEqual([...calls]);
+    if (code === 2) expect(done.stderr.toString()).toContain("flock not found");
+  }
+});
+
 // Both configs build their URLs and the server command from $E2E_PORT and never reuse a server already on that port
 // (it belongs to someone else); unset or empty, they fall back to 4173 and, outside CI, reuse a running server.
 test("the Playwright configs serve and browse on $E2E_PORT", () => {
@@ -287,18 +379,19 @@ test("the Playwright configs serve and browse on $E2E_PORT", () => {
 const shots = (await import("./playwright.shots.config.ts")).default;
 const show = (c) => [c.use.baseURL, c.webServer.url, c.webServer.command, c.webServer.reuseExistingServer];
 console.log(JSON.stringify([base, shots].map(show)));`;
-  for (const [port, want, reuse] of [
-    ["41731", "41731", false],
-    [undefined, "4173", true],
-    ["", "4173", true],
+  for (const [port, ci, want, reuse] of [
+    ["41731", undefined, "41731", false],
+    [undefined, undefined, "4173", true],
+    ["", undefined, "4173", true],
+    [undefined, "1", "4173", false],
   ] as const) {
-    const env: Record<string, string | undefined> = { ...process.env, E2E_PORT: port };
+    const env: Record<string, string | undefined> = { ...process.env, E2E_PORT: port, CI: ci };
     if (port === undefined) delete env.E2E_PORT;
-    delete env.CI;
+    if (ci === undefined) delete env.CI;
     const done = Bun.spawnSync([process.execPath, "-e", read], { cwd: web, env });
     expect(done.exitCode, done.stderr.toString()).toBe(0);
     const config = [`http://127.0.0.1:${want}`, `http://127.0.0.1:${want}/`, `bun run build && PORT=${want} bun tests/e2e/serve.ts`, reuse];
-    expect(JSON.parse(done.stdout.toString()), `E2E_PORT=${port}`).toEqual([config, config]);
+    expect(JSON.parse(done.stdout.toString()), `E2E_PORT=${port} CI=${ci}`).toEqual([config, config]);
   }
 });
 
@@ -330,9 +423,20 @@ console.log(JSON.stringify([baseURL, url, command, reuseExistingServer, c.snapsh
   }
 });
 
-// A copy of tests/e2e/serve.ts sits in tmp/serve/tests/e2e/, so its default build folder (dist/ two levels up) is
-// tmp/serve/dist, never the real web/dist. Starts it on a free port with `env` added, answers one GET, stops it.
-async function served(env: Record<string, string>, path: string) {
+// A copy of tests/e2e/serve.ts in tmp/serve/tests/e2e/, so its default build folder (dist/ two levels up) is
+// tmp/serve/dist, never the real web/dist; tmp/other is another build.
+function serveCopy() {
+  mkdirSync(join(tmp, "serve/tests/e2e"), { recursive: true });
+  copyFileSync(join(web, "tests/e2e/serve.ts"), join(tmp, "serve/tests/e2e/serve.ts"));
+  mkdirSync(join(tmp, "serve/dist"));
+  writeFileSync(join(tmp, "serve/dist/index.html"), "default build");
+  mkdirSync(join(tmp, "other"));
+  writeFileSync(join(tmp, "other/only.js"), "only in other");
+}
+
+// Starts the copy of serve.ts on a free port with `env` added and `stdin` ("ignore" is /dev/null); resolves once it
+// says it is ready.
+async function startServe<In extends "pipe" | "ignore">(env: Record<string, string>, stdin: In) {
   const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
   const port = probe.port;
   await probe.stop(true);
@@ -341,17 +445,19 @@ async function served(env: Record<string, string>, path: string) {
   const p = Bun.spawn([process.execPath, join(tmp, "serve/tests/e2e/serve.ts")], {
     cwd: join(tmp, "serve"),
     env: { ...inherited, ...env },
+    stdin,
     stdout: "pipe",
     stderr: "pipe",
   });
+  const said = await readUntil(p.stdout, "ready");
+  if (!said.includes("ready")) throw new Error(`serve.ts did not start: ${await new Response(p.stderr).text()}`);
+  return { p, port };
+}
+
+// Starts the copy of serve.ts with `env` added, answers one GET, stops it.
+async function served(env: Record<string, string>, path: string) {
+  const { p, port } = await startServe(env, "ignore");
   try {
-    const out = p.stdout.getReader();
-    let said = "";
-    while (!said.includes("ready")) {
-      const chunk = await out.read();
-      if (chunk.done) throw new Error(`serve.ts did not start: ${await new Response(p.stderr).text()}`);
-      said += new TextDecoder().decode(chunk.value);
-    }
     const res = await fetch(`http://127.0.0.1:${port}${path}`);
     return { status: res.status, csp: res.headers.get("content-security-policy") ?? "", body: await res.text() };
   } finally {
@@ -365,13 +471,6 @@ async function served(env: Record<string, string>, path: string) {
 //   the default: pixel-diff then compares head with itself; why_new=the config test reads only the server command, no
 //   test starts serve.ts with $GUARD_DIST set; seam=none; no_claim=Playwright driving it; a copy of serve.ts stands in
 test("serve.ts serves the build in $GUARD_DIST, absolute or relative, else the dist/ beside tests/", async () => {
-  mkdirSync(join(tmp, "serve/tests/e2e"), { recursive: true });
-  copyFileSync(join(web, "tests/e2e/serve.ts"), join(tmp, "serve/tests/e2e/serve.ts"));
-  mkdirSync(join(tmp, "serve/dist"));
-  writeFileSync(join(tmp, "serve/dist/index.html"), "default build");
-  mkdirSync(join(tmp, "other"));
-  writeFileSync(join(tmp, "other/only.js"), "only in other");
-
   const fallback = await served({}, "/");
   expect([fallback.status, fallback.body]).toEqual([200, "default build"]);
   expect(fallback.csp).toContain("default-src 'self'");
@@ -383,6 +482,24 @@ test("serve.ts serves the build in $GUARD_DIST, absolute or relative, else the d
   }
   expect((await served({ GUARD_DIST: "" }, "/")).body).toBe("default build");
 });
+
+// Value: protects=a Playwright run killed outright (SIGKILL, the pre-gate's escalation) leaves no server behind: the
+//   server, started detached, stops at the end of its stdin pipe; fails_when=serve.ts stops watching stdin, or watches
+//   /dev/null too (started by hand in the background it would stop at once); seam=none; no_claim=Playwright's own pipe
+//   (a socket pair, as Bun's here), a terminal on stdin
+test("serve.ts stops when its stdin pipe closes, and stays up on /dev/null", async () => {
+  const piped = await startServe({}, "pipe");
+  piped.p.stdin.end();
+  expect(await Promise.race([piped.p.exited, Bun.sleep(3000).then(() => "still up")])).toBe(0);
+  const { p, port } = await startServe({}, "ignore");
+  try {
+    expect(await Promise.race([p.exited, Bun.sleep(500).then(() => "still up")])).toBe("still up");
+    expect((await fetch(`http://127.0.0.1:${port}/`)).status).toBe(200);
+  } finally {
+    p.kill();
+    await p.exited;
+  }
+}, 10_000);
 
 // The children of `pid` that run `name` (Linux /proc).
 function children(pid: number, name: string) {
@@ -397,42 +514,43 @@ function children(pid: number, name: string) {
   });
 }
 
-// Two runs in one checkout share web/dist and test-results, so the second waits for the first and says so. While it
-// blocks in `flock`, its runner cannot have started; both log to one file, so the order shows it started after the
-// first one was released.
-test("a second e2e run in the same checkout waits until the first one ends", async () => {
+// The process group of `pid` (Linux /proc).
+function group(pid: number) {
+  const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  return Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[2]);
+}
+
+// Two runs in one checkout share web/dist and test-results, so the second waits for the first, says so, and says so
+// again every $TEST_FILES_HEARTBEAT seconds (a silence-based stall timeout must not take it for hung). While it blocks
+// in `flock`, its runner cannot have started; both log to one file, so the order shows it started after the first one
+// was released.
+test("a second e2e run in the same checkout waits until the first one ends, and keeps saying so", async () => {
   const go = join(tmp, "go-first");
   const first = stubEnv(0, { STUB_GO: go });
-  const p1 = Bun.spawn(["sh", script, e2e], { cwd: tmp, env: first.env, stderr: "pipe" });
-  const secondEnv = { ...first.env };
+  const p1 = start([e2e], first.env);
+  const secondEnv: Record<string, string | undefined> = { ...first.env, TEST_FILES_HEARTBEAT: "1" };
   delete secondEnv.STUB_GO;
-  let p2: ReturnType<typeof Bun.spawn> | undefined;
+  let p2: ReturnType<typeof start> | undefined;
   try {
-    for (let i = 0; i < 250 && readCalls(first.log).length === 0; i++) await Bun.sleep(20);
-    const second = Bun.spawn(["sh", script, shots], { cwd: tmp, env: secondEnv, stderr: "pipe" });
+    await waitFor(() => readCalls(first.log).length > 0, "the first runner");
+    const second = start([shots], secondEnv);
     p2 = second;
-    const stderr = second.stderr.getReader();
-    let said = "";
-    while (!said.includes("waiting")) {
-      const chunk = await stderr.read();
-      if (chunk.done) break;
-      said += new TextDecoder().decode(chunk.value);
-    }
-    expect(said).toContain(`waiting for another e2e run in ${stubWeb}`);
-    for (let i = 0; i < 250 && children(second.pid, "flock").length === 0; i++) await Bun.sleep(20);
-    expect(children(second.pid, "flock")).toHaveLength(1);
+    const said = await readUntil(second.stderr, "still waiting");
+    expect(said).toContain(`waiting for another e2e run in ${stubWeb}\n`);
+    expect(said).toContain(`still waiting for another e2e run in ${stubWeb} (1 s)`);
+    await waitFor(() => children(second.pid, "flock").length === 1, "the second run's flock");
     expect(readCalls(first.log)).toHaveLength(1);
     writeFileSync(go, "");
     expect(await p1.exited).toBe(0);
     expect(await second.exited).toBe(0);
-    expect(readCalls(first.log).map((c) => c.argv ?? c.name)).toEqual([e2eCall[1], "released", shotsCall[1]]);
+    expect(readCalls(first.log).map((c) => [c.name, c.argv])).toEqual([e2eCall, ["released", ""], shotsCall]);
   } finally {
     // a failed expectation must not leave the first stub waiting and the second run blocked on its lock
     writeFileSync(go, "");
     p1.kill();
     p2?.kill();
   }
-});
+}, 20_000);
 
 // A Playwright web server outlives a killed run (it is spawned detached); holding fd 9 it would block every later run.
 test("the runners never inherit the lock", () => {
@@ -441,43 +559,116 @@ test("the runners never inherit the lock", () => {
   expect(got.calls.map((c) => c.fd9)).toEqual(["", "", ""]);
 });
 
-test("a failing shots runner leaves no temp dir either", () => {
+test("a failing shots runner leaves no pregate-shots either", () => {
   const got = run([shots], 3);
   expect(got.code).toBe(3);
-  const dir = got.calls[0]?.shotsDir ?? "";
-  expect(dir).toMatch(/^\//);
-  expect(existsSync(dir)).toBe(false);
+  expect(got.calls[0]?.shotsDir).toBe(join(shotsRoot, "shots"));
+  expect(existsSync(shotsRoot)).toBe(false);
 });
 
-// gstack-pregate stops a stalled lane with TERM; INT and HUP come from a terminal. The stub holds until the signal
-// is sent, so it lands while shots render, and the script exits 128 + the signal number.
-for (const [signal, code] of [
-  ["SIGTERM", 143],
-  ["SIGINT", 130],
-  ["SIGHUP", 129],
+// gstack-pregate stops a stalled lane with TERM; INT and HUP come from a terminal, and any of them from a manual kill.
+// Sent to the script alone while its runner holds, it reaches the runner as TERM (the stub then tears down for
+// 0.3 s); the script exits 128 + the signal number only once the runner is gone, and removes pregate-shots.
+for (const [kind, file, call] of [
+  ["e2e", e2e, e2eCall],
+  ["shots", shots, shotsCall],
 ] as const) {
-  test(`a ${signal} while shots render exits ${code} and removes the temp dir`, async () => {
-    const go = join(tmp, `go-${signal}`);
-    const { log, env } = stubEnv(0, { STUB_GO: go });
-    const proc = Bun.spawn(["sh", script, shots], { cwd: tmp, env, stderr: "pipe" });
-    for (let i = 0; i < 250 && readCalls(log).length === 0; i++) await Bun.sleep(20);
-    proc.kill(signal);
-    writeFileSync(go, "");
-    expect(await proc.exited).toBe(code);
-    const dir = readCalls(log)[0]?.shotsDir ?? "";
-    expect(dir).toMatch(/^\//);
-    expect(existsSync(dir)).toBe(false);
-  });
+  for (const [signal, code] of [
+    ["SIGTERM", 143],
+    ["SIGINT", 130],
+    ["SIGHUP", 129],
+  ] as const) {
+    test(`a ${signal} to the script alone while ${kind} run stops the runner, then exits ${code}`, async () => {
+      const go = join(tmp, `go-${kind}-${signal}`);
+      const { log, env } = stubEnv(0, { STUB_GO: go });
+      const proc = start([file], env);
+      try {
+        await waitFor(() => readCalls(log).length > 0, "the runner");
+        proc.kill(signal);
+        expect(await proc.exited).toBe(code);
+        expect(readCalls(log).map((c) => [c.name, c.argv])).toEqual([call, ["stopped", ""]]);
+        expect(existsSync(shotsRoot)).toBe(false);
+      } finally {
+        writeFileSync(go, "");
+        proc.kill();
+      }
+    }, 10_000);
+  }
 }
 
-// The stubs only show that the script exports SHOTS_DIR; the spec must write every screenshot under it, or pre-gate
-// shots overwrite docs/img.
-test("readme.spec.ts writes every screenshot into $SHOTS_DIR", () => {
-  const src = readFileSync(join(web, "tests/shots/readme.spec.ts"), "utf8");
-  expect(src).toMatch(/^const out = process\.env\.SHOTS_DIR \|\| "\.\.\/docs\/img";$/m);
-  const shotCalls = src.match(/\.screenshot\(/g) ?? [];
-  expect(shotCalls.length).toBeGreaterThan(0);
-  expect(src.match(/\.screenshot\(\{ path: `\$\{out\}\/[^`/]+\.png`/g) ?? []).toHaveLength(shotCalls.length);
+// Value: protects=on a signal to the whole group (a terminal's Ctrl-C, a group kill) the script keeps the lock until its
+//   runner has stopped, so a queued run never starts beside a runner still tearing down; fails_when=a path has no trap,
+//   or the trap exits without reaping the runner; why_new=the tests above signal the script alone; seam=setsid (the
+//   script leads its own group); no_claim=the real Playwright's teardown
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  test(`on a ${signal} to the whole group a queued run starts only after the runner has stopped`, async () => {
+    const go = join(tmp, `go-group-${signal}`);
+    const first = stubEnv(0, { STUB_GO: go });
+    const p1 = start([e2e], first.env, ["setsid", "sh"]);
+    const queuedEnv: Record<string, string | undefined> = { ...first.env };
+    delete queuedEnv.STUB_GO;
+    let p2: ReturnType<typeof start> | undefined;
+    try {
+      await waitFor(() => readCalls(first.log).length > 0, "the first runner");
+      const queued = start([shots], queuedEnv);
+      p2 = queued;
+      expect(await readUntil(queued.stderr, "waiting")).toContain("waiting for another e2e run");
+      // never signal a group the script does not lead: it would be this test runner's
+      expect(group(p1.pid)).toBe(p1.pid);
+      process.kill(-p1.pid, signal);
+      expect(await p1.exited).toBe(signal === "SIGTERM" ? 143 : 130);
+      expect(await queued.exited).toBe(0);
+      expect(readCalls(first.log).map((c) => [c.name, c.argv])).toEqual([e2eCall, ["stopped", ""], shotsCall]);
+    } finally {
+      writeFileSync(go, "");
+      p1.kill();
+      p2?.kill();
+    }
+  }, 20_000);
+}
+
+// Value: protects=a run killed outright (SIGKILL skips the EXIT trap) leaves web/pregate-shots behind, and the next run
+//   clears it under the lock before its runner starts, so stale shots never pass for fresh ones; fails_when=the clearing
+//   goes, or moves after the runner starts; seam=none; no_claim=the real Playwright
+test("a run killed outright leaves pregate-shots behind, and the next run clears it before its runner starts", async () => {
+  const go = join(tmp, "go-killed");
+  const killed = stubEnv(0, { STUB_GO: go });
+  const proc = start([shots], killed.env);
+  try {
+    await waitFor(() => readCalls(killed.log).length > 0, "the runner");
+    proc.kill("SIGKILL");
+    await proc.exited;
+    writeFileSync(go, "");
+    await waitFor(() => readCalls(killed.log).some((c) => c.name === "released"), "the orphaned runner to end");
+    expect(existsSync(join(shotsRoot, "shots"))).toBe(true);
+    writeFileSync(join(shotsRoot, "shots/old.png"), "stale");
+    mkdirSync(join(shotsRoot, "guard-a"));
+    writeFileSync(join(shotsRoot, "guard-a/view.png"), "stale");
+    const next = run([shots]);
+    expect(next.code).toBe(0);
+    expect(next.calls.map((c) => c.left)).toEqual(["pregate-shots/shots"]);
+    expect(existsSync(shotsRoot)).toBe(false);
+  } finally {
+    writeFileSync(go, "");
+    proc.kill();
+  }
+}, 10_000);
+
+// The stubs only show that the script exports SHOTS_DIR; every shots spec must write each screenshot under it, or
+// pre-gate shots overwrite docs/img. Comments aside, docs/img may appear only as the fallback for an unset SHOTS_DIR.
+test("every shots spec writes each screenshot into $SHOTS_DIR and names docs/img only as its fallback", () => {
+  const fallback = /^const out\s*=\s*process\.env\.SHOTS_DIR\s*\|\|\s*"\.\.\/docs\/img";$/m;
+  const specs = readdirSync(join(web, "tests/shots")).filter((f) => f.endsWith(".spec.ts"));
+  let total = 0;
+  for (const spec of specs) {
+    const src = readFileSync(join(web, "tests/shots", spec), "utf8").replace(/^\s*\/\/.*$/gm, "");
+    const shotCalls = src.match(/\.screenshot\(/g) ?? [];
+    total += shotCalls.length;
+    expect(src.match(/\.screenshot\(\s*\{\s*path:\s*`\$\{out\}\/[^`/]+\.png`/g) ?? [], spec).toHaveLength(shotCalls.length);
+    if (shotCalls.length > 0) expect(src, spec).toMatch(fallback);
+    expect(src.replace(fallback, ""), spec).not.toContain("docs/img");
+  }
+  expect(total).toBeGreaterThan(0);
 });
 
 // What the e2e server builds and serves: no spec imports these, so only .gstack/pregate.json selects e2e for them.

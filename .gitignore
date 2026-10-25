@@ -7,3 +7,4 @@ web/dist/
 web/test-results/
 web/playwright-report/
 web/guard-shots/
+web/pregate-shots/
