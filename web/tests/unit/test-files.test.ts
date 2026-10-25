@@ -352,23 +352,27 @@ test("a CDPATH entry holding a scripts/ dir does not move the repo root", () => 
 });
 
 // Value: protects=without flock (util-linux) a run that needs the lock exits 2 naming it before anything runs, where it
-//   used to say "waiting" and run unlocked; a unit run takes no lock and still runs; fails_when=the `command -v flock`
-//   check goes or covers unit runs too; seam=PATH (the stubs and the tools they use, no flock); no_claim=a flock that
-//   fails otherwise (status 2 and up: "flock failed")
-test("without flock an e2e run exits 2 naming it, and a unit run still runs", () => {
+//   used to say "waiting" and run unlocked; so does a flock that fails (status 2 and up); a unit run takes no lock;
+//   fails_when=the `command -v flock` check goes or covers unit runs too, or any flock failure counts as "busy";
+//   seam=PATH (the stubs and the tools they use; no flock, or one that exits 2); no_claim=the real flock's statuses
+test("without flock, or with one that fails, an e2e run exits 2 naming it; a unit run still runs", () => {
   const bin = join(tmp, "no-flock");
   mkdirSync(bin);
   for (const tool of ["dirname", "find", "sort", "paste", "sleep"]) symlinkSync(Bun.which(tool) ?? tool, join(bin, tool));
-  const path = `${join(tmp, "bin")}:${bin}`;
-  for (const [args, code, calls] of [
-    [[e2e], 2, []],
-    [[unit], 0, [unitCall]],
+  mkdirSync(join(tmp, "bad-flock"));
+  writeFileSync(join(tmp, "bad-flock/flock"), "#!/bin/sh\nexit 2\n");
+  chmodSync(join(tmp, "bad-flock/flock"), 0o755);
+  const noFlock = `${join(tmp, "bin")}:${bin}`;
+  for (const [path, args, code, calls, said] of [
+    [noFlock, [e2e], 2, [], "flock not found"],
+    [`${join(tmp, "bad-flock")}:${noFlock}`, [e2e], 2, [], "flock failed with status 2"],
+    [noFlock, [unit], 0, [unitCall], ""],
   ] as const) {
     const { log, env } = stubEnv(0, { PATH: path });
     const done = Bun.spawnSync(["/bin/sh", script, ...args], { cwd: tmp, env });
     expect(done.exitCode, done.stderr.toString()).toBe(code);
     expect(readCalls(log).map((c) => [c.name, c.argv])).toEqual([...calls]);
-    if (code === 2) expect(done.stderr.toString()).toContain("flock not found");
+    expect(done.stderr.toString()).toContain(said);
   }
 });
 
@@ -546,6 +550,39 @@ test("a second e2e run in the same checkout waits until the first one ends, and 
     expect(readCalls(first.log).map((c) => [c.name, c.argv])).toEqual([e2eCall, ["released", ""], shotsCall]);
   } finally {
     // a failed expectation must not leave the first stub waiting and the second run blocked on its lock
+    writeFileSync(go, "");
+    p1.kill();
+    p2?.kill();
+  }
+}, 20_000);
+
+// Value: protects=a run queued behind another one's lock stops at once on a TERM (the pre-gate's stall stop) and takes
+//   its flock with it, its runner never started; fails_when=the wait runs flock in the foreground (the trap then waits
+//   for the heartbeat, 30 s by default) or leaves flock running; why_new=the signal tests above hit a running runner;
+//   seam=none; no_claim=the pre-gate's own stall timer
+test("a run waiting for the lock stops at once on a TERM, its flock gone and its runner never started", async () => {
+  const go = join(tmp, "go-queued");
+  const first = stubEnv(0, { STUB_GO: go });
+  const p1 = start([e2e], first.env);
+  const queuedEnv: Record<string, string | undefined> = { ...first.env, TEST_FILES_HEARTBEAT: "30" };
+  delete queuedEnv.STUB_GO;
+  let p2: ReturnType<typeof start> | undefined;
+  try {
+    await waitFor(() => readCalls(first.log).length > 0, "the first runner");
+    const queued = start([shots], queuedEnv);
+    p2 = queued;
+    await readUntil(queued.stderr, "waiting");
+    await waitFor(() => children(queued.pid, "flock").length === 1, "the queued run's flock");
+    const flock = children(queued.pid, "flock")[0];
+    const sent = Date.now();
+    queued.kill("SIGTERM");
+    expect(await queued.exited).toBe(143);
+    expect(Date.now() - sent).toBeLessThan(2000);
+    await waitFor(() => !existsSync(`/proc/${flock}`), "the queued run's flock to end", 1000);
+    writeFileSync(go, "");
+    expect(await p1.exited).toBe(0);
+    expect(readCalls(first.log).map((c) => [c.name, c.argv])).toEqual([e2eCall, ["released", ""]]);
+  } finally {
     writeFileSync(go, "");
     p1.kill();
     p2?.kill();
