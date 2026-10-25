@@ -1,6 +1,6 @@
 # Code quality gates
 
-Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Date: 2026-10-23.
+Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Lane B is merged (B0-B4 as #15-#19, B5 as #20); in lane A, A0 is in review and A1-A4 are open. Date: 2026-10-23.
 
 ## Problem
 
@@ -1649,7 +1649,7 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: Scope Challenge — S2b (D4), S5 (D6)
   - Files: web/src/inspector.ts, web/src/dom.ts, web/tests/e2e/mock.ts
   - Verify: `bunx biome lint --error-on-warnings` clean; e2e green
-- [ ] **T19 (P1, human: ~1 day / CC: ~1h)** — web — Fix the Biome recommended-preset findings without suppressions
+- [x] **T19 (P1, human: ~1 day / CC: ~1h)** — web — Fix the Biome recommended-preset findings without suppressions
   - Surfaced by: Late finding L1 (D27), global rule 1 "strict settings"
   - Files: web/src/, web/tests/ (after T8, T9)
   - Verify: `bunx biome lint .` with `"preset": "recommended"` reports none; e2e green; refactor-guard pixel-diff 0 px
