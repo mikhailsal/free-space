@@ -51,16 +51,19 @@ pub(super) fn canonical(path: &Path) -> Result<PathBuf> {
     Ok(path)
 }
 pub(super) fn create_lease(path: &Path) -> Result<()> {
-    OpenOptions::new()
+    let file = OpenOptions::new()
         .create(true)
         .truncate(false)
         .read(true)
         .write(true)
-        .mode(0o644)
+        .mode(crate::snapshot::fsutil::FILE_MODE)
         .open(lease_path(path))
-        .map_err(|e| Error::io("create v2 reader lease", e))?;
+        .map_err(|e| Error::storage_io("create v2 reader lease", e))?;
+    crate::snapshot::fsutil::secure_file(&file)
+        .map_err(|e| Error::io("secure v2 reader lease", e))?;
     Ok(())
 }
+
 fn lock(path: &Path, exclusive: bool) -> Result<Option<File>> {
     let file = File::open(lease_path(path)).map_err(|e| Error::io("open v2 reader lease", e))?;
     let mode = if exclusive {

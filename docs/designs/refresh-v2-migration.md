@@ -121,6 +121,15 @@ and ENOSPC remain separate tests; statement rollback is not evidence for them.
 
 ## Retention, reader leases and recovery
 
+DB, WAL, SHM and reader-lease files use v1's 0640 ownership/mode helper; a new
+dedicated directory uses 0750. The database and lease are restricted at creation,
+including under a permissive umask. SQLite inherits DB modes for sidecars, and
+persistent WAL/SHM sidecars let group-read-only clients reopen the live store
+without creating files in that directory. `journal_size_limit=0` trims the WAL
+at checkpoint/reset; automatic refresh checkpoints remain disabled. Empty or
+missing stores report NoSnapshot, while foreign/malformed databases report Schema.
+These contracts have isolated process/umask and first-run regression coverage.
+
 Each Reader acquires a shared `flock` on a persistent `.readers` sibling file,
 then opens its read-only SQLite transaction. Maintenance requests the exclusive
 lock without waiting. If any Reader is alive, it reports `readers_blocking` and
@@ -271,11 +280,10 @@ equal SQL mutation counts and no linear increase in VM instructions. This proves
 only that fixture's unrelated-group isolation; H/A fanout measurements remain.
 
 Validation: after integrating master `abe7eff8` (including disk-backed scan),
-161 core tests passed. `scripts/check.sh rust size` passed workspace strict
+165 core tests passed after the first-run and secure-file follow-up. `scripts/check.sh rust size` passed workspace strict
 Clippy, formatting, suppression and file-size checks. The explicit release
-benchmark passed before that integration. The subsequent default-budget and
-initial-seed diagnostic follow-up passed all eight retention tests and the same
-strict Rust/size checks. The nine v2 store tests, seven
-hardlink parity/locality tests, eight public-query parity tests, eight retention
+benchmark passed before that integration. The subsequent default-budget, initial-seed, first-run and secure-file follow-ups
+passed all eleven retention tests and the same strict Rust/size checks. The nine v2 store tests, seven
+hardlink parity/locality tests, eight public-query parity tests, eleven retention
 checks and four v2 unit tests cover the contracts described above. Production
 routing, bounded-RSS seeding and physical/crash gates remain open.

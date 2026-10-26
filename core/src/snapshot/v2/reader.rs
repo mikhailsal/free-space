@@ -1,6 +1,4 @@
-use super::{
-    Entry, Mount, Root, key, metadata, pair, prefix_end, schema, unsupported, validate_path,
-};
+use super::{Entry, Mount, Root, key, metadata, pair, prefix_end, schema, validate_path};
 use crate::{Error, Result};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use schema::COLUMNS;
@@ -32,16 +30,42 @@ pub struct Change {
 
 impl Reader {
     pub fn open(path: &Path) -> Result<Self> {
-        let path = super::retention::canonical(path)?;
-        let lease = super::retention::shared(&path)?;
-        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        conn.execute_batch("BEGIN")?;
-        let app: i64 = conn.pragma_query_value(None, "application_id", |r| r.get(0))?;
-        let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if app != schema::APP_ID || version != schema::REVISION {
-            return Err(unsupported("not a v2 store"));
+        if let Err(e) = std::fs::metadata(path) {
+            return Err(if e.kind() == std::io::ErrorKind::NotFound {
+                Error::new(
+                    crate::ErrorCode::NoSnapshot,
+                    "no v2 store at the requested path",
+                )
+            } else {
+                Error::io("stat v2 store", e)
+            });
         }
-        let generations = pair(&conn)?.ok_or_else(|| unsupported("v2 store has no scan"))?;
+        let path = super::retention::canonical(path)?;
+        let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let schema_error = |e: rusqlite::Error| {
+            Error::new(crate::ErrorCode::Schema, format!("invalid v2 store: {e}"))
+        };
+        let app: i64 = conn
+            .pragma_query_value(None, "application_id", |r| r.get(0))
+            .map_err(schema_error)?;
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .map_err(schema_error)?;
+        if app != schema::APP_ID || version != schema::REVISION {
+            return Err(Error::new(
+                crate::ErrorCode::Schema,
+                "not a supported v2 store revision",
+            ));
+        }
+        let lease = super::retention::shared(&path)?;
+        super::files::persist_wal(&conn)?;
+        conn.execute_batch("BEGIN")?;
+        let generations = pair(&conn)?.ok_or_else(|| {
+            Error::new(
+                crate::ErrorCode::NoSnapshot,
+                "v2 store has no published generation",
+            )
+        })?;
         let full_scan =
             conn.query_row("SELECT full_scan FROM control WHERE singleton=1", [], |r| {
                 r.get(0)

@@ -435,7 +435,7 @@ fn initial_seed_budget_failure_reports_space_and_preserves_unpublished_state() {
             .unwrap(),
         0
     );
-    assert!(Reader::open(&db).is_err());
+    assert!(matches!(Reader::open(&db),Err(e) if e.code==ErrorCode::NoSnapshot));
     store
         .configure_retention(RetentionPolicy {
             max_records: temporary,
@@ -446,4 +446,95 @@ fn initial_seed_budget_failure_reports_space_and_preserves_unpublished_state() {
     let r = Reader::open(&db).unwrap();
     assert_eq!(r.generations.current, 1);
     assert_eq!(r.generations.prev, None);
+}
+
+#[test]
+fn empty_and_missing_stores_are_distinct_from_foreign_or_malformed_databases() {
+    let tmp = tempfile::tempdir().unwrap();
+    let db = tmp.path().join("empty.db");
+    let _store = Store::open(&db).unwrap();
+    assert!(matches!(Reader::open(&db),Err(e) if e.code==ErrorCode::NoSnapshot));
+    assert!(
+        matches!(Reader::open(&tmp.path().join("missing.db")),Err(e) if e.code==ErrorCode::NoSnapshot)
+    );
+    let foreign = tmp.path().join("foreign.db");
+    rusqlite::Connection::open(&foreign)
+        .unwrap()
+        .execute_batch("CREATE TABLE other(value INTEGER)")
+        .unwrap();
+    assert!(matches!(Reader::open(&foreign),Err(e) if e.code==ErrorCode::Schema));
+    let malformed = tmp.path().join("malformed.db");
+    fs::write(&malformed, b"this is not sqlite").unwrap();
+    assert!(matches!(Reader::open(&malformed),Err(e) if e.code==ErrorCode::Schema));
+}
+
+#[test]
+fn store_and_sidecars_match_v1_modes_under_permissive_umask() {
+    let tmp = tempfile::tempdir().unwrap();
+    let result = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "store_mode_child", "--nocapture"])
+        .env("FREESPACE_V2_MODE_DIR", tmp.path())
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+#[test]
+fn store_mode_child() {
+    use freespace_core::snapshot::fsutil;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let Some(dir) = std::env::var_os("FREESPACE_V2_MODE_DIR") else {
+        return;
+    };
+    // This helper runs alone in a child process, so umask cannot race other tests.
+    unsafe {
+        libc::umask(0);
+    }
+    let dir = PathBuf::from(dir);
+    let root = dir.join("root");
+    fs::create_dir(&root).unwrap();
+    let state = dir.join("state");
+    let db = state.join("generations.db");
+    let mut store = Store::open(&db).unwrap();
+    store.scan(&root, 1).unwrap();
+    let reader = Reader::open(&db).unwrap();
+    drop(reader);
+    drop(store);
+    assert_eq!(
+        fs::metadata(&state).unwrap().permissions().mode() & 0o777,
+        fsutil::DIR_MODE
+    );
+    for suffix in ["", ".readers", "-wal", "-shm"] {
+        let mut path = db.as_os_str().to_os_string();
+        path.push(suffix);
+        let metadata = fs::metadata(path).unwrap();
+        assert_eq!(
+            metadata.permissions().mode() & 0o777,
+            fsutil::FILE_MODE,
+            "{suffix}"
+        );
+        if suffix == "-wal" {
+            assert_eq!(
+                metadata.len(),
+                0,
+                "last-close checkpoint leaves an empty persistent WAL"
+            );
+        }
+        assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+        if fsutil::is_root()
+            && let Some(gid) = fsutil::group_gid(fsutil::GROUP)
+        {
+            assert_eq!(metadata.gid(), gid, "{suffix}");
+        }
+    }
+    fs::set_permissions(&state, fs::Permissions::from_mode(0o550)).unwrap();
+    let reader = Reader::open(&db).unwrap();
+    assert_eq!(reader.generations.current, 1);
+    drop(reader);
+    fs::set_permissions(&state, fs::Permissions::from_mode(fsutil::DIR_MODE)).unwrap();
 }

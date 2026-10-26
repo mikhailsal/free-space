@@ -5,6 +5,7 @@
 //! Reader leases, bounded reclamation and explicit admission limits protect history.
 
 mod aggregate;
+mod files;
 mod hardlinks;
 mod metadata;
 mod reader;
@@ -114,7 +115,7 @@ struct PreparedRefresh {
 impl Store {
     /// Use a dedicated file. Refuses any pre-existing foreign SQLite database.
     pub fn open(path: &Path) -> Result<Self> {
-        let conn = Connection::open(path)?;
+        let conn = files::open(path)?;
         let app: i64 = conn.pragma_query_value(None, "application_id", |r| r.get(0))?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
         if app == 0 && version == 0 {
@@ -139,9 +140,11 @@ impl Store {
             return Err(unsupported("refusing non-v2 database"));
         }
         let path = retention::canonical(path)?;
+        files::secure(&path)?;
+        files::persist_wal(&conn)?;
         retention::create_lease(&path)?;
         conn.execute_batch(
-            "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA wal_autocheckpoint=0;",
+            "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA wal_autocheckpoint=0; PRAGMA journal_size_limit=0;",
         )?;
         Ok(Self { conn, path })
     }
