@@ -234,6 +234,21 @@ pub fn raw_if_lossy(b: &[u8]) -> Option<String> {
     }
 }
 
+/// Render a path as one safe POSIX shell word when it can be pasted intact.
+pub fn shell_path_word(path: &[u8]) -> Option<String> {
+    let path = std::str::from_utf8(path).ok()?;
+    if path.chars().any(char::is_control) {
+        return None;
+    }
+    Some(format!("'{}'", path.replace('\'', "'\\''")))
+}
+
+/// Render a path as safe POSIX shell arguments for a copyable CLI hint.
+/// Paths that cannot be pasted intact travel through `--path-raw`.
+pub fn shell_path_args(path: &[u8]) -> String {
+    shell_path_word(path).unwrap_or_else(|| format!("--path-raw {}", hex_encode(path)))
+}
+
 /// Resolve user input to an entry; PATH_NOT_FOUND names the nearest ancestor that exists.
 pub fn resolve(snap: &Snapshot, input: &[u8]) -> Result<(Row, Vec<u8>)> {
     let path = normalize(input)?;
@@ -263,7 +278,6 @@ pub fn resolve(snap: &Snapshot, input: &[u8]) -> Result<(Row, Vec<u8>)> {
             break;
         }
     }
-    let a = lossy(&anc);
     Err(Error::new(
         ErrorCode::PathNotFound,
         format!(
@@ -272,7 +286,7 @@ pub fn resolve(snap: &Snapshot, input: &[u8]) -> Result<(Row, Vec<u8>)> {
             crate::format::local_hm(snap.meta.scanned_at)
         ),
     )
-    .with_fix(format!("freespace ls {a}")))
+        .with_fix(format!("freespace ls {}", shell_path_args(&anc))))
 }
 
 /// Topmost DENIED directories of the whole snapshot (D13: any DENIED is an anomaly).
@@ -426,6 +440,17 @@ mod tests {
         assert_eq!(normalize(b"/home/./tass/../x").unwrap(), b"/home/x");
         assert_eq!(normalize(b"/..").unwrap(), b"/");
         assert!(normalize(b"home").is_err());
+    }
+
+    #[test]
+    fn shell_path_args_quote_utf8_and_preserve_raw_bytes() {
+        assert_eq!(shell_path_args(b"/tmp/a b"), "'/tmp/a b'");
+        assert_eq!(shell_path_args(b"/tmp/a'b"), "'/tmp/a'\\''b'");
+        assert_eq!(shell_path_args(b"/tmp/\xff"), "--path-raw 2f746d702fff");
+        assert_eq!(shell_path_args(b"/tmp/a\tb"), "--path-raw 2f746d702f610962");
+        assert_eq!(shell_path_word(b"/tmp/a b").as_deref(), Some("'/tmp/a b'"));
+        assert_eq!(shell_path_word(b"/tmp/\xff"), None);
+        assert_eq!(shell_path_word(b"/tmp/a\nb"), None);
     }
 
     #[test]
