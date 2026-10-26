@@ -122,6 +122,14 @@ fn pin_pair_refresh_delete_and_full_scan_rotation() {
             .iter()
             .any(|c| c.path.ends_with(b"local/c") && c.before.is_none())
     );
+    remove_local_and_check(&mut f, before.apparent - local_before.apparent);
+    f.scan();
+    assert_eq!(f.reader().generations.prev, Some(4));
+    assert!(f.reader().refresh_history().unwrap().is_empty());
+    assert_eq!(pinned.generations.current, 2);
+}
+
+fn remove_local_and_check(f: &mut Fixture, remaining: i64) {
     fs::remove_dir_all(f.root.join("local")).unwrap();
     f.store.refresh(&f.root.join("local"), 1).unwrap();
     assert!(
@@ -132,11 +140,7 @@ fn pin_pair_refresh_delete_and_full_scan_rotation() {
     );
     assert_eq!(f.reader().generations.prev, Some(1));
     assert_eq!(f.reader().refresh_history().unwrap().len(), 2);
-    assert_eq!(f.get("").apparent, before.apparent - local_before.apparent);
-    f.scan();
-    assert_eq!(f.reader().generations.prev, Some(4));
-    assert!(f.reader().refresh_history().unwrap().is_empty());
-    assert_eq!(pinned.generations.current, 2);
+    assert_eq!(f.get("").apparent, remaining);
 }
 
 #[test]

@@ -234,3 +234,44 @@ fn concurrent_prepared_writers_publish_one_and_reject_the_stale_base() {
         .unwrap();
     assert_eq!(Reader::open(&db).unwrap().generations.current, 4);
 }
+
+#[test]
+fn sqlite_full_during_refresh_preserves_current_previous_and_accounting() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("root");
+    let local = root.join("local");
+    fs::create_dir_all(&local).unwrap();
+    fs::write(local.join("a"), [1]).unwrap();
+    let db = dir.path().join("v2.db");
+    let mut store = Store::open(&db).unwrap();
+    store.scan(&root, 1).unwrap();
+    store.scan(&root, 1).unwrap();
+    let r = Reader::open(&db).unwrap();
+    let pair = r.generations;
+    let old = r.subtree(root.as_os_str().as_bytes(), false).unwrap();
+    let old_prev = r.subtree(root.as_os_str().as_bytes(), true).unwrap();
+    let count = store.retained_records().unwrap();
+    drop(r);
+    let pages: i64 = store
+        .conn
+        .pragma_query_value(None, "page_count", |r| r.get(0))
+        .unwrap();
+    store
+        .conn
+        .pragma_update(None, "max_page_count", pages)
+        .unwrap();
+    for n in 0..300 {
+        fs::write(local.join(format!("new-file-{n:04}")), [1]).unwrap();
+    }
+    let error = store.refresh(&local, 1).unwrap_err();
+    assert!(error.message.contains("full"), "{error}");
+    let r = Reader::open(&db).unwrap();
+    assert_eq!(r.generations, pair);
+    assert_eq!(r.subtree(root.as_os_str().as_bytes(), false).unwrap(), old);
+    assert_eq!(
+        r.subtree(root.as_os_str().as_bytes(), true).unwrap(),
+        old_prev
+    );
+    assert!(r.refresh_history().unwrap().is_empty());
+    assert_eq!(store.retained_records().unwrap(), count);
+}

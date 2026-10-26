@@ -68,18 +68,7 @@ pub(super) fn stage(tree: Tree, scope_override: Option<&[u8]>) -> Result<Staged>
             stack.push((child, Some(id), root));
         }
     }
-    let roots = tree
-        .roots
-        .into_iter()
-        .enumerate()
-        .map(|(raw, r)| Root {
-            entry_id: raw_ids[&(raw as u32)],
-            path: r.path.as_os_str().as_bytes().to_vec(),
-            dev: r.dev,
-            fs_type: r.fs_type,
-            stats: r.stats,
-        })
-        .collect();
+    let roots = roots(tree.roots, &raw_ids);
     let mounts = tree
         .mounts
         .into_iter()
@@ -112,4 +101,19 @@ pub(super) fn fold(out: &mut [Entry]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn roots(roots: Vec<crate::scan::RootInfo>, raw_ids: &HashMap<u32, i64>) -> Vec<Root> {
+    roots
+        .into_iter()
+        .enumerate()
+        .map(|(raw, r)| Root {
+            entry_id: raw_ids[&(raw as u32)],
+            ordinal: raw as i64,
+            path: r.path.as_os_str().as_bytes().to_vec(),
+            dev: r.dev,
+            fs_type: r.fs_type,
+            stats: r.stats,
+        })
+        .collect()
 }

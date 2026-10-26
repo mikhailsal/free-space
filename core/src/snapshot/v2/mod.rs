@@ -2,12 +2,15 @@
 //!
 //! See `docs/designs/refresh-v2-migration.md` for supported scope and adoption gates.
 //! Identity means exact raw path; traversal order and generation are independent.
-//! History is retained indefinitely until the separate retention milestone lands.
+//! Reader leases, bounded reclamation and explicit admission limits protect history.
 
 mod aggregate;
 mod hardlinks;
 mod metadata;
 mod reader;
+mod retention;
+mod writer;
+pub use retention::{MaintenanceReport, RetentionPolicy};
 mod staging;
 pub use metadata::{Mount, Root};
 mod schema;
@@ -17,6 +20,7 @@ use crate::scan::{self, Kind, Tree, WalkOptions};
 use crate::{Error, ErrorCode, Result};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use schema::COLUMNS;
+pub(crate) const ENTRY_COLUMNS: &str = schema::COLUMNS;
 use staging::{fold, stage};
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
@@ -52,7 +56,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+    pub(crate) fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: r.get(0)?,
             parent: r.get(1)?,
@@ -95,6 +99,7 @@ pub struct WriteReport {
 
 pub struct Store {
     conn: Connection,
+    path: PathBuf,
 }
 
 struct PreparedRefresh {
@@ -126,16 +131,66 @@ impl Store {
                 return Err(unsupported("database was initialized concurrently; reopen"));
             }
             conn.execute_batch(schema::CREATE)?;
+            schema::accounting(&conn)?;
             conn.pragma_update(None, "application_id", schema::APP_ID)?;
             conn.pragma_update(None, "user_version", schema::REVISION)?;
             conn.execute_batch("COMMIT")?;
         } else if app != schema::APP_ID || version != schema::REVISION {
             return Err(unsupported("refusing non-v2 database"));
         }
+        let path = retention::canonical(path)?;
+        retention::create_lease(&path)?;
         conn.execute_batch(
             "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA wal_autocheckpoint=0;",
         )?;
-        Ok(Self { conn })
+        Ok(Self { conn, path })
+    }
+
+    /// Set explicit admission budgets; active/current history is never truncated.
+    pub fn configure_retention(&mut self, policy: RetentionPolicy) -> Result<()> {
+        retention::configure(&self.conn, policy)
+    }
+    pub fn retained_records(&self) -> Result<u64> {
+        retention::rows(&self.conn)
+    }
+    /// Examine at most `budget` records. Optional checkpoint is explicitly global
+    /// WAL work, separately requested, and never part of scan/refresh publication.
+    pub fn maintain(&mut self, budget: usize, checkpoint: bool) -> Result<MaintenanceReport> {
+        if budget == 0 || budget > 100000 {
+            return Err(Error::usage("maintenance budget must be 1..=100000"));
+        }
+        let Some(_lease) = retention::exclusive(&self.path)? else {
+            return Ok(MaintenanceReport {
+                readers_blocking: true,
+                retained_rows: retention::rows(&self.conn)?,
+                wal_bytes: retention::wal_bytes(&self.path)?,
+                ..Default::default()
+            });
+        };
+        if let Some(report) = retention::prepare_checkpoint(&self.conn, &self.path, checkpoint)? {
+            return Ok(report);
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        retention::admit_wal(&tx, &self.path)?;
+        let (examined, deleted) = retention::collect(&tx, pair(&tx)?, budget)?;
+        tx.commit()?;
+        let (checkpoint_busy, checkpoint_log_frames, checkpointed_frames) = if checkpoint {
+            retention::checkpoint(&self.conn)?
+        } else {
+            (false, 0, 0)
+        };
+        Ok(MaintenanceReport {
+            examined,
+            deleted,
+            retained_rows: retention::rows(&self.conn)?,
+            checkpoint_busy,
+            checkpoint_log_frames,
+            checkpointed_frames,
+            wal_bytes: retention::wal_bytes(&self.path)?,
+            readers_blocking: false,
+        })
     }
 
     /// Diagnostic observer for locality experiments. Counts SQLite VM instructions;
@@ -156,259 +211,6 @@ impl Store {
             self.conn.progress_handler(0, None::<fn() -> bool>)?;
         }
         Ok(())
-    }
-
-    /// A full scan seeds/rotates the store. Existing root/path identities survive.
-    pub fn scan(&mut self, root: &Path, workers: usize) -> Result<WriteReport> {
-        self.scan_roots(&[root.to_path_buf()], true, workers)
-    }
-    /// Root normalization and overlap validation are shared with the v1 walker.
-    pub fn scan_roots(
-        &mut self,
-        roots: &[PathBuf],
-        one_file_system: bool,
-        workers: usize,
-    ) -> Result<WriteReport> {
-        if roots.is_empty() {
-            return Err(Error::usage("at least one scan root is required"));
-        }
-        let start = Instant::now();
-        let mut opts = WalkOptions::new(roots.to_vec());
-        opts.workers = workers;
-        opts.one_file_system = one_file_system;
-        let tree = scan::walk(&opts).map_err(|e| Error::io("v2 walk", e))?;
-        self.seed_tree(tree, one_file_system, start)
-    }
-    fn seed_tree(
-        &mut self,
-        tree: Tree,
-        one_file_system: bool,
-        start: Instant,
-    ) -> Result<WriteReport> {
-        let mut staged = stage(tree, None)?;
-        hardlinks::scan(&mut staged.entries);
-        fold(&mut staged.entries)?;
-        let walk = start.elapsed();
-        let start = Instant::now();
-        let before = self.conn.total_changes();
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let current = pair(&tx)?.map(|p| p.current);
-        let generation = next_generation(current)?;
-        let old_count: i64 = tx.query_row("SELECT count(*) FROM live", [], |r| r.get(0))?;
-        tx.execute(
-            "UPDATE versions SET dead=?1 WHERE dead IS NULL",
-            [generation],
-        )?;
-        tx.execute(
-            "UPDATE root_versions SET dead=?1 WHERE dead IS NULL",
-            [generation],
-        )?;
-        tx.execute(
-            "UPDATE mount_versions SET dead=?1 WHERE dead IS NULL",
-            [generation],
-        )?;
-        tx.execute_batch("DELETE FROM live; DELETE FROM live_roots; DELETE FROM live_mounts;")?;
-        let ids = assign_ids(&tx, &mut staged.entries, None)?;
-        for e in &staged.entries {
-            insert(&tx, e, generation)?;
-        }
-        for mut root in staged.roots {
-            root.entry_id = ids[&root.entry_id];
-            metadata::insert_root(&tx, &root, generation)?;
-        }
-        for mut mount in staged.mounts {
-            mount.entry_id = ids[&mount.entry_id];
-            metadata::insert_mount(&tx, &mount, generation)?;
-        }
-        tx.execute("INSERT INTO control VALUES(1,?1,?2,?1,?3) ON CONFLICT(singleton) DO UPDATE SET current=excluded.current,prev=excluded.prev,full_scan=excluded.full_scan,one_file_system=excluded.one_file_system",params![generation,current,one_file_system])?;
-        tx.commit()?;
-        Ok(WriteReport {
-            generation,
-            old_subtree_entries: old_count as usize,
-            new_subtree_entries: staged.entries.len(),
-            ancestors: 0,
-            touched_inode_groups: 0,
-            known_inode_members: 0,
-            sql_changes: self.conn.total_changes() - before,
-            walk,
-            transaction: start.elapsed(),
-        })
-    }
-
-    /// Replaces an existing directory, including a configured root. Missing
-    /// non-root directories are removed; root deletion still requires a full scan.
-    pub fn refresh(&mut self, path: &Path, workers: usize) -> Result<WriteReport> {
-        let prepared = self.prepare_refresh(path, workers)?;
-        self.publish_refresh(prepared)
-    }
-    fn prepare_refresh(&mut self, path: &Path, workers: usize) -> Result<PreparedRefresh> {
-        let bytes = path.as_os_str().as_bytes();
-        validate_path(bytes)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Deferred)?;
-        let pair = pair(&tx)?.ok_or_else(|| unsupported("seed the store first"))?;
-        let target = live_path(&tx, bytes)?
-            .ok_or_else(|| Error::usage("path is absent from current generation"))?;
-        if target.kind != Kind::Dir {
-            return Err(Error::usage(
-                "refresh requires a directory within its root filesystem",
-            ));
-        }
-        let mut root = metadata::live_root(&tx, &target.scope)?;
-        let one_file_system: bool = tx.query_row(
-            "SELECT one_file_system FROM control WHERE singleton=1",
-            [],
-            |r| r.get(0),
-        )?;
-        tx.commit()?;
-        let target_meta = match std::fs::symlink_metadata(path) {
-            Ok(m) if m.is_dir() => Some(m),
-            Ok(_) => {
-                return Err(Error::usage(
-                    "refresh directory replaced by non-directory; refresh its parent",
-                ));
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(Error::io("refresh path", e)),
-        };
-        crate::refresh::mounts::check(
-            path,
-            target_meta.as_ref().map(|m| m.dev()),
-            &[root.info()],
-            one_file_system,
-            &String::from_utf8_lossy(bytes),
-        )?;
-        if target_meta.is_none() && target.parent.is_none() {
-            return Err(Error::usage("root is missing; run a full scan"));
-        }
-        let started = crate::platform::now_secs();
-        let start = Instant::now();
-        let staged = if target_meta.is_some() {
-            let mut opts = WalkOptions::new(vec![path.to_path_buf()]);
-            opts.workers = workers;
-            opts.one_file_system = one_file_system;
-            stage(
-                scan::walk(&opts).map_err(|e| Error::io("v2 refresh walk", e))?,
-                Some(&target.scope),
-            )?
-        } else {
-            staging::Staged {
-                entries: Vec::new(),
-                roots: Vec::new(),
-                mounts: Vec::new(),
-            }
-        };
-        if staged.entries.first().is_some_and(|e| e.path != bytes) {
-            return Err(Error::usage("refresh path resolves to another location"));
-        }
-        // Preserve the original root type and refresh its df numbers as v1 does.
-        if scan::walk::statvfs_safe(&root.fs_type)
-            && let Ok(stats) = crate::platform::statvfs(&root.info().path)
-        {
-            root.stats = stats;
-        }
-        if target.parent.is_none()
-            && let Some(m) = target_meta
-        {
-            root.dev = m.dev();
-        }
-        Ok(PreparedRefresh {
-            base_generation: pair.current,
-            target,
-            root,
-            staged,
-            started,
-            walk: start.elapsed(),
-        })
-    }
-    fn publish_refresh(&mut self, prepared: PreparedRefresh) -> Result<WriteReport> {
-        let PreparedRefresh {
-            base_generation,
-            target,
-            root,
-            mut staged,
-            started,
-            walk,
-        } = prepared;
-        let start = Instant::now();
-        let before = self.conn.total_changes();
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if pair(&tx)?.map(|p| p.current) != Some(base_generation) {
-            return Err(Error::new(
-                ErrorCode::Rotated,
-                "v2 generation changed during refresh walk; retry against the new generation",
-            ));
-        }
-        let generation = next_generation(Some(base_generation))?;
-        let bytes = &target.path;
-        let upper = if target.sort_key.is_empty() {
-            vec![255]
-        } else {
-            prefix_end(&target.sort_key)
-        };
-        let old = {
-            let mut q = tx.prepare(&format!(
-                "SELECT {COLUMNS} FROM live WHERE scope=?1 AND sort_key>=?2 AND sort_key<?3"
-            ))?;
-            q.query_map(params![target.scope, target.sort_key, upper], Entry::row)?
-                .collect::<rusqlite::Result<Vec<_>>>()?
-        };
-        let links = hardlinks::refresh(&tx, &old, &mut staged.entries)?;
-        fold(&mut staged.entries)?;
-        let mut changes = vec![(
-            target.parent,
-            aggregate::Delta::between(&target, staged.entries.first()),
-        )];
-        for (previous, replacement) in links.entries {
-            changes.push((
-                previous.parent,
-                aggregate::Delta::between(&previous, Some(&replacement)),
-            ));
-            retire(&tx, previous.id, generation)?;
-            insert(&tx, &replacement, generation)?;
-        }
-        for e in &old {
-            retire(&tx, e.id, generation)?;
-            if e.kind == Kind::Mount {
-                metadata::retire_mount(&tx, e.id, generation)?;
-            }
-        }
-        let ids = assign_ids(&tx, &mut staged.entries, target.parent)?;
-        for e in &staged.entries {
-            insert(&tx, e, generation)?;
-        }
-        for mut mount in staged.mounts {
-            mount.entry_id = ids[&mount.entry_id];
-            metadata::insert_mount(&tx, &mount, generation)?;
-        }
-        let ancestors = aggregate::update(&tx, changes, generation)?;
-        metadata::retire_root(&tx, root.entry_id, generation)?;
-        metadata::insert_root(&tx, &root, generation)?;
-        tx.execute(
-            "INSERT INTO refreshes VALUES(?1,?2,?3)",
-            params![generation, bytes, started],
-        )?;
-        tx.execute(
-            "UPDATE control SET current=?1 WHERE singleton=1",
-            [generation],
-        )?;
-        tx.commit()?;
-        Ok(WriteReport {
-            generation,
-            old_subtree_entries: old.len(),
-            new_subtree_entries: staged.entries.len(),
-            ancestors,
-            touched_inode_groups: links.groups,
-            known_inode_members: links.members,
-            sql_changes: self.conn.total_changes() - before,
-            walk,
-            transaction: start.elapsed(),
-        })
     }
 }
 

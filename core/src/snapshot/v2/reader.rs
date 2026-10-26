@@ -19,6 +19,8 @@ pub struct Reader {
     conn: Connection,
     pub generations: GenerationPair,
     full_scan: i64,
+    // Last field: release the SQLite read transaction before releasing its lease.
+    _lease: std::fs::File,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +32,8 @@ pub struct Change {
 
 impl Reader {
     pub fn open(path: &Path) -> Result<Self> {
+        let path = super::retention::canonical(path)?;
+        let lease = super::retention::shared(&path)?;
         let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         conn.execute_batch("BEGIN")?;
         let app: i64 = conn.pragma_query_value(None, "application_id", |r| r.get(0))?;
@@ -46,9 +50,10 @@ impl Reader {
             conn,
             generations,
             full_scan,
+            _lease: lease,
         })
     }
-    fn generation(&self, previous: bool) -> Result<i64> {
+    pub(crate) fn generation(&self, previous: bool) -> Result<i64> {
         if previous {
             self.generations
                 .prev
@@ -56,6 +61,19 @@ impl Reader {
         } else {
             Ok(self.generations.current)
         }
+    }
+    pub(crate) fn with_pin<T>(&self, f: impl FnOnce(&Self) -> Result<T>) -> Result<T> {
+        f(self)
+    }
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.conn
+    }
+    pub fn meta(&self, previous: bool) -> Result<crate::snapshot::reader::Meta> {
+        metadata::generation(&self.conn, self.generation(previous)?)
+    }
+    pub fn get_id(&self, id: i64, previous: bool) -> Result<Option<Entry>> {
+        let g = self.generation(previous)?;
+        Ok(self.conn.query_row(&format!("SELECT {COLUMNS} FROM versions WHERE id=?1 AND born<=?2 AND (dead IS NULL OR dead>?2)"),params![id,g],Entry::row).optional()?)
     }
     pub fn get(&self, path: &[u8], previous: bool) -> Result<Option<Entry>> {
         validate_path(path)?;
@@ -117,7 +135,7 @@ impl Reader {
     }
     pub fn roots(&self, previous: bool) -> Result<Vec<Root>> {
         let g = self.generation(previous)?;
-        let mut q=self.conn.prepare(&format!("SELECT {} FROM root_versions WHERE born<=?1 AND (dead IS NULL OR dead>?1) ORDER BY path",metadata::ROOT_COLS))?;
+        let mut q=self.conn.prepare(&format!("SELECT {} FROM root_versions WHERE born<=?1 AND (dead IS NULL OR dead>?1) ORDER BY ordinal",metadata::ROOT_COLS))?;
         Ok(q.query_map([g], Root::row)?
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
@@ -139,7 +157,7 @@ impl Reader {
     /// Global incompleteness and capped non-nested denied paths, from the pin.
     pub fn unknown_subtrees(&self, previous: bool, cap: usize) -> Result<(bool, Vec<Vec<u8>>)> {
         let g = self.generation(previous)?;
-        let mut q=self.conn.prepare("SELECT scope,sort_key,path FROM versions WHERE (flags & 1)!=0 AND born<=?1 AND (dead IS NULL OR dead>?1) ORDER BY scope,sort_key")?;
+        let mut q=self.conn.prepare("SELECT e.scope,e.sort_key,e.path FROM versions e JOIN root_versions r ON r.path=e.scope AND r.born<=?1 AND (r.dead IS NULL OR r.dead>?1) WHERE (e.flags & 1)!=0 AND e.born<=?1 AND (e.dead IS NULL OR e.dead>?1) ORDER BY r.ordinal,e.sort_key")?;
         let mut rows = q.query([g])?;
         let mut paths = Vec::new();
         let mut enclosing: Option<(Vec<u8>, Vec<u8>)> = None;

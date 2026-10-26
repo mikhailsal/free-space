@@ -21,7 +21,9 @@ is not complete until the remaining production gates below are satisfied.
    OV-11 rules. Update changed external aliases and owner ancestors. Retain
    generation-scoped root/mount metadata and global denied-subtree reporting.
 4. **Implemented:** pin readers to one generation pair; expose exact-path,
-   children, subtree, raw diff, root, mount, owner and refresh-history queries.
+   children, subtree, root, mount, owner and refresh-history queries. Add opt-in
+   public ls/top/find/diff/status adapters with persisted generation headers and
+   configured root order; retain stable-ID-independent traversal ordering.
    Prepare filesystem work outside transactions; acquire the writer lock only
    for publication and reject a stale base generation before changing rows.
 5. **Implemented experiments:** deterministic v1/v2 attribution comparisons,
@@ -29,10 +31,12 @@ is not complete until the remaining production gates below are satisfied.
    mount/root/denied fixtures and unrelated-entry/inode-group locality checks.
    An ignored release benchmark records full v2 scan and local refresh timings,
    logical SQL mutations, separately instrumented VM steps and WAL growth.
-6. **Remaining:** implement production query adapters, complete retention/GC and
-   checkpoint budgets, crash/ENOSPC coverage and production integration. Measure
-   physical I/O, memory, long-run history costs and target-machine budgets before
-   considering v2 the default.
+6. **Implemented:** conservative read-only reader leases, bounded cursor GC,
+   persisted record accounting/admission limits and explicit checkpoint upkeep.
+   Test public query parity while pinned, after GC, and through capacity recovery.
+7. **Remaining:** CLI/HTTP routing, a bounded-RSS v2 full-scan seed compatible with
+   v1 `--low-memory`, process-crash/real ENOSPC coverage and production integration.
+   Measure physical I/O, memory, long-run history and target-machine budgets.
 
 Validation commands:
 
@@ -92,13 +96,13 @@ cannot itself be refreshed as a directory. Refreshing its enclosing subtree can
 add, update or retire mount records. Safe `statvfs` numbers on the enclosing root
 are refreshed. Denied flags and exact own errors remain versioned with entries;
 reader-level global incompleteness and capped non-nested denied paths use the
-same pin. Production query headers/filtering still need adapters.
+same pin. The opt-in public adapter consumes these headers and filters.
 
 Root/mount identities and generation retention are tested with synthetic
 cross-device/nested-root fixtures, and local mount replacement uses walker mount
 fixtures. These are not claims of privileged live-mount/unmount stress coverage.
 
-## Atomicity, contention and retention
+## Atomicity and contention
 
 Preparation reads the target, enclosing root and base generation in a short
 read transaction, then releases it. Boundary checks, filesystem traversal,
@@ -115,16 +119,65 @@ publication-trigger failures after local and external-owner updates roll back
 entries, root metadata, current, prev and history together. Process termination
 and ENOSPC remain separate tests; statement rollback is not evidence for them.
 
-History retention is deliberately unbounded in this experiment. Old readers pin
-WAL; all entry, root, mount, identity and history rows remain retained. Refresh
-does not VACUUM or checkpoint. SQLite may checkpoint on final connection close;
-that global work is outside local-refresh benchmark timing. Bounded leases,
-reclamation and explicit checkpoint budgets are mandatory before adoption.
+## Retention, reader leases and recovery
+
+Each Reader acquires a shared `flock` on a persistent `.readers` sibling file,
+then opens its read-only SQLite transaction. Maintenance requests the exclusive
+lock without waiting. If any Reader is alive, it reports `readers_blocking` and
+performs no pruning or checkpoint. Reader drop or process termination releases
+the kernel lease. Canonical paths share the same lease; hardlinked database
+filenames are rejected. This conservative local-filesystem protocol preserves
+read-only client access and every pinned current/prev pair, including idle
+readers, at the cost of deferred maintenance while any reader remains open.
+
+`Store::maintain(budget, checkpoint)` examines at most `budget` candidate records
+(1–100,000) through persisted cursors and ordered indexes. It preserves exact
+current/prev version intervals and both generations' full refresh histories,
+pruning obsolete entry/root/mount versions, generation headers, history and
+unreferenced identities. IDs never recycle; a path recreated after its entire
+history was reclaimed receives a new identity. Cursor/accounting changes and
+pruning commit together. Failure after partial pruning rolls everything back.
+
+Admission uses transactional O(1) record accounting. Defaults are 10,000,000
+retained logical records and a 512 MiB WAL admission threshold; callers can set
+explicit `RetentionPolicy` values. Counted records are identities, all version
+rows, generation headers and refresh history. A publication exceeding the record
+budget rolls back. WAL admission is a threshold plus one admitted transaction,
+**not a hard byte cap**. Row size, index overhead, uncommitted spill and database
+high-water space require separate physical measurement. No automatic VACUUM or
+full rewrite occurs during refresh.
+
+Checkpoint is explicitly requested maintenance and can do global WAL work. It
+uses a nonblocking TRUNCATE checkpoint and reports SQLite contention. Maintenance
+without checkpoint also respects WAL admission; checkpoint requests clear an
+already over-budget WAL before adding pruning writes, or return busy without
+pruning. SQLite may additionally checkpoint on final connection close. Neither
+explicit maintenance nor close/checkpoint cost is hidden in refresh timing.
+
+A long-running current generation can fill the budget with history that cannot
+legally be pruned. The error gives the exact failed-publication record count and
+a numeric temporary budget/headroom for retrying the operation followed by two
+full scans of the same indexed tree (one additional scan when the failed
+operation was already a full scan). Recovery is:
+
+1. Close old readers and attempt bounded maintenance/checkpoint.
+2. If protected history itself fills capacity, explicitly set the reported
+   temporary record budget and retry the failed operation.
+3. Run two full scans after a refresh retry. The first preserves the old current
+   and its complete history as prev; the second rotates it out. A changed/growing
+   filesystem can require a newly reported budget; the estimate is conditional
+   on the indexed tree remaining the same.
+4. Run bounded maintenance/checkpoint, then restore the lower budget once the
+   retained-record count fits. Required history is never silently truncated.
+
+Tests cover this sequence with and without an old Reader: active leases defer
+reclamation, the first scan preserves prev/diff semantics, and two rotations
+allow history reclamation and resumed refresh under the lower budget.
 
 ## Experimental format and measurements
 
-The engine is v2, with experimental SQLite `user_version = 3` for the
-root-scoped/inode metadata layout. Prior experimental revision 2 stores must be
+The engine is v2, with experimental SQLite `user_version = 4` for the
+root-scoped/inode, header and retention layout. Prior experimental stores must be
 reseeded into a new file. No v1 file or earlier published inode is mutated or
 silently migrated, and no whole-snapshot rewrite fallback is introduced.
 
@@ -147,24 +200,42 @@ affected paths. Readers materialize requested result sets; raw diff uses a
 path-keyed map. Full scan materializes the full seed. These allocations do not
 change the production v1 scanner.
 
-## Remaining release dependencies
+## Public query adapter and remaining release dependencies
 
-- All existing query adapters, headers, filters, top/find/pass ordering and
-  limits, public diff semantics and invalidation. The raw v2 diff includes scan
-  timestamps and is not API-compatible with v1 diff.
-- Reader leases, bounded version/identity/history reclamation and explicit WAL
-  checkpoint budgets, with long-lived readers and repeated tiny refreshes.
-- Crash/process-kill/ENOSPC testing at staging, indexes, publication and cleanup;
-  broader writer contention and live boundary-race stress.
-- Full v1 semantic corpus parity, target root/mount filesystem fixtures and
-  pathological H/A fanout timings.
-- Long-run disk, RSS, reader latency, physical I/O and dirty-page measurements;
-  comparisons against v1 and agreed numerical target-machine budgets.
+`queries::v2` returns the existing public response types for ls/top/find/diff,
+status/status_page and the filtered pass. It streams indexed scoped generations,
+uses component ordering for ties/nesting and bounded result heaps, and pairs diff
+rows by exact path. It does not synthesize DFS IDs, materialize compatibility
+snapshots, or copy full stores. Both generations use the same leased Reader.
+Persisted headers include full-scan timestamps, host/OS/version, entry counts and
+fresh snapshot IDs; root ordinals preserve configured-root order.
 
-The unsupported hardlink/mount restriction from the first slice has been removed.
-These production gates still prevent marking issue #10 complete.
+Eight cross-backend parity fixtures exercise hundreds of parameter combinations,
+including filters, limits, byte paths, ties after stable IDs diverge, denied
+suppression, overlapping mount/root paths, missing snapshots, invalidation,
+status and pinned-pair behavior across publication and GC. Deep diff currently
+streams the scoped subtree below the requested depth; memory is bounded, but
+extra scoped reads remain to be benchmarked/optimized. The experimental raw
+`Reader::diff` remains separate from the public adapter.
 
-## Measured revision-3 evidence (2026-10-26)
+Remaining gates:
+
+- CLI/HTTP routing and operational maintenance commands with end-to-end v1
+  response parity. Production remains v1 by default.
+- A bounded-RSS full-scan seed for v2 preserving the merged `--low-memory`
+  capability. Importing v1 aggregates alone is insufficient: exact raw own
+  directory metadata must survive, including counter saturation cases.
+- Writer process-kill and actual ENOSPC at staging, WAL/index writes, publication
+  and maintenance. SQLite `max_page_count` FULL rollback and reader-process death
+  are tested, but do not substitute for these fault modes.
+- Wider real mount/unmount races, H/A fanout and concurrent lifecycle stress;
+  long-run upkeep throughput, capacity sizing and read-only deployment permissions.
+- Physical I/O, dirty pages, RSS, cold-cache and deep-query measurements, and
+  agreed target-machine budgets. Admission limits are not physical-size claims.
+
+Issue #10 remains open until these gates pass.
+
+## Measured revision-4 evidence (2026-10-26)
 
 Linux 5.15.0-136-generic, ext4 on `/`, Intel Core i7-4770S (8 visible logical
 CPUs), one walker worker, release profile, warm fixtures without cache dropping.
@@ -175,16 +246,18 @@ siblings, exercising a wide ancestor. Every operation publishes a generation.
 
 | Unrelated files | v2 full scan median ms | v2 refresh median ms | SQL row changes | VM instructions | WAL growth median bytes |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 100 | 23.802 | 5.324 | 18 | 1,321 | 103,000 |
-| 1,000 | 162.226 | 3.946 | 18 | 1,321 | 107,120 |
-| 10,000 | 1,598.963 | 4.574 | 18 | 1,321 | 111,240 |
+| 100 | 59.023 | 17.587 | 25 | 1,732 | 123,600 |
+| 1,000 | 385.534 | 17.465 | 25 | 1,732 | 127,720 |
+| 10,000 | 2,740.527 | 5.935 | 25 | 1,732 | 131,840 |
 
 [Raw runs and stage timings](../benchmarks/refresh-v2-locality.csv) contain all
 15 repetitions. Compared with the earlier experimental layout, mutation counts
-now include versioned root metadata. WAL growth includes index/page maintenance
+now include versioned root/header metadata and accounting triggers. Host
+contention makes these timings noisy; the instruction/mutation counts are the
+locality evidence. WAL growth includes index/page maintenance
 and is not constant. No cold-cache, RSS, device-write, dirty-page, v1 timing or
 pathological fanout timing result is claimed. Checkpoint/connection-close cost
-and unbounded retained history remain outside the benchmark window.
+and explicit maintenance remain outside the benchmark window.
 
 A separate deterministic locality test deletes an owner and transfers attribution
 outside the refreshed subtree while growing unrelated inode groups from 10 to
@@ -192,9 +265,9 @@ outside the refreshed subtree while growing unrelated inode groups from 10 to
 equal SQL mutation counts and no linear increase in VM instructions. This proves
 only that fixture's unrelated-group isolation; H/A fanout measurements remain.
 
-Validation for this slice: 134 core tests passed, strict clippy and formatting
-passed, and the explicit release benchmark passed. Seven new real-filesystem
-v1/v2 parity/locality tests cover cross-boundary and cross-root ownership,
-unknown aliases, prior zeroing/recovery, ordering and rollback. Three new unit
-tests cover scoped root/mount/denied generations, local mount replacement and
-concurrent stale-base rejection. The broader production gates above remain open.
+Validation before final integration: 150 core tests passed, strict core Clippy
+passed, and the explicit release benchmark passed. Repository Rust/size checks
+are rerun after integrating the latest master. The nine v2 store tests, seven
+hardlink parity/locality tests, eight public-query parity tests, seven retention
+checks and four v2 unit tests cover the contracts described above. Production
+routing, bounded-RSS seeding and physical/crash gates remain open.
