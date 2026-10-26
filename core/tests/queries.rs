@@ -355,6 +355,16 @@ fn find_nested_matches_counted_once() {
     assert!(i.truncated);
 }
 
+fn populate_split_pass_directory(f: &Fx, p: usize, depth: usize, now: i64) {
+    let dir = format!("p{p}{}", "/node_modules/m".repeat(depth));
+    for i in 0..4usize {
+        // all of p0 and every deepest folder untouched, the rest mixed
+        let aged = p == 0 || depth == 3 || (p + i).is_multiple_of(2);
+        let t = if aged { now - 400 * DAY } else { now };
+        f.file(&format!("{dir}/f{i}.js"), (i + 1) * depth * 4096, t);
+    }
+}
+
 /// Wide subtrees are read as parallel id ranges, a selective --min-size
 /// through the size index. Every split and the index answer like one pass,
 /// `nested` included, when a matched directory starts in an earlier range.
@@ -364,13 +374,7 @@ fn split_passes_answer_like_one_pass() {
     let now = now_secs();
     for p in 0..3usize {
         for depth in 1..=3usize {
-            let dir = format!("p{p}{}", "/node_modules/m".repeat(depth));
-            for i in 0..4usize {
-                // all of p0 and every deepest folder untouched, the rest mixed
-                let aged = p == 0 || depth == 3 || (p + i) % 2 == 0;
-                let t = if aged { now - 400 * DAY } else { now };
-                f.file(&format!("{dir}/f{i}.js"), (i + 1) * depth * 4096, t);
-            }
+            populate_split_pass_directory(&f, p, depth, now);
         }
     }
     f.scan(false);
