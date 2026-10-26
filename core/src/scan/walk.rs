@@ -7,7 +7,6 @@
 //! A worker holds at most one open directory, so open fds = workers (T3).
 
 use std::collections::HashSet;
-use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
@@ -145,66 +144,7 @@ pub fn walk_with_mounts(opts: &WalkOptions, mounts: &[MountInfo]) -> io::Result<
         started_at,
         ..Default::default()
     };
-    if let Some(e) = opts.expected {
-        // +2% headroom: entries on other filesystems' mount nodes, files created meanwhile
-        let n = (e + e / 50).min(u32::MAX as u64) as usize;
-        tree.nodes.reserve_exact(n);
-        tree.names.reserve_exact(n.saturating_mul(16));
-    }
-    let mut root_ctx = Vec::new();
-    let mut root_paths: Vec<PathBuf> = Vec::new();
-    for r in &opts.roots {
-        let p = normalize_root(r)?;
-        if root_paths.contains(&p) {
-            continue;
-        }
-        root_paths.push(p);
-    }
-    for p in &root_paths {
-        let md = fs::metadata(p)?;
-        for q in &root_paths {
-            if q != p && p.starts_with(q) && fs::metadata(q)?.dev() == md.dev() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "root {} is inside root {} on the same filesystem",
-                        p.display(),
-                        q.display()
-                    ),
-                ));
-            }
-        }
-        let dev_s = dev_string(md.dev());
-        let bind_mounts = platform::bind_mounts_below(mounts, p, &dev_s)
-            .into_iter()
-            .collect();
-        let fs_type = platform::mount_for(mounts, p)
-            .map(|m| m.fs_type)
-            .unwrap_or_default();
-        let (off, len) = tree.push_name(p.as_os_str().as_bytes());
-        tree.nodes.push(Node {
-            allocated: md.blocks() * 512,
-            apparent: md.len(),
-            mtime: md.mtime(),
-            scanned_at: started_at,
-            name_off: off,
-            name_len: len,
-            parent: NO_PARENT,
-            nlink: md.nlink().min(u32::MAX as u64) as u32,
-            kind: Kind::Dir.code(),
-            ..Default::default()
-        });
-        tree.roots.push(RootInfo {
-            path: p.clone(),
-            dev: md.dev(),
-            stats: platform::statvfs(p).unwrap_or_default(),
-            fs_type,
-        });
-        root_ctx.push(RootCtx {
-            dev: md.dev(),
-            bind_mounts,
-        });
-    }
+    let (root_paths, root_ctx) = prepare_roots(opts, mounts, started_at, &mut tree)?;
 
     let jobs: Vec<Job> = root_paths
         .iter()
@@ -250,6 +190,81 @@ pub fn walk_with_mounts(opts: &WalkOptions, mounts: &[MountInfo]) -> io::Result<
     Ok(tree)
 }
 
+fn prepare_roots(
+    opts: &WalkOptions,
+    mounts: &[MountInfo],
+    started_at: i64,
+    tree: &mut Tree,
+) -> io::Result<(Vec<PathBuf>, Vec<RootCtx>)> {
+    if let Some(expected) = opts.expected {
+        // +2% headroom: entries on other filesystems' mount nodes, files created meanwhile
+        let n = (expected + expected / 50).min(u32::MAX as u64) as usize;
+        tree.nodes.reserve_exact(n);
+        tree.names.reserve_exact(n.saturating_mul(16));
+    }
+
+    let mut root_paths = Vec::new();
+    for root in &opts.roots {
+        let path = normalize_root(root)?;
+        if !root_paths.contains(&path) {
+            root_paths.push(path);
+        }
+    }
+
+    let mut root_ctx = Vec::new();
+    for path in &root_paths {
+        let metadata = fs::metadata(path)?;
+        validate_root_nesting(path, &root_paths, metadata.dev())?;
+        let dev_s = dev_string(metadata.dev());
+        let bind_mounts = platform::bind_mounts_below(mounts, path, &dev_s)
+            .into_iter()
+            .collect();
+        let fs_type = platform::mount_for(mounts, path)
+            .map(|mount| mount.fs_type)
+            .unwrap_or_default();
+        let (off, len) = tree.push_name(path.as_os_str().as_bytes());
+        tree.nodes.push(Node {
+            allocated: metadata.blocks() * 512,
+            apparent: metadata.len(),
+            mtime: metadata.mtime(),
+            scanned_at: started_at,
+            name_off: off,
+            name_len: len,
+            parent: NO_PARENT,
+            nlink: metadata.nlink().min(u32::MAX as u64) as u32,
+            kind: Kind::Dir.code(),
+            ..Default::default()
+        });
+        tree.roots.push(RootInfo {
+            path: path.clone(),
+            dev: metadata.dev(),
+            stats: platform::statvfs(path).unwrap_or_default(),
+            fs_type,
+        });
+        root_ctx.push(RootCtx {
+            dev: metadata.dev(),
+            bind_mounts,
+        });
+    }
+    Ok((root_paths, root_ctx))
+}
+
+fn validate_root_nesting(path: &Path, roots: &[PathBuf], dev: u64) -> io::Result<()> {
+    for other in roots {
+        if other != path && path.starts_with(other) && fs::metadata(other)?.dev() == dev {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "root {} is inside root {} on the same filesystem",
+                    path.display(),
+                    other.display()
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn finish_mounts(tree: &mut Tree, mounts: &[MountInfo]) {
     for m in tree.mounts.iter_mut() {
         let info = mounts.iter().rev().find(|mi| mi.mount_point == m.path);
@@ -278,7 +293,7 @@ fn worker(ctx: &Ctx, tx: mpsc::Sender<DirResult>) {
             ctx.cv.notify_all();
             return;
         };
-        let (res, sub) = read_dir(ctx, &job);
+        let (res, sub) = read::read_dir(ctx, &job);
         let _ = tx.send(res);
         let mut q = ctx.queue.lock().unwrap();
         let k = sub.len();
@@ -296,136 +311,6 @@ fn worker(ctx: &Ctx, tx: mpsc::Sender<DirResult>) {
             }
         }
     }
-}
-
-fn read_dir(ctx: &Ctx, job: &Job) -> (DirResult, Vec<Job>) {
-    let mut res = DirResult {
-        id: job.id,
-        base: 0,
-        scanned_at: platform::now_secs(),
-        denied: false,
-        errors: 0,
-        names: Vec::new(),
-        children: Vec::new(),
-        hardlinks: Vec::new(),
-        mounts: Vec::new(),
-    };
-    let rd = match fs::read_dir(&job.path) {
-        Ok(rd) => rd,
-        Err(_) => {
-            res.denied = true;
-            res.errors = 1;
-            return (res, Vec::new());
-        }
-    };
-    let mut ents: Vec<(OsString, io::Result<fs::Metadata>, Option<fs::FileType>)> = Vec::new();
-    for e in rd {
-        match e {
-            Ok(e) => {
-                let md = e.metadata();
-                let ft = if md.is_err() {
-                    e.file_type().ok()
-                } else {
-                    None
-                };
-                ents.push((e.file_name(), md, ft));
-            }
-            Err(_) => {
-                // readdir failed mid-stream: the listing is incomplete.
-                res.denied = true;
-                res.errors += 1;
-                break;
-            }
-        }
-    }
-    ents.sort_unstable_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
-
-    let n = ents.len() as u32;
-    let base = ctx.next_id.fetch_add(n, Ordering::Relaxed);
-    if base.checked_add(n).is_none_or(|e| e == u32::MAX) {
-        ctx.overflow.store(1, Ordering::Relaxed);
-        res.denied = true;
-        return (res, Vec::new());
-    }
-    res.base = base;
-    ctx.seen.fetch_add(n as u64, Ordering::Relaxed);
-    let root = &ctx.roots[job.root as usize];
-    let mut sub = Vec::new();
-    res.children.reserve(ents.len());
-    for (i, (name, md, ft)) in ents.into_iter().enumerate() {
-        let id = base + i as u32;
-        let nb = name.as_bytes();
-        let name_start = res.names.len() as u32;
-        let name_len = nb.len().min(u16::MAX as usize) as u16;
-        res.names.extend_from_slice(&nb[..name_len as usize]);
-        let mut rec = ChildRec {
-            name_start,
-            name_len,
-            kind: Kind::Other.code(),
-            flags: 0,
-            allocated: 0,
-            apparent: 0,
-            mtime: 0,
-            nlink: 1,
-            errors: 0,
-        };
-        match md {
-            Ok(md) => {
-                let t = md.file_type();
-                let mut kind = if t.is_dir() {
-                    Kind::Dir
-                } else if t.is_file() {
-                    Kind::File
-                } else if t.is_symlink() {
-                    Kind::Symlink
-                } else {
-                    Kind::Other
-                };
-                rec.allocated = md.blocks() * 512;
-                rec.apparent = md.len();
-                rec.mtime = md.mtime();
-                rec.nlink = md.nlink().min(u32::MAX as u64) as u32;
-                if kind == Kind::Dir {
-                    let child_path = job.path.join(&name);
-                    let crosses = md.dev() != root.dev;
-                    if (crosses && ctx.one_file_system) || root.bind_mounts.contains(&child_path) {
-                        kind = Kind::Mount;
-                        rec.allocated = 0;
-                        rec.apparent = 0;
-                        res.mounts.push((id, child_path));
-                    } else {
-                        sub.push(Job {
-                            id,
-                            root: job.root,
-                            path: child_path,
-                        });
-                    }
-                } else if md.nlink() > 1 {
-                    res.hardlinks.push((id, md.dev(), md.ino()));
-                }
-                rec.kind = kind.code();
-            }
-            Err(_) => {
-                let kind = match ft {
-                    Some(t) if t.is_dir() => Kind::Dir,
-                    Some(t) if t.is_file() => Kind::File,
-                    Some(t) if t.is_symlink() => Kind::Symlink,
-                    Some(t) if t.is_fifo() || t.is_socket() => Kind::Other,
-                    _ => Kind::Other,
-                };
-                rec.kind = kind.code();
-                rec.flags |= flags::STAT_ERROR;
-                if kind == Kind::Dir {
-                    rec.flags |= flags::DENIED;
-                }
-                rec.errors = 1;
-            }
-        }
-        res.children.push(rec);
-    }
-    // LIFO stack pops the last job first: push in reverse so siblings run in name order.
-    sub.reverse();
-    (res, sub)
 }
 
 fn apply(tree: &mut Tree, res: DirResult) {
@@ -471,6 +356,8 @@ fn apply(tree: &mut Tree, res: DirResult) {
         });
     }
 }
+
+mod read;
 
 #[cfg(test)]
 #[path = "walk/tests.rs"]
