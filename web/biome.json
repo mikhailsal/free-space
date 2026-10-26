@@ -15,7 +15,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "none",
+      "preset": "recommended",
       "complexity": {
         "noExcessiveLinesPerFunction": { "level": "error", "options": { "maxLines": 80 } },
         "noExcessiveCognitiveComplexity": { "level": "error", "options": { "maxAllowedComplexity": 25 } }

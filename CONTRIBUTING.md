@@ -14,6 +14,8 @@ Bug reports and pull requests are welcome. For a bug, please use the [issue temp
 
 You need Rust 1.88 or newer and [bun](https://bun.sh) 1.4 or newer.
 
+Install Rust and its check components with [rustup](https://rustup.rs/), then run `rustup component add rustfmt clippy`. Install Bun using its [installation instructions](https://bun.sh/docs/installation), then install the pinned web dependencies with `cd web && bun install --frozen-lockfile`. Install ShellCheck using its [official instructions](https://www.shellcheck.net/).
+
 ```sh
 cargo build
 cargo test --workspace
@@ -33,6 +35,18 @@ bunx playwright test
 ```
 
 `bunx biome format --write .` fixes the formatting (Biome 2.6.2, line width 140, two-space indent).
+
+## Quality gates
+
+Run `scripts/check.sh` from the repository root, or use the path to it from a subdirectory (for example, `../scripts/check.sh` from `web/`); the script then runs at the repository root. With no arguments it runs every quality check. Select parts with `rust`, `size`, `shell`, `tsc`, and `biome`. The checker prints an install hint if a required tool is missing. Install the local pre-push hook once with:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The hook runs all five checks against the current work tree. CI checks the pushed commit and is authoritative. Keep source files to 500 lines and test files (`*/tests/**`, `*/tests.rs`, `web/tests/**`) to 1000 lines. The counted tracked files are `*.rs`, `*.ts`, `*.js`, `*.css`, `*.html`, `*.sh`, and files under `.githooks/`; `docs/**` is excluded. Rust functions are limited to 80 lines and nesting to 4 levels. TypeScript functions are limited to 80 lines and cognitive complexity to 25. Biome enforces its recommended rules and formats with two-space indentation and a 140-character line width; Rust uses rustfmt.
+
+Split code before crossing a limit. Never raise a limit or add an exception without the user's agreement. Move long Rust tests into a `tests.rs` submodule. Run relevant tests locally as you work; full e2e, the gate canary, and `refactor-guard` comparisons run on GitHub.
 
 `bun test tests/unit` also runs `scripts/rust-diff.sh` and `scripts/coverage-functions.sh` on made-up input, so `jq`, `curl`, `perl`, `sqlite3`, `script`, `flock` and `setsid` (util-linux), `c++filt` (binutils), `getfacl`/`setfacl` (acl) and tzdata must be installed.
 
