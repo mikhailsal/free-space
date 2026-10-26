@@ -420,7 +420,8 @@ pub fn diff(a: &DiffArgs) -> output::Result<()> {
     }
     if same > 0 {
         out.push_str(&format!("{same} unchanged not shown\n"));
-    } else if r.truncated {
+    }
+    if r.truncated {
         out.push_str(&more_line(r.total_count, r.entries.len(), "--limit"));
     }
     output::print(&out)?;
