@@ -158,12 +158,13 @@ impl StagedTree {
             }
         } else if md.nlink() > 1 {
             self.conn
-                .prepare_cached("INSERT INTO links VALUES (?1,?2,?3,?4)")?
+                .prepare_cached("INSERT INTO links VALUES (?1,?2,?3,?4,?5)")?
                 .execute(params![
                     id as i64,
                     md.dev() as i64,
                     md.ino() as i64,
-                    path.as_os_str().as_bytes()
+                    path.as_os_str().as_bytes(),
+                    job.root as i64
                 ])?;
         }
         Ok(())

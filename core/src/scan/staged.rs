@@ -79,7 +79,7 @@ fn open_database(path: &Path) -> Result<Connection> {
         .create_new(true)
         .mode(0o640)
         .open(path)
-        .map_err(|e| Error::io(format!("create {}", path.display()), e))?;
+        .map_err(|e| Error::storage_io(format!("create {}", path.display()), e))?;
     fsutil::secure_file(&file).map_err(|e| Error::io("secure scan database", e))?;
     let conn = Connection::open(path)?;
     conn.execute_batch(&format!(
@@ -127,8 +127,8 @@ impl StagedTree {
             CREATE INDEX raw_children ON raw(parent,name,id);
             CREATE TABLE jobs(id INTEGER PRIMARY KEY, root INTEGER NOT NULL, path BLOB NOT NULL);
             CREATE TABLE links(id INTEGER PRIMARY KEY, dev INTEGER NOT NULL, ino INTEGER NOT NULL,
-              path BLOB NOT NULL);
-            CREATE INDEX links_owner ON links(dev,ino,path);
+              path BLOB NOT NULL, root INTEGER NOT NULL);
+            CREATE INDEX links_owner ON links(dev,ino,path,root,id);
             CREATE TABLE mount_info(id INTEGER PRIMARY KEY, path BLOB NOT NULL, fs_type TEXT NOT NULL,
               fs_used INTEGER, fs_total INTEGER);")?;
         let count = roots.nodes.len() as u64;

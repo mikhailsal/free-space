@@ -2,6 +2,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -28,15 +29,22 @@ impl From<Vec<String>> for DeniedPaths {
     }
 }
 
+fn create_spool(path: &Path) -> std::io::Result<File> {
+    // Restrict access at creation: chmod after unlink cannot revoke an fd that
+    // another user obtained while the predictable name was visible.
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+}
+
 impl DeniedPaths {
     pub(crate) fn on_disk(dir: &Path) -> Result<Self> {
         let path = dir.join("snapshot.denied.tmp");
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .map_err(|e| Error::io("create denied-path spool", e))?;
+        let file =
+            create_spool(&path).map_err(|e| Error::storage_io("create denied-path spool", e))?;
         // The open descriptor keeps the spool alive across publication and concurrent
         // scans; unlink now so process termination cannot leak it.
         std::fs::remove_file(&path).map_err(|e| Error::io("unlink denied-path spool", e))?;
@@ -58,7 +66,7 @@ impl DeniedPaths {
             .unwrap();
         file.write_all(&(text.len() as u64).to_le_bytes())
             .and_then(|()| file.write_all(text.as_bytes()))
-            .map_err(|e| Error::io("write denied-path spool", e))?;
+            .map_err(|e| Error::storage_io("write denied-path spool", e))?;
         if self.examples.len() < 5 {
             self.examples.push(text.into_owned());
         }
@@ -118,6 +126,31 @@ impl Serialize for DeniedPaths {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn spool_is_private_at_creation_and_unlinked_before_use() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("creation-mode");
+        let file = create_spool(&path).unwrap();
+        assert_eq!(file.metadata().unwrap().permissions().mode() & 0o077, 0);
+        let report = DeniedPaths::on_disk(dir.path()).unwrap();
+        assert!(!dir.path().join("snapshot.denied.tmp").exists());
+        assert!(report.is_empty());
+    }
+
+    #[test]
+    fn spool_write_enospc_is_space_without_adding_a_report_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut report = DeniedPaths::on_disk(dir.path()).unwrap();
+        let full = OpenOptions::new().write(true).open("/dev/full").unwrap();
+        *report.spool.as_ref().unwrap().lock().unwrap() = full;
+        let error = report.push(b"/denied/path").unwrap_err();
+        assert_eq!(error.code, crate::ErrorCode::Space);
+        assert!(report.is_empty());
+        assert!(report.examples.is_empty());
+        assert!(!dir.path().join("snapshot.denied.tmp").exists());
+    }
+
     #[test]
     fn disk_report_streams_every_path_and_keeps_only_warning_examples() {
         let dir = tempfile::tempdir().unwrap();

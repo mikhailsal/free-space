@@ -243,3 +243,60 @@ fn disk_scan_reports_every_denied_directory_without_truncation() {
         .unwrap();
     }
 }
+
+/// Equal full paths occur when a cross-mount scan includes a nested root on a
+/// different device. Tree assigns the inode to the first root's DFS occurrence.
+#[test]
+fn disk_hardlink_path_ties_follow_root_order_across_overlapping_mounts() {
+    use std::os::unix::fs::MetadataExt;
+    let fixture = tempfile::tempdir_in("/dev/shm").unwrap();
+    let device = Path::new("/dev");
+    if fs::metadata(device).unwrap().dev() == fs::metadata(fixture.path()).unwrap().dev() {
+        return; // This host does not have the cross-device overlap used by the fixture.
+    }
+    fs::write(fixture.path().join("a"), vec![1; 8192]).unwrap();
+    fs::hard_link(fixture.path().join("a"), fixture.path().join("b")).unwrap();
+    let inode = fs::metadata(fixture.path().join("a")).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    for (order, roots) in [[device, fixture.path()], [fixture.path(), device]]
+        .iter()
+        .enumerate()
+    {
+        let mut results = Vec::new();
+        for low_memory in [false, true] {
+            let dir = SnapshotDir::new(temp.path().join(format!("{order}-{low_memory}")));
+            run_scan(ScanRequest {
+                roots: roots.iter().map(|p| p.to_path_buf()).collect(),
+                one_file_system: false,
+                workers: 1,
+                low_memory,
+                dir: dir.clone(),
+                keep_previous: false,
+                on_progress: None,
+            })
+            .unwrap();
+            let snapshot = Snapshot::open_current(&dir).unwrap();
+            let sql = format!(
+                "SELECT r.path,e.name,e.allocated,e.flags,h.allocated FROM hardlinks h
+                JOIN entries e ON e.id=h.entry_id JOIN roots r JOIN entries rt ON rt.id=r.entry_id
+                WHERE h.dev={} AND h.ino={} AND e.id BETWEEN rt.id AND rt.subtree_end
+                ORDER BY r.entry_id,e.name",
+                inode.dev() as i64,
+                inode.ino() as i64
+            );
+            results.push(rows(&snapshot, &sql));
+        }
+        assert_eq!(results[0].len(), 4);
+        assert_eq!(results[0], results[1], "original root order {order}");
+        assert_eq!(
+            results[1][0][2],
+            Value::Integer((inode.blocks() * 512) as i64)
+        );
+        assert!(
+            results[1]
+                .iter()
+                .skip(1)
+                .all(|row| row[2] == Value::Integer(0))
+        );
+    }
+}

@@ -245,11 +245,13 @@ impl StagedTree {
         if node.kind() == Kind::Dir || node.nlink <= 1 {
             return Ok(());
         }
+        // Identical full paths can appear in overlapping roots across filesystems.
+        // Tree keeps the first DFS occurrence, so ties follow original root order.
         let link: Option<(i64, i64, i64)> = self
             .conn
             .prepare_cached(
                 "SELECT l.dev,l.ino,
-            (SELECT o.id FROM links o WHERE o.dev=l.dev AND o.ino=l.ino ORDER BY o.path LIMIT 1)
+            (SELECT o.id FROM links o WHERE o.dev=l.dev AND o.ino=l.ino ORDER BY o.path,o.root,o.id LIMIT 1)
             FROM links l WHERE l.id=?1",
             )?
             .query_row([raw as i64], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
