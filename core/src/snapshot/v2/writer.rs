@@ -85,7 +85,7 @@ impl Store {
             generation,
         )?;
         tx.execute("INSERT INTO control VALUES(1,?1,?2,?1,?3) ON CONFLICT(singleton) DO UPDATE SET current=excluded.current,prev=excluded.prev,full_scan=excluded.full_scan,one_file_system=excluded.one_file_system",params![generation,current,one_file_system])?;
-        retention::admit_rows(&tx, true)?;
+        retention::admit_rows(&tx, true, generation)?;
         tx.commit()?;
         Ok(WriteReport {
             generation,
@@ -252,7 +252,7 @@ impl Store {
             started,
             staged.entries.len() as i64 - old.len() as i64,
         )?;
-        retention::admit_rows(&tx, false)?;
+        retention::admit_rows(&tx, false, generation)?;
         tx.commit()?;
         Ok(WriteReport {
             generation,

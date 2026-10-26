@@ -48,7 +48,7 @@ CREATE UNIQUE INDEX mounts_open ON mount_versions(entry_id) WHERE dead IS NULL;
 CREATE TABLE generation_meta(generation INTEGER PRIMARY KEY,prev_generation INTEGER,scanned_at INTEGER NOT NULL,host TEXT NOT NULL,os TEXT NOT NULL,snapshot_id TEXT NOT NULL,entries INTEGER NOT NULL,one_file_system INTEGER NOT NULL,freespace_version TEXT NOT NULL,full_scan INTEGER NOT NULL);
 CREATE TABLE refreshes(generation INTEGER PRIMARY KEY,path BLOB NOT NULL,scanned_at INTEGER NOT NULL);
 CREATE TABLE retention(singleton INTEGER PRIMARY KEY CHECK(singleton=1),max_records INTEGER NOT NULL,max_wal_bytes INTEGER NOT NULL,next_kind INTEGER NOT NULL);
-INSERT INTO retention VALUES(1,10000000,536870912,0);
+INSERT INTO retention VALUES(1,100000000,536870912,0);
 CREATE TABLE storage_stats(singleton INTEGER PRIMARY KEY CHECK(singleton=1),retained_rows INTEGER NOT NULL);
 INSERT INTO storage_stats VALUES(1,0);
 CREATE TABLE gc_cursor(kind INTEGER PRIMARY KEY,k1 INTEGER NOT NULL,k2 INTEGER NOT NULL,k3 INTEGER NOT NULL);

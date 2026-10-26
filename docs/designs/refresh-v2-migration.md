@@ -138,9 +138,14 @@ unreferenced identities. IDs never recycle; a path recreated after its entire
 history was reclaimed receives a new identity. Cursor/accounting changes and
 pruning commit together. Failure after partial pruning rolls everything back.
 
-Admission uses transactional O(1) record accounting. Defaults are 10,000,000
+Admission uses transactional O(1) record accounting. Defaults are 100,000,000
 retained logical records and a 512 MiB WAL admission threshold; callers can set
-explicit `RetentionPolicy` values. Counted records are identities, all version
+explicit `RetentionPolicy` values. The published 7.8M-entry fixture needs about
+15.6M records for its first seed (identities plus versions), and about 23.4M for
+two full generations, before root/mount/header/history overhead. The 100M
+logical default accommodates that baseline and recovery rotations; it is not
+a measured disk-space or RSS guarantee. Production defaults still need sizing
+against available disk and the bounded-RSS seed. Counted records are identities, all version
 rows, generation headers and refresh history. A publication exceeding the record
 budget rolls back. WAL admission is a threshold plus one admitted transaction,
 **not a hard byte cap**. Row size, index overhead, uncommitted spill and database
@@ -268,7 +273,9 @@ only that fixture's unrelated-group isolation; H/A fanout measurements remain.
 Validation: after integrating master `abe7eff8` (including disk-backed scan),
 161 core tests passed. `scripts/check.sh rust size` passed workspace strict
 Clippy, formatting, suppression and file-size checks. The explicit release
-benchmark passed before that integration. The nine v2 store tests, seven
-hardlink parity/locality tests, eight public-query parity tests, seven retention
+benchmark passed before that integration. The subsequent default-budget and
+initial-seed diagnostic follow-up passed all eight retention tests and the same
+strict Rust/size checks. The nine v2 store tests, seven
+hardlink parity/locality tests, eight public-query parity tests, eight retention
 checks and four v2 unit tests cover the contracts described above. Production
 routing, bounded-RSS seeding and physical/crash gates remain open.

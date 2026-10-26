@@ -29,9 +29,30 @@ impl Fixture {
     fn reader(&self) -> Reader {
         Reader::open(&self.db).unwrap()
     }
+    // Maintenance is deliberately nonblocking. A parallel subprocess spawn can
+    // briefly inherit a CLOEXEC lease descriptor until exec closes it.
+    fn upkeep(
+        &mut self,
+        budget: usize,
+        checkpoint: bool,
+    ) -> freespace_core::Result<freespace_core::snapshot::v2::MaintenanceReport> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            let report = self.store.maintain(budget, checkpoint)?;
+            if !report.readers_blocking {
+                return Ok(report);
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(freespace_core::Error::generic(
+                    "reader lease remained held after expected readers closed",
+                ));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
     fn sweep(&mut self) {
         for _ in 0..160 {
-            let r = self.store.maintain(3, false).unwrap();
+            let r = self.upkeep(3, false).unwrap();
             assert!(!r.readers_blocking);
             assert!(r.examined <= 3);
         }
@@ -173,7 +194,7 @@ fn explicit_checkpoint_resets_wal_admission_and_active_readers_defer_it() {
     );
     assert!(f.store.maintain(10, true).unwrap().readers_blocking);
     drop(pinned);
-    let report = f.store.maintain(10, true).unwrap();
+    let report = f.upkeep(10, true).unwrap();
     assert!(!report.checkpoint_busy);
     assert_eq!(report.wal_bytes, 0);
     // Admission threshold allows one transaction, and blocks the next until upkeep.
@@ -182,7 +203,7 @@ fn explicit_checkpoint_resets_wal_admission_and_active_readers_defer_it() {
         f.store.refresh(&f.root.join("local"), 1).unwrap_err().code,
         ErrorCode::Space
     );
-    assert_eq!(f.store.maintain(10, true).unwrap().wal_bytes, 0);
+    assert_eq!(f.upkeep(10, true).unwrap().wal_bytes, 0);
 }
 
 #[test]
@@ -213,7 +234,7 @@ fn lease_survives_read_only_symlink_open_and_releases_after_process_exit() {
     assert!(f.store.maintain(1, true).unwrap().readers_blocking);
     child.kill().unwrap();
     child.wait().unwrap();
-    assert!(!f.store.maintain(1, true).unwrap().readers_blocking);
+    assert!(!f.upkeep(1, true).unwrap().readers_blocking);
 }
 
 #[test]
@@ -247,7 +268,12 @@ fn maintenance_failure_rolls_back_pruning_cursors_and_generation_state() {
     let before = f.store.retained_records().unwrap();
     let c = rusqlite::Connection::open(&f.db).unwrap();
     c.execute_batch("CREATE TRIGGER fail_gc BEFORE UPDATE ON gc_cursor WHEN OLD.kind=1 BEGIN SELECT RAISE(ABORT,'injected failure after entry pruning'); END;").unwrap();
-    assert!(f.store.maintain(1000, true).is_err());
+    assert!(
+        f.upkeep(1000, true)
+            .unwrap_err()
+            .message
+            .contains("injected failure")
+    );
     assert_eq!(f.store.retained_records().unwrap(), before);
     f.accounting();
     assert_eq!(
@@ -269,7 +295,7 @@ fn maintenance_failure_rolls_back_pruning_cursors_and_generation_state() {
     assert_eq!(r.refresh_history().unwrap(), history);
     drop(r);
     c.execute_batch("DROP TRIGGER fail_gc").unwrap();
-    assert!(f.store.maintain(1000, false).unwrap().deleted > 0);
+    assert!(f.upkeep(1000, false).unwrap().deleted > 0);
 }
 
 #[test]
@@ -366,4 +392,58 @@ fn assert_fresh_diff(f: &Fixture) {
     assert!(!diff.partial);
     assert!(diff.refreshed.is_empty());
     drop(first);
+}
+
+#[test]
+fn initial_seed_budget_failure_reports_space_and_preserves_unpublished_state() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("root");
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("a"), [1]).unwrap();
+    let db = tmp.path().join("v2.db");
+    let mut store = Store::open(&db).unwrap();
+    store
+        .configure_retention(RetentionPolicy {
+            max_records: 1,
+            max_wal_bytes: 1 << 30,
+        })
+        .unwrap();
+    let error = store.scan(&root, 1).unwrap_err();
+    assert_eq!(error.code, ErrorCode::Space);
+    assert!(error.message.contains("publication requires"));
+    assert!(error.fix.as_ref().unwrap().contains("retry this operation"));
+    let temporary: u64 = error
+        .message
+        .split("Temporary recovery budget: ")
+        .nth(1)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(store.retained_records().unwrap(), 0);
+    let c = rusqlite::Connection::open(&db).unwrap();
+    assert_eq!(
+        c.query_row("SELECT count(*) FROM control", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        c.query_row("SELECT count(*) FROM generation_meta", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert!(Reader::open(&db).is_err());
+    store
+        .configure_retention(RetentionPolicy {
+            max_records: temporary,
+            max_wal_bytes: 1 << 30,
+        })
+        .unwrap();
+    store.scan(&root, 1).unwrap();
+    let r = Reader::open(&db).unwrap();
+    assert_eq!(r.generations.current, 1);
+    assert_eq!(r.generations.prev, None);
 }

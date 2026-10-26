@@ -124,7 +124,7 @@ pub(super) fn admit_wal(c: &Connection, path: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub(super) fn admit_rows(c: &Connection, full_scan: bool) -> Result<()> {
+pub(super) fn admit_rows(c: &Connection, full_scan: bool, generation: i64) -> Result<()> {
     let required = rows(c)?;
     let limit = policy(c)?.max_records;
     if required <= limit {
@@ -132,7 +132,7 @@ pub(super) fn admit_rows(c: &Connection, full_scan: bool) -> Result<()> {
     }
     // Only capacity failures need this root/mount metadata count. The successful
     // refresh path uses the O(1) retained-row counter and never enumerates it.
-    let seed_rows:u64=c.query_row("SELECT m.entries+(SELECT count(*) FROM live_roots)+(SELECT count(*) FROM live_mounts)+1 FROM generation_meta m JOIN control c ON c.current=m.generation WHERE c.singleton=1",[],|r|r.get::<_,i64>(0))? as u64;
+    let seed_rows:u64=c.query_row("SELECT m.entries+(SELECT count(*) FROM live_roots)+(SELECT count(*) FROM live_mounts)+1 FROM generation_meta m WHERE m.generation=?1",[generation],|r|r.get::<_,i64>(0))? as u64;
     let scans = if full_scan { 1 } else { 2 };
     let temporary = required + scans * seed_rows;
     Err(Error::new(ErrorCode::Space,format!("publication requires {required} retained records; limit is {limit}. Temporary recovery budget: {temporary} records ({} above the limit) for retrying this operation followed by {scans} full scan(s) of the same indexed tree",temporary.saturating_sub(limit)))
