@@ -307,7 +307,7 @@ tests, including malformed/empty stores, complete denied reports, report timing
 groups, read-only access and isolated root install/uninstall. V1 remains default.
 
 Acceptance measurements use the exact integrated CLI binary: three warm
-refresh/scan repetitions at each unrelated-tree size, plus four no-swap128MiB
+refresh/scan repetitions at each unrelated-tree size, plus four no-swap 128 MiB
 full-seed runs up to a million files. Complete command time includes close and
 checkpoint. Reported RSS and kernel process I/O counters complement the logical
 SQL tests; raw data and full-scan/storage tradeoffs are in `docs/benchmarks.md`.
@@ -318,7 +318,7 @@ keep-prev modes.
 Evidence limits remain explicit: no cold-cache or target Raspberry Pi run,
 direct device-write/dirty-page attribution, pathological H/A latency bound or
 deep-query performance guarantee is claimed. No target-machine numerical budget
-was supplied; the128MiB fixture demonstrates one working limit. Admission limits
+was supplied; the 128 MiB fixture demonstrates one working limit. Admission limits
 are not physical-size guarantees. These qualifications constrain performance
 claims; final CI/publication is required before closing issue #10.
 
