@@ -150,6 +150,25 @@ pub fn next_generation(dir: &SnapshotDir) -> (u64, Option<u64>) {
     (base + 1, cur)
 }
 
+fn has_required_schema(snapshot: &Snapshot) -> bool {
+    use std::collections::HashSet;
+    crate::snapshot::schema::REQUIRED_COLUMNS
+        .iter()
+        .all(|(table, required)| {
+            let mut stmt = match snapshot
+                .conn
+                .prepare(&format!("PRAGMA table_info(\"{table}\")"))
+            {
+                Ok(stmt) => stmt,
+                Err(_) => return false,
+            };
+            let columns: rusqlite::Result<HashSet<String>> = stmt
+                .query_map([], |row| row.get(1))
+                .and_then(Iterator::collect);
+            columns.is_ok_and(|columns| required.iter().all(|name| columns.contains(*name)))
+        })
+}
+
 /// How a successful scan publishes its previous generation. Only snapshots
 /// this binary can open are eligible; unreadable current files never replace prev.
 enum Previous {
@@ -167,8 +186,11 @@ impl Previous {
             return Self::Rotate(generation);
         }
         match Snapshot::open(&dir.prev()) {
-            Ok(previous) => Self::Retain(previous.meta.generation),
+            Ok(previous) if has_required_schema(&previous) => {
+                Self::Retain(previous.meta.generation)
+            }
             Err(_) => Self::Drop,
+            Ok(_) => Self::Drop,
         }
     }
 
@@ -286,6 +308,13 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     })?;
     fault::point(&req.dir, "prechecked");
     let (generation, current_gen) = next_generation(&req.dir);
+    // Only full-scan rotation needs the application-schema check. Refresh
+    // uses next_generation too and must not pay for seven PRAGMA queries.
+    let current_gen = current_gen.filter(|_| {
+        Snapshot::open(&req.dir.current())
+            .ok()
+            .is_some_and(|snapshot| has_required_schema(&snapshot))
+    });
     let previous = Previous::for_scan(&req.dir, req.keep_previous, current_gen);
     let prev_generation = previous.generation();
     // State/current may both be unreadable: the retained bytes still establish
