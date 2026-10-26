@@ -19,10 +19,10 @@ mod mounts;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::job::{denied_paths, denied_warning};
-use crate::platform::{self, FsStats};
-use crate::queries::common::{Paths, normalize, resolve, shell_path_word};
+use crate::platform;
+use crate::queries::common::{Paths, Row, normalize, resolve, shell_path_word};
 use crate::scan::tree::LinkPolicy;
-use crate::scan::{self, Kind, MountRow, NO_PARENT, Node, RootInfo, Tree, flags};
+use crate::scan::{self, Kind, MountRow, RootInfo, Tree, flags};
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
 use crate::snapshot::reader::Snapshot;
 use crate::snapshot::writer::{self, RefreshRow, Reserve, WriteMeta, WriteStats};
@@ -52,199 +52,10 @@ pub struct RefreshReport {
     pub denied: Vec<String>,
 }
 
-/// Old hardlink row: (raw id, dev, ino, allocated, apparent, was_owner).
-type OldLink = (u32, u64, u64, u64, u64, bool);
-
-pub struct Loaded {
-    pub tree: Tree,
-    /// snapshot id → raw id
-    pub raw_of: Vec<u32>,
-    pub links: Vec<OldLink>,
-}
-
-/// Load a published snapshot into a walker-shaped tree (contiguous, name-ordered
-/// child ranges) with own values per node.
-pub fn load_tree(snap: &Snapshot) -> Result<Loaded> {
-    let conn = &snap.conn;
-    let n: i64 = conn.query_row("SELECT count(*) FROM entries", [], |r| r.get(0))?;
-    let n = n as usize;
-    let mut parent: Vec<u32> = Vec::with_capacity(n);
-    let mut child_count = vec![0u32; n];
-    {
-        let mut st = conn.prepare("SELECT id, parent_id FROM entries ORDER BY id")?;
-        let mut rows = st.query([])?;
-        while let Some(r) = rows.next()? {
-            let id: i64 = r.get(0)?;
-            if id as usize != parent.len() {
-                return Err(Error::generic("snapshot ids are not dense"));
-            }
-            let p: Option<i64> = r.get(1)?;
-            match p {
-                Some(p) => {
-                    parent.push(p as u32);
-                    child_count[p as usize] += 1;
-                }
-                None => parent.push(NO_PARENT),
-            }
-        }
-    }
-    let roots: Vec<u32> = (0..n as u32)
-        .filter(|&i| parent[i as usize] == NO_PARENT)
-        .collect();
-    let mut block_start = vec![0u32; n];
-    let mut next = roots.len() as u32;
-    for id in 0..n {
-        if child_count[id] > 0 {
-            block_start[id] = next;
-            next += child_count[id];
-        }
-    }
-    let mut fill = block_start.clone();
-    let mut raw_of = vec![0u32; n];
-    let mut root_idx = 0u32;
-    for id in 0..n {
-        let p = parent[id];
-        raw_of[id] = if p == NO_PARENT {
-            root_idx += 1;
-            root_idx - 1
-        } else {
-            let r = fill[p as usize];
-            fill[p as usize] += 1;
-            r
-        };
-    }
-    drop(fill);
-
-    let mut tree = Tree {
-        started_at: snap.meta.scanned_at,
-        ..Default::default()
-    };
-    tree.nodes.resize(n, Node::default());
-    {
-        let mut st = conn.prepare(
-            "SELECT id, name, kind, flags, allocated, apparent, mtime, nlink, errors, scanned_at FROM entries ORDER BY id",
-        )?;
-        let mut rows = st.query([])?;
-        while let Some(r) = rows.next()? {
-            let id = r.get::<_, i64>(0)? as usize;
-            let name: Vec<u8> = r.get(1)?;
-            let (off, len) = tree.push_name(&name);
-            let raw = raw_of[id] as usize;
-            let p = parent[id];
-            let fl = r.get::<_, i64>(3)? as u8 & !flags::ALIAS;
-            tree.nodes[raw] = Node {
-                allocated: r.get::<_, i64>(4)? as u64,
-                apparent: r.get::<_, i64>(5)? as u64,
-                mtime: r.get(6)?,
-                scanned_at: r.get(9)?,
-                name_off: off,
-                name_len: len,
-                parent: if p == NO_PARENT {
-                    NO_PARENT
-                } else {
-                    raw_of[p as usize]
-                },
-                child_start: if child_count[id] > 0 {
-                    block_start[id]
-                } else {
-                    0
-                },
-                child_count: child_count[id],
-                nlink: r.get::<_, i64>(7)? as u32,
-                errors: r.get::<_, i64>(8)? as u32,
-                kind: r.get::<_, i64>(2)? as u8,
-                flags: fl,
-                ..Default::default()
-            };
-        }
-    }
-    // Own values: subtract each child's aggregate from its parent. In preorder a
-    // child is visited before its own children, so it still holds its aggregate.
-    for id in 0..n {
-        let p = parent[id];
-        if p == NO_PARENT {
-            continue;
-        }
-        let c = tree.nodes[raw_of[id] as usize];
-        let pn = &mut tree.nodes[raw_of[p as usize] as usize];
-        pn.allocated = pn.allocated.saturating_sub(c.allocated);
-        pn.apparent = pn.apparent.saturating_sub(c.apparent);
-        pn.errors = pn.errors.saturating_sub(c.errors);
-    }
-    // Hardlinks carry their real sizes (aliases were stored as 0).
-    let mut links = Vec::new();
-    {
-        let mut st = conn.prepare(
-            "SELECT h.entry_id, h.dev, h.ino, h.allocated, h.apparent, (e.flags & 2) = 0
-             FROM hardlinks h JOIN entries e ON e.id = h.entry_id ORDER BY h.entry_id",
-        )?;
-        let mut rows = st.query([])?;
-        while let Some(r) = rows.next()? {
-            let raw = raw_of[r.get::<_, i64>(0)? as usize];
-            let (dev, ino) = (r.get::<_, i64>(1)? as u64, r.get::<_, i64>(2)? as u64);
-            let (a, ap) = (r.get::<_, i64>(3)? as u64, r.get::<_, i64>(4)? as u64);
-            let owner: bool = r.get(5)?;
-            let nd = &mut tree.nodes[raw as usize];
-            nd.allocated = a;
-            nd.apparent = ap;
-            tree.hardlinks.push((raw, dev, ino));
-            links.push((raw, dev, ino, a, ap, owner));
-        }
-    }
-    {
-        let mut st = conn.prepare(
-            "SELECT entry_id, path, fs_type, fs_used, fs_total, fs_avail, inodes_used FROM roots ORDER BY entry_id",
-        )?;
-        let mut rows = st.query([])?;
-        while let Some(r) = rows.next()? {
-            let path: Vec<u8> = r.get(1)?;
-            let used = r.get::<_, i64>(3)? as u64;
-            let total = r.get::<_, i64>(4)? as u64;
-            let inodes_used: Option<i64> = r.get(6)?;
-            tree.roots.push(RootInfo {
-                path: PathBuf::from(std::ffi::OsStr::from_bytes(&path)),
-                dev: 0,
-                fs_type: r.get(2)?,
-                stats: FsStats {
-                    total,
-                    used,
-                    free: total.saturating_sub(used),
-                    avail: r.get::<_, i64>(5)? as u64,
-                    inodes_total: inodes_used.unwrap_or(0) as u64,
-                    inodes_free: 0,
-                },
-            });
-        }
-    }
-    {
-        let mut st =
-            conn.prepare("SELECT entry_id, path, fs_type, fs_used, fs_total FROM mounts")?;
-        let mut rows = st.query([])?;
-        while let Some(r) = rows.next()? {
-            let path: Vec<u8> = r.get(1)?;
-            let used: Option<i64> = r.get(3)?;
-            let total: Option<i64> = r.get(4)?;
-            tree.mounts.push(MountRow {
-                raw: raw_of[r.get::<_, i64>(0)? as usize],
-                path: PathBuf::from(std::ffi::OsStr::from_bytes(&path)),
-                fs_type: r.get(2)?,
-                stats: match (used, total) {
-                    (Some(u), Some(t)) => Some(FsStats {
-                        used: u as u64,
-                        total: t as u64,
-                        ..Default::default()
-                    }),
-                    _ => None,
-                },
-            });
-        }
-    }
-    Ok(Loaded {
-        tree,
-        raw_of,
-        links,
-    })
-}
+#[path = "refresh/load.rs"]
+mod load;
+use load::OldLink;
+pub use load::{Loaded, load_tree};
 
 /// Replace the subtree at raw `x` with `sub` (a walk rooted at the same path);
 /// `None` = the path is gone on disk and `x` is dropped. Returns the hardlink policy.
@@ -267,6 +78,11 @@ pub fn graft(
     tree.hardlinks.retain(|h| !removed.contains_key(&h.0));
     tree.mounts.retain(|m| !removed.contains_key(&m.raw));
 
+    let new_links = replace_subtree(tree, x, sub);
+    hardlink_policy(tree, &loaded.links, &removed, &new_links, conn_paths)
+}
+
+fn replace_subtree(tree: &mut Tree, x: u32, sub: Option<Tree>) -> Vec<(u32, u64, u64)> {
     let mut new_links: Vec<(u32, u64, u64)> = Vec::new();
     match sub {
         None => {
@@ -317,6 +133,16 @@ pub fn graft(
         }
     }
 
+    new_links
+}
+
+fn hardlink_policy(
+    tree: &Tree,
+    old_links: &[OldLink],
+    removed: &HashMap<u32, i64>,
+    new_links: &[(u32, u64, u64)],
+    conn_paths: &mut Paths<'_>,
+) -> Result<LinkPolicy> {
     // Hardlink rules (T19, OV-11). Per inode: a previous owner that is still
     // known keeps the size; otherwise count the links we know of (old rows
     // outside the subtree + links seen by this walk). Fewer than `nlink` means
@@ -324,11 +150,11 @@ pub fn graft(
     // or a link made outside since), so nobody here is counted.
     let mut policy = LinkPolicy::default();
     let mut old_by_key: HashMap<(u64, u64), Vec<&OldLink>> = HashMap::new();
-    for l in &loaded.links {
+    for l in old_links {
         old_by_key.entry((l.1, l.2)).or_default().push(l);
     }
     let mut new_by_key: HashMap<(u64, u64), Vec<u32>> = HashMap::new();
-    for &(raw, dev, ino) in &new_links {
+    for &(raw, dev, ino) in new_links {
         new_by_key.entry((dev, ino)).or_default().push(raw);
     }
     let mut keys: Vec<(u64, u64)> = old_by_key
@@ -400,15 +226,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     publish::cleanup_tmp(&req.dir);
     let snap = Snapshot::open_current(&req.dir)?;
     let (x, xpath) = resolve(&snap, &path)?;
-    match x.kind() {
-        Kind::Dir => {}
-        Kind::Mount => {
-            return Err(Error::usage(format!(
-                "{label} is a mount point outside this root's filesystem; refresh is per filesystem"
-            )));
-        }
-        _ => return Err(Error::usage(format!("{label} is not a directory"))),
-    }
+    check_target(&x, label)?;
     let started = platform::now_secs();
     let seen = Arc::new(AtomicU64::new(0));
     let pw = ProgressWriter::start(
@@ -425,7 +243,83 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let load_seconds = t.elapsed().as_secs_f64();
 
     let t = Instant::now();
-    let os_path = PathBuf::from(std::ffi::OsStr::from_bytes(&xpath));
+    let sub = rescan_subtree(
+        &snap,
+        &loaded.tree.roots,
+        &x,
+        &xpath,
+        req.workers,
+        seen,
+        label,
+    )?;
+    let walk_seconds = t.elapsed().as_secs_f64();
+    let removed = sub.is_none();
+    let subtree_entries = sub.as_ref().map(|t| t.nodes.len() as u64).unwrap_or(0);
+
+    let t = Instant::now();
+    let mut paths = Paths::new(&snap.conn);
+    let policy = graft(&mut loaded, x.id, x.subtree_end, sub, &mut paths)?;
+    drop(paths);
+    let mut tree = loaded.tree;
+    update_fs_stats(&mut tree, &xpath);
+    let fin = tree.finalize_with(&policy);
+    let finalize_seconds = t.elapsed().as_secs_f64();
+    let denied = denied_paths(&tree, &fin);
+
+    pw.set_stage(progress::STAGE_WRITE);
+    precheck(&req.dir, fin.order.len() as u64)?;
+    crate::fault::point(&req.dir, "prechecked");
+    let (generation, _) = crate::job::next_generation(&req.dir);
+    let meta = refresh_meta(&snap, generation, &xpath, started)?;
+    let tmp = req.dir.tmp(generation);
+    let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
+    drop(snap);
+    crate::fault::point(&req.dir, "written");
+
+    pw.set_stage(progress::STAGE_PUBLISH);
+    let t = Instant::now();
+    publish::publish_current(&req.dir, &tmp)?;
+    let publish_seconds = t.elapsed().as_secs_f64();
+    drop(pw);
+
+    record_success(&req.dir, generation, &denied)?;
+
+    Ok(RefreshReport {
+        generation,
+        path: label.to_string(),
+        entries: fin.order.len() as u64,
+        subtree_entries,
+        removed,
+        load_seconds,
+        walk_seconds,
+        finalize_seconds,
+        write: ws,
+        publish_seconds,
+        total_seconds: t_all.elapsed().as_secs_f64(),
+        snapshot_bytes: ws.bytes,
+        denied,
+    })
+}
+
+fn check_target(x: &Row, label: &str) -> Result<()> {
+    match x.kind() {
+        Kind::Dir => {}
+        Kind::Mount => {
+            return Err(Error::usage(format!(
+                "{label} is a mount point outside this root's filesystem; refresh is per filesystem"
+            )));
+        }
+        _ => return Err(Error::usage(format!("{label} is not a directory"))),
+    }
+    Ok(())
+}
+
+fn subtree_exists(
+    os_path: &Path,
+    roots: &[RootInfo],
+    one_file_system: bool,
+    label: &str,
+) -> Result<bool> {
     // Only a missing path can remove the cached subtree. Other stat failures
     // (for example, an unsearchable ancestor) must leave the snapshot intact.
     let exists = match os_path.symlink_metadata() {
@@ -444,91 +338,83 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
         }
         Ok(m) => {
             use std::os::unix::fs::MetadataExt;
-            mounts::check(
-                &os_path,
-                Some(m.dev()),
-                &loaded.tree.roots,
-                snap.meta.one_file_system,
-                label,
-            )?;
+            mounts::check(os_path, Some(m.dev()), roots, one_file_system, label)?;
             true
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            mounts::check(
-                &os_path,
-                None,
-                &loaded.tree.roots,
-                snap.meta.one_file_system,
-                label,
-            )?;
+            mounts::check(os_path, None, roots, one_file_system, label)?;
             false
         }
         Err(e) => return Err(Error::io(format!("stat {label}"), e)),
     };
-    let sub = if exists {
-        let opts = scan::WalkOptions {
-            roots: vec![os_path.clone()],
-            one_file_system: snap.meta.one_file_system,
-            workers: req.workers,
-            seen,
-            expected: Some(x.items as u64 + 1),
-        };
-        let t =
-            scan::walk(&opts).map_err(|e| Error::generic(format!("refresh walk failed: {e}")))?;
-        if t.nodes.is_empty() || t.roots[0].path.as_os_str().as_bytes() != xpath.as_slice() {
-            return Err(Error::usage(format!(
-                "{label} resolves to {} on disk (symlink?); refresh the real path",
-                t.roots
-                    .first()
-                    .map(|r| r.path.display().to_string())
-                    .unwrap_or_default()
-            )));
-        }
-        Some(t)
-    } else {
+    Ok(exists)
+}
+
+fn rescan_subtree(
+    snap: &Snapshot,
+    roots: &[RootInfo],
+    x: &Row,
+    xpath: &[u8],
+    workers: usize,
+    seen: Arc<AtomicU64>,
+    label: &str,
+) -> Result<Option<Tree>> {
+    let os_path = PathBuf::from(std::ffi::OsStr::from_bytes(xpath));
+    if !subtree_exists(&os_path, roots, snap.meta.one_file_system, label)? {
         if x.parent_id.is_none() {
             return Err(Error::usage(format!(
                 "root {label} no longer exists; run a full scan"
             )));
         }
-        None
+        return Ok(None);
+    }
+    let opts = scan::WalkOptions {
+        roots: vec![os_path.clone()],
+        one_file_system: snap.meta.one_file_system,
+        workers,
+        seen,
+        expected: Some(x.items as u64 + 1),
     };
-    let walk_seconds = t.elapsed().as_secs_f64();
-    let removed = sub.is_none();
-    let subtree_entries = sub.as_ref().map(|t| t.nodes.len() as u64).unwrap_or(0);
+    let t = scan::walk(&opts).map_err(|e| Error::generic(format!("refresh walk failed: {e}")))?;
+    if t.nodes.is_empty() || t.roots[0].path.as_os_str().as_bytes() != xpath {
+        return Err(Error::usage(format!(
+            "{label} resolves to {} on disk (symlink?); refresh the real path",
+            t.roots
+                .first()
+                .map(|r| r.path.display().to_string())
+                .unwrap_or_default()
+        )));
+    }
+    Ok(Some(t))
+}
 
-    let t = Instant::now();
-    let mut paths = Paths::new(&snap.conn);
-    let policy = graft(&mut loaded, x.id, x.subtree_end, sub, &mut paths)?;
-    drop(paths);
-    let mut tree = loaded.tree;
+fn update_fs_stats(tree: &mut Tree, xpath: &[u8]) {
     // a refresh usually follows a cleanup: the free space shown "at scan"
     // should move with it
     if let Some(r) = tree
         .roots
         .iter_mut()
-        .filter(|r| is_under(&xpath, r.path.as_os_str().as_bytes()))
+        .filter(|r| is_under(xpath, r.path.as_os_str().as_bytes()))
         .max_by_key(|r| r.path.as_os_str().len())
         && scan::walk::statvfs_safe(&r.fs_type)
         && let Ok(st) = platform::statvfs(&r.path)
     {
         r.stats = st;
     }
-    let fin = tree.finalize_with(&policy);
-    let finalize_seconds = t.elapsed().as_secs_f64();
-    let denied = denied_paths(&tree, &fin);
+}
 
-    pw.set_stage(progress::STAGE_WRITE);
-    publish::precheck(&req.dir, Some(fin.order.len() as u64), 2).map_err(|mut e| {
+fn precheck(dir: &SnapshotDir, entries: u64) -> Result<publish::PrecheckInfo> {
+    publish::precheck(dir, Some(entries), 2).map_err(|mut e| {
         e.last_error = Some(state::LastError {
             ts: platform::now_secs(),
             op: "precheck".into(),
             message: e.message.clone(),
         });
         e
-    })?;
-    crate::fault::point(&req.dir, "prechecked");
-    let (generation, _) = crate::job::next_generation(&req.dir);
+    })
+}
+
+fn refresh_meta(snap: &Snapshot, generation: u64, xpath: &[u8], started: i64) -> Result<WriteMeta> {
     let mut meta = WriteMeta::new(generation, snap.meta.prev_generation, snap.meta.scanned_at);
     meta.one_file_system = snap.meta.one_file_system;
     meta.host = snap.meta.host.clone();
@@ -547,43 +433,22 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
             .collect::<rusqlite::Result<Vec<_>>>()?;
     }
     meta.refreshes.push(RefreshRow {
-        path: xpath.clone(),
+        path: xpath.to_vec(),
         scanned_at: started,
         generation,
     });
-    let tmp = req.dir.tmp(generation);
-    let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
-    drop(snap);
-    crate::fault::point(&req.dir, "written");
+    Ok(meta)
+}
 
-    pw.set_stage(progress::STAGE_PUBLISH);
-    let t = Instant::now();
-    publish::publish_current(&req.dir, &tmp)?;
-    let publish_seconds = t.elapsed().as_secs_f64();
-    drop(pw);
-
-    let mut st = state::read(&req.dir).ok().flatten().unwrap_or_default();
+fn record_success(dir: &SnapshotDir, generation: u64, denied: &[String]) -> Result<()> {
+    let mut st = state::read(dir).ok().flatten().unwrap_or_default();
     st.last_error = None;
     st.last_success_ts = Some(platform::now_secs());
     st.current_generation = Some(generation);
-    st.warnings = denied_warning(&denied).into_iter().collect();
-    state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
+    st.warnings = denied_warning(denied).into_iter().collect();
+    state::write(dir, &st).map_err(|e| Error::io("write state.json", e))?;
 
-    Ok(RefreshReport {
-        generation,
-        path: label.to_string(),
-        entries: fin.order.len() as u64,
-        subtree_entries,
-        removed,
-        load_seconds,
-        walk_seconds,
-        finalize_seconds,
-        write: ws,
-        publish_seconds,
-        total_seconds: t_all.elapsed().as_secs_f64(),
-        snapshot_bytes: ws.bytes,
-        denied,
-    })
+    Ok(())
 }
 
 /// `path` is `root` or lies below it.

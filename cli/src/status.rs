@@ -126,9 +126,7 @@ fn stamp(ts: i64) -> String {
     format!("{} {}", format::local_date(ts), format::local_hm(ts))
 }
 
-fn details(s: &Summary) -> String {
-    let r = &s.status;
-    let mut rows: Vec<(String, String)> = Vec::new();
+fn append_snapshot_rows(r: &StatusResponse, rows: &mut Vec<(String, String)>) {
     rows.push((
         "host".into(),
         format!("{} · {} · freespace {}", r.host, r.os, r.version),
@@ -173,6 +171,12 @@ fn details(s: &Summary) -> String {
             ),
         ));
     }
+}
+
+fn details(s: &Summary) -> String {
+    let r = &s.status;
+    let mut rows: Vec<(String, String)> = Vec::new();
+    append_snapshot_rows(r, &mut rows);
     for x in &r.refreshed {
         rows.push((
             "refreshed".into(),

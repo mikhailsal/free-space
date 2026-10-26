@@ -35,7 +35,26 @@ fn build(dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
         Ok(s) => (s, None),
         Err(e) => (None, Some(e)),
     };
-    let mut resp = StatusResponse {
+    let mut resp = initial_response(dir, scanning, prog, st.as_ref(), state_error);
+    let snap = match Snapshot::open_current(dir) {
+        Ok(s) => s,
+        Err(e) if e.code == ErrorCode::NoSnapshot && (allow_missing || resp.scanning.is_some()) => {
+            return Ok(resp);
+        }
+        Err(e) => return Err(e),
+    };
+    populate_snapshot(dir, &mut resp, snap)?;
+    Ok(resp)
+}
+
+fn initial_response(
+    dir: &SnapshotDir,
+    scanning: Option<lock::Scanning>,
+    prog: Option<progress::Progress>,
+    st: Option<&state::State>,
+    state_error: Option<String>,
+) -> StatusResponse {
+    StatusResponse {
         host: platform::hostname(),
         os: platform::os_name(),
         version: crate::VERSION.into(),
@@ -53,20 +72,16 @@ fn build(dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
         fs: Vec::new(),
         incomplete: false,
         unknown_subtrees: Vec::new(),
-        last_error: st.as_ref().and_then(|s| s.last_error.clone()),
-        last_success_ts: st.as_ref().and_then(|s| s.last_success_ts),
-        warnings: st.as_ref().map(|s| s.warnings.clone()).unwrap_or_default(),
+        last_error: st.and_then(|s| s.last_error.clone()),
+        last_success_ts: st.and_then(|s| s.last_success_ts),
+        warnings: st.map(|s| s.warnings.clone()).unwrap_or_default(),
         state_error,
         scanning,
         progress: prog,
-    };
-    let snap = match Snapshot::open_current(dir) {
-        Ok(s) => s,
-        Err(e) if e.code == ErrorCode::NoSnapshot && (allow_missing || resp.scanning.is_some()) => {
-            return Ok(resp);
-        }
-        Err(e) => return Err(e),
-    };
+    }
+}
+
+fn populate_snapshot(dir: &SnapshotDir, resp: &mut StatusResponse, snap: Snapshot) -> Result<()> {
     let m = &snap.meta;
     resp.host = m.host.clone();
     resp.os = m.os.clone();
@@ -81,6 +96,17 @@ fn build(dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
     resp.incomplete = incomplete;
     resp.unknown_subtrees = unknown;
 
+    populate_roots(resp, &snap, m.scanned_at)?;
+    if let Ok(prev) = Snapshot::open(&dir.prev()) {
+        resp.prev = Some(PrevOut {
+            generation: prev.meta.generation,
+            scanned_at: prev.meta.scanned_at,
+        });
+    }
+    Ok(())
+}
+
+fn populate_roots(resp: &mut StatusResponse, snap: &Snapshot, scanned_at: i64) -> Result<()> {
     let mut st = snap.conn.prepare_cached(
         "SELECT r.path, r.fs_type, e.allocated, e.items, r.fs_used, r.fs_total, r.fs_avail, e.min_scanned_at
          FROM roots r JOIN entries e ON e.id = r.entry_id ORDER BY r.entry_id",
@@ -99,7 +125,7 @@ fn build(dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
-    let mut oldest = m.scanned_at;
+    let mut oldest = scanned_at;
     for (path, fs_type, alloc, items, used, total, avail, min_sc) in rows {
         oldest = oldest.min(min_sc);
         let p = lossy(&path);
@@ -122,11 +148,5 @@ fn build(dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
         });
     }
     resp.age_seconds = Some((now_secs() - oldest).max(0));
-    if let Ok(prev) = Snapshot::open(&dir.prev()) {
-        resp.prev = Some(PrevOut {
-            generation: prev.meta.generation,
-            scanned_at: prev.meta.scanned_at,
-        });
-    }
-    Ok(resp)
+    Ok(())
 }

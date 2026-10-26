@@ -4,17 +4,17 @@
 //! the exact parent path so a parent-hash collision cannot cross-pair rows.
 
 use std::collections::HashMap;
-use std::hash::{BuildHasher, RandomState};
 
 use rusqlite::{Connection, params};
 
 use super::common::{COLS, Paths, Row, find_path, header, lossy, normalize, raw_if_lossy};
 use super::params::{DiffParams, KindFilter, MAX_DEPTH, PathArg, check_limit};
-use super::types::{DiffEntry, DiffResponse, DiffStatus, Refreshed};
+use super::types::{DiffResponse, Refreshed};
 use crate::error::{Error, ErrorCode, Result};
-use crate::scan::Kind;
 use crate::snapshot::SnapshotDir;
 use crate::snapshot::reader::Snapshot;
+
+mod pair;
 
 pub fn no_prev(msg: &str) -> Error {
     Error::new(ErrorCode::NoPrev, format!("no previous generation: {msg}"))
@@ -278,157 +278,13 @@ pub fn diff_pair(
         Some(x) => denied_prev_ranges(cur, prev, x)?,
         None => Vec::new(),
     };
-    let mut prev_rows: Vec<Option<LevelRow>> = prev_rows.into_iter().map(Some).collect();
-    let mut prev_next = vec![None; prev_rows.len()];
-    let mut prev_prev = vec![None; prev_rows.len()];
-    let name_hasher = RandomState::new();
-    let mut prev_by_key: HashMap<(i64, u64, Option<i64>), usize> =
-        HashMap::with_capacity(prev_rows.len());
-    for (i, row) in prev_rows.iter().enumerate() {
-        let row = row.as_ref().expect("previous row is present");
-        let key = (
-            row.hash,
-            name_hasher.hash_one(&row.row.name),
-            row.parent_hash,
-        );
-        prev_next[i] = prev_by_key.insert(key, i);
-        if let Some(next) = prev_next[i] {
-            prev_prev[next] = Some(i);
-        }
-    }
     let mut cpaths = Paths::new(&cur.conn);
     let mut ppaths = Paths::new(&prev.conn);
-    // (current row, prev row)
-    let mut pairs: Vec<(Option<LevelRow>, Option<LevelRow>)> = Vec::new();
-    for c in cur_rows {
-        let mut candidate: Option<usize> = None;
-        let key = (c.hash, name_hasher.hash_one(&c.row.name), c.parent_hash);
-        let mut cursor = prev_by_key.get(&key).copied();
-        while let Some(i) = cursor {
-            let row = prev_rows[i]
-                .as_ref()
-                .expect("linked previous row is present");
-            if row.row.name == c.row.name
-                && same_parent_path(&mut cpaths, c.row.parent_id, &mut ppaths, row.row.parent_id)?
-                && candidate.is_none_or(|best| {
-                    row.row.id
-                        < prev_rows[best]
-                            .as_ref()
-                            .expect("candidate previous row is present")
-                            .row
-                            .id
-                })
-            {
-                candidate = Some(i);
-            }
-            cursor = prev_next[i];
-        }
-        let pm = if let Some(i) = candidate {
-            if let Some(previous) = prev_prev[i] {
-                prev_next[previous] = prev_next[i];
-            } else if let Some(next) = prev_next[i] {
-                prev_by_key.insert(key, next);
-            } else {
-                prev_by_key.remove(&key);
-            }
-            if let Some(next) = prev_next[i] {
-                prev_prev[next] = prev_prev[i];
-            }
-            prev_rows[i].take()
-        } else {
-            None
-        };
-        pairs.push((Some(c), pm));
-    }
-    for pr in prev_rows.into_iter().flatten() {
-        if denied
-            .iter()
-            .any(|&(a, b)| pr.row.id >= a && pr.row.id <= b)
-        {
-            continue; // not observed this time, not gone (OV-3)
-        }
-        pairs.push((None, Some(pr)));
-    }
-    let delta_of = |c: &Option<LevelRow>, p: &Option<LevelRow>| {
-        c.as_ref().map(|r| r.row.allocated).unwrap_or(0)
-            - p.as_ref().map(|r| r.row.allocated).unwrap_or(0)
-    };
-    pairs.sort_by(|a, b| {
-        let (da, db) = (delta_of(&a.0, &a.1), delta_of(&b.0, &b.1));
-        db.unsigned_abs()
-            .cmp(&da.unsigned_abs())
-            .then((db > 0).cmp(&(da > 0)))
-            .then_with(|| {
-                let na = a.0.as_ref().or(a.1.as_ref()).map(|r| &r.row.name);
-                let nb = b.0.as_ref().or(b.1.as_ref()).map(|r| &r.row.name);
-                na.cmp(&nb)
-            })
-            .then_with(|| {
-                // deterministic: current rows by id, then gone rows by their prev id
-                let key = |x: &(Option<LevelRow>, Option<LevelRow>)| match (&x.0, &x.1) {
-                    (Some(c), _) => (0, c.row.id),
-                    (None, Some(p)) => (1, p.row.id),
-                    (None, None) => (2, 0),
-                };
-                key(a).cmp(&key(b))
-            })
-    });
+    let mut pairs = pair::match_rows(cur_rows, prev_rows, &denied, &mut cpaths, &mut ppaths)?;
+    pair::sort_pairs(&mut pairs);
     let total_count = pairs.len() as u64;
     pairs.truncate(limit as usize);
-    let mut entries = Vec::with_capacity(pairs.len());
-    for (c, pv) in &pairs {
-        if let (Some(c), Some(pv)) = (c, pv) {
-            let same_parent =
-                same_parent_path(&mut cpaths, c.row.parent_id, &mut ppaths, pv.row.parent_id)?;
-            if c.row.name != pv.row.name || !same_parent {
-                return Err(Error::new(
-                    ErrorCode::HashCollision,
-                    format!(
-                        "path hash collision between {} (current) and {} (prev)",
-                        lossy(&cpaths.path(c.row.id)?),
-                        lossy(&ppaths.path(pv.row.id)?)
-                    ),
-                )
-                .with_fix("report this at https://github.com/mikhailsal/free-space/issues; ls and top are unaffected"));
-            }
-        }
-        let (src, paths) = match c {
-            Some(c) => (&c.row, &mut cpaths),
-            None => (&pv.as_ref().expect("one side present").row, &mut ppaths),
-        };
-        let full = paths.path(src.id)?;
-        let allocated = c
-            .as_ref()
-            .map(|r| r.row.allocated.max(0) as u64)
-            .unwrap_or(0);
-        let allocated_prev = pv
-            .as_ref()
-            .map(|r| r.row.allocated.max(0) as u64)
-            .unwrap_or(0);
-        let items = c.as_ref().map(|r| r.row.items.max(0) as u64).unwrap_or(0);
-        let items_prev = pv.as_ref().map(|r| r.row.items.max(0) as u64).unwrap_or(0);
-        let delta = allocated as i64 - allocated_prev as i64;
-        let status = match (c, pv) {
-            (Some(_), None) => DiffStatus::New,
-            (None, Some(_)) => DiffStatus::Gone,
-            _ if delta != 0 || items != items_prev => DiffStatus::Changed,
-            _ => DiffStatus::Same,
-        };
-        entries.push(DiffEntry {
-            path: lossy(&full),
-            path_raw: raw_if_lossy(&full),
-            name: lossy(&src.name),
-            kind: Kind::from_code(src.kind),
-            status,
-            allocated,
-            allocated_prev,
-            delta,
-            items,
-            items_prev,
-            mtime: src.mtime,
-            newest_mtime: src.newest_mtime,
-        });
-    }
+    let entries = pair::entries(&pairs, &mut cpaths, &mut ppaths)?;
     let refreshed = refreshes(&cur.conn)?;
     let roots_changed = root_paths(&cur.conn)? != root_paths(&prev.conn)?;
     let x_delta = xc.as_ref().map(|r| r.allocated).unwrap_or(0)

@@ -253,49 +253,63 @@ pub fn run_scan(req: ScanRequest) -> Result<ScanReport> {
     r
 }
 
-fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
+fn scan_locked(mut req: ScanRequest, label: &str) -> Result<ScanReport> {
     let t_all = Instant::now();
-    publish::cleanup_tmp(&req.dir);
-    if req.roots.is_empty() {
-        return Err(Error::new(ErrorCode::Config, "no roots to scan").with_fix(
-            "pass a path (freespace scan /) or set roots in /etc/freespace/config.toml",
-        ));
-    }
-    let seen = Arc::new(AtomicU64::new(0));
-    let expected = expected_entries(&req.roots);
-    let pw = ProgressWriter::start(
-        &req.dir,
-        "scan",
-        label,
-        seen.clone(),
-        expected,
-        req.on_progress,
-    );
-    let opts = scan::WalkOptions {
-        roots: req.roots.clone(),
-        one_file_system: req.one_file_system,
-        workers: req.workers,
-        seen,
-        expected,
-    };
-    let t = Instant::now();
-    let mut tree = scan::walk(&opts).map_err(|e| {
-        let code = if e.kind() == std::io::ErrorKind::InvalidInput
-            || e.kind() == std::io::ErrorKind::NotFound
-        {
-            ErrorCode::Usage
-        } else {
-            ErrorCode::Generic
-        };
-        Error::new(code, format!("scan failed: {e}"))
-    })?;
-    let walk_seconds = t.elapsed().as_secs_f64();
-    let t = Instant::now();
-    let fin = tree.finalize();
-    let finalize_seconds = t.elapsed().as_secs_f64();
-    let denied = denied_paths(&tree, &fin);
+    let ScanWalk {
+        pw,
+        tree,
+        fin,
+        walk_seconds,
+        finalize_seconds,
+        denied,
+    } = walk_scan(&mut req, label)?;
     fault::point(&req.dir, "walked");
 
+    let published = publish_scan(&req, &tree, &fin, pw, walk_seconds)?;
+    let mut st = state::read(&req.dir).ok().flatten().unwrap_or_default();
+    st.last_error = None;
+    st.last_success_ts = Some(platform::now_secs());
+    st.prev_generation = published.prev_generation;
+    st.current_generation = Some(published.generation);
+    st.warnings = denied_warning(&denied).into_iter().collect();
+    st.last_scan_seconds = Some(t_all.elapsed().as_secs_f64());
+    state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
+
+    let errors = tree
+        .roots
+        .iter()
+        .enumerate()
+        .map(|(i, _)| tree.nodes[i].errors as u64)
+        .sum();
+    Ok(ScanReport {
+        generation: published.generation,
+        prev_generation: published.prev_generation,
+        entries: tree.nodes.len() as u64,
+        walk_seconds,
+        finalize_seconds,
+        write: published.write,
+        publish_seconds: published.publish_seconds,
+        total_seconds: t_all.elapsed().as_secs_f64(),
+        snapshot_bytes: published.write.bytes,
+        denied,
+        errors,
+    })
+}
+
+struct PublishedScan {
+    generation: u64,
+    prev_generation: Option<u64>,
+    write: WriteStats,
+    publish_seconds: f64,
+}
+
+fn publish_scan(
+    req: &ScanRequest,
+    tree: &Tree,
+    fin: &Finalized,
+    pw: ProgressWriter,
+    walk_seconds: f64,
+) -> Result<PublishedScan> {
     pw.set_stage(progress::STAGE_WRITE);
     let factor = if req.keep_previous { 3 } else { 2 };
     publish::precheck(&req.dir, Some(tree.nodes.len() as u64), factor).map_err(|mut e| {
@@ -324,7 +338,7 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     meta.one_file_system = req.one_file_system;
     meta.scan_seconds = Some(walk_seconds);
     let tmp = req.dir.tmp(generation);
-    let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
+    let ws = writer::write_snapshot(&tmp, tree, fin, &meta, &Reserve::new(req.dir.as_path()))?;
     fault::point(&req.dir, "written");
 
     pw.set_stage(progress::STAGE_PUBLISH);
@@ -339,32 +353,69 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     let publish_seconds = t.elapsed().as_secs_f64();
     drop(pw);
 
-    let mut st = state::read(&req.dir).ok().flatten().unwrap_or_default();
-    st.last_error = None;
-    st.last_success_ts = Some(platform::now_secs());
-    st.prev_generation = prev_generation;
-    st.current_generation = Some(generation);
-    st.warnings = denied_warning(&denied).into_iter().collect();
-    st.last_scan_seconds = Some(t_all.elapsed().as_secs_f64());
-    state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
-
-    let errors = tree
-        .roots
-        .iter()
-        .enumerate()
-        .map(|(i, _)| tree.nodes[i].errors as u64)
-        .sum();
-    Ok(ScanReport {
+    Ok(PublishedScan {
         generation,
         prev_generation,
-        entries: tree.nodes.len() as u64,
-        walk_seconds,
-        finalize_seconds,
         write: ws,
         publish_seconds,
-        total_seconds: t_all.elapsed().as_secs_f64(),
-        snapshot_bytes: ws.bytes,
+    })
+}
+
+struct ScanWalk {
+    pw: ProgressWriter,
+    tree: Tree,
+    fin: Finalized,
+    walk_seconds: f64,
+    finalize_seconds: f64,
+    denied: Vec<String>,
+}
+
+fn walk_scan(req: &mut ScanRequest, label: &str) -> Result<ScanWalk> {
+    publish::cleanup_tmp(&req.dir);
+    if req.roots.is_empty() {
+        return Err(Error::new(ErrorCode::Config, "no roots to scan").with_fix(
+            "pass a path (freespace scan /) or set roots in /etc/freespace/config.toml",
+        ));
+    }
+    let seen = Arc::new(AtomicU64::new(0));
+    let expected = expected_entries(&req.roots);
+    let pw = ProgressWriter::start(
+        &req.dir,
+        "scan",
+        label,
+        seen.clone(),
+        expected,
+        req.on_progress.take(),
+    );
+    let opts = scan::WalkOptions {
+        roots: req.roots.clone(),
+        one_file_system: req.one_file_system,
+        workers: req.workers,
+        seen,
+        expected,
+    };
+    let t = Instant::now();
+    let mut tree = scan::walk(&opts).map_err(|e| {
+        let code = if e.kind() == std::io::ErrorKind::InvalidInput
+            || e.kind() == std::io::ErrorKind::NotFound
+        {
+            ErrorCode::Usage
+        } else {
+            ErrorCode::Generic
+        };
+        Error::new(code, format!("scan failed: {e}"))
+    })?;
+    let walk_seconds = t.elapsed().as_secs_f64();
+    let t = Instant::now();
+    let fin = tree.finalize();
+    let finalize_seconds = t.elapsed().as_secs_f64();
+    let denied = denied_paths(&tree, &fin);
+    Ok(ScanWalk {
+        pw,
+        tree,
+        fin,
+        walk_seconds,
+        finalize_seconds,
         denied,
-        errors,
     })
 }
