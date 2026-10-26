@@ -1,5 +1,6 @@
 #!/bin/sh
 # Runs the given repo-relative test files, each with its own runner:
+#   core/*.rs, cli/*.rs       cargo test once per selected crate (source modules and integration helpers included)
 #   web/tests/unit/*.test.ts   bun test
 #   web/tests/e2e/*.spec.ts    Playwright (playwright.config.ts)
 #   web/tests/shots/*.spec.ts  Playwright with playwright.shots.config.ts, into
@@ -24,10 +25,14 @@ unit=
 e2e=
 shots=
 guard=
+rust_core=
+rust_cli=
 for f in "$@"; do
   case $f in
     # The lists below are split on spaces, so a path must not need quoting.
     *[!A-Za-z0-9._/-]* | *..*) say "$0: unsafe test path $f"; exit 2 ;;
+    core/*.rs) rust_core=core ;;
+    cli/*.rs) rust_cli=cli ;;
     web/tests/unit/*.test.ts) unit="$unit ./${f#web/}" ;;
     web/tests/e2e/*.spec.ts) e2e="$e2e ${f#web/}" ;;
     web/tests/shots/*.spec.ts) shots="$shots ${f#web/}" ;;
@@ -39,6 +44,10 @@ for f in "$@"; do
   # A runner given a missing file next to others runs the others and passes.
   [ -f "$root/$f" ] || { say "$0: no such test file $f"; exit 2; }
 done
+if [ -n "$rust_core$rust_cli" ] && ! command -v setsid >/dev/null 2>&1; then
+  say "$0: setsid not found (util-linux); it keeps Cargo and its tests in one cancellable group"
+  exit 2
+fi
 if [ -n "$e2e$shots$guard" ]; then
   if ! command -v flock >/dev/null 2>&1; then
     say "$0: flock not found (util-linux); it keeps two e2e runs in one checkout apart"
@@ -51,13 +60,33 @@ if [ -n "$e2e$shots$guard" ]; then
   esac
 fi
 
-cd "$root/web"
+cd "$root"
 child=
+cargo_group=
+launching=
+pending=
 # On a signal: pass it on to the running runner as TERM and reap it, so the lock outlives it; then the EXIT trap.
 stop() {
+  # Defer signals between launching setsid and recording $!: cleanup needs its PID.
+  if [ -n "$launching" ]; then
+    [ -n "$pending" ] || pending=$1
+    return
+  fi
   trap '' HUP INT TERM
   if [ -n "$child" ]; then
-    kill -TERM "$child" 2>/dev/null || :
+    if [ -n "$cargo_group" ]; then
+      # setsid may not have created the group yet: also stop the launch PID on that path.
+      grace=0
+      while [ "$grace" -lt 10 ]; do
+        kill -TERM "-$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || :
+        if ! kill -0 "-$child" 2>/dev/null && ! kill -0 "$child" 2>/dev/null; then break; fi
+        sleep 0.05
+        grace=$((grace + 1))
+      done
+      kill -KILL "-$child" 2>/dev/null || kill -KILL "$child" 2>/dev/null || :
+    else
+      kill -TERM "$child" 2>/dev/null || :
+    fi
     wait "$child" 2>/dev/null || :
   fi
   exit "$1"
@@ -74,6 +103,28 @@ run() {
   child=
   return "$status"
 }
+
+# Cargo owns subprocesses that survive a signal to Cargo alone. Isolate only Cargo;
+# web runners retain their existing process and lock lifetime.
+run_cargo() {
+  launching=1
+  cargo_group=1
+  setsid "$@" &
+  child=$!
+  launching=
+  [ -z "$pending" ] || stop "$pending"
+  status=0
+  wait "$child" || status=$?
+  child='' cargo_group=''
+  return "$status"
+}
+
+# Cargo selects tests at crate granularity, including cfg(test) source modules and
+# integration-test helpers. Run each selected crate once, at low priority with bounded concurrency.
+for crate in $rust_core $rust_cli; do
+  run_cargo nice -n 19 cargo test -j 2 --manifest-path "$root/$crate/Cargo.toml" -- --test-threads=1 9<&-
+done
+cd "$root/web"
 
 # The runners get fd 9 closed (9<&-): a server orphaned by a killed run must not keep holding the lock.
 # shellcheck disable=SC2086

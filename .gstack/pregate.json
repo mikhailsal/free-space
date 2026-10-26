@@ -129,6 +129,12 @@
     "scripts/test-files.sh": [
       "web/tests/unit/test-files.test.ts"
     ],
+    "scripts/mount-fs.sh": [
+      "web/tests/unit/fs-harness.test.ts"
+    ],
+    "scripts/fault-fs.sh": [
+      "web/tests/unit/fs-harness.test.ts"
+    ],
     "install.sh": [],
     ".github/**": [],
     ".githooks/**": []

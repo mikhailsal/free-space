@@ -12,10 +12,27 @@ set -eu
 bin=$(realpath "$1")
 t=$(mktemp -d)
 cleanup() {
-    umount "$t/snap" 2>/dev/null || true
-    rm -rf "$t"
+    # a second signal must not cut the cleanup short
+    trap '' HUP INT QUIT PIPE TERM
+    # a paused scan would hold the mount: it goes first, and pid is cleared once reaped
+    if [ -n "${pid:-}" ]; then
+        kill -KILL "$pid" 2> /dev/null || true
+        wait "$pid" 2> /dev/null || true
+    fi
+    # a tmpfs that will not unmount stays, and rm must not walk into it
+    if umount "$t/snap" 2> /dev/null || ! mountpoint -q "$t/snap"; then
+        rm -rf --one-file-system "$t"
+    else
+        echo "cleanup: $t/snap is still mounted, $t left in place" >&2
+        exit 1
+    fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 131' QUIT
+trap 'exit 141' PIPE
+trap 'exit 143' TERM
 fail() {
     echo "FAIL: $*" >&2
     ls -la "$t/snap" >&2 || true
@@ -64,6 +81,7 @@ fallocate -l "$avail" "$t/snap/fill" 2> /dev/null || fallocate -l $((avail - 655
 rm "$t/snap/.pause-prechecked"
 code=0
 wait "$pid" || code=$?
+pid=
 [ "$code" = 1 ] || fail "write on a full disk: exit $code"
 jq -e '.error.code == "SPACE"' "$t/out.json" > /dev/null || fail "$(cat "$t/out.json")"
 [ "$(sums)" = "$before" ] || fail "a failed write changed a snapshot"
