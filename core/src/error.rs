@@ -274,7 +274,14 @@ impl Error {
 
 impl From<rusqlite::Error> for Error {
     fn from(e: rusqlite::Error) -> Self {
-        Error::generic(format!("sqlite: {e}"))
+        let code = if matches!(&e, rusqlite::Error::SqliteFailure(f, _)
+            if f.code == rusqlite::ErrorCode::DiskFull)
+        {
+            ErrorCode::Space
+        } else {
+            ErrorCode::Generic
+        };
+        Error::new(code, format!("sqlite: {e}"))
     }
 }
 

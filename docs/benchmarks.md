@@ -231,3 +231,65 @@ and other system/cgroup memory and cannot demonstrate a memory budget or OOM
 safety. A separately configured VM/cgroup and phase-aware profiling are needed
 for those acceptance checks. This infrastructure supplies measurements for #10
 and #11 and makes no speed or memory improvement claim.
+
+## Disk-backed full scan
+
+`scan --low-memory` (or config `low_memory = true`) streams individual entries and
+pending directory jobs to SQLite in the snapshot directory. It never retains the
+whole tree or an entire directory listing. An indexed DFS writes schema v1 rows,
+with one aggregate frame per traversal depth. Hardlink ownership still follows
+full byte-path order. Denied-path JSON is spooled and streamed without truncation.
+
+The mode uses one walker, overriding `workers`. Each of the two SQLite connections
+used during final writing has an 8 MiB cache target, with mmap disabled. Indexes
+are maintained from empty tables so index construction does not require a large
+sort. This is a working-set design, **not a hard process memory limit**. SQLite
+cache targets, allocator overhead, path depth, root/mount configuration and kernel
+page cache all affect memory. Use a cgroup when an operating-system limit matters.
+
+Temporary space includes the staging database and final snapshot simultaneously,
+plus any retained generations. Long directory paths and many hardlinks increase
+staging size. The initial space check uses the existing snapshot size; ongoing
+reserve checks cover staging and output. Interrupted temporary databases are
+removed on the next scan. The previous snapshot remains published until the new
+one is closed, fsynced and atomically renamed. Keep benchmark snapshots outside
+the fixture tree, and use a disk-backed filesystem rather than tmpfs.
+
+Finalization and final-row insertion are combined: `finalize_seconds` is zero in
+this mode; `insert_seconds` includes DFS aggregation and incremental index
+maintenance; `index_seconds` covers final analysis/closing. These phase timings
+are not directly comparable with the fast engine's separate finalize/index stages.
+`refresh` continues to use the existing in-memory engine.
+
+Build once and compare increasing tree sizes:
+
+```sh
+cargo build --release -p freespace
+STEPS="10000 100000 1000000" REPEATS=3 TMPDIR=/disk/scratch \
+  scripts/bench-scan-memory.py target/release/freespace ./bench-results
+```
+
+On a Linux host with a systemd user manager and memory-controller delegation,
+measure each run in a fresh cgroup with swap disabled:
+
+```sh
+STEPS="100000 1000000" MEMORY_MAX=128M TMPDIR=/disk/scratch \
+  scripts/bench-scan-memory.py target/release/freespace ./bench-results
+```
+
+The harness creates empty files, scans each size with both engines, checks entry
+counts and errors, then removes its own scratch tree. `FILES_PER_DIR` defaults to
+1000; setting it above the largest step exercises one very wide directory. Each
+run gets a fresh snapshot directory. A failed fast-engine run is retained so its
+OOM can be compared with the disk engine; a disk-engine failure stops the run.
+
+Results include a binary hash, host/configuration metadata, raw stdout/stderr,
+JSON reports, elapsed time, process peak RSS (KiB), sampled peak snapshot-directory
+disk occupancy, and constrained-run `memory.peak`, swap and OOM event counters.
+The measurement helper shares the cgroup, so its memory is included in cgroup
+usage; process RSS is the scanner's own peak. Sampling every 20 ms can miss brief
+disk peaks. This fixture has no denied paths, so the unlinked report spool does
+not contribute material disk usage. The harness measures whole-command RSS;
+it does not claim per-phase RSS. Cache state is uncontrolled and fixture creation
+warms metadata. Record source revision, filesystem, load and repetitions alongside
+results before generalizing to a VPS or Raspberry Pi.

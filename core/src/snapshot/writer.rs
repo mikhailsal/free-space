@@ -72,7 +72,7 @@ impl Reserve {
     }
 }
 
-fn reserve_error(have: u64, min_free: u64, dir: &Path) -> Error {
+pub(crate) fn reserve_error(have: u64, min_free: u64, dir: &Path) -> Error {
     let mut e = Error::new(
         ErrorCode::Space,
         format!(
@@ -151,7 +151,7 @@ fn write_inner(
     let t0 = Instant::now();
     conn.execute_batch("BEGIN")?;
     conn.execute_batch(CREATE_TABLES).map_err(map_err)?;
-    insert_metadata(&conn, fin, meta, &map_err)?;
+    insert_metadata(&conn, fin.order.len() as u64, meta, &map_err)?;
     insert_entries(&conn, tree, fin, &map_err)?;
     stats.rows = fin.order.len() as u64;
     insert_hardlinks(&conn, fin, &map_err)?;
@@ -222,9 +222,9 @@ fn install_reserve_guard(
     Ok(reserve_hit)
 }
 
-fn insert_metadata(
+pub(crate) fn insert_metadata(
     conn: &Connection,
-    fin: &Finalized,
+    entries: u64,
     meta: &WriteMeta,
     map_err: &impl Fn(rusqlite::Error) -> Error,
 ) -> Result<()> {
@@ -238,7 +238,7 @@ fn insert_metadata(
             meta.host,
             meta.os,
             snapshot_id(),
-            fin.order.len() as i64,
+            entries as i64,
             meta.one_file_system as i64,
             meta.scan_seconds,
             crate::VERSION,
@@ -394,7 +394,7 @@ fn insert_refreshes(
     Ok(())
 }
 
-fn sync_snapshot(path: &Path) -> Result<u64> {
+pub(crate) fn sync_snapshot(path: &Path) -> Result<u64> {
     let f = std::fs::OpenOptions::new()
         .read(true)
         .write(true)

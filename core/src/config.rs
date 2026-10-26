@@ -19,6 +19,8 @@ pub struct Config {
     pub keep_previous: bool,
     /// Walker threads; unset = min(CPUs, 8).
     pub workers: Option<usize>,
+    /// Use disk-backed staging for full scans.
+    pub low_memory: bool,
     /// `serve`/`gui` port; 0 = random.
     pub port: u16,
     pub interval: String,
@@ -32,6 +34,7 @@ impl Default for Config {
             snapshot_dir: PathBuf::from(DEFAULT_SNAPSHOT_DIR),
             keep_previous: true,
             workers: None,
+            low_memory: false,
             port: 0,
             interval: "daily".into(),
             at: "02:00".into(),
@@ -146,6 +149,9 @@ pub fn render(c: &Config) -> String {
     if let Some(w) = c.workers {
         s.push_str(&format!("workers = {w}\n"));
     }
+    if c.low_memory {
+        s.push_str("low_memory = true\n");
+    }
     s.push_str(&format!("port = {}\n", c.port));
     s.push_str(&format!("interval = {:?}\n", c.interval));
     s.push_str(&format!("at = {:?}\n", c.at));
@@ -163,6 +169,7 @@ mod tests {
         let c = Config {
             roots: vec!["/".into(), "/home".into()],
             workers: Some(4),
+            low_memory: true,
             ..Default::default()
         };
         assert_eq!(parse(&render(&c), p).unwrap(), c);

@@ -30,6 +30,7 @@ struct Fx {
 fn scan(root: &Path, dir: &SnapshotDir, keep_previous: bool) {
     job::run_scan(ScanRequest {
         roots: vec![root.to_path_buf()],
+        low_memory: false,
         one_file_system: true,
         workers: 2,
         dir: dir.clone(),
