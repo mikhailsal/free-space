@@ -1,3 +1,4 @@
+mod backend;
 mod bare;
 mod completions;
 mod crash;
@@ -62,6 +63,9 @@ Every Look command takes --json. Errors under --json are JSON on stdout too.
     help_template = HELP_TEMPLATE
 )]
 struct Cli {
+    /// Snapshot backend (v2 is experimental and uses a separate database)
+    #[arg(long, global = true, value_parser = ["v1", "v2"])]
+    backend: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
     /// Print the summary as JSON (same as `status --json`)
@@ -155,6 +159,7 @@ fn main() -> ExitCode {
         Ok(c) => c,
         Err(e) => return output::clap_error(e),
     };
+    backend::select(cli.backend.as_deref());
     let (res, json) = match cli.command {
         None => (bare::run(cli.json), cli.json),
         Some(Command::Status(a)) => (status::run(&a), a.json),

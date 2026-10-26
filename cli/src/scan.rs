@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use clap::Args;
 use freespace_core::Error;
-use freespace_core::config;
 use freespace_core::format;
 use freespace_core::job::{self, ScanRequest};
 use freespace_core::platform;
@@ -55,14 +54,8 @@ struct Report<'a> {
 }
 
 pub fn run(a: ScanArgs) -> output::Result<()> {
-    let loaded = config::load()?;
-    let roots = if !a.roots.is_empty() {
-        a.roots.clone()
-    } else if !loaded.config.roots.is_empty() {
-        loaded.config.roots.clone()
-    } else {
-        platform::default_roots(&platform::mountinfo())
-    };
+    let loaded = crate::backend::load()?;
+    let roots = scan_roots(&a, &loaded);
     let workers = a
         .workers
         .or(loaded.config.workers)
@@ -72,27 +65,30 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
     }
     let low_memory = a.low_memory || loaded.config.low_memory;
     let workers = if low_memory { 1 } else { workers };
-    let dir = loaded.snapshot_dir();
+    let dir = crate::backend::dir(&loaded);
+    if loaded.config.backend == freespace_core::config::Backend::V2 {
+        crate::backend::timing_note();
+    }
     let tty = output::stderr_is_tty();
-    let label = roots
-        .iter()
-        .map(|r| output::escape(&r.display().to_string()))
-        .collect::<Vec<_>>()
-        .join(" ");
+    let label = roots_label(&roots);
     eprintln!(
         "freespace scan {label}: started, {workers} workers, snapshot dir {}",
         output::escape(&dir.path.display().to_string())
     );
     let on_progress = progress_line(tty);
-    let rep = job::run_scan(ScanRequest {
-        roots: roots.clone(),
-        one_file_system: !a.cross_mounts,
-        workers,
-        low_memory,
-        dir: dir.clone(),
-        keep_previous: loaded.config.keep_previous,
-        on_progress,
-    });
+    let rep = if loaded.config.backend == freespace_core::config::Backend::V2 {
+        crate::backend::scan(&loaded, &roots, !a.cross_mounts, workers, low_memory)
+    } else {
+        job::run_scan(ScanRequest {
+            roots: roots.clone(),
+            one_file_system: !a.cross_mounts,
+            workers,
+            low_memory,
+            dir: dir.clone(),
+            keep_previous: loaded.config.keep_previous,
+            on_progress,
+        })
+    };
     if tty {
         eprint!("\r\x1b[2K");
     }
@@ -123,7 +119,13 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
             publish_seconds: rep.publish_seconds,
             total_seconds: rep.total_seconds,
             snapshot_bytes: rep.snapshot_bytes,
-            snapshot_path: dir.current().display().to_string(),
+            snapshot_path: if loaded.config.backend == freespace_core::config::Backend::V2 {
+                crate::backend::database(&dir)
+            } else {
+                dir.current()
+            }
+            .display()
+            .to_string(),
             errors: rep.errors,
             incomplete: !rep.denied.is_empty(),
             unknown_subtrees: &rep.denied,
@@ -163,5 +165,23 @@ pub fn count(n: u64) -> String {
         format!("{} K", n / 1000)
     } else {
         n.to_string()
+    }
+}
+
+fn roots_label(roots: &[PathBuf]) -> String {
+    roots
+        .iter()
+        .map(|r| output::escape(&r.display().to_string()))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn scan_roots(a: &ScanArgs, loaded: &freespace_core::config::Loaded) -> Vec<PathBuf> {
+    if !a.roots.is_empty() {
+        a.roots.clone()
+    } else if !loaded.config.roots.is_empty() {
+        loaded.config.roots.clone()
+    } else {
+        platform::default_roots(&platform::mountinfo())
     }
 }

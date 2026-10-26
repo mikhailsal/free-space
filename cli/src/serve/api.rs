@@ -27,6 +27,7 @@ const CSP: &str = "default-src 'self'; base-uri 'none'; form-action 'none'; fram
 
 pub struct AppState {
     pub port: u16,
+    pub backend: freespace_core::config::Backend,
     pub token: String,
     pub dir: SnapshotDir,
     pub config: String,
@@ -99,6 +100,16 @@ impl AppState {
         })
         .await;
         self.respond(r)
+    }
+
+    async fn with_v2<T, F>(self: &Arc<Self>, f: F) -> Response
+    where
+        T: Serialize + Send + 'static,
+        F: FnOnce(&freespace_core::snapshot::v2::Reader) -> Result<T> + Send + 'static,
+    {
+        let dir = self.dir.clone();
+        let result = tokio::task::spawn_blocking(move || f(&crate::backend::reader(&dir)?)).await;
+        self.respond(result)
     }
 
     async fn with_dir<T, F>(self: &Arc<Self>, f: F) -> Response
@@ -221,11 +232,16 @@ async fn unknown(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
 }
 
 async fn status(State(s): State<Arc<AppState>>) -> Response {
-    s.with_dir(queries::status::status_page).await
+    let backend = s.backend;
+    s.with_dir(move |dir| crate::backend::status(backend, dir, true))
+        .await
 }
 
 async fn ls(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response {
     match parse::<params::LsParams>(q) {
+        Ok(p) if s.backend == freespace_core::config::Backend::V2 => {
+            s.with_v2(move |reader| queries::v2::ls(reader, &p)).await
+        }
         Ok(p) => s.with_snapshot(move |snap| queries::ls(snap, &p)).await,
         Err(e) => s.error(&e),
     }
@@ -233,6 +249,9 @@ async fn ls(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response {
 
 async fn top(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response {
     match parse::<params::TopParams>(q) {
+        Ok(p) if s.backend == freespace_core::config::Backend::V2 => {
+            s.with_v2(move |reader| queries::v2::top(reader, &p)).await
+        }
         Ok(p) => s.with_snapshot(move |snap| queries::top(snap, &p)).await,
         Err(e) => s.error(&e),
     }
@@ -240,6 +259,9 @@ async fn top(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response 
 
 async fn find(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response {
     match parse::<params::FindParams>(q) {
+        Ok(p) if s.backend == freespace_core::config::Backend::V2 => {
+            s.with_v2(move |reader| queries::v2::find(reader, &p)).await
+        }
         Ok(p) => s.with_snapshot(move |snap| queries::find(snap, &p)).await,
         Err(e) => s.error(&e),
     }
@@ -247,6 +269,9 @@ async fn find(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response
 
 async fn diff(State(s): State<Arc<AppState>>, RawQuery(q): RawQuery) -> Response {
     match parse::<params::DiffParams>(q) {
+        Ok(p) if s.backend == freespace_core::config::Backend::V2 => {
+            s.with_v2(move |reader| queries::v2::diff(reader, &p)).await
+        }
         Ok(p) => s.with_dir(move |d| queries::diff(d, &p)).await,
         Err(e) => s.error(&e),
     }

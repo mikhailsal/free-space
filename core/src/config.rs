@@ -10,9 +10,19 @@ use crate::error::{Error, ErrorCode, Result};
 pub const DEFAULT_CONFIG: &str = "/etc/freespace/config.toml";
 pub const DEFAULT_SNAPSHOT_DIR: &str = "/var/lib/freespace";
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Backend {
+    #[default]
+    V1,
+    V2,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
+    /// Experimental generation store, explicitly opt in with v2.
+    pub backend: Backend,
     /// Empty: real filesystems from /proc/self/mountinfo.
     pub roots: Vec<PathBuf>,
     pub snapshot_dir: PathBuf,
@@ -30,6 +40,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            backend: Backend::V1,
             roots: Vec::new(),
             snapshot_dir: PathBuf::from(DEFAULT_SNAPSHOT_DIR),
             keep_previous: true,
@@ -145,6 +156,9 @@ pub fn render(c: &Config) -> String {
         "snapshot_dir = {:?}\n",
         c.snapshot_dir.display().to_string()
     ));
+    if c.backend == Backend::V2 {
+        s.push_str("backend = \"v2\"\n");
+    }
     s.push_str(&format!("keep_previous = {}\n", c.keep_previous));
     if let Some(w) = c.workers {
         s.push_str(&format!("workers = {w}\n"));
@@ -170,6 +184,7 @@ mod tests {
             roots: vec!["/".into(), "/home".into()],
             workers: Some(4),
             low_memory: true,
+            backend: Backend::V2,
             ..Default::default()
         };
         assert_eq!(parse(&render(&c), p).unwrap(), c);
@@ -181,6 +196,8 @@ mod tests {
         let e = parse("rootz = []", p).unwrap_err();
         assert_eq!(e.code, ErrorCode::Config);
         assert!(e.message.contains("rootz"), "{}", e.message);
+        let e = parse("backend = \"v3\"", p).unwrap_err();
+        assert!(e.message.contains("v3"));
         let e = parse("at = \"25:00\"", p).unwrap_err();
         assert!(e.message.contains("at"));
         let e = parse("roots = [\"relative\"]", p).unwrap_err();

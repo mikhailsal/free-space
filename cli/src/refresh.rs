@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use clap::Args;
 use freespace_core::Error;
-use freespace_core::config;
 use freespace_core::format;
 use freespace_core::job;
 use freespace_core::refresh::{self, RefreshRequest};
@@ -51,7 +50,7 @@ struct Report {
 }
 
 pub fn run(a: RefreshArgs) -> output::Result<()> {
-    let loaded = config::load()?;
+    let loaded = crate::backend::load()?;
     let workers = a
         .workers
         .or(loaded.config.workers)
@@ -67,18 +66,25 @@ pub fn run(a: RefreshArgs) -> output::Result<()> {
         let joined = cwd.join(&a.path);
         std::fs::canonicalize(&joined).unwrap_or(joined)
     };
-    let dir = loaded.snapshot_dir();
+    let dir = crate::backend::dir(&loaded);
+    if loaded.config.backend == freespace_core::config::Backend::V2 {
+        crate::backend::timing_note();
+    }
     let tty = output::stderr_is_tty();
     eprintln!(
         "freespace refresh {}: started, {workers} workers",
         output::escape(&path.display().to_string())
     );
-    let rep = refresh::run_refresh(RefreshRequest {
-        path: path.as_os_str().as_bytes().to_vec(),
-        workers,
-        dir,
-        on_progress: progress_line(tty),
-    });
+    let rep = if loaded.config.backend == freespace_core::config::Backend::V2 {
+        crate::backend::refresh(&loaded, &path, workers)
+    } else {
+        refresh::run_refresh(RefreshRequest {
+            path: path.as_os_str().as_bytes().to_vec(),
+            workers,
+            dir,
+            on_progress: progress_line(tty),
+        })
+    };
     if tty {
         eprint!("\r\x1b[2K");
     }
