@@ -285,7 +285,10 @@ OOM can be compared with the disk engine; a disk-engine failure stops the run.
 
 Results include a binary hash, host/configuration metadata, raw stdout/stderr,
 JSON reports, elapsed time, process peak RSS (KiB), sampled peak snapshot-directory
-disk occupancy, and constrained-run `memory.peak`, swap and OOM event counters.
+disk occupancy, and constrained-run `memory.peak` when available; otherwise
+sampled `memory.current`. Swap, OOM/limit-event counters and available memory
+pressure statistics are also recorded. Set `SOURCE_REVISION` to the revision used
+to build the supplied binary to retain it in the manifest.
 The measurement helper shares the cgroup, so its memory is included in cgroup
 usage; process RSS is the scanner's own peak. Sampling every 20 ms can miss brief
 disk peaks. This fixture has no denied paths, so the unlinked report spool does

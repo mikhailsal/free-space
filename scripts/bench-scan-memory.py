@@ -7,7 +7,8 @@ Usage: [STEPS="10000 100000 1000000"] [MEMORY_MAX=128M] [REPEATS=1]
 MEMORY_MAX requires a systemd user manager with cgroup memory delegation. The
 runner samples process RSS and snapshot-directory occupancy every 20 ms. Peak RSS
 also comes from wait4 rusage. The scanner and measurement helper share the cgroup;
-its memory.peak therefore includes the helper, filesystem cache and kernel memory.
+its memory.peak (when available), or sampled memory.current, includes the helper,
+filesystem cache and kernel memory. SOURCE_REVISION records the built source hash.
 """
 
 import hashlib
@@ -46,7 +47,7 @@ def cgroup_metrics():
         if line.startswith("0::"):
             folder = Path("/sys/fs/cgroup") / line[3:].lstrip("/")
             result = {}
-            for name in ("memory.peak", "memory.swap.peak", "memory.events", "memory.max", "memory.swap.max"):
+            for name in ("memory.peak", "memory.swap.peak", "memory.events", "memory.max", "memory.swap.max", "memory.pressure"):
                 file = folder / name
                 if file.exists():
                     result[name] = file.read_text().strip()
@@ -158,6 +159,7 @@ def main():
     (output / "config.toml").write_text("keep_previous = false\n")
     print(f"Results: {output}", flush=True)
     write_json(output / "manifest.json", {"binary": str(binary), "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+        "source_revision": os.environ.get("SOURCE_REVISION"),
         "platform": platform.platform(), "memory_max": limit, "swap_max": "0" if limit else None,
         "steps": steps, "repeats": repeats, "files_per_dir": per_dir,
         "meminfo": Path("/proc/meminfo").read_text(), "cache_policy": "uncontrolled, freshly generated metadata"})
