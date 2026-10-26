@@ -31,7 +31,7 @@ export function scanningLine(s: Status, now: number, fetchedAt: number): string 
   const tick = Math.max(0, now - fetchedAt);
   const el = fmt.elapsed(sc.elapsed_seconds + tick);
   const p = s.progress;
-  const what = sc.op === "refresh" ? "Refreshing" : "Scanning";
+  const what = sc.op === "maintain" ? "Maintaining" : sc.op === "refresh" ? "Refreshing" : "Scanning";
   if (p?.entries_expected) {
     return `${what} ${sc.path} · ${fmt.bigCount(p.entries_seen)} of ~${fmt.bigCount(p.entries_expected)} files · ${p.percent ?? 0}% · ${el}`;
   }

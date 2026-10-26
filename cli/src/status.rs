@@ -105,6 +105,8 @@ pub fn sentence(s: &Summary) -> String {
 /// "Scanning / since 12:03 · 2.1 M of ~7.3 M files · 29% · 48 s" (D12/D14).
 pub fn scanning_line(sc: &Scanning, p: Option<&Progress>, capital: bool) -> String {
     let verb = match (sc.op.as_str(), capital) {
+        ("maintain", true) => "Maintaining",
+        ("maintain", false) => "maintaining",
         ("refresh", true) => "Refreshing",
         ("refresh", false) => "refreshing",
         (_, true) => "Scanning",

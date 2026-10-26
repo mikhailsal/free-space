@@ -56,10 +56,12 @@ fn explicit_backend_isolated_scan_refresh_history_and_failure() {
         "--json",
     ]);
     assert!(!bad.status.success());
+    let error: Value = serde_json::from_slice(&bad.stdout).unwrap();
+    assert_eq!(error["error"]["code"], "USAGE");
     let status = answer(&e, &["--backend", "v2", "status", "--json"]);
     assert_eq!(status["generation"], 3);
     assert_eq!(status["prev_generation"], 1);
-    assert!(status["last_error"].is_object());
+    assert_eq!(status["last_error"], Value::Null);
     answer(&e, &["scan", path, "--json"]);
     assert!(e.snap().join("snapshot.db").exists());
     assert_eq!(answer(&e, &["status", "--json"])["generation"], 1);
@@ -70,20 +72,9 @@ fn explicit_backend_isolated_scan_refresh_history_and_failure() {
 }
 
 #[test]
-fn config_opt_in_preflight_and_foreign_database() {
+fn config_opt_in_and_foreign_database() {
     let e = Env::new();
     std::fs::create_dir_all(e.root()).unwrap();
-    std::fs::write(e.config(), "backend = \"v2\"\nlow_memory = true\n").unwrap();
-    let result = e.run(&["scan", e.root().to_str().unwrap(), "--json"]);
-    assert!(!result.status.success());
-    assert!(!e.snap().exists());
-    std::fs::write(e.config(), "backend = \"v2\"\nkeep_previous = false\n").unwrap();
-    assert!(
-        !e.run(&["scan", e.root().to_str().unwrap(), "--json"])
-            .status
-            .success()
-    );
-    assert!(!e.snap().exists());
     std::fs::write(e.config(), "backend = \"v2\"\n").unwrap();
     assert!(!e.run(&["ls", "--json"]).status.success());
     assert!(!e.snap().exists());

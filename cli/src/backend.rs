@@ -110,7 +110,12 @@ fn record<T>(dir: &SnapshotDir, op: &str, result: Result<T>) -> Result<T> {
     }
     result
 }
-fn success(dir: &SnapshotDir, reader: &Reader, seconds: f64, denied: &[String]) -> Result<()> {
+fn success(
+    dir: &SnapshotDir,
+    reader: &Reader,
+    seconds: f64,
+    warning: Option<String>,
+) -> Result<()> {
     use freespace_core::snapshot::state;
     let mut state = state::read(dir).ok().flatten().unwrap_or_default();
     state.current_generation = Some(reader.generations.current as u64);
@@ -118,9 +123,7 @@ fn success(dir: &SnapshotDir, reader: &Reader, seconds: f64, denied: &[String]) 
     state.last_error = None;
     state.last_success_ts = Some(freespace_core::platform::now_secs());
     state.last_scan_seconds = Some(seconds);
-    state.warnings = freespace_core::job::denied_warning(denied)
-        .into_iter()
-        .collect();
+    state.warnings = warning.into_iter().collect();
     state::write(dir, &state).map_err(|e| Error::io("write state.json", e))
 }
 fn scan_store(
@@ -128,8 +131,10 @@ fn scan_store(
     roots: &[std::path::PathBuf],
     one_file_system: bool,
     workers: usize,
+    low_memory: bool,
+    keep_previous: bool,
 ) -> Result<freespace_core::snapshot::v2::WriteReport> {
-    store.scan_roots(roots, one_file_system, workers)
+    store.scan_roots_with_options(roots, one_file_system, workers, low_memory, keep_previous)
 }
 pub fn scan(
     loaded: &Loaded,
@@ -139,12 +144,6 @@ pub fn scan(
     low_memory: bool,
 ) -> Result<freespace_core::job::ScanReport> {
     use freespace_core::snapshot::{fsutil, lock, v2::Store, writer::WriteStats};
-    if low_memory || !loaded.config.keep_previous {
-        return Err(Error::new(
-            ErrorCode::NotSupported,
-            "v2 does not yet support low_memory=true or keep_previous=false",
-        ));
-    }
     let dir = dir(loaded);
     fsutil::ensure_dir(dir.as_path())
         .map_err(|e| lock::open_error("scan", "", dir.as_path(), e))?;
@@ -160,16 +159,24 @@ pub fn scan(
         (|| {
             let started = std::time::Instant::now();
             let mut store = Store::open(&database(&dir))?;
-            let write = scan_store(&mut store, roots, one_file_system, workers)?;
+            let write = scan_store(
+                &mut store,
+                roots,
+                one_file_system,
+                workers,
+                low_memory,
+                loaded.config.keep_previous,
+            )?;
             let reader = reader(&dir)?;
-            let status = queries::v2::status(&reader, &dir)?;
+            let entries = reader.meta(false)?.entries;
+            let denied = reader.denied_report(dir.as_path())?;
             let bytes = snapshot_bytes(&dir)?;
             let total_seconds = started.elapsed().as_secs_f64();
-            success(&dir, &reader, total_seconds, &status.unknown_subtrees)?;
+            success(&dir, &reader, total_seconds, denied.warning())?;
             Ok(freespace_core::job::ScanReport {
                 generation: reader.generations.current as u64,
                 prev_generation: reader.generations.prev.map(|g| g as u64),
-                entries: status.entries.unwrap_or_default(),
+                entries,
                 walk_seconds: write.walk.as_secs_f64(),
                 finalize_seconds: 0.0,
                 write: WriteStats {
@@ -180,7 +187,7 @@ pub fn scan(
                 publish_seconds: 0.0,
                 total_seconds,
                 snapshot_bytes: bytes,
-                denied: status.unknown_subtrees.into(),
+                denied,
                 errors: reader
                     .roots(false)?
                     .iter()
@@ -217,14 +224,24 @@ pub fn refresh(
             let mut store = Store::open(&database(&dir))?;
             let write = store.refresh(path, workers)?;
             let reader = reader(&dir)?;
-            let status = queries::v2::status(&reader, &dir)?;
+            let entries = reader.meta(false)?.entries;
+            let mut denied = Vec::new();
+            reader.visit_denied(|path| {
+                denied.push(String::from_utf8_lossy(path).into_owned());
+                Ok(())
+            })?;
             let bytes = snapshot_bytes(&dir)?;
             let total_seconds = started.elapsed().as_secs_f64();
-            success(&dir, &reader, total_seconds, &status.unknown_subtrees)?;
+            success(
+                &dir,
+                &reader,
+                total_seconds,
+                freespace_core::job::denied_warning(&denied),
+            )?;
             Ok(freespace_core::refresh::RefreshReport {
                 generation: reader.generations.current as u64,
                 path: path.display().to_string(),
-                entries: status.entries.unwrap_or_default(),
+                entries,
                 subtree_entries: write.new_subtree_entries as u64,
                 removed: write.new_subtree_entries == 0,
                 load_seconds: 0.0,
@@ -238,7 +255,7 @@ pub fn refresh(
                 publish_seconds: 0.0,
                 total_seconds,
                 snapshot_bytes: bytes,
-                denied: status.unknown_subtrees,
+                denied,
             })
         })(),
     )
