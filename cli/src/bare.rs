@@ -2,12 +2,12 @@
 //! Piped, the next commands carry `--json` (D15); `--json` prints `status --json`.
 
 use freespace_core::config;
-use freespace_core::{ErrorCode, INSTALL_CMD, Result};
+use freespace_core::{ErrorCode, INSTALL_CMD};
 
 use crate::output;
 use crate::status;
 
-pub fn run(json: bool) -> Result<()> {
+pub fn run(json: bool) -> output::Result<()> {
     let dir = config::load()?.snapshot_dir();
     let piped = !output::stdout_is_tty();
     let j = if piped { " --json" } else { "" };
@@ -25,13 +25,13 @@ pub fn run(json: bool) -> Result<()> {
                     ("sudo freespace scan".into(), "or scan once by hand"),
                     ("freespace --help".into(), "every command"),
                 ])
-            ));
+            ))?;
             return Ok(());
         }
-        Err(e) => return Err(e),
+        Err(e) => return Err(e.into()),
     };
     if json {
-        output::print_json(&s.status);
+        output::print_json(&s.status)?;
         return Ok(());
     }
     let r = &s.status;
@@ -79,7 +79,7 @@ pub fn run(json: bool) -> Result<()> {
         "{}\n{hint}Next:\n{}",
         status::sentence(&s),
         next(&lines)
-    ));
+    ))?;
     Ok(())
 }
 

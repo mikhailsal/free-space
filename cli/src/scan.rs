@@ -2,13 +2,13 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use clap::Args;
+use freespace_core::Error;
 use freespace_core::config;
 use freespace_core::format;
 use freespace_core::job::{self, ScanRequest};
 use freespace_core::platform;
 use freespace_core::scan::default_workers;
 use freespace_core::snapshot::progress::ProgressCallback;
-use freespace_core::{Error, Result};
 use serde::Serialize;
 
 use crate::output;
@@ -51,7 +51,7 @@ struct Report {
     unknown_subtrees: Vec<String>,
 }
 
-pub fn run(a: ScanArgs) -> Result<()> {
+pub fn run(a: ScanArgs) -> output::Result<()> {
     let loaded = config::load()?;
     let roots = if !a.roots.is_empty() {
         a.roots.clone()
@@ -65,7 +65,7 @@ pub fn run(a: ScanArgs) -> Result<()> {
         .or(loaded.config.workers)
         .unwrap_or_else(default_workers);
     if workers == 0 {
-        return Err(Error::usage("--workers must be at least 1"));
+        return Err(Error::usage("--workers must be at least 1").into());
     }
     let dir = loaded.snapshot_dir();
     let tty = output::stderr_is_tty();
@@ -121,7 +121,7 @@ pub fn run(a: ScanArgs) -> Result<()> {
             errors: rep.errors,
             incomplete: !rep.denied.is_empty(),
             unknown_subtrees: rep.denied.clone(),
-        });
+        })?;
     }
     Ok(())
 }

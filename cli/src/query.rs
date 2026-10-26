@@ -141,7 +141,7 @@ fn path_params(o: &PathOpts) -> Result<(Option<String>, Option<String>)> {
     })
 }
 
-pub fn ls(a: &LsArgs) -> Result<()> {
+pub fn ls(a: &LsArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
     let snap = Snapshot::open_current(&dir()?)?;
     let r = queries::ls(
@@ -156,7 +156,7 @@ pub fn ls(a: &LsArgs) -> Result<()> {
     )?;
     output::warn_incomplete(&r.header);
     if a.json {
-        output::print_json(&r);
+        output::print_json(&r)?;
         return Ok(());
     }
     let e = &r.entry;
@@ -169,7 +169,7 @@ pub fn ls(a: &LsArgs) -> Result<()> {
     );
     if r.entries.is_empty() {
         out.push_str(&empty_note(e));
-        output::print(&out);
+        output::print(&out)?;
         return Ok(());
     }
     let mut t = Table::new(&[
@@ -195,11 +195,11 @@ pub fn ls(a: &LsArgs) -> Result<()> {
     if r.truncated {
         out.push_str(&more_line(r.total_count, r.entries.len(), "--limit"));
     }
-    output::print(&out);
+    output::print(&out)?;
     Ok(())
 }
 
-pub fn top(a: &TopArgs) -> Result<()> {
+pub fn top(a: &TopArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
     let snap = Snapshot::open_current(&dir()?)?;
     let r = queries::top(
@@ -216,7 +216,7 @@ pub fn top(a: &TopArgs) -> Result<()> {
     )?;
     output::warn_incomplete(&r.header);
     if a.json {
-        output::print_json(&r);
+        output::print_json(&r)?;
         return Ok(());
     }
     let dirs = r.kind == "dir";
@@ -237,7 +237,7 @@ pub fn top(a: &TopArgs) -> Result<()> {
     );
     if r.entries.is_empty() {
         out.push_str("Nothing matches.\n");
-        output::print(&out);
+        output::print(&out)?;
         return Ok(());
     }
     let mut t = if dirs {
@@ -274,11 +274,11 @@ pub fn top(a: &TopArgs) -> Result<()> {
     if r.truncated {
         out.push_str(&more_line(r.total_count, r.entries.len(), "--limit"));
     }
-    output::print(&out);
+    output::print(&out)?;
     Ok(())
 }
 
-pub fn find(a: &FindArgs) -> Result<()> {
+pub fn find(a: &FindArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
     let snap = Snapshot::open_current(&dir()?)?;
     let r = queries::find(
@@ -299,7 +299,7 @@ pub fn find(a: &FindArgs) -> Result<()> {
     )?;
     output::warn_incomplete(&r.header);
     if a.json {
-        output::print_json(&r);
+        output::print_json(&r)?;
         return Ok(());
     }
     let nested = r.total.count - r.total.counted;
@@ -317,7 +317,7 @@ pub fn find(a: &FindArgs) -> Result<()> {
     );
     if r.entries.is_empty() {
         out.push_str(&format!("No matches within {}.\n", r.path));
-        output::print(&out);
+        output::print(&out)?;
         return Ok(());
     }
     let mut t = Table::new(&[
@@ -342,11 +342,11 @@ pub fn find(a: &FindArgs) -> Result<()> {
     if r.truncated {
         out.push_str(&more_line(r.total_count, r.entries.len(), "--limit"));
     }
-    output::print(&out);
+    output::print(&out)?;
     Ok(())
 }
 
-pub fn diff(a: &DiffArgs) -> Result<()> {
+pub fn diff(a: &DiffArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
     let r = queries::diff(
         &dir()?,
@@ -360,7 +360,7 @@ pub fn diff(a: &DiffArgs) -> Result<()> {
     )?;
     output::warn_incomplete(&r.header);
     if a.json {
-        output::print_json(&r);
+        output::print_json(&r)?;
         return Ok(());
     }
     let what = match r.kind.as_str() {
@@ -419,7 +419,7 @@ pub fn diff(a: &DiffArgs) -> Result<()> {
     } else if r.truncated {
         out.push_str(&more_line(r.total_count, r.entries.len(), "--limit"));
     }
-    output::print(&out);
+    output::print(&out)?;
     Ok(())
 }
 

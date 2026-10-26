@@ -151,13 +151,13 @@ fn main() -> ExitCode {
         Some(Command::Top(a)) => (query::top(&a), a.json),
         Some(Command::Find(a)) => (query::find(&a), a.json),
         Some(Command::Diff(a)) => (query::diff(&a), a.json),
-        Some(Command::Gui(a)) => (serve::gui(&a), false),
-        Some(Command::Serve(a)) => (serve::run(&a), false),
+        Some(Command::Gui(a)) => (serve::gui(&a).map_err(Into::into), false),
+        Some(Command::Serve(a)) => (serve::run(&a).map_err(Into::into), false),
         Some(Command::Doctor(a)) => {
-            return if doctor::run(&a) {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
+            return match doctor::run(&a) {
+                Ok(true) => ExitCode::SUCCESS,
+                Ok(false) => ExitCode::from(1),
+                Err(error) => output::fail(&error, a.json),
             };
         }
         Some(Command::Scan(a)) => {

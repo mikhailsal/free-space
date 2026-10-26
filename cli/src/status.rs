@@ -111,14 +111,14 @@ pub fn doctor_hint(r: &StatusResponse) -> Option<String> {
     (stale || failed).then(|| "Run: freespace doctor".to_owned())
 }
 
-pub fn run(a: &StatusArgs) -> Result<()> {
+pub fn run(a: &StatusArgs) -> output::Result<()> {
     let dir = config::load()?.snapshot_dir();
     let s = gather(&dir)?;
     if a.json {
-        output::print_json(&s.status);
+        output::print_json(&s.status)?;
         return Ok(());
     }
-    output::print(&details(&s));
+    output::print(&details(&s))?;
     Ok(())
 }
 

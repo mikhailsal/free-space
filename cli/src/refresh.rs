@@ -5,12 +5,12 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
 use clap::Args;
+use freespace_core::Error;
 use freespace_core::config;
 use freespace_core::format;
 use freespace_core::job;
 use freespace_core::refresh::{self, RefreshRequest};
 use freespace_core::scan::default_workers;
-use freespace_core::{Error, Result};
 use serde::Serialize;
 
 use crate::output;
@@ -50,14 +50,14 @@ struct Report {
     unknown_subtrees: Vec<String>,
 }
 
-pub fn run(a: RefreshArgs) -> Result<()> {
+pub fn run(a: RefreshArgs) -> output::Result<()> {
     let loaded = config::load()?;
     let workers = a
         .workers
         .or(loaded.config.workers)
         .unwrap_or_else(default_workers);
     if workers == 0 {
-        return Err(Error::usage("--workers must be at least 1"));
+        return Err(Error::usage("--workers must be at least 1").into());
     }
     let path = if a.path.is_absolute() {
         a.path.clone()
@@ -115,7 +115,7 @@ pub fn run(a: RefreshArgs) -> Result<()> {
             snapshot_bytes: rep.snapshot_bytes,
             incomplete: !rep.denied.is_empty(),
             unknown_subtrees: rep.denied.clone(),
-        });
+        })?;
     }
     Ok(())
 }
