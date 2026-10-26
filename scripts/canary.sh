@@ -44,11 +44,21 @@ text = re.sub(r"\x1b\][^\x1b]*(?:\x1b\\|\x07)", "", text)
 text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
 lines = text.splitlines()
 rule, path = sys.argv[2:]
-for index, line in enumerate(lines):
-    start, end = max(0, index - 10), min(len(lines), index + 11)
-    nearby = "\n".join(lines[start:end])
-    if rule in nearby and path in nearby:
-        raise SystemExit(0)
+records = []
+current = []
+for line in lines:
+    # Clippy starts each diagnostic with error:, Biome with a file:line:column
+    # header, and the shell gates emit one check: line per violation.
+    begins = (line.startswith(("error:", "warning:", "check-size:", "check:", "check-rust-suppressions:"))
+              or re.match(r"^(?:src|tests)/[^:]+:\d+:\d+\b", line))
+    if begins and current:
+        records.append("\n".join(current))
+        current = []
+    current.append(line)
+if current:
+    records.append("\n".join(current))
+if any(rule in record and path in record for record in records):
+    raise SystemExit(0)
 raise SystemExit(1)
 PY
 }
@@ -56,8 +66,6 @@ PY
 run_case() {
   local name=$1 part=$2 rule=$3 path=$4 injector=$5
   shift 5
-  local package=
-  [[ "$injector" != inject_long_rust ]] || package=${1:-}
   local diagnostic_path=$path
   [[ "$part" != biome ]] || diagnostic_path=${path#web/}
   reset_tree
@@ -73,13 +81,6 @@ run_case() {
     fail "$name unexpectedly passed"
   fi
   if ! assert_diagnostic "$rule" "$diagnostic_path"; then
-    # A pre-existing core Clippy failure can stop --workspace before Cargo
-    # checks the injected cli member. Probe that member directly in this case.
-    if [[ -n "$package" ]]; then
-      (cd "$worktree" && cargo clippy --package "$package" --no-deps --all-targets -- -D warnings) >>"$log" 2>&1 || true
-    fi
-  fi
-  if ! assert_diagnostic "$rule" "$diagnostic_path"; then
     cat "$log" >&2
     fail "$name failed without a nearby $rule diagnostic naming $path"
   fi
@@ -88,13 +89,15 @@ run_case() {
 }
 
 inject_long_rust() {
-  python3 - "$worktree/$1" <<'PY'
+  python3 - "$worktree/$1" "${2:-}" <<'PY'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
 body = "\n".join("    n += 1;" for _ in range(79))
 with path.open("a") as f:
+    if sys.argv[2] == "suppress":
+        f.write("\n#[allow(clippy::too_many_lines)]")
     f.write("\n#[allow(dead_code)]\nfn canary_long_function() {\n    let mut n = 0;\n")
     f.write(body + "\n    std::hint::black_box(n);\n}\n")
 PY
@@ -148,6 +151,20 @@ inject_suppression() {
   printf '// biome-ignore lint/suspicious/noExplicitAny: canary unused suppression\nconst canarySuppression = 1;\nvoid canarySuppression;\n' > "$worktree/$1"
 }
 
+inject_used_suppression() {
+  python3 - "$worktree/$1" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+body = "\n".join("  value += 1;" for _ in range(79))
+with path.open("a") as f:
+    f.write("\n// biome-ignore lint/complexity/noExcessiveLinesPerFunction: canary used suppression\n")
+    f.write("function canarySuppressedLength() {\n  let value = 0;\n")
+    f.write(body + "\n  return value;\n}\nvoid canarySuppressedLength;\n")
+PY
+}
+
 inject_lines() {
   local count=$2
   awk -v n="$count" 'BEGIN { for (i=0;i<n;i++) print "line" }' > "$worktree/$1"
@@ -179,18 +196,20 @@ PY
 members=0
 while IFS=$'\t' read -r package source; do
   [[ -n "$source" ]] || continue
-  run_case "Rust function length in $package" rust too_many_lines "$source" inject_long_rust "$package"
+  run_case "Rust function length in $package" rust too_many_lines "$source" inject_long_rust
   ((members += 1))
 done < "$tmp/rust-members.tsv"
 (( members > 0 )) || fail 'cargo metadata returned no workspace members'
 
 first_member=$(head -n 1 "$tmp/rust-members.tsv" | cut -f2)
 run_case Rust-nesting rust excessive_nesting "$first_member" inject_nested_rust
+run_case Rust-used-suppression rust too_many_lines "$first_member" inject_long_rust suppress
 run_case TypeScript-source-function-length biome noExcessiveLinesPerFunction web/src/canary-length.ts inject_ts_length
 run_case TypeScript-test-function-length biome noExcessiveLinesPerFunction web/tests/canary-length.ts inject_ts_length
 run_case TypeScript-complexity biome noExcessiveCognitiveComplexity web/src/canary-complexity.ts inject_ts_complexity
 run_case Biome-formatting biome format web/src/canary-format.ts inject_format
 run_case Biome-unused-suppression biome 'unused suppression' web/src/canary-suppression.ts inject_suppression
+run_case Biome-used-suppression biome 'Biome suppression forbidden' web/src/main.ts inject_used_suppression
 css_file=$(git -C "$worktree" ls-files 'web/src/*.css' | head -n 1)
 test_file=$(git -C "$worktree" ls-files 'core/tests/*.rs' | head -n 1)
 [[ -n "$css_file" && -n "$test_file" ]] || fail 'could not find tracked CSS and Rust test files'
