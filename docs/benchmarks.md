@@ -310,3 +310,11 @@ speed improvement claim. This retains the timing boundaries described above:
 refresh-only releases happen outside load/finalize/insert/index timers and
 are included in total time. This workload contains no hardlinks, so it does
 not quantify the benefit from releasing old hardlink rows or policy maps.
+
+D18 allocation inventory against master `47a76ac`: no new `clone()`,
+`collect()`, or allocation inside a per-entry loop. The existing root-error
+sum moves before ownership transfer without changing its iteration or
+allocations. Writer insert loops and refresh graft/finalize loops are
+unchanged. The new report counters are scalars; transferring `Tree` and
+`Finalized` moves their existing buffers without copying them. Explicit drops
+release existing allocations and the old snapshot connection.
