@@ -78,6 +78,11 @@ pub fn graft(
     tree.hardlinks.retain(|h| !removed.contains_key(&h.0));
     tree.mounts.retain(|m| !removed.contains_key(&m.raw));
 
+    let new_links = replace_subtree(tree, x, sub);
+    hardlink_policy(tree, &loaded.links, &removed, &new_links, conn_paths)
+}
+
+fn replace_subtree(tree: &mut Tree, x: u32, sub: Option<Tree>) -> Vec<(u32, u64, u64)> {
     let mut new_links: Vec<(u32, u64, u64)> = Vec::new();
     match sub {
         None => {
@@ -128,6 +133,16 @@ pub fn graft(
         }
     }
 
+    new_links
+}
+
+fn hardlink_policy(
+    tree: &Tree,
+    old_links: &[OldLink],
+    removed: &HashMap<u32, i64>,
+    new_links: &[(u32, u64, u64)],
+    conn_paths: &mut Paths<'_>,
+) -> Result<LinkPolicy> {
     // Hardlink rules (T19, OV-11). Per inode: a previous owner that is still
     // known keeps the size; otherwise count the links we know of (old rows
     // outside the subtree + links seen by this walk). Fewer than `nlink` means
@@ -135,11 +150,11 @@ pub fn graft(
     // or a link made outside since), so nobody here is counted.
     let mut policy = LinkPolicy::default();
     let mut old_by_key: HashMap<(u64, u64), Vec<&OldLink>> = HashMap::new();
-    for l in &loaded.links {
+    for l in old_links {
         old_by_key.entry((l.1, l.2)).or_default().push(l);
     }
     let mut new_by_key: HashMap<(u64, u64), Vec<u32>> = HashMap::new();
-    for &(raw, dev, ino) in &new_links {
+    for &(raw, dev, ino) in new_links {
         new_by_key.entry((dev, ino)).or_default().push(raw);
     }
     let mut keys: Vec<(u64, u64)> = old_by_key
