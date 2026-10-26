@@ -13,6 +13,25 @@
 # 4. refresh of a sibling folder keeps both mounts.
 set -eu
 
+# Re-exec before creating any fixture: even SIGKILL cannot propagate our
+# mounts to the caller. No --fork: preserve the pid and signal traps.
+# Check the namespace identity so a failed/no-op launcher cannot run mounts.
+if [ "${1:-}" = --private-mount-namespace ]; then
+    [ "$#" -eq 2 ] || exit 2
+    current_namespace=$(readlink /proc/self/ns/mnt)
+    parent_namespace=$(readlink "/proc/$PPID/ns/mnt")
+    init_namespace=$(readlink /proc/1/ns/mnt)
+    if [ "$current_namespace" = "$parent_namespace" ] || [ "$current_namespace" = "$init_namespace" ]; then
+        echo "refusing to mount in the caller's mount namespace or init's" >&2
+        exit 1
+    fi
+    shift
+else
+    [ "$#" -eq 1 ] || { echo "usage: $0 path/to/freespace" >&2; exit 2; }
+    exec unshare --mount --propagation private -- \
+        sh "$0" --private-mount-namespace "$@"
+fi
+
 [ "$#" -eq 1 ] || { echo "usage: $0 path/to/freespace" >&2; exit 2; }
 bin=$(realpath "$1")
 t=$(mktemp -d)

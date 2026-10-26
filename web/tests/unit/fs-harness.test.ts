@@ -3,7 +3,7 @@
 // Value: protects=cleanup preserves mounted directories and reaps paused scans before unmounting;
 // fails_when=failed unmounts are ignored, a target is omitted or the child is not killed and reaped;
 // why_new=the sudo happy-path harnesses never exercise failed cleanup or controlled signal ordering;
-// seam=none; no_claim=real mount semantics (mount commands are stubbed)
+// seam=none; no_claim=real mount/namespace semantics (privileged commands are stubbed)
 import { expect, test } from "bun:test";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,6 +22,24 @@ function fixture() {
   const scratch = join(dir, "scratch");
   mkdirSync(bin);
   mkdirSync(scratch);
+  executable(
+    join(bin, "readlink"),
+    `case "$1" in
+      /proc/self/ns/mnt) echo "mnt:[\${STUB_PRIVATE_MNT_NS:-\${STUB_CALLER_MNT_NS:-parent}}]";;
+      /proc/1/ns/mnt) echo "mnt:[init]";;
+      /proc/[0-9]*/ns/mnt) echo "mnt:[\${STUB_CALLER_MNT_NS:-parent}]";;
+      *) exit 92;;
+    esac`,
+  );
+  executable(
+    join(bin, "unshare"),
+    `
+    [ "$1" = --mount ] && [ "$2" = --propagation ] && [ "$3" = private ] &&
+      [ "$4" = -- ] || exit 91
+    shift 4
+    export STUB_PRIVATE_MNT_NS=child
+    exec "$@"`,
+  );
   return {
     dir,
     bin,
@@ -55,6 +73,45 @@ function run(script: string, unmount: boolean, mounted: boolean, signal?: string
 }
 
 for (const script of scripts) {
+  for (const fakeCaller of [false, true]) {
+    test(`${script}: direct internal arguments${fakeCaller ? " with fake caller ID" : ""} cannot bypass nested caller isolation`, () => {
+      const { dir, bin, scratch, env } = fixture();
+      executable(join(bin, "mount"), 'echo unsafe-mount >&2; exit 99');
+      try {
+        const args = ["sh", join(repo, "scripts", script), "--private-mount-namespace"];
+        if (fakeCaller) args.push("fake-id");
+        args.push("/bin/false");
+        const result = Bun.spawnSync(args, { env: { ...env, STUB_CALLER_MNT_NS: "nested-caller" } });
+        expect(result.exitCode).toBe(fakeCaller ? 2 : 1);
+        if (!fakeCaller) expect(result.stderr.toString()).toContain("caller's mount namespace");
+        expect(result.stderr.toString()).not.toContain("unsafe-mount");
+        expect(readdirSync(scratch)).toEqual([]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  }
+
+  for (const [label, launcher] of [
+    ["failed namespace launcher", "exit 73"],
+    ["unchanged namespace", 'shift 4; exec "$@"'],
+  ]) {
+    test(`${script}: ${label} refuses to create fixtures`, () => {
+      const { dir, bin, scratch, env } = fixture();
+      executable(join(bin, "unshare"), launcher);
+      executable(join(bin, "mount"), 'echo unsafe-mount >&2; exit 99');
+      try {
+        const result = Bun.spawnSync(["sh", join(repo, "scripts", script), "/bin/false"], { env });
+        expect(result.exitCode).toBe(launcher === "exit 73" ? 73 : 1);
+        expect(result.stderr.toString()).not.toContain("unsafe-mount");
+        if (launcher !== "exit 73") expect(result.stderr.toString()).toContain("caller's mount namespace");
+        expect(readdirSync(scratch)).toEqual([]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  }
+
   test(`${script}: a mount left behind fails cleanup and preserves its directory`, () => {
     const result = run(script, false, true);
     expect(result.code).toBe(1);
