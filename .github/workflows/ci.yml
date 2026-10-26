@@ -30,8 +30,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: scripts/check.sh rust
       - run: cargo test --workspace
       # T10: precheck and a disk that fills up mid-write, on a real tmpfs
       - name: fault injection on a full filesystem
@@ -67,7 +66,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - run: bunx tsc --noEmit
+      - run: ../scripts/check.sh tsc
       # The non-root install manifest tests read real ACLs; rust-diff stubs also need sqlite3.
       - run: |
           if ! command -v sqlite3 >/dev/null || ! command -v getfacl >/dev/null || ! command -v setfacl >/dev/null; then
@@ -159,7 +158,20 @@ jobs:
         with:
           persist-credentials: false
       # .shellcheckrc lets it follow what scripts/rust-diff.sh sources from scripts/rust-diff/
-      - run: shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh
+      - run: scripts/check.sh shell
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+        working-directory: web
+      - run: scripts/check.sh size biome
 
   # T36/T37/T44 on a real systemd VM: install.sh from a local release layout
   # (no TTY + no sudo → the escalation line; fresh install; rerun), first scan
