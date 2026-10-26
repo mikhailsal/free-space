@@ -175,6 +175,11 @@ fn v2_status_text_and_json_agree_on_growth_and_generation() {
 fn v2_install_lifecycle_refuses_before_mutating_files() {
     use std::os::unix::fs::PermissionsExt;
     let e = Env::new();
+    let expected_error = if unsafe { libc::geteuid() } == 0 {
+        "do not yet support the v2 backend"
+    } else {
+        "NOT_ROOT"
+    };
     let units = e.tmp.path().join("units");
     let bin = e.tmp.path().join("bin");
     let called = e.tmp.path().join("systemctl-called");
@@ -209,10 +214,7 @@ fn v2_install_lifecycle_refuses_before_mutating_files() {
             }
             let output = run(&args);
             assert!(!output.status.success());
-            assert!(
-                String::from_utf8_lossy(&output.stdout)
-                    .contains("do not yet support the v2 backend")
-            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains(expected_error));
             assert_eq!(std::fs::read_to_string(e.config()).unwrap(), config);
             assert_eq!(std::fs::read(&data).unwrap(), b"preserve v2 data");
         }
@@ -221,7 +223,7 @@ fn v2_install_lifecycle_refuses_before_mutating_files() {
     // v2 configuration through the v1 installer lifecycle either.
     let output = run(&["--backend", "v1", "install-timer", "--uninstall", "--json"]);
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stdout).contains("do not yet support the v2 backend"));
+    assert!(String::from_utf8_lossy(&output.stdout).contains(expected_error));
     assert_eq!(std::fs::read(&data).unwrap(), b"preserve v2 data");
     assert_eq!(
         std::fs::read_to_string(&unit).unwrap(),

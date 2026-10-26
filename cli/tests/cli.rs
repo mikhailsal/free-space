@@ -214,6 +214,23 @@ fn install_timer_needs_root() {
 }
 
 #[test]
+fn install_timer_checks_root_before_loading_bad_config() {
+    if euid_is_root() {
+        return;
+    }
+    let e = Env::new();
+    std::fs::write(e.config(), "this is not valid TOML = [").unwrap();
+    for args in [
+        vec!["install-timer", "--json"],
+        vec!["--backend", "v2", "install-timer", "--json"],
+        vec!["install-timer", "--uninstall", "--json"],
+    ] {
+        let output = e.run(&args);
+        assert_eq!(json(&output)["error"]["code"], "NOT_ROOT");
+    }
+}
+
+#[test]
 fn scan_and_refresh_without_write_access_say_sudo() {
     if euid_is_root() {
         return;
