@@ -21,7 +21,9 @@ use freespace_core::{Error, ErrorCode, Result};
 
 use crate::output;
 
+mod lifecycle;
 mod report;
+use lifecycle::{grant_backend_access, prepare_backend_dirs};
 mod uninstall;
 
 use report::Report;
@@ -70,20 +72,13 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
             .with_fix("sudo freespace install-timer")
             .into());
     }
-    // Installation/uninstallation manages the v1 file manifest and grants.
-    // Refuse before any mutation until the v2 lifecycle is implemented.
-    if crate::backend::load()?.config.backend == config::Backend::V2
-        || config::load_from(&config::config_path())?.config.backend == config::Backend::V2
-    {
-        return Err(Error::new(ErrorCode::NotSupported,
-            "install-timer and --uninstall do not yet support the v2 backend; v2 data was left untouched").into());
-    }
     systemd::check_supported()?;
     if a.uninstall {
         return uninstall(&a);
     }
     let cfg_path = config::config_path();
     let mut c = config::load_from(&cfg_path)?.config;
+    c.backend = crate::backend::load()?.config.backend;
     apply_config_overrides(&a, &mut c);
     let text = config::render(&c);
     // the file we write must load back: catches a bad --at or a relative path
@@ -102,8 +97,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
     }
     write_root_file(&cfg_path, text.as_bytes(), 0o644)?;
     ensure_group()?;
-    let dir = SnapshotDir::new(&c.snapshot_dir);
-    prepare_snapshot_dir(&dir)?;
+    let dir = prepare_backend_dirs(&c)?;
 
     let user = match &a.user {
         Some(n) => Some(
@@ -112,7 +106,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         None => platform::invoking_user(),
     };
     let (access, relogin) = match &user {
-        Some(u) => grant_access(&c.snapshot_dir, u),
+        Some(u) => grant_backend_access(&c, &dir, u),
         None => {
             eprintln!(
                 "note: no $SUDO_USER, so nobody got read access; run: sudo freespace install-timer --user <name>"
@@ -126,7 +120,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
     let (scan_started, scan_reason) = if a.no_start {
         (false, None)
     } else {
-        start_scan_if_needed(&dir)?
+        start_scan_if_needed(&dir, c.backend)?
     };
 
     let report = Report {
@@ -137,7 +131,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         interval: c.interval.clone(),
         at: c.at.clone(),
         keep_previous: c.keep_previous,
-        snapshot_dir: c.snapshot_dir.display().to_string(),
+        snapshot_dir: dir.path.display().to_string(),
         user: user.as_ref().map(|u| u.name.clone()),
         access: access.into(),
         relogin_needed: relogin,
@@ -306,19 +300,23 @@ fn grant_access(dir: &Path, u: &UserInfo) -> (&'static str, bool) {
                 output::escape(&e.message),
                 fsutil::GROUP
             );
-            let in_group = user_in_group(u);
-            if !in_group && let Err(e) = run_tool("usermod", &["-aG", fsutil::GROUP, &u.name]) {
-                eprintln!(
-                    "warning: could not add {} to group {}: {}",
-                    output::escape(&u.name),
-                    fsutil::GROUP,
-                    output::escape(&e.message)
-                );
-                return ("none", false);
-            }
-            ("group", !in_group)
+            grant_group_access(u)
         }
     }
+}
+
+fn grant_group_access(u: &UserInfo) -> (&'static str, bool) {
+    let in_group = user_in_group(u);
+    if !in_group && let Err(e) = run_tool("usermod", &["-aG", fsutil::GROUP, &u.name]) {
+        eprintln!(
+            "warning: could not add {} to group {}: {}",
+            output::escape(&u.name),
+            fsutil::GROUP,
+            output::escape(&e.message)
+        );
+        return ("none", false);
+    }
+    ("group", !in_group)
 }
 
 fn user_in_group(u: &UserInfo) -> bool {
@@ -380,8 +378,17 @@ pub fn timer_next_run() -> Option<String> {
 
 /// D5/D13: no snapshot, or one this binary cannot read → start the unit now and
 /// wait up to 5 s for it to take the lock (or fail).
-fn start_scan_if_needed(dir: &SnapshotDir) -> Result<(bool, Option<String>)> {
-    let (reason, schema_change) = match Snapshot::open_current(dir) {
+fn start_scan_if_needed(
+    dir: &SnapshotDir,
+    backend: config::Backend,
+) -> Result<(bool, Option<String>)> {
+    let opened = match backend {
+        config::Backend::V1 => Snapshot::open_current(dir).map(|_| ()),
+        config::Backend::V2 => crate::backend::reader(dir)
+            .and_then(|reader| reader.meta(false))
+            .map(|_| ()),
+    };
+    let (reason, schema_change) = match opened {
         Ok(_) => return Ok((false, None)),
         Err(e) if e.code == ErrorCode::NoSnapshot => ("no snapshot yet".to_owned(), false),
         Err(e) if e.code == ErrorCode::Schema => (

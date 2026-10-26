@@ -163,14 +163,13 @@ fn v2_status_text_and_json_agree_on_growth_and_generation() {
 }
 
 #[test]
-fn v2_install_lifecycle_refuses_before_mutating_files() {
+fn v2_install_lifecycle_requires_root_before_mutating_files() {
     use std::os::unix::fs::PermissionsExt;
     let e = Env::new();
-    let expected_error = if unsafe { libc::geteuid() } == 0 {
-        "do not yet support the v2 backend"
-    } else {
-        "NOT_ROOT"
-    };
+    if unsafe { libc::geteuid() } == 0 {
+        return;
+    }
+    let expected_error = "NOT_ROOT";
     let units = e.tmp.path().join("units");
     let bin = e.tmp.path().join("bin");
     let called = e.tmp.path().join("systemctl-called");
