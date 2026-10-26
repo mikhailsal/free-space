@@ -200,6 +200,7 @@ roots = ["/", "/home"]
 snapshot_dir = "/var/lib/freespace"
 keep_previous = true            # previous snapshot for diff; needs room for both
 # workers = 4                   # walker threads; default min(CPUs, 8)
+# low_memory = true             # full scans use disk staging and one walker
 port = 0                        # gui/serve port; 0 picks a free one
 interval = "daily"              # hourly, daily or weekly
 at = "02:00"
@@ -225,3 +226,13 @@ How it works, in short: one parallel walk of the tree, written into a new SQLite
 ## License
 
 [MIT](LICENSE).
+
+
+For large scans on machines with limited RAM, use `freespace scan /path --low-memory`
+or set `low_memory = true` in the config for scheduled scans. This mode stores the
+walk in a temporary SQLite database, uses one walker regardless of `workers`, and
+trades scan time and temporary disk space for a smaller working set. It produces
+the same snapshot format and supports the usual queries and refresh command.
+Refresh itself still uses the in-memory pipeline. See [memory measurements and
+benchmark instructions](docs/benchmarks.md#disk-backed-full-scan) before selecting
+a machine memory budget.

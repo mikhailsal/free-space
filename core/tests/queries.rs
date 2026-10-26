@@ -893,7 +893,10 @@ fn unreadable_folder_marks_every_answer_incomplete() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
     let rep = f.scan(false);
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
-    assert_eq!(rep.denied, vec![f.s("locked")]);
+    assert_eq!(
+        serde_json::to_value(&rep.denied).unwrap(),
+        serde_json::json!([f.s("locked")])
+    );
 
     let r = f.ls("");
     assert!(r.header.incomplete);

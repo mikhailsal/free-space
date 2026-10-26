@@ -54,6 +54,7 @@ impl Fx {
     ) -> Result<ScanReport, Error> {
         job::run_scan(ScanRequest {
             roots,
+            low_memory: false,
             one_file_system: true,
             workers,
             dir: self.dir.clone(),

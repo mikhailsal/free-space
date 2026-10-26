@@ -30,6 +30,7 @@ fn scan_request(
 ) -> freespace_core::Result<ScanReport> {
     job::run_scan(ScanRequest {
         roots: vec![root.to_path_buf()],
+        low_memory: false,
         one_file_system: true,
         workers,
         dir: dir.clone(),

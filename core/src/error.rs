@@ -247,6 +247,15 @@ impl Error {
         Error::new(ErrorCode::Generic, format!("{context}: {e}"))
     }
 
+    /// Capacity errors from scan staging/spool files use the same contract as SQLite FULL.
+    pub(crate) fn storage_io(context: impl std::fmt::Display, e: std::io::Error) -> Self {
+        let code = match e.raw_os_error() {
+            Some(libc::ENOSPC | libc::EDQUOT) => ErrorCode::Space,
+            _ => ErrorCode::Generic,
+        };
+        Error::new(code, format!("{context}: {e}"))
+    }
+
     pub fn exit(&self) -> i32 {
         self.code.exit()
     }
@@ -274,13 +283,31 @@ impl Error {
 
 impl From<rusqlite::Error> for Error {
     fn from(e: rusqlite::Error) -> Self {
-        Error::generic(format!("sqlite: {e}"))
+        let code = if matches!(&e, rusqlite::Error::SqliteFailure(f, _)
+            if f.code == rusqlite::ErrorCode::DiskFull)
+        {
+            ErrorCode::Space
+        } else {
+            ErrorCode::Generic
+        };
+        Error::new(code, format!("sqlite: {e}"))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn staging_capacity_errors_are_space_and_other_io_errors_remain_generic() {
+        for errno in [libc::ENOSPC, libc::EDQUOT] {
+            let error = Error::storage_io("staging", std::io::Error::from_raw_os_error(errno));
+            assert_eq!(error.code, ErrorCode::Space);
+            assert_eq!(error.exit(), 1);
+        }
+        let error = Error::storage_io("staging", std::io::Error::from_raw_os_error(libc::EACCES));
+        assert_eq!(error.code, ErrorCode::Generic);
+    }
 
     #[test]
     fn exit_codes_match_the_contract() {

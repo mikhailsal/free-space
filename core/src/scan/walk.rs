@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::{FileTypeExt, MetadataExt};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, mpsc};
@@ -84,11 +84,11 @@ struct Queue {
     pending: usize,
 }
 
-struct RootCtx {
-    dev: u64,
+pub(super) struct RootCtx {
+    pub(super) dev: u64,
     /// Mount points below this root on the same device (bind mounts): `st_dev`
     /// cannot tell them apart, so they are matched by path.
-    bind_mounts: HashSet<PathBuf>,
+    pub(super) bind_mounts: HashSet<PathBuf>,
 }
 
 struct Ctx {
@@ -190,7 +190,7 @@ pub fn walk_with_mounts(opts: &WalkOptions, mounts: &[MountInfo]) -> io::Result<
     Ok(tree)
 }
 
-fn prepare_roots(
+pub(super) fn prepare_roots(
     opts: &WalkOptions,
     mounts: &[MountInfo],
     started_at: i64,
@@ -273,6 +273,44 @@ fn finish_mounts(tree: &mut Tree, mounts: &[MountInfo]) {
             m.stats = platform::statvfs(&m.path).ok();
         }
     }
+}
+
+/// Shared lstat classification for the in-memory and disk-backed walkers.
+pub(super) fn entry_metadata(md: &io::Result<fs::Metadata>, ft: Option<fs::FileType>) -> Node {
+    let mut node = Node {
+        nlink: 1,
+        kind: Kind::Other.code(),
+        ..Default::default()
+    };
+    let classify = |t: fs::FileType| {
+        if t.is_dir() {
+            Kind::Dir
+        } else if t.is_file() {
+            Kind::File
+        } else if t.is_symlink() {
+            Kind::Symlink
+        } else {
+            Kind::Other
+        }
+    };
+    match md {
+        Ok(md) => {
+            node.kind = classify(md.file_type()).code();
+            node.allocated = md.blocks() * 512;
+            node.apparent = md.len();
+            node.mtime = md.mtime();
+            node.nlink = md.nlink().min(u32::MAX as u64) as u32;
+        }
+        Err(_) => {
+            node.kind = ft.map(classify).unwrap_or(Kind::Other).code();
+            node.flags = flags::STAT_ERROR;
+            if node.kind() == Kind::Dir {
+                node.flags |= flags::DENIED;
+            }
+            node.errors = 1;
+        }
+    }
+    node
 }
 
 fn worker(ctx: &Ctx, tx: mpsc::Sender<DirResult>) {

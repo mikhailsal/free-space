@@ -318,3 +318,144 @@ allocations. Writer insert loops and refresh graft/finalize loops are
 unchanged. The new report counters are scalars; transferring `Tree` and
 `Finalized` moves their existing buffers without copying them. Explicit drops
 release existing allocations and the old snapshot connection.
+
+## Disk-backed full scan
+
+`scan --low-memory` (or config `low_memory = true`) streams individual entries and
+pending directory jobs to SQLite in the snapshot directory. It never retains the
+whole tree or an entire directory listing. An indexed DFS writes schema v1 rows,
+with one aggregate frame per traversal depth. Hardlink ownership still follows
+full byte-path order. Denied-path JSON is spooled and streamed without truncation.
+
+The mode uses one walker, overriding `workers`. Each of the two SQLite connections
+used during final writing has an 8 MiB cache target, with mmap disabled. Indexes
+are maintained from empty tables so index construction does not require a large
+sort. This is a working-set design, **not a hard process memory limit**. SQLite
+cache targets, allocator overhead, path depth, root/mount configuration and kernel
+page cache all affect memory. Use a cgroup when an operating-system limit matters.
+
+Temporary space includes the staging database and final snapshot simultaneously,
+plus any retained generations. Long directory paths and many hardlinks increase
+staging size. The initial space check uses the existing snapshot size; ongoing
+reserve checks cover staging and output. Interrupted temporary databases are
+removed on the next scan. The previous snapshot remains published until the new
+one is closed, fsynced and atomically renamed. Keep benchmark snapshots outside
+the fixture tree, and use a disk-backed filesystem rather than tmpfs.
+
+Finalization and final-row insertion are combined: `finalize_seconds` is zero in
+this mode; `insert_seconds` includes DFS aggregation and incremental index
+maintenance; `index_seconds` covers final analysis/closing. These phase timings
+are not directly comparable with the fast engine's separate finalize/index stages.
+`refresh` continues to use the existing in-memory engine.
+
+Build once and compare increasing tree sizes:
+
+```sh
+cargo build --release -p freespace
+STEPS="10000 100000 1000000" REPEATS=3 TMPDIR=/disk/scratch \
+  scripts/bench-scan-memory.py target/release/freespace ./bench-results
+```
+
+On a Linux host with a systemd user manager and memory-controller delegation,
+measure each run in a fresh cgroup with swap disabled:
+
+```sh
+STEPS="100000 1000000" MEMORY_MAX=128M TMPDIR=/disk/scratch \
+  scripts/bench-scan-memory.py target/release/freespace ./bench-results
+```
+
+The harness creates empty files, scans each size with both engines, checks entry
+counts and errors, then removes its own scratch tree. `FILES_PER_DIR` defaults to
+1000; setting it above the largest step exercises one very wide directory. Each
+run gets a fresh snapshot directory. A failed fast-engine run is retained so its
+OOM can be compared with the disk engine; a disk-engine failure stops the run.
+
+Results include a binary hash, host/configuration metadata, raw stdout/stderr,
+JSON reports, elapsed time, process peak RSS (KiB), sampled peak snapshot-directory
+disk occupancy, and constrained-run `memory.peak` when available; otherwise
+sampled `memory.current`. Swap, OOM/limit-event counters and available memory
+pressure statistics are also recorded. Set `SOURCE_REVISION` to the revision used
+to build the supplied binary to retain it in the manifest.
+The measurement helper shares the cgroup, so its memory is included in cgroup
+usage; process RSS is the scanner's own peak. Sampling every 20 ms can miss brief
+disk peaks. This fixture has no denied paths, so the unlinked report spool does
+not contribute material disk usage. The harness opts into `FREESPACE_MEMORY_PROFILE`
+markers for walk, finalize, write and index phases. Each boundary records RSS and
+cumulative VmHWM; periodic 20 ms RSS samples are attributed to the active phase.
+`phase_rss.observed_peak_rss_kib` is the largest boundary/periodic sample, a lower
+bound on the true phase peak. Short phases can have no periodic samples; their
+start/end RSS still supplies phase evidence. VmHWM remains cumulative and is never
+presented as a phase peak. Low-memory finalization and incremental index updates
+are fused into write; its index phase covers final analysis/closing. Failed runs
+mark the last phase incomplete. Cache state is uncontrolled and fixture creation
+warms metadata. Record source revision, filesystem, load and repetitions alongside
+results before generalizing to a VPS or Raspberry Pi.
+
+### Constrained wide-directory result (2026-10-26)
+
+Release build of final integrated source `6755725` (including master `8dbb8d4`,
+the hardlink/spool review fixes and phase tracing), Linux 5.15 x86_64/glibc, ext4,
+one run per case, one walker, empty files in a single wide directory. Each scanner
+and its measurement helper ran in a fresh **128 MiB cgroup with swap disabled**.
+The snapshot directory and phase trace were outside the tree.
+[Machine-readable results](benchmark-results/disk-scan-2026-10-26.json) include the
+full source/tree hashes, final binary SHA-256, reports, phase boundaries, sampled
+phase/cgroup/disk peaks and OOM/limit-pressure counters.
+
+| Entries | Engine | Peak process RSS | Elapsed | Result |
+|---:|---|---:|---:|---|
+| 100,002 | default | 33.7 MiB | 1.36 s | completed |
+| 100,002 | low-memory | 24.6 MiB | 3.07 s | completed |
+| 1,000,002 | default | 121.7 MiB | 3.85 s | OOM-killed during walk |
+| 1,000,002 | low-memory | 24.9 MiB | 90.10 s | completed |
+
+Observed phase RSS below is the largest boundary/20 ms sample, **not an exact
+phase peak**. It can be lower than the whole-command peak above. The JSON retains
+boundary values, durations and periodic sample counts so short phases can be
+identified. `finalize` is part of `write` in low-memory mode; that engine's `write`
+also maintains indexes incrementally, while `index` performs final analysis and
+closing. Default-mode phase boundaries include releasing the tree between insert
+and index timing, so profile durations need not equal the CLI's phase timers.
+
+| Entries | Engine | Walk | Finalize | Write | Index |
+|---:|---|---:|---:|---:|---:|
+| 100,002 | default | 29.5 MiB | 21.1 MiB | 28.5 MiB | 26.8 MiB |
+| 100,002 | low-memory | 14.6 MiB | fused | 24.5 MiB | 24.5 MiB |
+| 1,000,002 | default | 121.4 MiB, incomplete | not reached | not reached | not reached |
+| 1,000,002 | low-memory | 15.6 MiB | fused | 24.9 MiB | 24.9 MiB |
+
+The million-file low-memory run used approximately **180.3 MiB** of sampled peak
+snapshot-directory disk space, including staging and output. **Its cgroup reached
+the 128 MiB cap and recorded 1,139 `memory.events` max events**, with zero OOM
+or OOM-kill events and zero sampled swap use. Low process RSS therefore does not
+mean the cgroup had spare memory: the run completed under limit pressure, with
+helper/kernel/filesystem-cache memory included in the cgroup. The default engine
+recorded an OOM kill on the same fixture. Linux 5.15 on this host does not expose
+`memory.peak`; cgroup peaks are 20 ms samples of `memory.current`, not exact
+high-water marks. Available memory-pressure statistics are retained in the JSON.
+
+This verifies one practical constrained workload, including a directory whose
+entire contents cannot fit in the default walker's budget. It does not establish
+a universal 128 MiB requirement. Repeat on the target filesystem/hardware,
+especially for deep paths, many hardlinks or slow storage. At 100,002 entries the
+disk engine was about 2.3 times slower; the million-file default scan did not
+complete, so there is no comparable full-scan time at that size. Raspberry Pi
+hardware measurements remain follow-up work.
+
+### Small VPS and Raspberry Pi deployment
+
+On a 512 MiB–2 GiB machine, enable `low_memory = true` for scheduled full scans.
+The option uses a fixed small SQLite working set; it does not reserve memory or
+enforce a process limit. Leave capacity for the OS and other services, and verify
+completion with a cgroup limit appropriate to the RAM available on that machine.
+The 128 MiB test above is one x86_64 workload, not a Raspberry Pi requirement or
+a promise of spare memory within that limit. A successful run can still encounter
+heavy cgroup memory pressure and reclaim, which affects elapsed time.
+
+Use persistent disk space for `snapshot_dir` and staging, not a RAM-backed tmpfs.
+Budget for staging and the new snapshot alongside retained generations; long paths
+and many hardlinks increase the temporary space needed. If storage is tight,
+`keep_previous = false` reduces retained generations at the cost of historical
+comparison. Measure both elapsed time and disk occupancy on the target storage,
+and allow scheduled scans to finish before the next interval. `refresh` still
+uses the in-memory engine and does not inherit the full-scan memory behavior.

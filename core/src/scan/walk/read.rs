@@ -93,56 +93,25 @@ fn process_entry(
     let name_start = res.names.len() as u32;
     let name_len = nb.len().min(u16::MAX as usize) as u16;
     res.names.extend_from_slice(&nb[..name_len as usize]);
+    let node = entry_metadata(&md, ft);
     let mut rec = ChildRec {
         name_start,
         name_len,
-        kind: Kind::Other.code(),
-        flags: 0,
-        allocated: 0,
-        apparent: 0,
-        mtime: 0,
-        nlink: 1,
-        errors: 0,
+        kind: node.kind,
+        flags: node.flags,
+        allocated: node.allocated,
+        apparent: node.apparent,
+        mtime: node.mtime,
+        nlink: node.nlink,
+        errors: node.errors,
     };
-    match md {
-        Ok(md) => {
-            let t = md.file_type();
-            let mut kind = if t.is_dir() {
-                Kind::Dir
-            } else if t.is_file() {
-                Kind::File
-            } else if t.is_symlink() {
-                Kind::Symlink
-            } else {
-                Kind::Other
-            };
-            rec.allocated = md.blocks() * 512;
-            rec.apparent = md.len();
-            rec.mtime = md.mtime();
-            rec.nlink = md.nlink().min(u32::MAX as u64) as u32;
-            if kind == Kind::Dir {
-                if record_directory(ctx, job, id, &name, &md, &mut rec, (res, sub)) {
-                    kind = Kind::Mount;
-                }
-            } else if md.nlink() > 1 {
-                res.hardlinks.push((id, md.dev(), md.ino()));
+    if let Ok(md) = md {
+        if node.kind() == Kind::Dir {
+            if record_directory(ctx, job, id, &name, &md, &mut rec, (res, sub)) {
+                rec.kind = Kind::Mount.code();
             }
-            rec.kind = kind.code();
-        }
-        Err(_) => {
-            let kind = match ft {
-                Some(t) if t.is_dir() => Kind::Dir,
-                Some(t) if t.is_file() => Kind::File,
-                Some(t) if t.is_symlink() => Kind::Symlink,
-                Some(t) if t.is_fifo() || t.is_socket() => Kind::Other,
-                _ => Kind::Other,
-            };
-            rec.kind = kind.code();
-            rec.flags |= flags::STAT_ERROR;
-            if kind == Kind::Dir {
-                rec.flags |= flags::DENIED;
-            }
-            rec.errors = 1;
+        } else if md.nlink() > 1 {
+            res.hardlinks.push((id, md.dev(), md.ino()));
         }
     }
     res.children.push(rec);

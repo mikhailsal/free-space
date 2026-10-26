@@ -10,6 +10,8 @@ use std::time::Instant;
 use crate::error::{Error, ErrorCode, Result};
 use crate::fault;
 use crate::platform;
+use crate::scan::denied::DeniedPaths;
+use crate::scan::staged::StagedTree;
 use crate::scan::{self, Finalized, NO_PARENT, Tree};
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
 use crate::snapshot::reader::Snapshot;
@@ -70,12 +72,14 @@ pub struct ScanRequest {
     pub roots: Vec<PathBuf>,
     pub one_file_system: bool,
     pub workers: usize,
+    /// Stream entries through SQLite staging instead of retaining a full tree.
+    pub low_memory: bool,
     pub dir: SnapshotDir,
     pub keep_previous: bool,
     pub on_progress: Option<ProgressCallback>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ScanReport {
     pub generation: u64,
     pub prev_generation: Option<u64>,
@@ -87,7 +91,7 @@ pub struct ScanReport {
     pub total_seconds: f64,
     pub snapshot_bytes: u64,
     /// Paths of directories that could not be read (D13).
-    pub denied: Vec<String>,
+    pub denied: DeniedPaths,
     pub errors: u64,
 }
 
@@ -234,7 +238,13 @@ fn record(dir: &SnapshotDir, op: &str, e: &Error) {
 }
 
 pub fn run_scan(req: ScanRequest) -> Result<ScanReport> {
-    let path_args = scan_root_args(&req.roots, req.one_file_system, req.workers);
+    let path_args = scan_root_args(&req.roots, req.one_file_system, req.workers).map(|args| {
+        if req.low_memory {
+            format!("{args} --low-memory")
+        } else {
+            args
+        }
+    });
     let label = req
         .roots
         .iter()
@@ -257,31 +267,24 @@ fn scan_locked(mut req: ScanRequest, label: &str) -> Result<ScanReport> {
     let t_all = Instant::now();
     let ScanWalk {
         pw,
-        tree,
-        fin,
+        data,
         walk_seconds,
         finalize_seconds,
-        denied,
     } = walk_scan(&mut req, label)?;
     fault::point(&req.dir, "walked");
 
-    let entries = tree.nodes.len() as u64;
-    let errors = tree
-        .roots
-        .iter()
-        .enumerate()
-        .map(|(i, _)| tree.nodes[i].errors as u64)
-        .sum();
-    let published = publish_scan(&req, tree, fin, pw, walk_seconds)?;
+    let entries = data.len();
+    let published = publish_scan(&req, data, pw, walk_seconds)?;
     let mut st = state::read(&req.dir).ok().flatten().unwrap_or_default();
     st.last_error = None;
     st.last_success_ts = Some(platform::now_secs());
     st.prev_generation = published.prev_generation;
     st.current_generation = Some(published.generation);
-    st.warnings = denied_warning(&denied).into_iter().collect();
+    st.warnings = published.denied.warning().into_iter().collect();
     st.last_scan_seconds = Some(t_all.elapsed().as_secs_f64());
     state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
 
+    scan::profile::phase("done");
     Ok(ScanReport {
         generation: published.generation,
         prev_generation: published.prev_generation,
@@ -292,12 +295,14 @@ fn scan_locked(mut req: ScanRequest, label: &str) -> Result<ScanReport> {
         publish_seconds: published.publish_seconds,
         total_seconds: t_all.elapsed().as_secs_f64(),
         snapshot_bytes: published.write.bytes,
-        denied,
-        errors,
+        denied: published.denied,
+        errors: published.errors,
     })
 }
 
 struct PublishedScan {
+    denied: DeniedPaths,
+    errors: u64,
     generation: u64,
     prev_generation: Option<u64>,
     write: WriteStats,
@@ -306,21 +311,13 @@ struct PublishedScan {
 
 fn publish_scan(
     req: &ScanRequest,
-    tree: Tree,
-    fin: Finalized,
+    data: ScanData,
     pw: ProgressWriter,
     walk_seconds: f64,
 ) -> Result<PublishedScan> {
     pw.set_stage(progress::STAGE_WRITE);
     let factor = if req.keep_previous { 3 } else { 2 };
-    publish::precheck(&req.dir, Some(tree.nodes.len() as u64), factor).map_err(|mut e| {
-        e.last_error = Some(state::LastError {
-            ts: platform::now_secs(),
-            op: "precheck".into(),
-            message: e.message.clone(),
-        });
-        e
-    })?;
+    scan_precheck(req, data.len(), factor)?;
     fault::point(&req.dir, "prechecked");
     let (generation, current_gen) = next_generation(&req.dir);
     // Only full-scan rotation needs the application-schema check. Refresh
@@ -335,13 +332,15 @@ fn publish_scan(
     // State/current may both be unreadable: the retained bytes still establish
     // a lower bound, and diff requires distinct, correctly paired generations.
     let generation = generation.max(prev_generation.map_or(1, |g| g + 1));
-    let mut meta = WriteMeta::new(generation, prev_generation, tree.started_at);
+    let mut meta = WriteMeta::new(generation, prev_generation, data.started_at());
     meta.one_file_system = req.one_file_system;
     meta.scan_seconds = Some(walk_seconds);
     let tmp = req.dir.tmp(generation);
-    let ws = writer::write_snapshot(&tmp, tree, fin, &meta, &Reserve::new(req.dir.as_path()))?;
+    scan::profile::phase("write");
+    let (ws, denied, errors) = data.write(&tmp, &meta, &Reserve::new(req.dir.as_path()))?;
     fault::point(&req.dir, "written");
 
+    scan::profile::phase("publish");
     pw.set_stage(progress::STAGE_PUBLISH);
     let t = Instant::now();
     if matches!(previous, Previous::Rotate(_)) {
@@ -355,6 +354,8 @@ fn publish_scan(
     drop(pw);
 
     Ok(PublishedScan {
+        denied,
+        errors,
         generation,
         prev_generation,
         write: ws,
@@ -364,11 +365,9 @@ fn publish_scan(
 
 struct ScanWalk {
     pw: ProgressWriter,
-    tree: Tree,
-    fin: Finalized,
+    data: ScanData,
     walk_seconds: f64,
     finalize_seconds: f64,
-    denied: Vec<String>,
 }
 
 fn walk_scan(req: &mut ScanRequest, label: &str) -> Result<ScanWalk> {
@@ -395,28 +394,84 @@ fn walk_scan(req: &mut ScanRequest, label: &str) -> Result<ScanWalk> {
         seen,
         expected,
     };
+    scan::profile::phase("walk");
     let t = Instant::now();
-    let mut tree = scan::walk(&opts).map_err(|e| {
-        let code = if e.kind() == std::io::ErrorKind::InvalidInput
-            || e.kind() == std::io::ErrorKind::NotFound
-        {
-            ErrorCode::Usage
-        } else {
-            ErrorCode::Generic
-        };
-        Error::new(code, format!("scan failed: {e}"))
-    })?;
-    let walk_seconds = t.elapsed().as_secs_f64();
-    let t = Instant::now();
-    let fin = tree.finalize();
-    let finalize_seconds = t.elapsed().as_secs_f64();
-    let denied = denied_paths(&tree, &fin);
+    let (data, walk_seconds, finalize_seconds) = if req.low_memory {
+        // Reserve disk space before staging starts. Its own guards continue to
+        // check both staging and final-output growth throughout the scan.
+        scan_precheck(req, 0, if req.keep_previous { 4 } else { 3 })?;
+        let path = req.dir.as_path().join("snapshot.stage.tmp");
+        let staged = StagedTree::walk(&opts, &path, &Reserve::new(req.dir.as_path()))?;
+        (ScanData::Staged(staged), t.elapsed().as_secs_f64(), 0.0)
+    } else {
+        let mut tree = scan::walk(&opts).map_err(scan::walk_error)?;
+        let walk_seconds = t.elapsed().as_secs_f64();
+        scan::profile::phase("finalize");
+        let finalize = Instant::now();
+        let fin = tree.finalize();
+        (
+            ScanData::Memory(tree, fin),
+            walk_seconds,
+            finalize.elapsed().as_secs_f64(),
+        )
+    };
     Ok(ScanWalk {
         pw,
-        tree,
-        fin,
+        data,
         walk_seconds,
         finalize_seconds,
-        denied,
     })
+}
+
+/// Both engines feed the same generation selection and publication protocol.
+enum ScanData {
+    Memory(Tree, Finalized),
+    Staged(StagedTree),
+}
+impl ScanData {
+    fn len(&self) -> u64 {
+        match self {
+            Self::Memory(tree, _) => tree.len() as u64,
+            Self::Staged(tree) => tree.len(),
+        }
+    }
+    fn started_at(&self) -> i64 {
+        match self {
+            Self::Memory(tree, _) => tree.started_at,
+            Self::Staged(tree) => tree.started_at(),
+        }
+    }
+    fn write(
+        self,
+        path: &std::path::Path,
+        meta: &WriteMeta,
+        reserve: &Reserve,
+    ) -> Result<(WriteStats, DeniedPaths, u64)> {
+        match self {
+            Self::Staged(tree) => tree.write(path, meta),
+            Self::Memory(tree, fin) => {
+                let denied = denied_paths(&tree, &fin).into();
+                let errors = tree
+                    .nodes
+                    .iter()
+                    .take(tree.roots.len())
+                    .map(|n| n.errors as u64)
+                    .sum();
+                let stats = writer::write_snapshot(path, tree, fin, meta, reserve)?;
+                Ok((stats, denied, errors))
+            }
+        }
+    }
+}
+
+fn scan_precheck(req: &ScanRequest, entries: u64, factor: u64) -> Result<()> {
+    publish::precheck(&req.dir, Some(entries), factor).map_err(|mut e| {
+        e.last_error = Some(state::LastError {
+            ts: platform::now_secs(),
+            op: "precheck".into(),
+            message: e.message.clone(),
+        });
+        e
+    })?;
+    Ok(())
 }

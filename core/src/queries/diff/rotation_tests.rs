@@ -5,6 +5,7 @@ use std::fs;
 fn scan(root: &std::path::Path, dir: &SnapshotDir) {
     job::run_scan(ScanRequest {
         roots: vec![root.to_path_buf()],
+        low_memory: false,
         one_file_system: true,
         workers: 1,
         dir: dir.clone(),
