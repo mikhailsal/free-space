@@ -82,7 +82,20 @@ fn open_database(path: &Path) -> Result<Connection> {
         .open(path)
         .map_err(|e| Error::storage_io(format!("create {}", path.display()), e))?;
     fsutil::secure_file(&file).map_err(|e| Error::io("secure scan database", e))?;
-    let conn = Connection::open(path)?;
+    configure_database(Connection::open(path)?)
+}
+
+fn connect_database(path: &Path) -> Result<Connection> {
+    use rusqlite::OpenFlags;
+    configure_database(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?)
+}
+
+fn configure_database(conn: Connection) -> Result<Connection> {
     conn.execute_batch(&format!(
         "PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=FILE;
          PRAGMA cache_size=-{CACHE_KIB}; PRAGMA mmap_size=0; PRAGMA cache_spill=ON;
@@ -101,14 +114,29 @@ struct WalkContext<'a> {
 
 impl StagedTree {
     pub fn walk(opts: &WalkOptions, path: &Path, reserve: &Reserve) -> Result<Self> {
-        let result = Self::walk_inner(opts, path, reserve);
+        let result = Self::walk_inner(opts, path, reserve, true);
         if result.is_err() {
             let _ = std::fs::remove_file(path);
         }
         result
     }
 
-    fn walk_inner(opts: &WalkOptions, path: &Path, reserve: &Reserve) -> Result<Self> {
+    /// The caller owns a securely created file and holds its exclusive lifetime
+    /// lock. This entry point never replaces or recreates a missing staging file.
+    pub(crate) fn walk_precreated(
+        opts: &WalkOptions,
+        path: &Path,
+        reserve: &Reserve,
+    ) -> Result<Self> {
+        Self::walk_inner(opts, path, reserve, false)
+    }
+
+    fn walk_inner(
+        opts: &WalkOptions,
+        path: &Path,
+        reserve: &Reserve,
+        create: bool,
+    ) -> Result<Self> {
         let mut guard = SpaceGuard::new(reserve)?;
         let mounts = platform::visible_mountinfo();
         let mut roots = Tree {
@@ -119,7 +147,11 @@ impl StagedTree {
         root_opts.expected = None; // used-inode estimates must never allocate a full tree
         let (paths, contexts) = prepare_roots(&root_opts, &mounts, roots.started_at, &mut roots)
             .map_err(super::walk_error)?;
-        let conn = open_database(path)?;
+        let conn = if create {
+            open_database(path)?
+        } else {
+            connect_database(path)?
+        };
         conn.execute_batch("BEGIN;
             CREATE TABLE raw(id INTEGER PRIMARY KEY, parent INTEGER, name BLOB NOT NULL,
               kind INTEGER NOT NULL, flags INTEGER NOT NULL, allocated INTEGER NOT NULL,

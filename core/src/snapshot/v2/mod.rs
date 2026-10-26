@@ -12,6 +12,7 @@ mod metadata;
 mod reader;
 mod retention;
 mod seed;
+mod stage_files;
 mod writer;
 pub use retention::{MaintenanceReport, RetentionPolicy};
 mod staging;

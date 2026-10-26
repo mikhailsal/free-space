@@ -42,11 +42,8 @@ impl Store {
         opts.one_file_system = one_file_system;
         if low_memory {
             let dir = self.path.parent().expect("canonical database parent");
-            let path = dir.join(format!(
-                "scan-{}.stage.tmp",
-                crate::snapshot::writer::snapshot_id()
-            ));
-            let staged = StagedTree::walk(&opts, &path, &Reserve::new(dir))?;
+            let stage_file = stage_files::StageFile::create(dir)?;
+            let staged = StagedTree::walk_precreated(&opts, stage_file.path(), &Reserve::new(dir))?;
             self.seed_disk(&staged, one_file_system, keep_previous, start.elapsed())
         } else {
             let tree = scan::walk(&opts).map_err(scan::walk_error)?;

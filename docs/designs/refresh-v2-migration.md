@@ -237,8 +237,15 @@ Per-row SQL formatting currently allocates short fixed-size statement strings.
 Staging and publication check the existing filesystem reserve at least every
 1,024 visitor steps and once after visiting. Staging uses a secure 0640 file named
 `scan-<16 lowercase hex digits>.stage.tmp` beside the v2 database; normal success
-and error paths unlink it. A killed process can leave that staging file for
-explicit lifecycle cleanup. The v2 transaction rolls back all generation rows on
+and error paths unlink it. Each stage holds an exclusive advisory lock from
+before SQLite opens it through publication and removal. Before a new disk scan,
+recovery opens only exact-pattern names with `O_NOFOLLOW`, accepts only regular
+single-link files, acquires a nonblocking exclusive lock, and rechecks inode
+identity before unlinking. Active concurrent scanners, symlinks, hardlinks,
+directories and unknown names are preserved. A killed scanner releases its lock
+so the next disk scan reclaims the abandoned file. A creation/recovery race is
+detected before SQLite opens the stage and retried with another name. The v2
+transaction rolls back all generation rows on
 visitor, reserve, admission or SQLite failure. Full scan writer locks span the
 staged database traversal, but never its earlier filesystem walk.
 
