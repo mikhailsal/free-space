@@ -171,6 +171,24 @@ I/O and system memory use. Keep results on a filesystem with adequate free space
 Defaults are `STEPS="100 1000"`, `WORKERS=2`, `REPEATS=1`, `SMALL_FILES=16`, and
 `FILES_PER_DIR=1000`. All are positive integers; steps must increase strictly.
 Python-style underscores in step values are accepted for readability.
+`BACKENDS` defaults to `v1`, so the default workload also accepts older binaries.
+For a binary supporting v2, compare both backends on the same tree:
+
+```sh
+BACKENDS="v1 v2" STEPS="1000 10000 100000" REPEATS=3 \
+  SOURCE_REVISION=$(git rev-parse HEAD) \
+  scripts/bench-refresh-memory.sh ./target/release/freespace ./bench-results
+```
+
+Each backend has its own snapshot directory. Their order alternates between
+repetitions; both see identical filesystem contents. The manifest retains the
+supplied source revision and binary hash. GNU time covers the entire process,
+including SQLite close and any close-time checkpoint, which can be outside the
+CLI stage timers. Its input/output counters are kernel block-operation counts,
+not measured physical device bytes. Endpoint disk occupancy includes WAL and
+retained files; it is not peak temporary space. Stage timings use each backend's
+documented grouping and should not be compared as identical implementations.
+
 Steps count **unrelated files**, not total entries. Files are empty, with fixed
 names and mtimes, grouped into numbered directories with at most
 `FILES_PER_DIR` files each. The scanned root contains `small/` and `unrelated/`;

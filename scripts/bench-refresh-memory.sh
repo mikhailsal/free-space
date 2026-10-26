@@ -4,7 +4,8 @@ set -euo pipefail
 if [[ ${1:-} == --help ]]; then
   cat <<'HELP'
 Usage: [STEPS="100 1000"] [WORKERS=2] [REPEATS=1] [SMALL_FILES=16]
-       [FILES_PER_DIR=1000] [TMPDIR=/scratch] scripts/bench-refresh-memory.sh BINARY OUTPUT_PARENT
+       [FILES_PER_DIR=1000] [BACKENDS="v1 v2"] [TMPDIR=/scratch]
+       scripts/bench-refresh-memory.sh BINARY OUTPUT_PARENT
 Creates a unique results directory in OUTPUT_PARENT and a disposable tree in TMPDIR.
 STEPS are strictly increasing counts of unrelated empty files (not total entries).
 Requires Bash, Python 3, and GNU /usr/bin/time. No root or cache dropping required.
@@ -77,6 +78,9 @@ def main():
     repeats = positive("REPEATS", "1")
     small_files = positive("SMALL_FILES", "16")
     per_dir = positive("FILES_PER_DIR", "1000")
+    backends = os.environ.get("BACKENDS", "v1").split()
+    if not backends or len(set(backends)) != len(backends) or any(b not in ("v1", "v2") for b in backends):
+        raise ValueError("BACKENDS must contain distinct v1 and/or v2 values")
     steps = [int(value) for value in os.environ.get("STEPS", "100 1000").split()]
     if not steps or steps[0] < 1 or any(b <= a for a, b in zip(steps, steps[1:])):
         raise ValueError("STEPS must be strictly increasing positive integers")
@@ -90,29 +94,40 @@ def main():
     # Both locations are newly created. Only this scratch directory is removed.
     with tempfile.TemporaryDirectory(prefix="freespace-scaling-") as scratch_name:
         scratch = Path(scratch_name).resolve()
-        tree, snapshot = scratch / "tree", scratch / "snapshot"
+        tree = scratch / "tree"
+        snapshots = {backend: scratch / f"snapshot-{backend}" for backend in backends}
         small, unrelated = tree / "small", tree / "unrelated"
         small.mkdir(parents=True)
         unrelated.mkdir()
-        snapshot.mkdir()
+        for snapshot in snapshots.values():
+            snapshot.mkdir()
         generate_files(small, 0, small_files, per_dir)
         config = scratch / "config.toml"
         config.write_text("keep_previous = true\n")
-        env = dict(os.environ, LC_ALL="C", FREESPACE_SNAPSHOT_DIR=str(snapshot), FREESPACE_CONFIG=str(config))
+        env = dict(os.environ, LC_ALL="C", FREESPACE_CONFIG=str(config))
         version = subprocess.run([str(binary), "--version"], capture_output=True, text=True, check=True)
         manifest = {
-            "schema_version": 1, "started_utc": datetime.now(timezone.utc).isoformat(),
+            "schema_version": 2, "started_utc": datetime.now(timezone.utc).isoformat(),
             "binary": str(binary), "binary_sha256": binary_digest(binary),
             "binary_version": version.stdout.strip(), "platform": platform.platform(),
             "python": platform.python_version(),
             "gnu_time_version": subprocess.check_output(["/usr/bin/time", "--version"], text=True).splitlines()[0],
-            "workers": workers, "repeats": repeats,
+            "workers": workers, "repeats": repeats, "backends": backends,
+            "source_revision": os.environ.get("SOURCE_REVISION"),
             "unrelated_file_steps": steps, "small_files": small_files, "files_per_dir": per_dir,
-            "file_payload_bytes": 0, "tree": str(tree), "snapshot_dir": str(snapshot),
+            "file_payload_bytes": 0, "tree": str(tree),
+            "snapshot_dirs": {b: str(p) for b, p in snapshots.items()},
             "cache_policy": "uncontrolled; freshly generated metadata; refresh follows scan",
             "snapshot_policy": "reused across steps and repeats; keep_previous=true",
             "config_toml": config.read_text(),
-            "environment": {key: env[key] for key in ("LC_ALL", "FREESPACE_CONFIG", "FREESPACE_SNAPSHOT_DIR")},
+            "environment": {key: env[key] for key in ("LC_ALL", "FREESPACE_CONFIG")},
+            "measurement_notes": [
+                "GNU time covers the complete command, including connection close and any close-time checkpoint.",
+                "peak_rss_kib is the command process high-water RSS, not cgroup memory.",
+                "fs_inputs/fs_outputs are kernel rusage block-operation counters, not measured physical device bytes.",
+                "CLI phase timings use each backend's documented grouping and need not sum to command wall time.",
+                "Snapshot occupancy is an endpoint sample including WAL, not peak temporary disk space.",
+            ],
         }
         if Path("/proc/meminfo").exists():
             manifest["meminfo_before"] = Path("/proc/meminfo").read_text()
@@ -127,16 +142,23 @@ def main():
             os.utime(tree, (FIXED_MTIME, FIXED_MTIME))
             expected_entries = 3 + small_files + (small_files + per_dir - 1) // per_dir + step + (step + per_dir - 1) // per_dir
             for repeat in range(1, repeats + 1):
+              # Alternate backend order between repeats to reduce systematic ordering bias.
+              for backend in backends if repeat % 2 else list(reversed(backends)):
+                snapshot = snapshots[backend]
+                run_env = dict(env, FREESPACE_SNAPSHOT_DIR=str(snapshot))
                 for operation, target in (("scan", tree), ("refresh", small)):
-                    prefix = f"files-{step}-r{repeat}-{operation}"
+                    prefix = f"files-{step}-r{repeat}-{backend}-{operation}"
                     report_path = output / f"{prefix}.json"
                     time_path = output / f"{prefix}.time"
                     stderr_path = output / f"{prefix}.stderr"
-                    command = [str(binary), operation, str(target), "--workers", str(workers), "--json"]
+                    command = [str(binary)]
+                    if backend != "v1" or backends != ["v1"]:
+                        command.extend(["--backend", backend])
+                    command.extend([operation, str(target), "--workers", str(workers), "--json"])
                     time_format = '{"wall_seconds":%e,"peak_rss_kib":%M,"fs_inputs":%I,"fs_outputs":%O,"exit_code":%x}'
                     with report_path.open("w") as stdout, stderr_path.open("w") as stderr:
                         result = subprocess.run(["/usr/bin/time", "-f", time_format, "-o", str(time_path), *command],
-                                                env=env, stdout=stdout, stderr=stderr)
+                                                env=run_env, stdout=stdout, stderr=stderr)
                     # GNU time may prepend a failure message; its formatted row is last.
                     metrics = json.loads(time_path.read_text().splitlines()[-1])
                     report = None
@@ -151,7 +173,8 @@ def main():
                     except (ValueError, KeyError) as error:
                         validation_error = str(error)
                     row = {
-                        "schema_version": 1, "operation": operation, "unrelated_files": step,
+                        "schema_version": 2, "backend": backend,
+                        "operation": operation, "unrelated_files": step,
                         "expected_entries": expected_entries, "repeat": repeat, "workers": workers,
                         "command": command, "time": metrics, "report": report,
                         "validation_error": validation_error, "process_exit_code": result.returncode,
