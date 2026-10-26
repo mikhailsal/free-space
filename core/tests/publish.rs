@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,19 +15,27 @@ use freespace_core::ErrorCode;
 use freespace_core::job::{self, ScanReport, ScanRequest};
 use freespace_core::queries::{self, diff, params::*};
 use freespace_core::refresh::{self, RefreshRequest};
-use freespace_core::snapshot::SnapshotDir;
 use freespace_core::snapshot::reader::Snapshot;
+use freespace_core::snapshot::{SnapshotDir, state};
 
 fn scan(root: &Path, dir: &SnapshotDir, workers: usize) -> ScanReport {
+    scan_request(root, dir, workers, true).unwrap()
+}
+
+fn scan_request(
+    root: &Path,
+    dir: &SnapshotDir,
+    workers: usize,
+    keep_previous: bool,
+) -> freespace_core::Result<ScanReport> {
     job::run_scan(ScanRequest {
         roots: vec![root.to_path_buf()],
         one_file_system: true,
         workers,
         dir: dir.clone(),
-        keep_previous: true,
+        keep_previous,
         on_progress: None,
     })
-    .unwrap()
 }
 
 fn tree(root: &Path, dirs: usize, files: usize) {
@@ -236,4 +245,149 @@ fn an_old_schema_prev_reads_as_no_prev() {
         panic!("diff opened")
     };
     assert_eq!(e.code, ErrorCode::NoPrev, "{}", e.message);
+}
+
+fn two_generations(root: &Path, dir: &SnapshotDir) {
+    fs::create_dir_all(root).unwrap();
+    fs::write(root.join("a"), [1; 4096]).unwrap();
+    scan(root, dir, 1);
+    fs::write(root.join("b"), [2; 4096]).unwrap();
+    scan(root, dir, 1);
+}
+
+fn assert_retained(dir: &SnapshotDir, bytes: &[u8], inode: u64) {
+    assert!(
+        fs::read(dir.prev()).unwrap() == bytes,
+        "previous bytes changed"
+    );
+    assert_eq!(fs::metadata(dir.prev()).unwrap().ino(), inode);
+}
+
+#[test]
+fn non_sqlite_current_retains_previous_bytes_generation_and_diff() {
+    assert_corrupt_current_retains_previous(b"not a SQLite database");
+}
+
+#[test]
+fn empty_current_retains_previous_bytes_generation_and_diff() {
+    assert_corrupt_current_retains_previous(b"");
+}
+
+fn assert_corrupt_current_retains_previous(corruption: &[u8]) {
+    for state_case in ["normal", "missing", "corrupt", "newer_previous"] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("r");
+        let dir = SnapshotDir::new(tmp.path().join("snap"));
+        two_generations(&root, &dir);
+        let prev_generation = if state_case == "newer_previous" {
+            17
+        } else {
+            1
+        };
+        if state_case == "newer_previous" {
+            let conn = rusqlite::Connection::open(dir.prev()).unwrap();
+            conn.execute("UPDATE meta SET generation = 17", []).unwrap();
+        }
+        match state_case {
+            "missing" | "newer_previous" => fs::remove_file(dir.state()).unwrap(),
+            "corrupt" => fs::write(dir.state(), b"{not json").unwrap(),
+            _ => {}
+        }
+        let bytes = fs::read(dir.prev()).unwrap();
+        let inode = fs::metadata(dir.prev()).unwrap().ino();
+        fs::write(dir.current(), corruption).unwrap();
+        fs::write(root.join("c"), [3; 4096]).unwrap();
+        let rep = scan(&root, &dir, 1);
+        let generation = if state_case == "normal" {
+            3
+        } else {
+            prev_generation + 1
+        };
+        assert_retained(&dir, &bytes, inode);
+        assert_eq!(
+            (rep.generation, rep.prev_generation),
+            (generation, Some(prev_generation))
+        );
+        let (cur, prev) = diff::open_pair(&dir).unwrap();
+        assert_eq!(cur.meta.generation, generation);
+        assert_eq!(cur.meta.prev_generation, Some(prev_generation));
+        assert_eq!(prev.meta.generation, prev_generation);
+        let st = state::read(&dir).unwrap().unwrap();
+        assert_eq!(st.current_generation, Some(generation));
+        assert_eq!(st.prev_generation, Some(prev_generation));
+        let result = queries::diff(
+            &dir,
+            &DiffParams {
+                path: Some(root.to_str().unwrap().into()),
+                kind: Some("file".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        for name in ["b", "c"] {
+            assert!(
+                result
+                    .entries
+                    .iter()
+                    .any(|entry| entry.name == name && entry.delta >= 4096)
+            );
+        }
+    }
+}
+
+#[test]
+fn corrupt_current_drops_previous_only_when_unusable_or_disabled() {
+    for corruption in [b"not a SQLite database".as_slice(), b"".as_slice()] {
+        for control in [
+            "disabled",
+            "incompatible_previous",
+            "corrupt_previous",
+            "missing_previous",
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            let root = tmp.path().join("r");
+            let dir = SnapshotDir::new(tmp.path().join("snap"));
+            two_generations(&root, &dir);
+            match control {
+                "incompatible_previous" => {
+                    let conn = rusqlite::Connection::open(dir.prev()).unwrap();
+                    conn.execute("UPDATE meta SET schema_version = 0", [])
+                        .unwrap();
+                }
+                "corrupt_previous" => fs::write(dir.prev(), b"not SQLite").unwrap(),
+                "missing_previous" => fs::remove_file(dir.prev()).unwrap(),
+                _ => {}
+            }
+            fs::write(dir.current(), corruption).unwrap();
+            let rep = scan_request(&root, &dir, 1, control != "disabled").unwrap();
+            assert_eq!((rep.generation, rep.prev_generation), (3, None));
+            assert!(!dir.prev().exists());
+            assert_eq!(
+                Snapshot::open_current(&dir).unwrap().meta.prev_generation,
+                None
+            );
+            assert_eq!(state::read(&dir).unwrap().unwrap().prev_generation, None);
+            assert_eq!(diff::open_pair(&dir).err().unwrap().code, ErrorCode::NoPrev);
+        }
+    }
+}
+
+#[test]
+fn failed_recovery_publish_preserves_previous() {
+    for keep_previous in [true, false] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("r");
+        let dir = SnapshotDir::new(tmp.path().join("snap"));
+        two_generations(&root, &dir);
+        let bytes = fs::read(dir.prev()).unwrap();
+        let inode = fs::metadata(dir.prev()).unwrap().ino();
+        // An unreadable current that also makes rename fail, after tmp is written.
+        fs::remove_file(dir.current()).unwrap();
+        fs::create_dir(dir.current()).unwrap();
+        fs::write(dir.current().join("block-rename"), b"x").unwrap();
+        let err = scan_request(&root, &dir, 1, keep_previous).unwrap_err();
+        assert!(err.message.contains("publish step rename failed"), "{err}");
+        assert_retained(&dir, &bytes, inode);
+        assert_eq!(Snapshot::open(&dir.prev()).unwrap().meta.generation, 1);
+    }
 }
