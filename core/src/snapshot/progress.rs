@@ -76,38 +76,9 @@ impl ProgressWriter {
         let (dir2, op, path) = (dir.clone(), op.to_string(), path.to_string());
         let (stop2, stage2, last2) = (stop.clone(), stage.clone(), last.clone());
         let handle = std::thread::spawn(move || {
-            let mut first = true;
-            loop {
-                if !first {
-                    for _ in 0..10 {
-                        if stop2.load(Ordering::Relaxed) {
-                            return;
-                        }
-                        std::thread::sleep(Duration::from_millis(100));
-                    }
-                }
-                first = false;
-                let now = now_secs();
-                let s = seen.load(Ordering::Relaxed);
-                let p = Progress {
-                    op: op.clone(),
-                    path: path.clone(),
-                    stage: stage_name(stage2.load(Ordering::Relaxed)).to_string(),
-                    started_at,
-                    updated_at: now,
-                    elapsed_seconds: now - started_at,
-                    entries_seen: s,
-                    entries_expected: expected,
-                    percent: percent(s, expected),
-                };
-                if let Ok(b) = serde_json::to_vec(&p) {
-                    let _ = fsutil::write_atomic(&dir2.progress(), &b);
-                }
-                if let Some(cb) = &on_tick {
-                    cb(&p);
-                }
-                *last2.lock().unwrap() = Some(p);
-            }
+            run_progress_writer(
+                dir2, op, path, seen, expected, on_tick, started_at, stop2, stage2, last2,
+            )
         });
         ProgressWriter {
             stop,
@@ -125,6 +96,78 @@ impl ProgressWriter {
     pub fn last(&self) -> Option<Progress> {
         self.last.lock().unwrap().clone()
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_progress_writer(
+    dir: SnapshotDir,
+    op: String,
+    path: String,
+    seen: Arc<AtomicU64>,
+    expected: Option<u64>,
+    on_tick: Option<ProgressCallback>,
+    started_at: i64,
+    stop: Arc<AtomicBool>,
+    stage: Arc<AtomicU8>,
+    last: Arc<Mutex<Option<Progress>>>,
+) {
+    let mut first = true;
+    loop {
+        if !first && !wait_for_next_tick(&stop) {
+            return;
+        }
+        first = false;
+        let progress = make_progress(&op, &path, &seen, expected, started_at, &stage);
+        write_progress(&dir, &progress, &on_tick, &last);
+    }
+}
+
+fn wait_for_next_tick(stop: &AtomicBool) -> bool {
+    for _ in 0..10 {
+        if stop.load(Ordering::Relaxed) {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    true
+}
+
+fn make_progress(
+    op: &str,
+    path: &str,
+    seen: &AtomicU64,
+    expected: Option<u64>,
+    started_at: i64,
+    stage: &AtomicU8,
+) -> Progress {
+    let now = now_secs();
+    let entries_seen = seen.load(Ordering::Relaxed);
+    Progress {
+        op: op.to_string(),
+        path: path.to_string(),
+        stage: stage_name(stage.load(Ordering::Relaxed)).to_string(),
+        started_at,
+        updated_at: now,
+        elapsed_seconds: now - started_at,
+        entries_seen,
+        entries_expected: expected,
+        percent: percent(entries_seen, expected),
+    }
+}
+
+fn write_progress(
+    dir: &SnapshotDir,
+    progress: &Progress,
+    on_tick: &Option<ProgressCallback>,
+    last: &Mutex<Option<Progress>>,
+) {
+    if let Ok(bytes) = serde_json::to_vec(progress) {
+        let _ = fsutil::write_atomic(&dir.progress(), &bytes);
+    }
+    if let Some(callback) = on_tick {
+        callback(progress);
+    }
+    *last.lock().unwrap() = Some(progress.clone());
 }
 
 impl Drop for ProgressWriter {
