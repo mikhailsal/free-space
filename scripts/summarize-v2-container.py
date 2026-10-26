@@ -56,7 +56,9 @@ def main():
         if not status.get("success"):
             issues.append(f'{path.relative_to(args.directory)}: incomplete/failed; {status.get("failures", [])}')
     print("Values: median [min..max]; times seconds, memory/disk MiB. Disk peaks are sampled lower bounds.")
-    print("Cgroup peak is arm-cumulative, including fixture generation and SQLite observations. RSS is per CLI.")
+    scopes = sorted({row.get("memory_peak_scope", "unspecified in artifact")
+                     for rows in groups.values() for row in rows})
+    print("Cgroup peak scope from raw artifacts: " + "; ".join(scopes) + ". RSS is per CLI.")
     print("\n| arm | keep | files | command | valid/rows | elapsed | RSS | cgroup peak | sampled current peak |")
     print("|---|---|---:|---|---:|---|---|---|---|")
     for key, rows in sorted(groups.items()):

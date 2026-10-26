@@ -4,9 +4,10 @@
 Host: --baseline BIN --candidate BIN --output DIR [--steps 100000,1000000]
       [--memory 128|256|512] [--repeats 2] [--include-v1]
 Each comparison arm receives a fresh 2-CPU, no-swap cgroup; bind-mounted fixtures
-and snapshots bypass overlayfs. No cache flushing is attempted. Peaks sampled
-at 20ms are lower bounds; cgroup memory.peak is arm-cumulative (including
-generation and observations), while GNU time RSS covers each CLI process.
+and snapshots bypass overlayfs. On a dedicated ephemeral GitHub-hosted VM,
+host fixture setup is synced and caches dropped before each arm container.
+Peaks sampled at 20ms are lower bounds; cgroup memory.peak is arm-cumulative
+for CLI/helper/observations, excluding host setup. RSS covers each CLI process.
 """
 
 import argparse
@@ -171,7 +172,7 @@ def measured_command(spec):
                sampler_errors=sampler_errors, elapsed_seconds=elapsed, cgroup_path=str(group),
                cgroup_before=before, cgroup_after=after, sampled_memory_peak=sampled_memory,
                sampled_disk_peak=peaks, endpoint_disk=endpoint, sample_interval_seconds=0.02)
-    row["memory_peak_scope"] = "arm cumulative including fixture generation and prior observations"
+    row["memory_peak_scope"] = "arm cumulative CLI, helper and prior observations; excludes host fixture generation"
     row["sampled_memory_peak_scope"] = "current command sampled memory.current; lower bound"
     row["sampled_file_peaks"] = file_peaks
     row["endpoint_files"] = file_occupancy(Path("/scratch/snapshot"))
@@ -228,8 +229,8 @@ def db_breakdown(snapshot):
 def generate(root, start, stop, checkpoint):
     """Create deterministic fixtures with constant Python state and bounded batches.
 
-    Sync drains dirty metadata without dropping caches or moving cgroup charges.
-    It is fixture preparation, outside every measured CLI command.
+    Host preparation happens outside the measured container. Sync drains dirty
+    metadata before the dedicated VM cache flush; no setup memory is CLI RAM.
     """
     fixed_time = (1700000000, 1700000000)
     checkpoint(root.name, start, "start")
@@ -252,43 +253,52 @@ def generate(root, start, stop, checkpoint):
     checkpoint(root.name, stop, "complete")
 
 
+def prepare_fixture(case, output, ident, files):
+    """Prepare outside the measured cgroup, then cold-start the entire arm."""
+    def checkpoint(subtree, created, phase):
+        row = dict(subtree=subtree, created_files=created, phase=phase,
+                   unix_seconds=time.time(), scope="host setup outside measured container")
+        with (output / (ident + ".fixture-progress.jsonl")).open("a") as stream:
+            stream.write(json.dumps(row) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        print(f"host fixture {ident} {subtree} {created} {phase}", flush=True)
+
+    tree = case / "tree"
+    (tree / "small").mkdir(parents=True)
+    (tree / "unrelated").mkdir()
+    generate(tree / "small", 0, 16, checkpoint)
+    generate(tree / "unrelated", 0, files, checkpoint)
+    os.utime(tree, (1700000000, 1700000000))
+    checkpoint("tree", files + 16, "before_final_sync")
+    os.sync()
+    checkpoint("tree", files + 16, "complete")
+    command = ["sudo", "-n", "tee", "/proc/sys/vm/drop_caches"]
+    receipt = dict(arm=ident, policy="sync then drop_caches=3 on this dedicated ephemeral GitHub-hosted VM only",
+                   runner_environment=os.environ["RUNNER_ENVIRONMENT"],
+                   sync_command="os.sync()", flush_command=command, flush_input="3\n",
+                   started_unix_seconds=time.time(), success=False)
+    receipt_path = output / (ident + ".cache-flush.json")
+    dump(receipt_path, receipt)
+    # The progress receipt was written after the final fixture sync. Flush it
+    # too, with every fixture/progress file closed before dropping VM caches.
+    os.sync()
+    try:
+        subprocess.run(command, input="3\n", text=True, stdout=subprocess.DEVNULL,
+                       check=True, timeout=60)
+        receipt["success"] = True
+    except (OSError, subprocess.SubprocessError) as error:
+        receipt["error"] = repr(error)
+        raise
+    finally:
+        receipt["finished_unix_seconds"] = time.time()
+        dump(receipt_path, receipt)
+
+
 def inside(spec_path):
     spec = json.loads(spec_path.read_text())
     group = cgroup()
     dump(Path("/results") / (spec["id"] + ".arm-start.json"), cg_read(group))
-
-    def checkpoint(subtree, created, phase):
-        selected = {"anon", "file", "kernel", "slab", "slab_reclaimable",
-                    "slab_unreclaimable", "file_dirty", "file_writeback"}
-        memory_stat = {}
-        for line in (group / "memory.stat").read_text().splitlines():
-            name, value = line.split()
-            if name in selected:
-                memory_stat[name] = int(value)
-        row = dict(subtree=subtree, created_files=created, phase=phase,
-                   unix_seconds=time.time(), cgroup=cg_read(group),
-                   memory_stat_bytes=memory_stat)
-        # Append and fsync each checkpoint so an OOM during the next batch or
-        # sync retains the last completed phase in the raw artifact.
-        with (Path("/results") / (spec["id"] + ".fixture-progress.jsonl")).open("a") as stream:
-            stream.write(json.dumps(row) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        print(f'fixture {spec["id"]} {subtree} {created} {phase}: '
-              f'memory.current={row["cgroup"]["memory.current"]} stat={memory_stat}', flush=True)
-
-    tree = Path("/scratch/tree")
-    (tree / "small").mkdir(parents=True)
-    (tree / "unrelated").mkdir()
-    # Generation happens inside this arm's cgroup, before timed commands. Its
-    # inode/dentry/cache charges remain subject to the same RAM budget.
-    generate(tree / "small", 0, 16, checkpoint)
-    generate(tree / "unrelated", 0, spec["files"], checkpoint)
-    os.utime(tree, (1700000000, 1700000000))
-    checkpoint("tree", spec["files"] + 16, "before_final_sync")
-    os.sync()
-    checkpoint("tree", spec["files"] + 16, "complete")
-    dump(Path("/results") / (spec["id"] + ".fixture-ready.json"), cg_read(group))
     for index, operation in enumerate(spec["operations"]):
         command_spec = dict(spec, id=f'{spec["id"]}-{index}-{operation}', operation=operation,
                             target="/scratch/tree/small" if operation == "refresh" else "/scratch/tree")
@@ -316,8 +326,8 @@ def inside(spec_path):
 
 
 def host(args):
-    if os.environ.get("GITHUB_ACTIONS") != "true":
-        raise RuntimeError("Measurements are allowed only on a GitHub Actions runner")
+    if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+        raise RuntimeError("Setup, cache flushing and measurements require an ephemeral GitHub-hosted Actions VM")
     steps = [int(value) for value in args.steps.split(",")]
     if any(value not in (100000, 1000000) for value in steps) or sorted(set(steps)) != steps:
         raise ValueError("steps must be 100000 and/or 1000000 in increasing order")
@@ -335,16 +345,17 @@ def host(args):
     failures = []
     completed = False
     manifest = dict(schema_version=1, arguments=vars(args), kernel=platform.release(),
+        measurement_protocol="host-setup-cold-arm-v2", cache_flush_receipts=[],
         started_unix_seconds=time.time(),
         cpu=Path("/proc/cpuinfo").read_text(), docker=capture(["docker", "version"]),
         image=capture(["docker", "image", "inspect", image]),
-        resource_policy="2 CPU quota, selected RAM MiB, memory-swap=memory, no OOM override",
-        cache_policy="fixture generated inside each fresh arm cgroup with immediate mtimes and constant Python state; os.sync every 10000 files and at completion drains dirty metadata outside timed commands without dropping caches; cache retained across CLI processes and read-only post-command dbstat; no host cache dropping; alternating paired arm order",
-        measurement_policy="complete CLI process incl close/checkpoint; helper shares cgroup; cgroup memory.peak arm-cumulative; per-command sampled memory.current lower bound and GNU time RSS; disk peaks sampled lower bounds",
+        resource_policy="dedicated ephemeral GitHub-hosted VM; host setup excluded; each arm has 2 CPU quota, selected RAM MiB, memory-swap=memory, no OOM override",
+        cache_policy="host-generated deterministic fixture, os.sync every 10000 files and at completion; os.sync then sudo -n tee /proc/sys/vm/drop_caches with input 3 before each arm on this job's ephemeral VM only; failure aborts, never warm fallback; clean OS input caches requested dropped (active pages and hardware caches not reset), then cache retained across CLI processes and immutable post-command dbstat; alternating paired arm order",
+        measurement_policy="complete CLI incl close/checkpoint; helper shares cgroup; memory.peak arm-cumulative CLI/helper/observations excluding host fixture generation; per-command sampled current lower bound and GNU time RSS; disk peaks sampled lower bounds",
         provenance={arm: dict(sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                      source_revision=binary.with_name(binary.name + ".revision.txt").read_text().strip(),
                      version=capture([str(binary), "--version"])) for arm, (binary, _) in binaries.items()},
-        github={key: os.environ.get(key) for key in ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_OS")})
+        github={key: os.environ.get(key) for key in ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_OS", "RUNNER_ENVIRONMENT")})
     dump(output / "manifest.json", manifest)
     try:
         with tempfile.TemporaryDirectory(prefix="freespace-gh-balance-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
@@ -359,8 +370,8 @@ def host(args):
                         if (repeat + step_index + int(keep)) % 2:
                             arms.reverse()
                         for arm in arms:
-                            # Each arm owns one container and one cache-accounting
-                            # cgroup for generation, all scans, refresh and observation.
+                            # Host setup is excluded; each arm owns one container
+                            # and cgroup for all scans, refresh and observation.
                             case = scratch / "case"
                             case.mkdir()
                             try:
@@ -377,6 +388,13 @@ def host(args):
                                     timeout_seconds=args.timeout_seconds, order=ordinal)
                                 spec_path = output / (ident + ".spec.json")
                                 dump(spec_path, spec)
+                                try:
+                                    prepare_fixture(case, output, ident, count)
+                                finally:
+                                    receipt_path = output / (ident + ".cache-flush.json")
+                                    if receipt_path.exists():
+                                        manifest["cache_flush_receipts"].append(json.loads(receipt_path.read_text()))
+                                        dump(output / "manifest.json", manifest)
                                 name = "fs-balance-" + uuid.uuid4().hex
                                 print(f"running {ident}: memory={args.memory}MiB CPUs=2 swap=0", flush=True)
                                 command = ["docker", "run", "--name", name, "--network", "none", "--cpus", "2",
