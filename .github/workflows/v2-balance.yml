@@ -1,0 +1,128 @@
+name: v2 storage balance
+
+on:
+  push:
+    branches: [perf/v2-storage-balance]
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Baseline revision (v1 and v2 comparator)
+        default: 036fd2b7cb223a212dc3c68d78d4400d74ab793a
+        type: string
+      candidate_ref:
+        description: Candidate revision
+        default: perf/v2-storage-balance
+        type: string
+      steps:
+        description: Pilot 100000; confirmation 100000,1000000
+        default: '100000'
+        type: choice
+        options: ['100000', '100000,1000000']
+      memory_mib:
+        description: Container RAM MiB (no swap)
+        default: '256'
+        type: choice
+        options: ['128', '256', '512']
+      repeats:
+        description: Paired repeats, alternating order
+        default: '2'
+        type: choice
+        options: ['1', '2', '3']
+      include_v1:
+        description: Include baseline v1 comparator
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-balance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.baseline_ref || '036fd2b7cb223a212dc3c68d78d4400d74ab793a' }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref || github.sha }}
+          path: candidate
+          persist-credentials: false
+      # A single installed toolchain compiles both checkouts sequentially.
+      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Build both release binaries and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir binaries
+          rustc -Vv > binaries/compiler.txt
+          cargo -V >> binaries/compiler.txt
+          bun --version >> binaries/compiler.txt
+          for arm in baseline candidate; do
+            git -C "$arm" rev-parse HEAD > "binaries/$arm.revision.txt"
+            (cd "$arm" && timeout 1200 cargo build --release --locked -p freespace) > "binaries/$arm.build.log" 2>&1
+            cp "$arm/target/release/freespace" "binaries/$arm"
+            sha256sum "binaries/$arm" > "binaries/$arm.sha256.txt"
+            "binaries/$arm" --version > "binaries/$arm.version.txt"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-balance-binaries
+          path: binaries/
+          if-no-files-found: error
+          retention-days: 7
+
+  measure:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: v2-balance-binaries
+          path: binaries
+      - name: Run all comparison arms sequentially on this runner
+        env:
+          # Fixed literals selected by booleans; commit text never reaches shell.
+          # Push markers let a branch-only workflow run confirmation before it
+          # exists on the default branch and can accept workflow_dispatch.
+          BENCH_STEPS: ${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '100000,1000000') || '100000' }}
+          BENCH_MEMORY: ${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}
+          BENCH_REPEATS: ${{ inputs.repeats || '2' }}
+          BENCH_V1: ${{ github.event_name == 'push' || inputs.include_v1 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x binaries/baseline binaries/candidate
+          extra=()
+          if [[ "$BENCH_V1" == true ]]; then extra+=(--include-v1); fi
+          python3 scripts/bench-v2-container.py \
+            --baseline binaries/baseline --candidate binaries/candidate \
+            --output results --steps "$BENCH_STEPS" --memory "$BENCH_MEMORY" \
+            --repeats "$BENCH_REPEATS" "${extra[@]}"
+      # Upload raw stdout/stderr, timing, cgroup, file allocation and dbstat JSON.
+      # Scratch trees and databases are never part of the results artifact.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-balance-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            results/
+            binaries/*.txt
+            binaries/*.log
+          if-no-files-found: error
+          retention-days: 14
