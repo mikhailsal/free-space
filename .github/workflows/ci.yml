@@ -5,8 +5,8 @@ on:
     branches: [master]
   pull_request:
 
-# the jobs read the code and nothing else; the token stays out of .git/config, so the code a pull request runs
-# (rust-diff, the tests) cannot read it there
+# every job reads the code only, except audit, which also writes its check (see there); the token stays out of
+# .git/config, so the code a pull request runs (rust-diff, the tests) cannot read it there
 permissions:
   contents: read
 
@@ -130,8 +130,9 @@ jobs:
 
   audit:
     runs-on: ubuntu-latest
-    # audit-check reports an advisory as a check on a push (on a pull request in its log): without checks: write the
-    # first advisory fails the job on master with a 403 instead
+    # audit-check publishes advisory checks (falling back to its log when a PR token is denied): without checks: write
+    # the first advisory fails the job on master with a 403 instead. The token can write checks here, so the action is
+    # pinned to a commit: a moved v2 tag must not get that token.
     permissions:
       contents: read
       checks: write
@@ -139,7 +140,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: rustsec/audit-check@v2
+      # the action installs cargo-audit with an unlocked cargo install when it is not on PATH, and the build's
+      # scripts would inherit the token from the action's environment: install it here, locked and without the token
+      - name: install cargo-audit
+        run: cargo install --locked --version =0.22.2 cargo-audit
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
