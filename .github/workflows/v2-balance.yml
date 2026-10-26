@@ -3,6 +3,21 @@ name: v2 storage balance
 on:
   push:
     branches: [perf/v2-storage-balance]
+    paths:
+      - .github/workflows/v2-balance.yml
+      - .cargo/**
+      - Cargo.toml
+      - Cargo.lock
+      - VERSION
+      - rust-toolchain*
+      - core/**
+      - cli/**
+      - web/**
+      - scripts/bench-v2-container.py
+      - scripts/bench-v2-container/**
+      - scripts/summarize-v2-container.py
+      - scripts/check.sh
+      - scripts/check-rust-suppressions.sh
   workflow_dispatch:
     inputs:
       baseline_ref:
@@ -14,10 +29,10 @@ on:
         default: master
         type: string
       steps:
-        description: Pilot 100000; confirmation 100000,1000000
+        description: Pilot 100000; confirmation 1000000; or both
         default: '100000'
         type: choice
-        options: ['100000', '100000,1000000']
+        options: ['100000', '1000000', '100000,1000000']
       memory_mib:
         description: Container RAM MiB (no swap)
         default: '256'
@@ -28,6 +43,11 @@ on:
         default: '2'
         type: choice
         options: ['1', '2', '3']
+      scans:
+        description: Complete scans per arm before refresh
+        default: '3'
+        type: choice
+        options: ['2', '3']
       include_v1:
         description: Include baseline v1 comparator
         default: true
@@ -37,7 +57,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: v2-balance-${{ github.ref }}
+  group: v2-balance-${{ github.ref }}-${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '1000000') || '100000' }}-${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}
   cancel-in-progress: false
 
 jobs:
@@ -131,9 +151,10 @@ jobs:
           # Fixed literals selected by booleans; commit text never reaches shell.
           # Push markers let a branch-only workflow run confirmation before it
           # exists on the default branch and can accept workflow_dispatch.
-          BENCH_STEPS: ${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '100000,1000000') || '100000' }}
+          BENCH_STEPS: ${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '1000000') || '100000' }}
           BENCH_MEMORY: ${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}
-          BENCH_REPEATS: ${{ inputs.repeats || '2' }}
+          BENCH_REPEATS: ${{ inputs.repeats || (contains(github.event.head_commit.message, '[bench-once]') && '1') || '2' }}
+          BENCH_SCANS: ${{ inputs.scans || (contains(github.event.head_commit.message, '[bench-two-scans]') && '2') || '3' }}
           BENCH_V1: ${{ github.event_name == 'push' || inputs.include_v1 }}
         shell: bash
         run: |
@@ -144,7 +165,7 @@ jobs:
           python3 scripts/bench-v2-container.py \
             --baseline binaries/baseline --candidate binaries/candidate \
             --output results --steps "$BENCH_STEPS" --memory "$BENCH_MEMORY" \
-            --repeats "$BENCH_REPEATS" "${extra[@]}"
+            --repeats "$BENCH_REPEATS" --scans "$BENCH_SCANS" "${extra[@]}"
       - name: Summarize measured results
         if: always()
         shell: bash
