@@ -543,6 +543,7 @@ test("a heartbeat that is not whole seconds from 1 stops an e2e run before any r
 
 // Both configs build their URLs and the server command from $E2E_PORT and never reuse a server already on that port
 // (it belongs to someone else); unset or empty, they fall back to 4173 and, outside CI, reuse a running server.
+// Four fresh Bun processes import Playwright here; allow for slow startup under concurrent CI load.
 test("the Playwright configs serve and browse on $E2E_PORT", () => {
   const read = `const base = (await import("./playwright.config.ts")).default;
 const shots = (await import("./playwright.shots.config.ts")).default;
@@ -562,7 +563,7 @@ console.log(JSON.stringify([base, shots].map(show)));`;
     const config = [`http://127.0.0.1:${want}`, `http://127.0.0.1:${want}/`, `bun run build && PORT=${want} bun tests/e2e/serve.ts`, reuse];
     expect(JSON.parse(done.stdout.toString()), `E2E_PORT=${port} CI=${ci}`).toEqual([config, config]);
   }
-});
+}, 10_000);
 
 // The guard serves the build in $GUARD_DIST, or builds web/dist first, on $E2E_PORT (else 4174) and never on a server
 // already there. Its shots are stable: no retry, animations off, and partial raster off (with it on, one build repainted

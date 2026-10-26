@@ -422,16 +422,22 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
 
     let t = Instant::now();
     let os_path = PathBuf::from(std::ffi::OsStr::from_bytes(&xpath));
-    // a folder replaced by a file (or a symlink) since the scan: the parent
-    // holds the new entry, so that is what to refresh
-    if os_path.symlink_metadata().is_ok_and(|m| !m.is_dir()) {
-        let parent = os_path.parent().unwrap_or(Path::new("/"));
-        return Err(
-            Error::usage(format!("{label} is no longer a folder on disk"))
-                .with_fix(format!("sudo freespace refresh {}", parent.display())),
-        );
-    }
-    let sub = if os_path.exists() {
+    // Only a missing path can remove the cached subtree. Other stat failures
+    // (for example, an unsearchable ancestor) must leave the snapshot intact.
+    let exists = match os_path.symlink_metadata() {
+        Ok(m) if !m.is_dir() => {
+            // The parent holds a replacement file or symlink.
+            let parent = os_path.parent().unwrap_or(Path::new("/"));
+            return Err(
+                Error::usage(format!("{label} is no longer a folder on disk"))
+                    .with_fix(format!("sudo freespace refresh {}", parent.display())),
+            );
+        }
+        Ok(_) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => return Err(Error::io(format!("stat {label}"), e)),
+    };
+    let sub = if exists {
         let opts = scan::WalkOptions {
             roots: vec![os_path.clone()],
             one_file_system: snap.meta.one_file_system,
