@@ -31,6 +31,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: scripts/check.sh rust
+      - run: scripts/canary.sh
       - run: cargo test --workspace
       # T10: precheck and a disk that fills up mid-write, on a real tmpfs
       - name: fault injection on a full filesystem
@@ -172,6 +173,7 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: web
       - run: scripts/check.sh size biome
+      - run: scripts/test-check.sh
 
   # T36/T37/T44 on a real systemd VM: install.sh from a local release layout
   # (no TTY + no sudo → the escalation line; fresh install; rerun), first scan
