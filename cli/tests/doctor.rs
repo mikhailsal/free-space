@@ -6,54 +6,30 @@
 //! out.
 
 use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
 
 use freespace_core::snapshot::SnapshotDir;
 use freespace_core::snapshot::state::{self, LastError};
 use serde_json::Value;
 
-struct Env {
-    tmp: tempfile::TempDir,
-}
+mod common;
+
+use common::Env;
 
 impl Env {
-    fn new() -> Self {
-        Env {
-            tmp: tempfile::tempdir().unwrap(),
-        }
-    }
-
-    fn snap(&self) -> PathBuf {
-        self.tmp.path().join("snap")
-    }
-
-    fn config(&self) -> PathBuf {
-        self.tmp.path().join("none.toml")
-    }
-
-    fn cmd(&self, args: &[&str]) -> Command {
-        let mut c = Command::new(env!("CARGO_BIN_EXE_freespace"));
-        c.args(args)
-            .env("FREESPACE_CONFIG", self.config())
-            .env("FREESPACE_SNAPSHOT_DIR", self.snap());
-        c
-    }
-
     /// A small tree, scanned once.
     fn scanned() -> Self {
         let e = Env::new();
-        let r = e.tmp.path().join("r");
+        let r = e.root();
         fs::create_dir_all(r.join("a")).unwrap();
         fs::write(r.join("a/f"), vec![1u8; 64 << 10]).unwrap();
-        let o = e.cmd(&["scan", r.to_str().unwrap()]).output().unwrap();
+        let o = e.run(&["scan", r.to_str().unwrap()]);
         assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
         e
     }
 
     /// Every check of one run, by id; and its exit code.
     fn doctor(&self) -> (Vec<Value>, i32) {
-        let o = self.cmd(&["doctor", "--json"]).output().unwrap();
+        let o = self.run(&["doctor", "--json"]);
         let v: Value = serde_json::from_slice(&o.stdout).unwrap();
         (
             v["checks"].as_array().unwrap().clone(),
@@ -202,7 +178,7 @@ fn a_failed_run_names_its_step_and_its_fix() {
         e.config().display()
     );
     assert_eq!(fix, Some(room.clone()));
-    // the same step under another op name: the same fix
+    // reserve is another out-of-space step: the same fix as precheck
     e.failed("reserve", "disk full while reserving");
     let (ok, detail, fix) = e.check("last_error");
     assert!(!ok);
@@ -244,14 +220,34 @@ fn a_failed_first_run_has_no_success_to_compare_with() {
     assert!(!ok);
     assert!(detail.ends_with(" scan: no roots to scan"), "{detail}");
     assert_eq!(fix.as_deref(), Some(JOURNAL));
-    // with no snapshot to read, status stops at that (exit 8), with no hint
-    let o = e.cmd(&["status"]).output().unwrap();
-    assert_eq!(o.status.code(), Some(8));
-    assert!(o.stdout.is_empty());
-    let err = String::from_utf8_lossy(&o.stderr);
-    assert!(err.starts_with("freespace: no snapshot in "), "{err}");
 }
 
+#[test]
+fn a_failed_run_with_no_recorded_success_sends_status_to_doctor() {
+    let e = Env::scanned();
+    let dir = SnapshotDir::new(e.snap());
+    let mut st = state::read(&dir).unwrap().unwrap();
+    st.last_success_ts = None;
+    st.last_error = Some(LastError {
+        ts: 1_700_000_000,
+        op: "write".into(),
+        message: "disk full".into(),
+    });
+    state::write(&dir, &st).unwrap();
+    let (ok, _, fix) = e.check("last_error");
+    assert!(!ok);
+    assert_eq!(fix.as_deref(), Some(JOURNAL));
+    let o = e.cmd(&["status"]).output().unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let t = String::from_utf8_lossy(&o.stdout);
+    assert!(t.contains("last error"), "{t}");
+    assert!(!t.contains("last success"), "{t}");
+    assert_eq!(t.lines().last(), Some("Run: freespace doctor"), "{t}");
+}
+
+/// Pins the history rule: an error older than the last success is not flagged.
+/// TODOS.md (P2) calls that a defect, because a success clears `last_error`;
+/// the fix PR flips this test on purpose.
 #[test]
 fn an_error_older_than_the_last_success_is_history() {
     let e = Env::scanned();
@@ -261,6 +257,8 @@ fn an_error_older_than_the_last_success_is_history() {
         (true, "none since the last successful scan".into(), None)
     );
     let o = e.cmd(&["status"]).output().unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
     let t = String::from_utf8_lossy(&o.stdout);
+    assert!(t.contains(" write: disk full"), "{t}"); // still listed, just not flagged
     assert!(!t.contains("Run: freespace doctor"), "{t}");
 }

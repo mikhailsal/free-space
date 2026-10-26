@@ -7,33 +7,11 @@ use std::process::{Command, Output};
 
 use serde_json::Value;
 
-struct Env {
-    tmp: tempfile::TempDir,
-}
+mod common;
+
+use common::Env;
 
 impl Env {
-    fn new() -> Self {
-        Env {
-            tmp: tempfile::tempdir().unwrap(),
-        }
-    }
-
-    fn root(&self) -> PathBuf {
-        self.tmp.path().join("r")
-    }
-
-    fn cmd(&self, args: &[&str]) -> Command {
-        let mut c = Command::new(env!("CARGO_BIN_EXE_freespace"));
-        c.args(args)
-            .env("FREESPACE_CONFIG", self.tmp.path().join("none.toml"))
-            .env("FREESPACE_SNAPSHOT_DIR", self.tmp.path().join("snap"));
-        c
-    }
-
-    fn run(&self, args: &[&str]) -> Output {
-        self.cmd(args).output().unwrap()
-    }
-
     fn fixture(&self) {
         let r = self.root();
         fs::create_dir_all(r.join("sub/deep")).unwrap();

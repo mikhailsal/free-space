@@ -8,31 +8,16 @@ use std::ffi::OsStr;
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::Command;
 
 use freespace_core::snapshot::SnapshotDir;
 use freespace_core::snapshot::state::{self, LastError};
 
-struct Env {
-    tmp: tempfile::TempDir,
-}
+mod common;
+
+use common::Env;
 
 impl Env {
-    fn new() -> Self {
-        Env {
-            tmp: tempfile::tempdir().unwrap(),
-        }
-    }
-
-    fn root(&self) -> PathBuf {
-        self.tmp.path().join("r")
-    }
-
-    fn snap(&self) -> PathBuf {
-        self.tmp.path().join("snap")
-    }
-
     /// A path under the root, as the CLI prints it ("" for the root).
     fn p(&self, rel: &str) -> String {
         let p = if rel.is_empty() {
@@ -41,20 +26,6 @@ impl Env {
             self.root().join(rel)
         };
         p.to_str().unwrap().to_owned()
-    }
-
-    fn cmd(&self, args: &[&str]) -> Command {
-        let mut c = Command::new(env!("CARGO_BIN_EXE_freespace"));
-        c.args(args)
-            .env("FREESPACE_CONFIG", self.tmp.path().join("none.toml"))
-            .env("FREESPACE_SNAPSHOT_DIR", self.snap())
-            .env_remove("FREESPACE_FAULT")
-            .env_remove("FREESPACE_PAUSE");
-        c
-    }
-
-    fn run(&self, args: &[&str]) -> Output {
-        self.cmd(args).output().unwrap()
     }
 
     /// The stdout of a command that must succeed.
@@ -106,12 +77,21 @@ impl Env {
 }
 
 /// Folders a normal user cannot read; none as root, who reads everything.
+/// As root the checks that use this pass without testing anything, so CI,
+/// which runs the suite as a normal user, must not get there as root.
 fn locked() -> usize {
     let root = Command::new("id")
         .arg("-u")
         .output()
         .is_ok_and(|o| o.stdout.starts_with(b"0\n"));
-    if root { 0 } else { 6 }
+    if !root {
+        return 6;
+    }
+    assert!(
+        std::env::var_os("CI").is_none(),
+        "CI runs as a normal user: as root the unreadable-folder checks pass without testing anything"
+    );
+    0
 }
 
 /// The first line, then each `label  value` row after it.
@@ -251,31 +231,94 @@ fn status_names_a_failed_run_and_an_unreadable_state_file() {
     assert!(rows.iter().all(|(k, _)| k != "last success"), "{t}");
 }
 
-/// A run held at the `prechecked` fault point (debug builds) until its pause
-/// file is removed.
+/// Own a paused CLI through readiness checks and assertions, including unwinding.
 #[cfg(debug_assertions)]
-fn held(e: &Env, args: &[&str]) -> std::process::Child {
-    use std::time::{Duration, Instant};
-    let mut child = e
-        .cmd(args)
-        .env("FREESPACE_PAUSE", "prechecked")
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .unwrap();
-    let pause = e.snap().join(".pause-prechecked");
-    let deadline = Instant::now() + Duration::from_secs(30);
-    while !pause.exists() {
-        assert!(child.try_wait().unwrap().is_none(), "{args:?} ended early");
-        assert!(Instant::now() < deadline, "{args:?} never paused");
-        std::thread::sleep(Duration::from_millis(20));
-    }
-    child
+struct Held {
+    child: Option<std::process::Child>,
 }
 
 #[cfg(debug_assertions)]
-fn release(e: &Env, mut child: std::process::Child) {
+impl Held {
+    fn id(&self) -> u32 {
+        self.child.as_ref().unwrap().id()
+    }
+}
+
+#[cfg(debug_assertions)]
+impl Drop for Held {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+/// A run held at the `prechecked` fault point (debug builds) until its pause
+/// file is removed.
+#[cfg(debug_assertions)]
+fn held(e: &Env, args: &[&str]) -> Held {
+    use std::time::{Duration, Instant};
+    let mut held = Held {
+        child: Some(
+            e.cmd(args)
+                .env("FREESPACE_PAUSE", "prechecked")
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        ),
+    };
+    let pause = e.snap().join(".pause-prechecked");
+    // the progress file comes from a thread that may not have written it yet
+    let progress = e.state_dir().progress();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !(pause.exists() && progress.exists()) {
+        assert!(
+            held.child.as_mut().unwrap().try_wait().unwrap().is_none(),
+            "{args:?} ended early"
+        );
+        assert!(Instant::now() < deadline, "{args:?} never paused");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    held
+}
+
+#[cfg(debug_assertions)]
+fn release(e: &Env, mut held: Held) {
     fs::remove_file(e.snap().join(".pause-prechecked")).unwrap();
-    assert!(child.wait().unwrap().success());
+    let status = held.child.as_mut().unwrap().wait().unwrap();
+    held.child.take();
+    assert!(status.success());
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn a_paused_cli_is_killed_and_reaped_when_an_assertion_unwinds() {
+    let e = Env::new();
+    e.tree(0);
+    let child = held(&e, &["scan", &e.p("")]);
+    let pid: libc::pid_t = child.id().try_into().unwrap();
+    let unwound = std::panic::catch_unwind(move || {
+        let _child = child;
+        panic!("a failed status assertion");
+    });
+    assert!(unwound.is_err());
+    // SAFETY: these inspect the known child's pid without changing process state.
+    assert_eq!(unsafe { libc::kill(pid, 0) }, -1);
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+    // SAFETY: pid is our child and the status pointer is valid; WNOHANG cannot block.
+    let mut status = 0;
+    assert_eq!(
+        unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) },
+        -1
+    );
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ECHILD)
+    );
 }
 
 #[cfg(debug_assertions)]
@@ -608,7 +651,7 @@ fn a_hardlink_with_no_owner_in_the_snapshot_says_so() {
     db.execute(
         "UPDATE entries SET flags = flags | ?1 \
          WHERE name IN (CAST('top.bin' AS BLOB), CAST('top-link.bin' AS BLOB))",
-        [i64::from(freespace_core::scan::tree::flags::ALIAS)],
+        [i64::from(freespace_core::scan::flags::ALIAS)],
     )
     .unwrap();
     drop(db);
@@ -668,7 +711,7 @@ fn a_few_unreadable_folders_are_named_in_full() {
     }
 }
 
-/// Two roots: the free space in the first line is for the first one, and each has its row.
+/// Two roots: the free space in the first line is for the first one, and each root has its row.
 #[test]
 fn status_names_the_root_its_free_space_is_for_when_there_are_two() {
     let e = Env::new();
@@ -685,4 +728,7 @@ fn status_names_the_root_its_free_space_is_for_when_there_are_two() {
         .map(|(_, value)| value)
         .collect();
     assert_eq!(roots.len(), 2, "{t}");
+    for root in [e.p(""), q.to_str().unwrap().to_owned()] {
+        assert!(roots.iter().any(|v| v.starts_with(&root)), "{root} in {t}");
+    }
 }
