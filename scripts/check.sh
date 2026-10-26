@@ -43,6 +43,8 @@ run_part() {
   case "$part" in
     rust)
       need_tool cargo 'install Rust with https://rustup.rs/' || return 1
+      need_tool rustfmt 'run rustup component add rustfmt for the active toolchain' || return 1
+      need_tool cargo-clippy 'run rustup component add clippy for the active toolchain' || return 1
       cargo fmt --all --check &&
         cargo clippy --workspace --all-targets -- -D warnings
       ;;
