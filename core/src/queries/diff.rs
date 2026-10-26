@@ -1,9 +1,10 @@
 //! `diff`: what changed since the previous generation (D6). Opens the current
 //! snapshot first, then prev, and checks the pairing (exit 3/4/5). Rows are
-//! matched by `path_hash`; returned pairs are verified by name and parent hash
-//! (exit 7 on a collision).
+//! matched by `path_hash` and raw name; candidate pairs are verified against
+//! the exact parent path so a parent-hash collision cannot cross-pair rows.
 
 use std::collections::HashMap;
+use std::hash::{BuildHasher, RandomState};
 
 use rusqlite::{Connection, params};
 
@@ -56,6 +57,7 @@ pub fn open_pair(dir: &SnapshotDir) -> Result<(Snapshot, Snapshot)> {
 pub(crate) struct LevelRow {
     pub(crate) row: Row,
     pub(crate) hash: i64,
+    pub(crate) parent_hash: Option<i64>,
 }
 
 pub(crate) fn level(
@@ -70,7 +72,9 @@ pub(crate) fn level(
         KindFilter::Any => "",
     };
     let sql = if depth == 1 {
-        format!("SELECT {COLS}, path_hash FROM entries WHERE parent_id = ?1 {kind_sql} AND ?2 = 1")
+        format!(
+            "SELECT {COLS}, path_hash, (SELECT path_hash FROM entries p WHERE p.id = entries.parent_id) FROM entries WHERE parent_id = ?1 {kind_sql} AND ?2 = 1"
+        )
     } else {
         format!(
             "WITH RECURSIVE lvl(id, d) AS (
@@ -78,7 +82,7 @@ pub(crate) fn level(
                UNION ALL
                SELECT e.id, lvl.d + 1 FROM entries e JOIN lvl ON e.parent_id = lvl.id WHERE lvl.d < ?2
              )
-             SELECT {COLS}, path_hash FROM entries WHERE id IN (SELECT id FROM lvl WHERE d = ?2) {kind_sql}"
+             SELECT {COLS}, path_hash, (SELECT path_hash FROM entries p WHERE p.id = entries.parent_id) FROM entries WHERE id IN (SELECT id FROM lvl WHERE d = ?2) {kind_sql}"
         )
     };
     let mut st = conn.prepare_cached(&sql)?;
@@ -87,19 +91,23 @@ pub(crate) fn level(
             Ok(LevelRow {
                 row: Row::from_sql(r)?,
                 hash: r.get(15)?,
+                parent_hash: r.get(16)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 
-fn parent_hash(conn: &Connection, id: Option<i64>) -> Result<Option<i64>> {
-    match id {
-        None => Ok(None),
-        Some(p) => Ok(Some(
-            conn.prepare_cached("SELECT path_hash FROM entries WHERE id = ?1")?
-                .query_row(params![p], |r| r.get(0))?,
-        )),
+fn same_parent_path(
+    cur: &mut Paths<'_>,
+    current: Option<i64>,
+    prev: &mut Paths<'_>,
+    old: Option<i64>,
+) -> Result<bool> {
+    match (current, old) {
+        (None, None) => Ok(true),
+        (Some(c), Some(p)) => Ok(cur.path(c)? == prev.path(p)?),
+        _ => Ok(false),
     }
 }
 
@@ -199,15 +207,69 @@ pub fn diff_pair(
         None => Vec::new(),
     };
 
-    let mut prev_by_hash: HashMap<i64, LevelRow> =
-        prev_rows.into_iter().map(|r| (r.hash, r)).collect();
+    let mut prev_rows: Vec<Option<LevelRow>> = prev_rows.into_iter().map(Some).collect();
+    let mut prev_next = vec![None; prev_rows.len()];
+    let mut prev_prev = vec![None; prev_rows.len()];
+    let name_hasher = RandomState::new();
+    let mut prev_by_key: HashMap<(i64, u64, Option<i64>), usize> =
+        HashMap::with_capacity(prev_rows.len());
+    for (i, row) in prev_rows.iter().enumerate() {
+        let row = row.as_ref().expect("previous row is present");
+        let key = (
+            row.hash,
+            name_hasher.hash_one(&row.row.name),
+            row.parent_hash,
+        );
+        prev_next[i] = prev_by_key.insert(key, i);
+        if let Some(next) = prev_next[i] {
+            prev_prev[next] = Some(i);
+        }
+    }
+    let mut cpaths = Paths::new(&cur.conn);
+    let mut ppaths = Paths::new(&prev.conn);
     // (current row, prev row)
     let mut pairs: Vec<(Option<LevelRow>, Option<LevelRow>)> = Vec::new();
     for c in cur_rows {
-        let pm = prev_by_hash.remove(&c.hash);
+        let mut candidate: Option<usize> = None;
+        let key = (c.hash, name_hasher.hash_one(&c.row.name), c.parent_hash);
+        let mut cursor = prev_by_key.get(&key).copied();
+        while let Some(i) = cursor {
+            let row = prev_rows[i]
+                .as_ref()
+                .expect("linked previous row is present");
+            if row.row.name == c.row.name
+                && same_parent_path(&mut cpaths, c.row.parent_id, &mut ppaths, row.row.parent_id)?
+                && candidate.is_none_or(|best| {
+                    row.row.id
+                        < prev_rows[best]
+                            .as_ref()
+                            .expect("candidate previous row is present")
+                            .row
+                            .id
+                })
+            {
+                candidate = Some(i);
+            }
+            cursor = prev_next[i];
+        }
+        let pm = if let Some(i) = candidate {
+            if let Some(previous) = prev_prev[i] {
+                prev_next[previous] = prev_next[i];
+            } else if let Some(next) = prev_next[i] {
+                prev_by_key.insert(key, next);
+            } else {
+                prev_by_key.remove(&key);
+            }
+            if let Some(next) = prev_next[i] {
+                prev_prev[next] = prev_prev[i];
+            }
+            prev_rows[i].take()
+        } else {
+            None
+        };
         pairs.push((Some(c), pm));
     }
-    for (_, pr) in prev_by_hash {
+    for pr in prev_rows.into_iter().flatten() {
         if denied
             .iter()
             .any(|&(a, b)| pr.row.id >= a && pr.row.id <= b)
@@ -243,13 +305,11 @@ pub fn diff_pair(
     let total_count = pairs.len() as u64;
     pairs.truncate(limit as usize);
 
-    let mut cpaths = Paths::new(&cur.conn);
-    let mut ppaths = Paths::new(&prev.conn);
     let mut entries = Vec::with_capacity(pairs.len());
     for (c, pv) in &pairs {
         if let (Some(c), Some(pv)) = (c, pv) {
-            let same_parent = parent_hash(&cur.conn, c.row.parent_id)?
-                == parent_hash(&prev.conn, pv.row.parent_id)?;
+            let same_parent =
+                same_parent_path(&mut cpaths, c.row.parent_id, &mut ppaths, pv.row.parent_id)?;
             if c.row.name != pv.row.name || !same_parent {
                 return Err(Error::new(
                     ErrorCode::HashCollision,

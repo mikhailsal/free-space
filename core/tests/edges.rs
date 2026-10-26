@@ -201,7 +201,7 @@ fn diff_of_a_path_in_neither_snapshot() {
 }
 
 #[test]
-fn diff_refuses_two_rows_of_one_hash() {
+fn diff_joins_same_hash_by_raw_name() {
     let f = fx();
     f.write_file("a/x", 4096);
     f.write_file("b/y", 4096);
@@ -218,22 +218,176 @@ fn diff_refuses_two_rows_of_one_hash() {
         .unwrap();
     assert_eq!(n, 1);
     drop(prev);
-    let e = f.diff("").unwrap_err();
-    assert_eq!(e.code, ErrorCode::HashCollision);
-    assert_eq!(
-        e.message,
-        format!(
-            "path hash collision between {} (current) and {} (prev)",
-            f.s("a"),
-            f.s("other")
+    let response = f.diff("").unwrap();
+    let a = response
+        .entries
+        .iter()
+        .find(|e| e.path == f.s("a"))
+        .unwrap();
+    let other = response
+        .entries
+        .iter()
+        .find(|e| e.path == f.s("other"))
+        .unwrap();
+    assert_eq!(a.status, queries::types::DiffStatus::New);
+    assert_eq!(other.status, queries::types::DiffStatus::Gone);
+}
+
+#[test]
+fn diff_keeps_gone_rows_with_duplicate_hashes() {
+    let f = fx();
+    f.write_file("a/x", 4096);
+    f.write_file("b/y", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+    fs::remove_dir_all(f.p("b")).unwrap();
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+
+    // Make the previous b/ hash collide with a/. The exact-name join must
+    // still consume a/ and retain b/ as a gone row.
+    let prev = rusqlite::Connection::open(f.dir.prev()).unwrap();
+    let hash: i64 = prev
+        .query_row(
+            "SELECT path_hash FROM entries WHERE name = ?1",
+            [b"a".as_slice()],
+            |r| r.get(0),
         )
-    );
-    assert_eq!(
-        e.fix.as_deref(),
-        Some(
-            "report this at https://github.com/mikhailsal/free-space/issues; ls and top are unaffected"
+        .unwrap();
+    let n = prev
+        .execute(
+            "UPDATE entries SET path_hash = ?1 WHERE name = ?2",
+            rusqlite::params![hash, b"b".as_slice()],
         )
+        .unwrap();
+    assert_eq!(n, 1);
+    drop(prev);
+
+    let response = f.diff("").unwrap();
+    assert!(
+        response
+            .entries
+            .iter()
+            .any(|e| e.path == f.s("a") && e.status == queries::types::DiffStatus::Same)
     );
+    assert!(
+        response
+            .entries
+            .iter()
+            .any(|e| e.path == f.s("b") && e.status == queries::types::DiffStatus::Gone)
+    );
+}
+
+#[test]
+fn diff_selects_duplicate_key_candidate_with_matching_parent() {
+    let f = fx();
+    f.write_file("a/x/file", 4096);
+    f.write_file("b/x/file", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+    fs::remove_dir_all(f.p("b")).unwrap();
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+
+    // At depth 2 both previous rows are named x. Force their path hashes to
+    // match, leaving parent hash as the discriminator for a/x.
+    let prev = rusqlite::Connection::open(f.dir.prev()).unwrap();
+    let hash: i64 = prev
+        .query_row(
+            "SELECT x.path_hash FROM entries x JOIN entries p ON p.id = x.parent_id WHERE x.name = ?1 AND p.name = ?2",
+            rusqlite::params![b"x".as_slice(), b"a".as_slice()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let n = prev
+        .execute(
+            "UPDATE entries SET path_hash = ?1 WHERE name = ?2 AND kind = 1",
+            rusqlite::params![hash, b"x".as_slice()],
+        )
+        .unwrap();
+    assert_eq!(n, 2);
+    drop(prev);
+
+    let response = diff::diff(
+        &f.dir,
+        &DiffParams {
+            path: Some(f.s("")),
+            depth: Some(2),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(
+        response
+            .entries
+            .iter()
+            .any(|e| e.path == f.s("a/x") && e.status == queries::types::DiffStatus::Same)
+    );
+    assert!(
+        response
+            .entries
+            .iter()
+            .any(|e| e.path == f.s("b/x") && e.status == queries::types::DiffStatus::Gone)
+    );
+}
+
+#[test]
+fn diff_matches_repeated_names_by_exact_parent_path() {
+    let f = fx();
+    f.write_file("a/x/file", 4096);
+    f.write_file("b/x/file", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+
+    // Force both the child and parent hashes to collide in both snapshots.
+    // The matcher must pair each repeated x/ with its actual raw parent path.
+    for path in [f.dir.current(), f.dir.prev()] {
+        let conn = rusqlite::Connection::open(path).unwrap();
+        let parent_hash: i64 = conn
+            .query_row(
+                "SELECT path_hash FROM entries WHERE name = ?1 AND kind = 1",
+                [b"a".as_slice()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let child_hash: i64 = conn
+            .query_row(
+                "SELECT x.path_hash FROM entries x JOIN entries p ON p.id = x.parent_id WHERE x.name = ?1 AND p.name = ?2",
+                rusqlite::params![b"x".as_slice(), b"a".as_slice()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            conn.execute(
+                "UPDATE entries SET path_hash = ?1 WHERE name IN (?2, ?3) AND kind = 1",
+                rusqlite::params![parent_hash, b"a".as_slice(), b"b".as_slice()],
+            )
+            .unwrap(),
+            2
+        );
+        assert_eq!(
+            conn.execute(
+                "UPDATE entries SET path_hash = ?1 WHERE name = ?2 AND kind = 1",
+                rusqlite::params![child_hash, b"x".as_slice()],
+            )
+            .unwrap(),
+            2
+        );
+    }
+
+    let response = diff::diff(
+        &f.dir,
+        &DiffParams {
+            path: Some(f.s("")),
+            depth: Some(2),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    for path in ["a/x", "b/x"] {
+        assert!(
+            response
+                .entries
+                .iter()
+                .any(|e| { e.path == f.s(path) && e.status == queries::types::DiffStatus::Same })
+        );
+    }
 }
 
 #[test]
