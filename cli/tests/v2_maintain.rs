@@ -266,3 +266,65 @@ fn maintain_lock_hides_stale_scan_progress() {
     assert_eq!(status["scanning"]["op"], "maintain");
     assert_eq!(status["progress"], Value::Null);
 }
+
+#[test]
+fn empty_store_policy_recovery_allows_the_first_scan_to_publish() {
+    use freespace_core::snapshot::v2::RetentionPolicy;
+    let env = Env::new();
+    fs::create_dir_all(env.root()).unwrap();
+    fs::write(env.root().join("a"), [1]).unwrap();
+    fs::create_dir_all(env.snap().join("v2")).unwrap();
+    let database = env.snap().join("v2/generations.db");
+    let mut store = Store::open(&database).unwrap();
+    store
+        .configure_retention(RetentionPolicy {
+            max_records: 1,
+            max_wal_bytes: 1073741824,
+        })
+        .unwrap();
+    let failed = env.run(&[
+        "--backend",
+        "v2",
+        "scan",
+        env.root().to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(!failed.status.success());
+    let error: Value = serde_json::from_slice(&failed.stdout).unwrap();
+    assert_eq!(error["error"]["code"], "SPACE");
+    assert_eq!(
+        Reader::open(&database).err().unwrap().code,
+        freespace_core::ErrorCode::NoSnapshot
+    );
+    let maintained = env.run(&[
+        "--backend",
+        "v2",
+        "maintain",
+        "--max-records",
+        "100000",
+        "--json",
+    ]);
+    assert!(
+        maintained.status.success(),
+        "{}",
+        String::from_utf8_lossy(&maintained.stdout)
+    );
+    let report: Value = serde_json::from_slice(&maintained.stdout).unwrap();
+    assert_eq!(report["generation"], Value::Null);
+    assert_eq!(report["prev_generation"], Value::Null);
+    assert_eq!(report["max_records"], 100000);
+    assert_eq!(store.retention_policy().unwrap().max_records, 100000);
+    let scanned = env.run(&[
+        "--backend",
+        "v2",
+        "scan",
+        env.root().to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        scanned.status.success(),
+        "{}",
+        String::from_utf8_lossy(&scanned.stdout)
+    );
+    assert_eq!(Reader::open(&database).unwrap().generations.current, 1);
+}

@@ -28,7 +28,7 @@ pub struct MaintainArgs {
 
 #[derive(Serialize)]
 struct Report {
-    generation: i64,
+    generation: Option<i64>,
     prev_generation: Option<i64>,
     budget: u32,
     checkpoint_requested: bool,
@@ -56,7 +56,7 @@ pub fn run(args: &MaintainArgs) -> output::Result<()> {
     }
     let dir = backend::dir(&loaded);
     // Missing/invalid stores fail before even creating the application lock.
-    drop(backend::reader(&dir)?);
+    generation_pair(&dir)?;
     let _lock = lock::acquire_with_path_arg(
         &dir,
         "maintain",
@@ -64,7 +64,7 @@ pub fn run(args: &MaintainArgs) -> output::Result<()> {
         None,
     )?;
     // Recheck under the writer lock, then drop the lease before reclamation.
-    let generations = backend::reader(&dir)?.generations;
+    let generations = generation_pair(&dir)?;
     let mut store = Store::open(&backend::database(&dir))?;
     let mut policy = store.retention_policy()?;
     let updated = args.max_records.is_some() || args.max_wal_bytes.is_some();
@@ -79,8 +79,8 @@ pub fn run(args: &MaintainArgs) -> output::Result<()> {
     }
     let report = store.maintain(args.budget as usize, args.checkpoint)?;
     let report = Report {
-        generation: generations.current,
-        prev_generation: generations.prev,
+        generation: generations.map(|pair| pair.current),
+        prev_generation: generations.and_then(|pair| pair.prev),
         budget: args.budget,
         checkpoint_requested: args.checkpoint,
         policy_updated: updated,
@@ -101,6 +101,23 @@ pub fn run(args: &MaintainArgs) -> output::Result<()> {
         print_report(&report)?;
     }
     Ok(())
+}
+
+/// Reader validates the schema before returning NoSnapshot for an unpublished
+/// store. Such a store needs policy recovery too; an absent file must stay absent.
+fn generation_pair(
+    dir: &freespace_core::snapshot::SnapshotDir,
+) -> freespace_core::Result<Option<freespace_core::snapshot::v2::GenerationPair>> {
+    match backend::reader(dir) {
+        Ok(reader) => Ok(Some(reader.generations)),
+        Err(error)
+            if error.code == ErrorCode::NoSnapshot
+                && std::fs::metadata(backend::database(dir)).is_ok_and(|meta| meta.is_file()) =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn print_report(report: &Report) -> std::io::Result<()> {
