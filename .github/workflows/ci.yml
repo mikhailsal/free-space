@@ -68,8 +68,12 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
-      # tests/unit runs scripts/rust-diff.sh on stub builds, which needs sqlite3 as well
-      - run: command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq sqlite3; }
+      # The non-root install manifest tests read real ACLs; rust-diff stubs also need sqlite3.
+      - run: |
+          if ! command -v sqlite3 >/dev/null || ! command -v getfacl >/dev/null || ! command -v setfacl >/dev/null; then
+            sudo timeout 180 apt-get update -q
+            sudo env DEBIAN_FRONTEND=noninteractive timeout 180 apt-get install -yq sqlite3 acl
+          fi
       - run: bun test tests/unit
       - run: bunx playwright install --with-deps chromium
       - run: bunx playwright test
@@ -195,6 +199,36 @@ jobs:
           (cd "$d/latest/download" && sha256sum "$a" > "$a.sha256")
           cp "$d/latest/download/"* "$d/download/v$V/"
           chmod -R a+rX "$d"
+      # Keep the root comparator's report contract current on every PR, before
+      # install.sh writes to this disposable runner. The same binary fills both slots.
+      - name: rust-install-diff, head against itself
+        run: |
+          if ! command -v getfacl >/dev/null || ! command -v setfacl >/dev/null; then
+            sudo timeout 180 apt-get update -q
+            sudo env DEBIAN_FRONTEND=noninteractive timeout 180 apt-get install -yq acl
+          fi
+          for path in /usr/local/share \
+            /usr/local/share/bash-completion /usr/local/share/bash-completion/completions \
+            /usr/local/share/zsh /usr/local/share/zsh/site-functions \
+            /usr/local/share/fish /usr/local/share/fish/vendor_completions.d; do
+            if [ -e "$path" ] || [ -L "$path" ]; then
+              [ -d "$path" ] && [ ! -L "$path" ] || { echo "unsafe completion ancestor: $path" >&2; exit 1; }
+              sudo chown root:root -- "$path"
+              sudo chmod go-w -- "$path"
+            fi
+          done
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" RUNNER_TEMP="$RUNNER_TEMP" \
+            scripts/rust-diff-install.sh --github-disposable-runner \
+            "$PWD/target/x86_64-unknown-linux-musl/release/freespace" \
+            "$PWD/target/x86_64-unknown-linux-musl/release/freespace" \
+            "$RUNNER_TEMP/rust-install-self" "$RUNNER_TEMP/install-self-scratch" "$USER"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-install-self
+          path: ${{ runner.temp }}/rust-install-self
+          retention-days: 14
+          overwrite: true
       - name: without a terminal and without sudo, install.sh hands over to a human
         run: |
           sudo useradd -m nosudo
