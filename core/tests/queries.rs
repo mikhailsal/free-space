@@ -925,7 +925,7 @@ fn refresh_of_a_folder_now_a_file_points_at_the_parent() {
     let parent = f.p("tc");
     assert_eq!(
         e.fix.as_deref(),
-        Some(format!("sudo freespace refresh {}", parent.display()).as_str())
+        Some(format!("sudo freespace refresh '{}'", parent.display()).as_str())
     );
     // the parent picks up the new kind
     f.refresh("tc");

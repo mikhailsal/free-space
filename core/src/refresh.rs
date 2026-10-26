@@ -434,8 +434,9 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
             let parent = os_path.parent().unwrap_or(Path::new("/"));
             let fix = match shell_path_word(parent.as_os_str().as_bytes()) {
                 Some(parent) => format!("sudo freespace refresh {parent}"),
-                None => "refresh the parent folder with sudo using its original path bytes"
-                    .to_string(),
+                None => {
+                    "refresh the parent folder with sudo using its original path bytes".to_string()
+                }
             };
             return Err(
                 Error::usage(format!("{label} is no longer a folder on disk")).with_fix(fix),
