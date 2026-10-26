@@ -17,6 +17,10 @@ use super::fsutil;
 use crate::error::{Error, ErrorCode, Result};
 use crate::platform::now_secs;
 
+fn shell_quote(path: &str) -> String {
+    format!("'{}'", path.replace('\'', "'\\''"))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LockPayload {
     pub op: String,
@@ -78,24 +82,61 @@ fn read_payload(f: &mut File) -> Option<LockPayload> {
 /// Creating or opening a file in the snapshot directory failed. Without root
 /// that means "run it with sudo" (NOT_ROOT), not an unexplained I/O error.
 pub fn open_error(op: &str, path: &str, what: &Path, e: std::io::Error) -> Error {
+    let path_args = shell_quote(path);
+    open_error_with_path_arg(op, Some(&path_args), what, e)
+}
+
+pub fn open_error_with_path_arg(
+    op: &str,
+    path_args: Option<&str>,
+    what: &Path,
+    e: std::io::Error,
+) -> Error {
     if e.kind() == std::io::ErrorKind::PermissionDenied && !fsutil::is_root() {
-        return Error::new(
+        let mut error = Error::new(
             ErrorCode::NotRoot,
             format!("{op} needs root: it writes {}", what.display()),
-        )
-        .with_fix(format!("sudo freespace {op} {path}"));
+        );
+        error.fix = Some(match path_args {
+            Some(args) => format!("sudo freespace {op} {args}"),
+            None => format!("rerun the same {op} command with sudo"),
+        });
+        return error;
     }
     Error::io(format!("open {}", what.display()), e)
 }
 
 pub fn acquire(dir: &SnapshotDir, op: &str, path: &str) -> Result<LockGuard> {
-    acquire_with_timeout(dir, op, path, Duration::from_secs(2))
+    let path_args = shell_quote(path);
+    acquire_with_path_arg(dir, op, path, Some(&path_args))
+}
+
+/// Acquire the operation lock while keeping the displayed path separate from
+/// the shell-safe arguments used in a permission fix hint.
+pub fn acquire_with_path_arg(
+    dir: &SnapshotDir,
+    op: &str,
+    path: &str,
+    path_args: Option<&str>,
+) -> Result<LockGuard> {
+    acquire_with_timeout_and_path_arg(dir, op, path, path_args, Duration::from_secs(2))
 }
 
 pub fn acquire_with_timeout(
     dir: &SnapshotDir,
     op: &str,
     path: &str,
+    timeout: Duration,
+) -> Result<LockGuard> {
+    let path_args = shell_quote(path);
+    acquire_with_timeout_and_path_arg(dir, op, path, Some(&path_args), timeout)
+}
+
+fn acquire_with_timeout_and_path_arg(
+    dir: &SnapshotDir,
+    op: &str,
+    path: &str,
+    path_args: Option<&str>,
     timeout: Duration,
 ) -> Result<LockGuard> {
     let p = dir.lock();
@@ -112,7 +153,7 @@ pub fn acquire_with_timeout(
                 format!("no snapshot in {}", dir.as_path().display()),
             )
             .with_fix("sudo freespace scan"),
-            _ => open_error(op, path, &p, e),
+            _ => open_error_with_path_arg(op, path_args, &p, e),
         })?;
     fsutil::secure_file(&file).map_err(|e| Error::io(format!("chmod {}", p.display()), e))?;
     let deadline = Instant::now() + timeout;
@@ -217,5 +258,11 @@ mod tests {
         }
         stop.store(true, std::sync::atomic::Ordering::Relaxed);
         h.join().unwrap();
+    }
+
+    #[test]
+    fn shell_quote_keeps_spaces_and_quotes_inside_one_argument() {
+        assert_eq!(shell_quote("/tmp/a b"), "'/tmp/a b'");
+        assert_eq!(shell_quote("/tmp/a'b"), "'/tmp/a'\\''b'");
     }
 }

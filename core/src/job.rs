@@ -1,6 +1,7 @@
 //! `scan` end to end: lock → cleanup → walk → finalize → precheck → write tmp →
 //! rotate prev → publish → state.json. `refresh` reuses the same tail.
 
+use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
@@ -14,6 +15,56 @@ use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
 use crate::snapshot::reader::Snapshot;
 use crate::snapshot::writer::{self, Reserve, WriteMeta, WriteStats};
 use crate::snapshot::{SnapshotDir, fsutil, lock, publish, state};
+
+fn scan_root_args(roots: &[PathBuf], one_file_system: bool, workers: usize) -> Option<String> {
+    if roots.is_empty() {
+        return None;
+    }
+    let mut args = Vec::with_capacity(roots.len());
+    for root in roots {
+        let bytes = root.as_os_str().as_bytes();
+        let path = std::str::from_utf8(bytes).ok()?;
+        if path.chars().any(char::is_control) {
+            return None;
+        }
+        args.push(format!("'{}'", path.replace('\'', "'\\''")));
+    }
+    if !one_file_system {
+        args.push("--cross-mounts".to_string());
+    }
+    args.push(format!("--workers {workers}"));
+    Some(args.join(" "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scan_root_args;
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+    use std::path::PathBuf;
+
+    #[test]
+    fn scan_root_args_quote_each_utf8_root_and_refuse_unrepresentable_paths() {
+        let roots = vec![PathBuf::from("/mnt/a b"), PathBuf::from("/mnt/a'b")];
+        assert_eq!(
+            scan_root_args(&roots, true, 4).as_deref(),
+            Some("'/mnt/a b' '/mnt/a'\\''b' --workers 4")
+        );
+        assert_eq!(
+            scan_root_args(&roots, false, 7).as_deref(),
+            Some("'/mnt/a b' '/mnt/a'\\''b' --cross-mounts --workers 7")
+        );
+        assert_eq!(
+            scan_root_args(
+                &[PathBuf::from(OsString::from_vec(b"/mnt/\xff".to_vec()))],
+                true,
+                2
+            ),
+            None
+        );
+        assert_eq!(scan_root_args(&[PathBuf::from("/mnt/a\tb")], true, 2), None);
+    }
+}
 
 pub struct ScanRequest {
     pub roots: Vec<PathBuf>,
@@ -183,15 +234,17 @@ fn record(dir: &SnapshotDir, op: &str, e: &Error) {
 }
 
 pub fn run_scan(req: ScanRequest) -> Result<ScanReport> {
+    let path_args = scan_root_args(&req.roots, req.one_file_system, req.workers);
     let label = req
         .roots
         .iter()
         .map(|r| r.display().to_string())
         .collect::<Vec<_>>()
         .join(" ");
-    fsutil::ensure_dir(req.dir.as_path())
-        .map_err(|e| lock::open_error("scan", &label, req.dir.as_path(), e))?;
-    let _lock = lock::acquire(&req.dir, "scan", &label)?;
+    fsutil::ensure_dir(req.dir.as_path()).map_err(|e| {
+        lock::open_error_with_path_arg("scan", path_args.as_deref(), req.dir.as_path(), e)
+    })?;
+    let _lock = lock::acquire_with_path_arg(&req.dir, "scan", &label, path_args.as_deref())?;
     let dir = req.dir.clone();
     let r = scan_locked(req, &label);
     if let Err(e) = &r {

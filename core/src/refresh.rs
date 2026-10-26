@@ -20,7 +20,7 @@ mod mounts;
 use crate::error::{Error, ErrorCode, Result};
 use crate::job::{denied_paths, denied_warning};
 use crate::platform::{self, FsStats};
-use crate::queries::common::{Paths, normalize, resolve};
+use crate::queries::common::{Paths, normalize, resolve, shell_path_word};
 use crate::scan::tree::LinkPolicy;
 use crate::scan::{self, Kind, MountRow, NO_PARENT, Node, RootInfo, Tree, flags};
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
@@ -376,7 +376,8 @@ pub fn graft(
 pub fn run_refresh(req: RefreshRequest) -> Result<RefreshReport> {
     let path = normalize(&req.path)?;
     let label = String::from_utf8_lossy(&path).into_owned();
-    let _lock = lock::acquire(&req.dir, "refresh", &label)?;
+    let path_arg = shell_path_word(&path);
+    let _lock = lock::acquire_with_path_arg(&req.dir, "refresh", &label, path_arg.as_deref())?;
     let dir = req.dir.clone();
     let r = refresh_locked(req, path, &label);
     if let Err(e) = &r
@@ -431,9 +432,14 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
         Ok(m) if !m.is_dir() => {
             // The parent holds a replacement file or symlink.
             let parent = os_path.parent().unwrap_or(Path::new("/"));
+            let fix = match shell_path_word(parent.as_os_str().as_bytes()) {
+                Some(parent) => format!("sudo freespace refresh {parent}"),
+                None => {
+                    "refresh the parent folder with sudo using its original path bytes".to_string()
+                }
+            };
             return Err(
-                Error::usage(format!("{label} is no longer a folder on disk"))
-                    .with_fix(format!("sudo freespace refresh {}", parent.display())),
+                Error::usage(format!("{label} is no longer a folder on disk")).with_fix(fix),
             );
         }
         Ok(m) => {

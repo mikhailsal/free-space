@@ -130,10 +130,19 @@ fn terminal_diagnostics_escape_data_without_changing_json() {
     assert_eq!(o.status.code(), Some(2));
     let err = safe(&o.stderr);
     assert_eq!(err.lines().count(), 2);
-    assert!(err.lines().all(|line| line.contains(DISPLAY)));
+    assert!(err.lines().next().unwrap().contains(DISPLAY));
+    let ancestor = e.root().join(NAME);
+    let raw = freespace_core::queries::params::hex_encode(ancestor.as_os_str().as_bytes());
+    assert!(
+        err.lines()
+            .nth(1)
+            .unwrap()
+            .contains(&format!("freespace ls --path-raw {raw}"))
+    );
     let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
     assert!(v.to_string().contains("\\u001b"));
     assert!(v["error"]["message"].as_str().unwrap().contains(NAME));
+    assert_eq!(v["error"]["fix"], format!("freespace ls --path-raw {raw}"));
 }
 
 #[test]
