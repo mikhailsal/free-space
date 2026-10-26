@@ -26,13 +26,16 @@ pub struct ScanArgs {
     /// Walker threads (default: config `workers`, else min(CPUs, 8))
     #[arg(long)]
     pub workers: Option<usize>,
+    /// Stage entries on disk with one walker, trading speed and disk space for lower RAM
+    #[arg(long)]
+    pub low_memory: bool,
     /// Print the scan report as JSON on stdout
     #[arg(long)]
     pub json: bool,
 }
 
 #[derive(Serialize)]
-struct Report {
+struct Report<'a> {
     generation: u64,
     prev_generation: Option<u64>,
     entries: u64,
@@ -48,7 +51,7 @@ struct Report {
     snapshot_path: String,
     errors: u64,
     incomplete: bool,
-    unknown_subtrees: Vec<String>,
+    unknown_subtrees: &'a freespace_core::scan::denied::DeniedPaths,
 }
 
 pub fn run(a: ScanArgs) -> output::Result<()> {
@@ -67,6 +70,8 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
     if workers == 0 {
         return Err(Error::usage("--workers must be at least 1").into());
     }
+    let low_memory = a.low_memory || loaded.config.low_memory;
+    let workers = if low_memory { 1 } else { workers };
     let dir = loaded.snapshot_dir();
     let tty = output::stderr_is_tty();
     let label = roots
@@ -83,6 +88,7 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
         roots: roots.clone(),
         one_file_system: !a.cross_mounts,
         workers,
+        low_memory,
         dir: dir.clone(),
         keep_previous: loaded.config.keep_previous,
         on_progress,
@@ -100,7 +106,7 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
         rep.walk_seconds,
         rep.write.insert_seconds + rep.write.index_seconds
     );
-    if let Some(w) = job::denied_warning(&rep.denied) {
+    if let Some(w) = rep.denied.warning() {
         eprintln!("warning: {}", output::escape(&w));
     }
     if a.json {
@@ -120,7 +126,7 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
             snapshot_path: dir.current().display().to_string(),
             errors: rep.errors,
             incomplete: !rep.denied.is_empty(),
-            unknown_subtrees: rep.denied.clone(),
+            unknown_subtrees: &rep.denied,
         })?;
     }
     Ok(())

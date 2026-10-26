@@ -1,0 +1,435 @@
+{
+  "source_revision": "67557256b86f156573d374a9964953682cf5b7ae",
+  "source_tree": "915299b43dce7c393f849b43c17641d7ebbad780",
+  "integrated_master": "8dbb8d4beb4e6ba96c18e49176dc480b9ab540c2",
+  "binary_sha256": "78799236d671e35d114dd5cc3775953ade9b5524050c64af3773c75cfb7f7a8a",
+  "profile": "cargo build --release -p freespace",
+  "date": "2026-10-26",
+  "platform": "Linux-5.15.0-136-generic-x86_64-with-glibc2.35",
+  "filesystem": "ext4",
+  "host_memory_total_kib": 16336140,
+  "memory_max_bytes": 134217728,
+  "memory_swap_max_bytes": 0,
+  "fixture": "Empty files in one wide directory below the scanned root; snapshots and phase traces outside the tree.",
+  "file_steps": [
+    100000,
+    1000000
+  ],
+  "files_per_dir": 1000000,
+  "repeats": 1,
+  "sampling_interval_ms": 20,
+  "cache_policy": "uncontrolled, freshly generated metadata",
+  "phase_layout": {
+    "fast": "walk, finalize, write, index, publish",
+    "disk": "walk; fused finalization/row insertion/incremental indexes in write; analysis/closing in index; publish"
+  },
+  "limitations": [
+    "One run per case on one x86_64 host; elapsed times are illustrative.",
+    "Linux 5.15 has no memory.peak here; cgroup peaks are sampled memory.current.",
+    "Cgroup usage includes the Python measurement helper and filesystem cache.",
+    "The successful million-entry disk scan reaches the cgroup cap with max events; success does not imply memory headroom.",
+    "Phase observed peaks are maxima of boundary and periodic RSS samples, lower bounds on true phase peaks. VmHWM is cumulative.",
+    "Profile phase durations include boundary work and need not equal CLI phase timers.",
+    "Snapshot-directory disk occupancy is sampled and may miss brief peaks.",
+    "No Raspberry Pi hardware measurement."
+  ],
+  "records": [
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json"
+      ],
+      "entries": 100002,
+      "exit_code": 0,
+      "wall_seconds": 1.3562803009990603,
+      "peak_rss_kib": 34536,
+      "sampled_peak_rss_kib": 30248,
+      "sampled_peak_snapshot_disk_bytes": 11227136,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 100002,
+        "roots": [
+          "$TREE"
+        ],
+        "workers": 1,
+        "walk_seconds": 0.670802022,
+        "finalize_seconds": 0.015300978,
+        "insert_seconds": 0.209073227,
+        "index_seconds": 0.387239214,
+        "publish_seconds": 0.003847308,
+        "total_seconds": 1.342512924,
+        "snapshot_bytes": 11214848,
+        "snapshot_path": "$SNAPSHOT_DIR/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      },
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0",
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0"
+      },
+      "sampled_peak_cgroup_bytes": 40185856,
+      "sampled_peak_swap_bytes": 0,
+      "phase_boundaries": [
+        {
+          "elapsed_seconds": 8.0476e-05,
+          "hwm_kib": 5956,
+          "phase": "walk",
+          "rss_kib": 5956
+        },
+        {
+          "elapsed_seconds": 0.671215754,
+          "hwm_kib": 34536,
+          "phase": "finalize",
+          "rss_kib": 19372
+        },
+        {
+          "elapsed_seconds": 0.686831295,
+          "hwm_kib": 34536,
+          "phase": "write",
+          "rss_kib": 21600
+        },
+        {
+          "elapsed_seconds": 0.898835967,
+          "hwm_kib": 34536,
+          "phase": "index",
+          "rss_kib": 19516
+        },
+        {
+          "elapsed_seconds": 1.325638455,
+          "hwm_kib": 34536,
+          "phase": "publish",
+          "rss_kib": 27432
+        },
+        {
+          "elapsed_seconds": 1.342126176,
+          "hwm_kib": 34536,
+          "phase": "done",
+          "rss_kib": 27444
+        }
+      ],
+      "phase_rss": {
+        "walk": {
+          "start_rss_kib": 5956,
+          "end_rss_kib": 19372,
+          "observed_peak_rss_kib": 30248,
+          "periodic_samples": 31,
+          "elapsed_seconds": 0.671135278,
+          "incomplete": false
+        },
+        "finalize": {
+          "start_rss_kib": 19372,
+          "end_rss_kib": 21600,
+          "observed_peak_rss_kib": 21600,
+          "periodic_samples": 1,
+          "elapsed_seconds": 0.015615540999999955,
+          "incomplete": false
+        },
+        "write": {
+          "start_rss_kib": 21600,
+          "end_rss_kib": 19516,
+          "observed_peak_rss_kib": 29172,
+          "periodic_samples": 10,
+          "elapsed_seconds": 0.21200467200000006,
+          "incomplete": false
+        },
+        "index": {
+          "start_rss_kib": 19516,
+          "end_rss_kib": 27432,
+          "observed_peak_rss_kib": 27432,
+          "periodic_samples": 19,
+          "elapsed_seconds": 0.426802488,
+          "incomplete": false
+        },
+        "publish": {
+          "start_rss_kib": 27432,
+          "end_rss_kib": 27444,
+          "observed_peak_rss_kib": 27444,
+          "periodic_samples": 1,
+          "elapsed_seconds": 0.016487721000000066,
+          "incomplete": false
+        }
+      },
+      "mode": "fast",
+      "repeat": 1
+    },
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json",
+        "--low-memory"
+      ],
+      "entries": 100002,
+      "exit_code": 0,
+      "wall_seconds": 3.065849779988639,
+      "peak_rss_kib": 25184,
+      "sampled_peak_rss_kib": 25116,
+      "sampled_peak_snapshot_disk_bytes": 18751488,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 100002,
+        "roots": [
+          "$TREE"
+        ],
+        "workers": 1,
+        "walk_seconds": 1.159967844,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 1.819415783,
+        "index_seconds": 0.018298798,
+        "publish_seconds": 0.001145029,
+        "total_seconds": 3.034512075,
+        "snapshot_bytes": 11825152,
+        "snapshot_path": "$SNAPSHOT_DIR/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      },
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0",
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0"
+      },
+      "sampled_peak_cgroup_bytes": 45719552,
+      "sampled_peak_swap_bytes": 0,
+      "phase_boundaries": [
+        {
+          "elapsed_seconds": 7.9525e-05,
+          "hwm_kib": 5860,
+          "phase": "walk",
+          "rss_kib": 5860
+        },
+        {
+          "elapsed_seconds": 1.160350244,
+          "hwm_kib": 14968,
+          "phase": "write",
+          "rss_kib": 14968
+        },
+        {
+          "elapsed_seconds": 2.98053547,
+          "hwm_kib": 25116,
+          "phase": "index",
+          "rss_kib": 25116
+        },
+        {
+          "elapsed_seconds": 3.004311039,
+          "hwm_kib": 25184,
+          "phase": "publish",
+          "rss_kib": 19892
+        },
+        {
+          "elapsed_seconds": 3.034120542,
+          "hwm_kib": 25184,
+          "phase": "done",
+          "rss_kib": 19968
+        }
+      ],
+      "phase_rss": {
+        "walk": {
+          "start_rss_kib": 5860,
+          "end_rss_kib": 14968,
+          "observed_peak_rss_kib": 14968,
+          "periodic_samples": 54,
+          "elapsed_seconds": 1.160270719,
+          "incomplete": false
+        },
+        "write": {
+          "start_rss_kib": 14968,
+          "end_rss_kib": 25116,
+          "observed_peak_rss_kib": 25116,
+          "periodic_samples": 85,
+          "elapsed_seconds": 1.820185226,
+          "incomplete": false
+        },
+        "index": {
+          "start_rss_kib": 25116,
+          "end_rss_kib": 19892,
+          "observed_peak_rss_kib": 25116,
+          "periodic_samples": 1,
+          "elapsed_seconds": 0.023775569000000107,
+          "incomplete": false
+        },
+        "publish": {
+          "start_rss_kib": 19892,
+          "end_rss_kib": 19968,
+          "observed_peak_rss_kib": 19968,
+          "periodic_samples": 1,
+          "elapsed_seconds": 0.02980950300000007,
+          "incomplete": false
+        }
+      },
+      "mode": "disk",
+      "repeat": 1
+    },
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json"
+      ],
+      "entries": 1000002,
+      "exit_code": -9,
+      "wall_seconds": 3.8543135939980857,
+      "peak_rss_kib": 124632,
+      "sampled_peak_rss_kib": 124316,
+      "sampled_peak_snapshot_disk_bytes": 12288,
+      "report": null,
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 47\noom 1\noom_kill 1",
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=52901\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=52901"
+      },
+      "sampled_peak_cgroup_bytes": 134213632,
+      "sampled_peak_swap_bytes": 0,
+      "phase_boundaries": [
+        {
+          "elapsed_seconds": 7.6362e-05,
+          "hwm_kib": 6004,
+          "phase": "walk",
+          "rss_kib": 6004
+        }
+      ],
+      "phase_rss": {
+        "walk": {
+          "start_rss_kib": 6004,
+          "end_rss_kib": null,
+          "observed_peak_rss_kib": 124316,
+          "periodic_samples": 177,
+          "elapsed_seconds": null,
+          "incomplete": true
+        }
+      },
+      "mode": "fast",
+      "repeat": 1
+    },
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json",
+        "--low-memory"
+      ],
+      "entries": 1000002,
+      "exit_code": 0,
+      "wall_seconds": 90.10104076599237,
+      "peak_rss_kib": 25492,
+      "sampled_peak_rss_kib": 25492,
+      "sampled_peak_snapshot_disk_bytes": 189026304,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 1000002,
+        "roots": [
+          "$TREE"
+        ],
+        "workers": 1,
+        "walk_seconds": 31.927228694,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 55.189164995,
+        "index_seconds": 2.858417489,
+        "publish_seconds": 0.00166408,
+        "total_seconds": 90.072072136,
+        "snapshot_bytes": 119451648,
+        "snapshot_path": "$SNAPSHOT_DIR/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      },
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 1139\noom 0\noom_kill 0",
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.pressure": "some avg10=0.02 avg60=0.11 avg300=0.03 total=466867\nfull avg10=0.01 avg60=0.09 avg300=0.03 total=464183"
+      },
+      "sampled_peak_cgroup_bytes": 134217728,
+      "sampled_peak_swap_bytes": 0,
+      "phase_boundaries": [
+        {
+          "elapsed_seconds": 0.000104567,
+          "hwm_kib": 5968,
+          "phase": "walk",
+          "rss_kib": 5968
+        },
+        {
+          "elapsed_seconds": 31.927726682,
+          "hwm_kib": 16024,
+          "phase": "write",
+          "rss_kib": 16024
+        },
+        {
+          "elapsed_seconds": 87.117944117,
+          "hwm_kib": 25492,
+          "phase": "index",
+          "rss_kib": 25492
+        },
+        {
+          "elapsed_seconds": 89.991900411,
+          "hwm_kib": 25492,
+          "phase": "publish",
+          "rss_kib": 24756
+        },
+        {
+          "elapsed_seconds": 90.07149647,
+          "hwm_kib": 25492,
+          "phase": "done",
+          "rss_kib": 24844
+        }
+      ],
+      "phase_rss": {
+        "walk": {
+          "start_rss_kib": 5968,
+          "end_rss_kib": 16024,
+          "observed_peak_rss_kib": 16024,
+          "periodic_samples": 1452,
+          "elapsed_seconds": 31.927622115,
+          "incomplete": false
+        },
+        "write": {
+          "start_rss_kib": 16024,
+          "end_rss_kib": 25492,
+          "observed_peak_rss_kib": 25492,
+          "periodic_samples": 2538,
+          "elapsed_seconds": 55.190217434999994,
+          "incomplete": false
+        },
+        "index": {
+          "start_rss_kib": 25492,
+          "end_rss_kib": 24756,
+          "observed_peak_rss_kib": 25492,
+          "periodic_samples": 136,
+          "elapsed_seconds": 2.87395629400001,
+          "incomplete": false
+        },
+        "publish": {
+          "start_rss_kib": 24756,
+          "end_rss_kib": 24844,
+          "observed_peak_rss_kib": 24844,
+          "periodic_samples": 3,
+          "elapsed_seconds": 0.07959605899999644,
+          "incomplete": false
+        }
+      },
+      "mode": "disk",
+      "repeat": 1
+    }
+  ]
+}

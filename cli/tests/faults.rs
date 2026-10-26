@@ -101,33 +101,38 @@ fn s(p: &Path) -> &str {
 
 #[test]
 fn a_kill_at_any_publish_step_leaves_a_readable_snapshot_and_a_clean_retry() {
-    for step in STEPS {
-        let e = Env::with_two_generations();
-        let o = e
-            .cmd(&["scan", s(&e.root())])
-            .env("FREESPACE_FAULT", step)
-            .output()
-            .unwrap();
-        assert_eq!(o.status.signal(), Some(9), "{step}: killed at the step");
+    for low_memory in [false, true] {
+        for step in STEPS {
+            let e = Env::with_two_generations();
+            if low_memory {
+                fs::write(e.config(), "low_memory = true\n").unwrap();
+            }
+            let o = e
+                .cmd(&["scan", s(&e.root())])
+                .env("FREESPACE_FAULT", step)
+                .output()
+                .unwrap();
+            assert_eq!(o.status.signal(), Some(9), "{step}: killed at the step");
 
-        // the published snapshot is whole: old before the rename, new after
-        let want = if step == "published" { 3 } else { 2 };
-        assert_eq!(e.generation(), want, "{step}");
-        let (code, ls) = e.json(&["ls", s(&e.root()), "--json"]);
-        assert_eq!(code, 0, "{step}: {ls}");
-        let paired = e.diff_is_honest();
-        if step == "rotated" {
-            // prev already holds what is still current: honest NO_PREV
-            assert_eq!(paired, None, "{step}");
-        } else {
-            assert_eq!(paired, Some((want - 1, want)), "{step}");
+            // the published snapshot is whole: old before the rename, new after
+            let want = if step == "published" { 3 } else { 2 };
+            assert_eq!(e.generation(), want, "{step}");
+            let (code, ls) = e.json(&["ls", s(&e.root()), "--json"]);
+            assert_eq!(code, 0, "{step}: {ls}");
+            let paired = e.diff_is_honest();
+            if step == "rotated" {
+                // prev already holds what is still current: honest NO_PREV
+                assert_eq!(paired, None, "{step}");
+            } else {
+                assert_eq!(paired, Some((want - 1, want)), "{step}");
+            }
+
+            // the lock died with the process; the next scan cleans up and publishes
+            e.ok(&["scan", s(&e.root())]);
+            assert_eq!(e.generation(), want + 1, "{step}");
+            assert_eq!(e.diff_is_honest(), Some((want, want + 1)), "{step}");
+            assert!(e.leftovers().is_empty(), "{step}: {:?}", e.leftovers());
         }
-
-        // the lock died with the process; the next scan cleans up and publishes
-        e.ok(&["scan", s(&e.root())]);
-        assert_eq!(e.generation(), want + 1, "{step}");
-        assert_eq!(e.diff_is_honest(), Some((want, want + 1)), "{step}");
-        assert!(e.leftovers().is_empty(), "{step}: {:?}", e.leftovers());
     }
 }
 
