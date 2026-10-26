@@ -123,44 +123,8 @@ fn write_inner(
     meta: &WriteMeta,
     reserve: &Reserve,
 ) -> Result<WriteStats> {
-    // Create the file ourselves so the mode is right before SQLite writes a byte.
-    let f = std::fs::File::create(path)
-        .map_err(|e| Error::io(format!("create {}", path.display()), e))?;
-    fsutil::secure_file(&f).map_err(|e| Error::io(format!("chmod {}", path.display()), e))?;
-    drop(f);
-
-    let conn = Connection::open(path)?;
-    conn.execute_batch(
-        "PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=MEMORY;
-         PRAGMA cache_size=-65536; PRAGMA locking_mode=EXCLUSIVE;",
-    )?;
-
-    // Reserve check through SQLite's progress handler: covers inserts and index builds.
-    let reserve_hit = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
-    {
-        let p = path.to_path_buf();
-        let r = reserve.clone();
-        let hit = reserve_hit.clone();
-        let mut last_checked: u64 = 0;
-        let mut first = true;
-        conn.progress_handler(
-            200_000,
-            Some(move || {
-                let len = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
-                if first || len >= last_checked + r.check_every {
-                    first = false;
-                    last_checked = len;
-                    if let Ok(st) = platform::statvfs(&r.dir)
-                        && st.avail < r.min_free
-                    {
-                        hit.store(st.avail.max(1), std::sync::atomic::Ordering::Relaxed);
-                        return true; // interrupt
-                    }
-                }
-                false
-            }),
-        )?;
-    }
+    let conn = open_snapshot(path)?;
+    let reserve_hit = install_reserve_guard(&conn, path, reserve)?;
     let map_err = |e: rusqlite::Error| -> Error {
         let have = reserve_hit.load(std::sync::atomic::Ordering::Relaxed);
         if have > 0 {
@@ -187,6 +151,83 @@ fn write_inner(
     let t0 = Instant::now();
     conn.execute_batch("BEGIN")?;
     conn.execute_batch(CREATE_TABLES).map_err(map_err)?;
+    insert_metadata(&conn, fin, meta, &map_err)?;
+    insert_entries(&conn, tree, fin, &map_err)?;
+    stats.rows = fin.order.len() as u64;
+    insert_hardlinks(&conn, fin, &map_err)?;
+    insert_roots(&conn, tree, fin, &map_err)?;
+    insert_mounts(&conn, tree, fin, &map_err)?;
+    insert_denied(&conn, tree, fin, &map_err)?;
+    insert_refreshes(&conn, meta, &map_err)?;
+    stats.insert_seconds = t0.elapsed().as_secs_f64();
+    let t1 = Instant::now();
+    for sql in CREATE_INDEXES {
+        conn.execute_batch(sql).map_err(map_err)?;
+    }
+    conn.execute_batch("COMMIT").map_err(map_err)?;
+    conn.execute_batch("PRAGMA analysis_limit=1000; ANALYZE;")
+        .map_err(map_err)?;
+    stats.index_seconds = t1.elapsed().as_secs_f64();
+    conn.close().map_err(|(_, e)| map_err(e))?;
+
+    stats.bytes = sync_snapshot(path)?;
+    Ok(stats)
+}
+
+fn open_snapshot(path: &Path) -> Result<Connection> {
+    // Create the file ourselves so the mode is right before SQLite writes a byte.
+    let f = std::fs::File::create(path)
+        .map_err(|e| Error::io(format!("create {}", path.display()), e))?;
+    fsutil::secure_file(&f).map_err(|e| Error::io(format!("chmod {}", path.display()), e))?;
+    drop(f);
+
+    let conn = Connection::open(path)?;
+    conn.execute_batch(
+        "PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=MEMORY;
+         PRAGMA cache_size=-65536; PRAGMA locking_mode=EXCLUSIVE;",
+    )?;
+
+    Ok(conn)
+}
+
+fn install_reserve_guard(
+    conn: &Connection,
+    path: &Path,
+    reserve: &Reserve,
+) -> Result<std::sync::Arc<std::sync::atomic::AtomicU64>> {
+    // Reserve check through SQLite's progress handler: covers inserts and index builds.
+    let reserve_hit = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let p = path.to_path_buf();
+    let r = reserve.clone();
+    let hit = reserve_hit.clone();
+    let mut last_checked: u64 = 0;
+    let mut first = true;
+    conn.progress_handler(
+        200_000,
+        Some(move || {
+            let len = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+            if first || len >= last_checked + r.check_every {
+                first = false;
+                last_checked = len;
+                if let Ok(st) = platform::statvfs(&r.dir)
+                    && st.avail < r.min_free
+                {
+                    hit.store(st.avail.max(1), std::sync::atomic::Ordering::Relaxed);
+                    return true; // interrupt
+                }
+            }
+            false
+        }),
+    )?;
+    Ok(reserve_hit)
+}
+
+fn insert_metadata(
+    conn: &Connection,
+    fin: &Finalized,
+    meta: &WriteMeta,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
     conn.execute(
         "INSERT INTO meta VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
@@ -204,124 +245,156 @@ fn write_inner(
         ],
     )
     .map_err(map_err)?;
-    {
-        let mut ins = conn
-            .prepare(
-                "INSERT INTO entries VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
-            )
-            .map_err(map_err)?;
-        for (new, &raw) in fin.order.iter().enumerate() {
-            let n = &tree.nodes[raw as usize];
-            let parent = if n.parent == NO_PARENT {
-                None
-            } else {
-                Some(fin.rank[n.parent as usize] as i64)
-            };
-            let new = new as i64;
-            ins.execute(params![
-                new,
-                parent,
-                tree.name(n),
-                fin.path_hash[new as usize],
-                n.kind as i64,
-                n.flags as i64,
-                n.allocated as i64,
-                n.apparent as i64,
-                n.mtime,
-                n.nlink as i64,
-                n.items as i64,
-                n.errors as i64,
-                n.scanned_at,
-                new + n.items as i64,
-                n.min_scanned_at,
-                n.newest_mtime,
-            ])
-            .map_err(map_err)?;
-        }
-        stats.rows = fin.order.len() as u64;
-    }
-    {
-        let mut ins = conn
-            .prepare("INSERT INTO hardlinks VALUES (?1, ?2, ?3, ?4, ?5)")
-            .map_err(map_err)?;
-        for h in &fin.hardlinks {
-            ins.execute(params![
-                h.entry_id as i64,
-                h.dev as i64,
-                h.ino as i64,
-                h.allocated as i64,
-                h.apparent as i64
-            ])
-            .map_err(map_err)?;
-        }
-    }
-    {
-        let mut ins = conn
-            .prepare("INSERT INTO roots VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")
-            .map_err(map_err)?;
-        for (i, r) in tree.roots.iter().enumerate() {
-            use std::os::unix::ffi::OsStrExt;
-            ins.execute(params![
-                fin.rank[i] as i64,
-                r.path.as_os_str().as_bytes(),
-                r.fs_type,
-                r.stats.used as i64,
-                r.stats.total as i64,
-                r.stats.avail as i64,
-                r.stats.inodes_used().map(|v| v as i64),
-            ])
-            .map_err(map_err)?;
-        }
-    }
-    {
-        let mut ins = conn
-            .prepare("INSERT INTO mounts VALUES (?1, ?2, ?3, ?4, ?5)")
-            .map_err(map_err)?;
-        for m in tree
-            .mounts
-            .iter()
-            .filter(|m| fin.rank[m.raw as usize] != u32::MAX)
-        {
-            use std::os::unix::ffi::OsStrExt;
-            ins.execute(params![
-                fin.rank[m.raw as usize] as i64,
-                m.path.as_os_str().as_bytes(),
-                m.fs_type,
-                m.stats.map(|s| s.used as i64),
-                m.stats.map(|s| s.total as i64),
-            ])
-            .map_err(map_err)?;
-        }
-    }
-    {
-        let mut ins = conn
-            .prepare("INSERT INTO denied VALUES (?1)")
-            .map_err(map_err)?;
-        for &d in &fin.denied {
-            debug_assert!(tree.nodes[fin.order[d as usize] as usize].flags & flags::DENIED != 0);
-            ins.execute(params![d as i64]).map_err(map_err)?;
-        }
-    }
-    {
-        let mut ins = conn
-            .prepare("INSERT INTO refreshes VALUES (?1, ?2, ?3)")
-            .map_err(map_err)?;
-        for r in &meta.refreshes {
-            ins.execute(params![r.path, r.scanned_at, r.generation as i64])
-                .map_err(map_err)?;
-        }
-    }
-    stats.insert_seconds = t0.elapsed().as_secs_f64();
-    let t1 = Instant::now();
-    for sql in CREATE_INDEXES {
-        conn.execute_batch(sql).map_err(map_err)?;
-    }
-    conn.execute_batch("COMMIT").map_err(map_err)?;
-    conn.execute_batch("PRAGMA analysis_limit=1000; ANALYZE;")
-        .map_err(map_err)?;
-    stats.index_seconds = t1.elapsed().as_secs_f64();
-    conn.close().map_err(|(_, e)| map_err(e))?;
+    Ok(())
+}
 
+fn insert_entries(
+    conn: &Connection,
+    tree: &Tree,
+    fin: &Finalized,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
+    let mut ins = conn
+        .prepare(
+            "INSERT INTO entries VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+        )
+        .map_err(map_err)?;
+    for (new, &raw) in fin.order.iter().enumerate() {
+        let n = &tree.nodes[raw as usize];
+        let parent = if n.parent == NO_PARENT {
+            None
+        } else {
+            Some(fin.rank[n.parent as usize] as i64)
+        };
+        let new = new as i64;
+        ins.execute(params![
+            new,
+            parent,
+            tree.name(n),
+            fin.path_hash[new as usize],
+            n.kind as i64,
+            n.flags as i64,
+            n.allocated as i64,
+            n.apparent as i64,
+            n.mtime,
+            n.nlink as i64,
+            n.items as i64,
+            n.errors as i64,
+            n.scanned_at,
+            new + n.items as i64,
+            n.min_scanned_at,
+            n.newest_mtime,
+        ])
+        .map_err(map_err)?;
+    }
+    Ok(())
+}
+
+fn insert_hardlinks(
+    conn: &Connection,
+    fin: &Finalized,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
+    let mut ins = conn
+        .prepare("INSERT INTO hardlinks VALUES (?1, ?2, ?3, ?4, ?5)")
+        .map_err(map_err)?;
+    for h in &fin.hardlinks {
+        ins.execute(params![
+            h.entry_id as i64,
+            h.dev as i64,
+            h.ino as i64,
+            h.allocated as i64,
+            h.apparent as i64
+        ])
+        .map_err(map_err)?;
+    }
+    Ok(())
+}
+
+fn insert_roots(
+    conn: &Connection,
+    tree: &Tree,
+    fin: &Finalized,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
+    let mut ins = conn
+        .prepare("INSERT INTO roots VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")
+        .map_err(map_err)?;
+    for (i, r) in tree.roots.iter().enumerate() {
+        use std::os::unix::ffi::OsStrExt;
+        ins.execute(params![
+            fin.rank[i] as i64,
+            r.path.as_os_str().as_bytes(),
+            r.fs_type,
+            r.stats.used as i64,
+            r.stats.total as i64,
+            r.stats.avail as i64,
+            r.stats.inodes_used().map(|v| v as i64),
+        ])
+        .map_err(map_err)?;
+    }
+    Ok(())
+}
+
+fn insert_mounts(
+    conn: &Connection,
+    tree: &Tree,
+    fin: &Finalized,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
+    let mut ins = conn
+        .prepare("INSERT INTO mounts VALUES (?1, ?2, ?3, ?4, ?5)")
+        .map_err(map_err)?;
+    for m in tree
+        .mounts
+        .iter()
+        .filter(|m| fin.rank[m.raw as usize] != u32::MAX)
+    {
+        use std::os::unix::ffi::OsStrExt;
+        ins.execute(params![
+            fin.rank[m.raw as usize] as i64,
+            m.path.as_os_str().as_bytes(),
+            m.fs_type,
+            m.stats.map(|s| s.used as i64),
+            m.stats.map(|s| s.total as i64),
+        ])
+        .map_err(map_err)?;
+    }
+    Ok(())
+}
+
+fn insert_denied(
+    conn: &Connection,
+    tree: &Tree,
+    fin: &Finalized,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
+    let mut ins = conn
+        .prepare("INSERT INTO denied VALUES (?1)")
+        .map_err(map_err)?;
+    for &d in &fin.denied {
+        debug_assert!(tree.nodes[fin.order[d as usize] as usize].flags & flags::DENIED != 0);
+        ins.execute(params![d as i64]).map_err(map_err)?;
+    }
+    Ok(())
+}
+
+fn insert_refreshes(
+    conn: &Connection,
+    meta: &WriteMeta,
+    map_err: &impl Fn(rusqlite::Error) -> Error,
+) -> Result<()> {
+    let mut ins = conn
+        .prepare("INSERT INTO refreshes VALUES (?1, ?2, ?3)")
+        .map_err(map_err)?;
+    for r in &meta.refreshes {
+        ins.execute(params![r.path, r.scanned_at, r.generation as i64])
+            .map_err(map_err)?;
+    }
+    Ok(())
+}
+
+fn sync_snapshot(path: &Path) -> Result<u64> {
     let f = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -330,6 +403,5 @@ fn write_inner(
     f.sync_all()
         .map_err(|e| Error::io(format!("fsync {}", path.display()), e))?;
     fsutil::secure_file(&f).map_err(|e| Error::io(format!("chmod {}", path.display()), e))?;
-    stats.bytes = f.metadata().map(|m| m.len()).unwrap_or(0);
-    Ok(stats)
+    Ok(f.metadata().map(|m| m.len()).unwrap_or(0))
 }
