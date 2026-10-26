@@ -51,7 +51,7 @@ pub fn sentence(s: &Summary) -> String {
     if let Some(fs) = r.fs.first() {
         let avail = fs.avail.map(format::size).unwrap_or_else(|| "?".into());
         if r.fs.len() > 1 {
-            parts.push(format!("{avail} free on {}", fs.path));
+            parts.push(format!("{avail} free on {}", output::escape(&fs.path)));
         } else {
             parts.push(format!("{avail} free"));
         }
@@ -60,7 +60,11 @@ pub fn sentence(s: &Summary) -> String {
         parts.push(format!("snapshot {} old", format::age(age)));
     }
     if let Some((path, d)) = &s.growth {
-        parts.push(format!("{} since prev in {path}", format::delta(*d)));
+        parts.push(format!(
+            "{} since prev in {}",
+            format::delta(*d),
+            output::escape(path)
+        ));
     }
     if let Some(sc) = &r.scanning {
         parts.push(scanning_line(sc, None, false));
@@ -81,7 +85,7 @@ pub fn scanning_line(sc: &Scanning, p: Option<&Progress>, capital: bool) -> Stri
     };
     let mut s = format!(
         "{verb} {} since {}",
-        sc.path,
+        output::escape(&sc.path),
         format::local_hm(sc.started_at)
     );
     if let Some(p) = p {
@@ -235,7 +239,7 @@ fn details(s: &Summary) -> String {
     let mut out = sentence(s);
     out.push('\n');
     for (k, v) in rows {
-        out.push_str(&format!("{k:<w$}  {v}\n"));
+        out.push_str(&format!("{k:<w$}  {}\n", output::escape(&v)));
     }
     if let Some(h) = doctor_hint(r) {
         out.push_str(&h);

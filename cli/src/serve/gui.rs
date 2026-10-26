@@ -14,7 +14,7 @@ use freespace_core::platform;
 use tokio::process::Command;
 
 use super::{Server, runtime};
-use crate::output::{stdin_is_tty, stdout_is_tty};
+use crate::output::{escape, stdin_is_tty, stdout_is_tty};
 
 /// Seconds the redirect file may live when no browser consumes it.
 const BOOTSTRAP_TTL: u64 = 60;
@@ -164,14 +164,14 @@ pub fn run(a: &GuiArgs) -> Result<()> {
                  If this ssh session does not forward the port (-L {port}:127.0.0.1:{port}), \
                  first run on your computer:\n  ssh -N -L {port}:127.0.0.1:{port} {host}\n\
                  press Ctrl-C to stop",
-                host = platform::hostname()
+                host = escape(&platform::hostname())
             );
             return srv.run(None).await;
         }
         let file = match write_bootstrap(&url) {
             Ok(f) => Some(f),
             Err(e) => {
-                eprintln!("freespace: {}; open {url}", e.message);
+                eprintln!("freespace: {}; open {url}", escape(&e.message));
                 None
             }
         };

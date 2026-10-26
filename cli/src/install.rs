@@ -116,7 +116,10 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
 
     let copied_from = self_install()?;
     if let Some(from) = &copied_from {
-        eprintln!("installed {BIN_TARGET} (copied from {from})");
+        eprintln!(
+            "installed {BIN_TARGET} (copied from {})",
+            output::escape(from)
+        );
     }
     if let Some(parent) = cfg_path.parent() {
         fs::create_dir_all(parent)
@@ -189,33 +192,37 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
     out.push_str(&format!(
         "freespace {} timer installed\n  config     {} (roots {}, {} at {}, keep_previous {})\n",
         freespace_core::VERSION,
-        report.config,
-        report.roots.join(" "),
-        report.interval,
-        report.at,
+        output::escape(&report.config),
+        output::escape(&report.roots.join(" ")),
+        output::escape(&report.interval),
+        output::escape(&report.at),
         report.keep_previous
     ));
     let who = match (&report.user, access) {
-        (Some(u), "acl") => format!("read access for {u} (ACL)"),
-        (Some(u), "group") => format!("read access for {u} via group freespace"),
+        (Some(u), "acl") => format!("read access for {} (ACL)", output::escape(u)),
+        (Some(u), "group") => format!("read access for {} via group freespace", output::escape(u)),
         _ => "root only".into(),
     };
-    out.push_str(&format!("  snapshots  {} ({who})\n", report.snapshot_dir));
+    out.push_str(&format!(
+        "  snapshots  {} ({who})\n",
+        output::escape(&report.snapshot_dir)
+    ));
     out.push_str(&format!(
         "  timer      {TIMER}, next run {}\n",
-        next_run.as_deref().unwrap_or("unknown")
+        output::escape(next_run.as_deref().unwrap_or("unknown"))
     ));
     if relogin {
         out.push_str(&format!(
             "Log out and back in once so {} picks up the freespace group.\n",
-            report.user.as_deref().unwrap_or("the user")
+            output::escape(report.user.as_deref().unwrap_or("the user"))
         ));
     }
     match (scan_started, scan_reason.as_deref()) {
         (true, Some(why)) => out.push_str(&format!(
-            "First scan started ({why}) · Open: freespace gui\n"
+            "First scan started ({}) · Open: freespace gui\n",
+            output::escape(why)
         )),
-        (false, Some(why)) => out.push_str(&format!("{why}\n")),
+        (false, Some(why)) => out.push_str(&format!("{}\n", output::escape(why))),
         _ => {}
     }
     output::print(&out)?;
@@ -338,16 +345,16 @@ fn grant_access(dir: &Path, u: &UserInfo) -> (&'static str, bool) {
         Err(e) => {
             eprintln!(
                 "note: ACL not applied ({}); using group {} instead",
-                e.message,
+                output::escape(&e.message),
                 fsutil::GROUP
             );
             let in_group = user_in_group(u);
             if !in_group && let Err(e) = run_tool("usermod", &["-aG", fsutil::GROUP, &u.name]) {
                 eprintln!(
                     "warning: could not add {} to group {}: {}",
-                    u.name,
+                    output::escape(&u.name),
                     fsutil::GROUP,
-                    e.message
+                    output::escape(&e.message)
                 );
                 return ("none", false);
             }
@@ -379,8 +386,8 @@ fn verify_units(unit_dir: &Path) {
             let msg = String::from_utf8_lossy(&o.stderr);
             eprintln!(
                 "warning: systemd-analyze verify {}: {}",
-                svc.display(),
-                msg.trim()
+                output::escape(&svc.display().to_string()),
+                output::escape(msg.trim())
             );
         }
         _ => {}
@@ -537,11 +544,12 @@ fn uninstall(a: &InstallArgs) -> output::Result<()> {
     }
     let mut out = String::from("freespace uninstalled\n");
     for r in &removed {
-        out.push_str(&format!("  removed  {r}\n"));
+        out.push_str(&format!("  removed  {}\n", output::escape(r)));
     }
     for k in &kept {
         out.push_str(&format!(
-            "  kept     {k} (not empty: holds files freespace did not write)\n"
+            "  kept     {} (not empty: holds files freespace did not write)\n",
+            output::escape(k)
         ));
     }
     out.push_str(&format!(

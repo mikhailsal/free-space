@@ -54,6 +54,20 @@ fn write_json<W: Write, T: serde::Serialize>(out: &mut W, v: &T) -> Result<()> {
     Ok(())
 }
 
+/// Escape terminal control characters in dynamic display data only. Keep Unicode
+/// names readable, and leave machine responses and intentional layout untouched.
+pub fn escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if c.is_control() {
+            out.extend(c.escape_default());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 pub fn stderr_is_tty() -> bool {
     std::io::stderr().is_terminal()
 }
@@ -69,9 +83,9 @@ pub fn stdout_is_tty() -> bool {
 pub fn fail(error: &CommandError, json: bool) -> ExitCode {
     match error {
         CommandError::Core(e) => {
-            eprintln!("freespace: {}", e.message);
+            eprintln!("freespace: {}", escape(&e.message));
             if let Some(fix) = &e.fix {
-                eprintln!("fix: {fix}");
+                eprintln!("fix: {}", escape(fix));
             }
             if json && let Err(error) = print_error_body(e) {
                 return fail(&error, false);
@@ -84,7 +98,7 @@ pub fn fail(error: &CommandError, json: bool) -> ExitCode {
 }
 
 fn output_failure(error: &dyn std::fmt::Display) -> ExitCode {
-    eprintln!("freespace: write stdout: {error}");
+    eprintln!("freespace: write stdout: {}", escape(&error.to_string()));
     ExitCode::from(1)
 }
 
@@ -99,7 +113,7 @@ fn print_error_body(e: &Error) -> Result<()> {
 
 /// clap parse errors are USAGE (exit 2) and follow the same `--json` rule;
 /// `--help` and `--version` print and exit 0 unless stdout delivery fails.
-pub fn clap_error(e: clap::Error) -> ExitCode {
+pub fn clap_error(mut e: clap::Error) -> ExitCode {
     if !e.use_stderr() {
         let result = e.print().and_then(|()| std::io::stdout().lock().flush());
         return match ignore_broken_pipe(result) {
@@ -107,15 +121,49 @@ pub fn clap_error(e: clap::Error) -> ExitCode {
             Err(error) => output_failure(&error),
         };
     }
+    let message = first_line(&e);
+    escape_clap_values(&mut e);
     let _ = e.print();
     if std::env::args_os().any(|a| a == "--json")
-        && let Err(error) = print_error_body(
-            &Error::new(ErrorCode::Usage, first_line(&e)).with_fix("freespace --help"),
-        )
+        && let Err(error) =
+            print_error_body(&Error::new(ErrorCode::Usage, message).with_fix("freespace --help"))
     {
         return fail(&error, false);
     }
     ExitCode::from(ErrorCode::Usage.exit() as u8)
+}
+
+// Clap owns the diagnostic layout and styling; its string contexts hold the
+// argument data. Preserve the original message for the machine error body.
+fn escape_clap_values(e: &mut clap::Error) {
+    use clap::error::{ContextKind, ContextValue};
+    let unsafe_value = e.context().any(|(_, value)| match value {
+        ContextValue::String(s) => s.chars().any(char::is_control),
+        ContextValue::Strings(ss) => ss.iter().any(|s| s.chars().any(char::is_control)),
+        _ => false,
+    });
+    // Rich suggestions embed the rejected value in an opaque styled string.
+    // Clap exposes no span-level editing API. Omit those optional tips for
+    // control-bearing input, keeping the escaped main diagnostic and usage.
+    if unsafe_value {
+        e.remove(ContextKind::Suggested);
+    }
+    let values: Vec<_> = e
+        .context()
+        .filter_map(|(kind, value)| {
+            let value = match value {
+                ContextValue::String(s) => ContextValue::String(escape(s)),
+                ContextValue::Strings(ss) => {
+                    ContextValue::Strings(ss.iter().map(|s| escape(s)).collect())
+                }
+                _ => return None,
+            };
+            Some((kind, value))
+        })
+        .collect();
+    for (kind, value) in values {
+        e.insert(kind, value);
+    }
 }
 
 fn first_line(e: &clap::Error) -> String {
@@ -137,7 +185,7 @@ pub fn warn_incomplete(h: &Header) {
         .unknown_subtrees
         .iter()
         .take(5)
-        .cloned()
+        .map(|path| escape(path))
         .collect::<Vec<_>>()
         .join(", ");
     let more = if n > 5 {
@@ -170,7 +218,8 @@ impl Table {
     }
 
     pub fn row(&mut self, cells: Vec<String>) {
-        self.rows.push(cells);
+        self.rows
+            .push(cells.iter().map(|cell| escape(cell)).collect());
     }
 
     pub fn render(&self) -> String {
@@ -237,6 +286,20 @@ fn write_bytes(out: &mut impl Write, bytes: &[u8]) -> std::io::Result<()> {
 mod tests {
     use super::*;
     use std::io::{self, ErrorKind};
+
+    #[test]
+    fn escapes_all_terminal_controls_but_preserves_readable_unicode() {
+        let readable = "имя 😀 café /back\\slash";
+        assert_eq!(escape(readable), readable);
+        // Display escapes are terminal-safe, not a reversible filename encoding.
+        assert_eq!(escape("\n"), r"\n");
+        assert_eq!(escape(r"\n"), r"\n");
+        for value in (0..=0x1f).chain(0x7f..=0x9f) {
+            let escaped = escape(&char::from_u32(value).unwrap().to_string());
+            assert!(escaped.starts_with('\\'));
+            assert!(!escaped.chars().any(char::is_control));
+        }
+    }
 
     struct FaultWriter {
         remaining: Option<usize>,

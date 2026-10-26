@@ -87,7 +87,10 @@ pub fn run(a: SkillArgs) -> output::Result<()> {
         SkillCmd::Install { dir } => {
             let (dir, owner) = target(dir)?;
             install(&dir, owner.as_ref())?;
-            eprintln!("freespace skill {VERSION} installed in {}", dir.display());
+            eprintln!(
+                "freespace skill {VERSION} installed in {}",
+                output::escape(&dir.display().to_string())
+            );
             Ok(())
         }
         SkillCmd::Uninstall { dir } => {
@@ -99,7 +102,10 @@ pub fn run(a: SkillArgs) -> output::Result<()> {
                 }
             }
             let _ = fs::remove_dir(&dir);
-            eprintln!("freespace skill: removed {n} files from {}", dir.display());
+            eprintln!(
+                "freespace skill: removed {n} files from {}",
+                output::escape(&dir.display().to_string())
+            );
             Ok(())
         }
     }

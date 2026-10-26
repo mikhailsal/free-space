@@ -162,7 +162,7 @@ pub fn ls(a: &LsArgs) -> output::Result<()> {
     let e = &r.entry;
     let mut out = format!(
         "{}  {} · {} items · snapshot {} old\n",
-        e.path,
+        output::escape(&e.path),
         format::size(e.allocated),
         count(e.items),
         format::age(r.header.age_seconds)
@@ -231,7 +231,7 @@ pub fn top(a: &TopArgs) -> output::Result<()> {
     let mut out = format!(
         "{} {noun}{filters} under {} · {} · snapshot {} old\n",
         count(r.total.count),
-        r.path,
+        output::escape(&r.path),
         format::size(r.total.allocated),
         format::age(r.header.age_seconds)
     );
@@ -311,12 +311,12 @@ pub fn find(a: &FindArgs) -> output::Result<()> {
     let mut out = format!(
         "{} matches under {} · {}{nested_note} · snapshot {} old\n",
         count(r.total.count),
-        r.path,
+        output::escape(&r.path),
         format::size(r.total.allocated),
         format::age(r.header.age_seconds)
     );
     if r.entries.is_empty() {
-        out.push_str(&format!("No matches within {}.\n", r.path));
+        out.push_str(&format!("No matches within {}.\n", output::escape(&r.path)));
         output::print(&out)?;
         return Ok(());
     }
@@ -370,14 +370,18 @@ pub fn diff(a: &DiffArgs) -> output::Result<()> {
     };
     let mut out = format!(
         "{}  {} since {} (generation {}) · depth {} · {what}\n",
-        r.path,
+        output::escape(&r.path),
         format::delta(r.delta),
         stamp(r.prev_scanned_at),
         r.header.prev_generation.unwrap_or_default(),
         r.depth
     );
     if r.partial {
-        let list: Vec<String> = r.refreshed.iter().map(|x| x.path.clone()).collect();
+        let list: Vec<String> = r
+            .refreshed
+            .iter()
+            .map(|x| output::escape(&x.path))
+            .collect();
         out.push_str(&format!(
             "partial: {} rescanned after the previous scan, deltas there mix two baselines\n",
             list.join(", ")
@@ -409,7 +413,7 @@ pub fn diff(a: &DiffArgs) -> output::Result<()> {
                 format::size(e.allocated),
                 items_delta(e),
                 status_badge(e),
-                e.path.clone(),
+                diff_path_cell(e),
             ]);
         }
         out.push_str(&t.render());
@@ -421,6 +425,14 @@ pub fn diff(a: &DiffArgs) -> output::Result<()> {
     }
     output::print(&out)?;
     Ok(())
+}
+
+fn diff_path_cell(e: &DiffEntry) -> String {
+    let mut path = e.path.clone();
+    if e.path_raw.is_some() {
+        path.push_str("  [name is not UTF-8, see --json path_raw]");
+    }
+    path
 }
 
 fn stamp(ts: i64) -> String {
@@ -497,9 +509,16 @@ fn empty_note(e: &EntryOut) -> String {
     if e.denied {
         "Contents unavailable: this folder could not be read as root.\n".into()
     } else if let Some(m) = &e.mount {
-        format!("Not scanned here: separate filesystem ({}).\n", m.fs_type)
+        format!(
+            "Not scanned here: separate filesystem ({}).\n",
+            output::escape(&m.fs_type)
+        )
     } else if e.kind != Kind::Dir {
-        format!("{} is a {}, not a folder.\n", e.path, kind_word(e.kind))
+        format!(
+            "{} is a {}, not a folder.\n",
+            output::escape(&e.path),
+            kind_word(e.kind)
+        )
     } else {
         "Nothing here in this snapshot.\n".into()
     }

@@ -29,6 +29,7 @@ impl Env {
     pub fn cmd(&self, args: &[&str]) -> Command {
         let mut c = Command::new(env!("CARGO_BIN_EXE_freespace"));
         c.args(args)
+            .env("XDG_STATE_HOME", self.tmp.path().join("state"))
             .env("FREESPACE_CONFIG", self.config())
             .env("FREESPACE_SNAPSHOT_DIR", self.snap())
             .env_remove("FREESPACE_FAULT")
