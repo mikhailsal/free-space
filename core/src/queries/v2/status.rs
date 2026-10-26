@@ -13,7 +13,10 @@ pub fn status(reader: &Reader, dir: &SnapshotDir) -> Result<StatusResponse> {
 /// The web first-run response can be built before a generation exists.
 pub fn status_page(reader: Option<&Reader>, dir: &SnapshotDir) -> Result<StatusResponse> {
     let scanning = lock::probe(dir);
-    let progress = scanning.as_ref().and_then(|_| progress::read(dir));
+    let progress = scanning
+        .as_ref()
+        .filter(|operation| operation.op != "maintain")
+        .and_then(|_| progress::read(dir));
     let (state, state_error) = match state::read(dir) {
         Ok(state) => (state, None),
         Err(error) => (None, Some(error)),
