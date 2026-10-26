@@ -11,7 +11,7 @@ on:
         type: string
       candidate_ref:
         description: Candidate revision
-        default: perf/v2-storage-balance
+        default: master
         type: string
       steps:
         description: Pilot 100000; confirmation 100000,1000000
@@ -58,7 +58,7 @@ jobs:
           path: candidate
           persist-credentials: false
       # A single installed toolchain compiles both checkouts sequentially.
-      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: dtolnay/rust-toolchain@1.99.1
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
@@ -97,7 +97,7 @@ jobs:
         with:
           ref: ${{ inputs.candidate_ref || github.sha }}
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt, clippy
       - uses: oven-sh/setup-bun@v2

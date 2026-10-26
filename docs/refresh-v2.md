@@ -4,10 +4,12 @@ The v2 backend stores stable entry identities and versioned generations in
 SQLite. A local refresh replaces the selected subtree and updates its ancestors
 and affected hardlink groups. It does not load or rewrite unrelated entries.
 Full scans support `--low-memory`, using disk staging and a depth stack.
-V2 trades slower full scans and larger retained storage for local updates; see
-the [measured CLI comparison](benchmarks.md#complete-cli-refresh-with-v2-2026-10-26).
-Enable disk staging on machines with limited RAM and budget for database/WAL
-space as well as the temporary staging file.
+Earlier revision-4 runs traded slower full scans and larger retained storage
+for local updates; see the [historical CLI comparison](benchmarks.md#complete-cli-refresh-with-v2-2026-10-26).
+The current revision-5 layout normalizes immutable paths and uses compact keys;
+its storage and performance results are pending container verification. Enable
+disk staging on machines with limited RAM and budget for database/WAL space as
+well as the temporary staging file.
 
 V1 remains the default. Select v2 explicitly and create a new full scan; v1
 snapshots are not converted. V2 uses `<snapshot_dir>/v2/generations.db` with its
@@ -45,6 +47,54 @@ backend does not import or refresh the other backend's data.
 An unreadable directory is recorded as incomplete. Scan and refresh JSON retain
 the complete denied-path list; ordinary query/status headers show at most 100.
 Disk-backed scans spool the complete report instead of retaining it in RAM.
+
+## Upgrade an earlier experimental store
+
+The current v2 format is experimental SQLite revision 5. It rejects revision 4
+and earlier stores; running `scan` against the old file does not migrate it.
+Use a new state directory so the previous database, WAL, generation state and
+locks remain together for rollback.
+
+Before installing the new binary, retain the old binary and a copy of your
+existing configuration. Stop scheduled scans and servers, and let an active
+scan finish before replacing the binary. Then select a new absolute `snapshot_dir` while keeping
+your roots and schedule settings. For a standard system installation:
+
+```sh
+sudo freespace --backend v2 install-timer \
+  --snapshot-dir /var/lib/freespace-v2-r5 --no-start
+sudo freespace scan --low-memory
+freespace status
+```
+
+This writes the new store at
+`/var/lib/freespace-v2-r5/v2/generations.db`; the old state directory is retained.
+The installer updates the configured location and service units together.
+`--no-start` suppresses its immediate scan, so run the explicit full scan before
+using the new store. The first scan has no previous generation for `diff`; a
+second full scan establishes one. Do not copy the earlier database into the new
+directory or edit its revision number.
+
+For rollback, restore the retained binary and prior configuration, then run
+that binary's `install-timer --no-start` to regenerate units for the old state
+directory. Its queries can use the retained old store. Keep both directories
+until you have chosen which installation to retain. `--backend v1` selects v1
+snapshots in the configured directory; it does not select an earlier v2 format.
+
+## Revision-5 storage tradeoffs
+
+The store keeps immutable paths and compact traversal keys once per stable
+identity. Historical child indexes retain short names instead of full absolute
+keys. Local refresh traverses only current descendants, so retained deleted
+paths do not expand that traversal. Disk staging avoids empty child queries for
+files and other leaves.
+
+Historical metadata and child names still consume space. Queries join identity
+data to metadata; current refresh sorts its selected subtree, and historical
+queries can inspect obsolete retained records. Maintenance remains explicit.
+See the [storage design](designs/refresh-v2-migration.md#storage-and-api-contract)
+for access paths and remaining costs. Revision-5 measurements are pending;
+no size, speed or peak-memory improvement is claimed yet.
 
 ## Generations and refresh
 

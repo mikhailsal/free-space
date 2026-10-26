@@ -42,9 +42,13 @@ snapshot files. Final publication checks are pending. See
    policy recovery, complete write reports, process-kill, syscall-boundary and
    actual private-volume ENOSPC tests. Interrupted stages are recovered under
    lifetime locks.
-9. **Measured:** complete CLI refresh scaling and constrained-memory full scans
+9. **Measured earlier layout:** complete CLI refresh scaling and constrained-memory full scans
    from source `575044b6`; raw manifests/reports and tradeoffs are archived in
-   `docs/benchmarks.md`. Final CI and publication checks remain.
+   `docs/benchmarks.md`. These results do not measure the revision-5 layout.
+10. **Implemented candidate, measurements pending:** normalize immutable entry
+    data, compact component keys, retain indexed child ordering through raw
+    basenames, traverse only current parent links during refresh, and skip staged
+    child probes for non-directory rows. Final CI and publication checks remain.
 
 Validation commands:
 
@@ -63,13 +67,40 @@ filesystem-to-store path. `Reader::open(dedicated_path)` pins a read transaction
 and current/prev pair. `--backend v2` or config `backend = "v2"` selects the
 separate store; the operator guide covers seeding and ongoing maintenance.
 
-The `identities` table allocates a permanent integer key by collision-free raw
-root/path equality. `live` contains one current row per scoped path; `versions`
-records `[born, dead)` visibility with a partial index for each open version.
-The subtree key encodes each byte as big-endian `byte + 1`, then terminates each
-component with `0,0`. Thus `a`, `a/z`, `a-` retain component-wise DFS order. Scope
-and key form an index: local replacement neither renumbers nor enumerates
-unrelated entries. Root and mount rows use the same generation intervals.
+The `identities` table allocates stable integer IDs by collision-free raw
+root/path equality. It holds immutable scope, absolute raw path and traversal
+key once per identity. `live_rows` contains current numeric entry metadata;
+`version_rows` stores historical numeric metadata and `[born, dead)` visibility,
+plus a raw basename for ordered child access. History uses `WITHOUT ROWID` with
+primary key `(id, born)` and a partial unique index for each open version. The
+`live` and `versions` read views join identities to physical metadata and expose
+the existing 21 entry columns; runtime writes and retained-record accounting
+operate on physical tables. Root and mount rows retain generation intervals.
+
+The filesystem root `/` has an empty traversal key. Every other key starts with
+one zero tag, followed by raw non-NUL component bytes and a NUL terminator after
+each component. Paths reject NUL. This preserves raw component order and exact
+ancestor prefixes, including names containing raw `0xff`; the leading tag keeps
+all non-root keys below the root upper bound `[255]`. A non-root subtree upper
+bound changes its final terminator from zero to one. Thus `a`, `a/z`, `a-` retain
+component-wise DFS order. Identity indexes cover `(scope, path)` and
+`(scope, sort_key)` for exact-path and historical subtree queries.
+
+Local replacement follows current `live_rows(parent, ...)` indexes recursively
+from the target ID, then sorts only the current result into component preorder.
+It does not range over retained identities for deleted paths. Reader children
+and depth-one public diff streams use `child_versions`, a read view that starts
+with `(parent, basename, born)` history access before joining identities. Raw
+basename BLOB order equals full traversal-key order among siblings, avoiding a
+sort of those streams without repeating absolute keys in history indexes.
+
+Normalization trades repeated absolute blobs for joins. Basenames still repeat
+in each retained version and its child index. Current subtree traversal has a
+recursive queue and a sort proportional to the current subtree. Historical
+subtree ranges can visit retained deleted identities before visibility filtering;
+child indexes can visit obsolete versions belonging to that parent. These costs
+need container measurements; the layout alone establishes no storage-size,
+latency or memory improvement.
 
 Raw own file sizes remain available even when an alias is charged zero bytes.
 An indexed `(dev, ino)` lookup obtains old membership and ownership only for
@@ -106,6 +137,10 @@ add, update or retire mount records. Safe `statvfs` numbers on the enclosing roo
 are refreshed. Denied flags and exact own errors remain versioned with entries;
 reader-level global incompleteness and capped non-nested denied paths use the
 same pin. The opt-in public adapter consumes these headers and filters.
+Denied reporting explicitly starts with the sparse partial denied-history index
+before identity/root joins, then filters scopes and orders the denied results.
+It avoids starting with all entries, but retained denied history, result sorting
+and repeated sparse scans across configured roots remain measurement tradeoffs.
 
 Root/mount identities and generation retention are tested with synthetic
 cross-device/nested-root fixtures, and local mount replacement uses walker mount
@@ -137,7 +172,7 @@ passwordless sudo and private mount
 namespaces; it explicitly skips when namespace privileges are unavailable.
 This verifies the bounded tmpfs fixture, not every filesystem's failure modes.
 
-The lifecycle suite repeats 160 refreshes and 16 full-scan rotations with pinned
+Historical revision-4 lifecycle evidence repeats 160 refreshes and 16 full-scan rotations with pinned
 readers, accounting checks and bounded GC. After reclamation the retained-record
 count returns to 211 in each sampled cycle. A separate 8-versus-1,024 unrelated
 entry fixture keeps 25 logical SQL changes and 1,732 VM instructions across each
@@ -219,10 +254,19 @@ allow history reclamation and resumed refresh under the lower budget.
 
 ## Experimental format and measurements
 
-The engine is v2, with experimental SQLite `user_version = 4` for the
-root-scoped/inode, header and retention layout. Prior experimental stores must be
-reseeded into a new file. No v1 file or earlier published inode is mutated or
-silently migrated, and no whole-snapshot rewrite fallback is introduced.
+The engine is v2, with experimental SQLite `user_version = 5` for normalized
+identity/metadata storage and compact keys. Revision 4 and earlier stores are
+rejected, never migrated in place. Seed revision 5 in a new `snapshot_dir`, which
+creates a separate `v2/generations.db` and state/lock files. Keep the earlier
+state directory, configuration and matching old binary for rollback; changing
+only the backend flag cannot make a revision-5 binary read revision 4. The
+[operator guide](../refresh-v2.md#upgrade-an-earlier-experimental-store) gives the
+sequence. No v1 file or earlier published inode is mutated or silently migrated,
+and no whole-snapshot rewrite fallback is introduced.
+
+Revision-5 performance and storage results are pending container verification.
+The revision-4 evidence below and earlier integrated CLI comparisons describe
+their recorded sources, not this candidate.
 
 `walk` includes filesystem preparation and raw in-memory staging; full scans
 also fold and attribute their seed there. Refresh attribution/folding and
@@ -254,8 +298,14 @@ and lifetimes are:
 | Raw row/name and link/mount metadata | One row at a time; owner lookup uses `(dev,ino,path,root,id)` index |
 | Visitor stack | One cursor/name and Entry per active depth; each Entry holds ancestor path, scope and encoded key until its children finish |
 | Stable identity | Indexed lookup/insert per row; parent ID lives in the depth stack, with no full raw-to-stable map |
-| Entry SQL | Cached fixed-size statements; bound path/key blobs live for one call; live/version rows are inserted once on subtree exit |
+| Entry SQL | Cached fixed-size statements; identity writes bind scope/path/key; physical live/history writes bind numeric metadata and history basename, once on subtree exit |
 | Denied report | One raw path/string at a time plus five warning examples; complete records go to an unlinked disk spool |
+
+The staged visitor queries children only for directory rows. Files, symlinks,
+mount placeholders and other non-directory leaves still receive enter/leave
+callbacks and contribute to their parent, but do not issue empty child probes.
+This removes SQL work structurally; its effect on full-scan throughput has not
+yet been measured for revision 5.
 
 SQLite cache values are targets, not process RSS caps. Ancestor path/key storage
 can grow quadratically with extreme depth, but not with unrelated entry count.
@@ -306,7 +356,7 @@ CLI/HTTP routing, maintenance/policy recovery and timer lifecycle have integrate
 tests, including malformed/empty stores, complete denied reports, report timing
 groups, read-only access and isolated root install/uninstall. V1 remains default.
 
-Acceptance measurements use the exact integrated CLI binary: three warm
+Historical acceptance measurements used the exact integrated revision-4 CLI binary: three warm
 refresh/scan repetitions at each unrelated-tree size, plus four no-swap 128 MiB
 full-seed runs up to a million files. Complete command time includes close and
 checkpoint. Reported RSS and kernel process I/O counters complement the logical
