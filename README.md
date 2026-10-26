@@ -4,6 +4,10 @@ Where did my disk go? `freespace` keeps a snapshot of the whole filesystem tree,
 
 Linux with systemd, x86_64 and aarch64. One static binary, MIT licensed.
 
+For local refresh without rebuilding the whole snapshot, the opt-in
+[v2 generation store](docs/refresh-v2.md) supports CLI/HTTP queries, disk-backed
+full scans, and explicit maintenance of older versions.
+
 ![freespace gui: a 169 G home folder, its fifteen folders by size, .cache (46 G) selected with what is biggest inside it](docs/img/gui.png)
 
 ## How it compares
