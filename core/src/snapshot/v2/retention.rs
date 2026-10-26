@@ -209,7 +209,7 @@ impl Pins {
     }
 }
 const TABLES: [(&str, &str); 6] = [
-    ("versions", "id"),
+    ("version_rows", "id"),
     ("root_versions", "entry_id"),
     ("mount_versions", "entry_id"),
     ("generation_meta", "generation"),
@@ -292,7 +292,7 @@ fn collect_table(
                 .iter()
                 .any(|(start, end)| a > *start && a <= *end),
             _ => c.query_row(
-                "SELECT EXISTS(SELECT 1 FROM versions WHERE id=?1)",
+                "SELECT EXISTS(SELECT 1 FROM version_rows WHERE id=?1)",
                 [a],
                 |r| r.get(0),
             )?,

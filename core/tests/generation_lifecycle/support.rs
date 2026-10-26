@@ -90,7 +90,7 @@ impl Fixture {
         let mut actual = 0;
         for table in [
             "identities",
-            "versions",
+            "version_rows",
             "root_versions",
             "mount_versions",
             "generation_meta",

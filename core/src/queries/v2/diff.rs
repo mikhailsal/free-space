@@ -201,7 +201,7 @@ fn merge_levels(
 fn level_sql(depth: u32) -> String {
     if depth == 1 {
         format!(
-            "SELECT {ENTRY_COLUMNS} FROM versions WHERE parent=?5 AND born<=?4 AND (dead IS NULL OR dead>?4) AND scope=?1 AND sort_key>?2 AND sort_key<?3 ORDER BY sort_key"
+            "SELECT {ENTRY_COLUMNS} FROM child_versions WHERE parent=?5 AND born<=?4 AND (dead IS NULL OR dead>?4) AND scope=?1 AND sort_key>?2 AND sort_key<?3 ORDER BY basename"
         )
     } else {
         // Index-ordered streaming avoids a recursive CTE's potentially unbounded
@@ -300,3 +300,6 @@ fn ranked(current: Option<&Entry>, previous: Option<&Entry>) -> Ranked {
         },
     }
 }
+
+#[cfg(test)]
+mod tests;

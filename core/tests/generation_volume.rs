@@ -115,7 +115,7 @@ fn accounting(db: &Path) {
     let mut count = 0i64;
     for t in [
         "identities",
-        "versions",
+        "version_rows",
         "root_versions",
         "mount_versions",
         "generation_meta",

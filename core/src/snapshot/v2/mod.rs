@@ -254,21 +254,24 @@ fn validate_path(path: &[u8]) -> Result<()> {
     }
     Ok(())
 }
-// Each component byte is encoded as big-endian (byte + 1), followed by 0,0.
-// This preserves raw component order, with a terminator below every byte.
+// NUL is prohibited in path components. A leading zero places every non-root
+// key below the root upper bound [255], including names containing raw 255.
+// Component terminators sort below any name byte and make subtree prefixes exact.
 fn key(path: &[u8]) -> Vec<u8> {
-    let mut key = Vec::with_capacity(path.len() * 2 + 2);
+    if path == b"/" {
+        return Vec::new();
+    }
+    let mut key = Vec::with_capacity(path.len() + 1);
+    key.push(0);
     for component in path.split(|b| *b == b'/').filter(|c| !c.is_empty()) {
-        for b in component {
-            key.extend_from_slice(&(*b as u16 + 1).to_be_bytes());
-        }
-        key.extend_from_slice(&[0, 0]);
+        key.extend_from_slice(component);
+        key.push(0);
     }
     key
 }
 fn prefix_end(prefix: &[u8]) -> Vec<u8> {
     let mut end = prefix.to_vec();
-    // Every non-root key ends in 0,0; no overflow or ambiguous '/' boundary.
+    // Every non-root key ends in 0; no overflow or ambiguous '/' boundary.
     *end.last_mut().expect("non-root subtree key") += 1;
     end
 }
@@ -288,9 +291,9 @@ fn assign_ids(
 }
 fn identity(conn: &Connection, scope: &[u8], path: &[u8]) -> Result<i64> {
     conn.prepare_cached(
-        "INSERT INTO identities(scope,path) VALUES(?1,?2) ON CONFLICT(scope,path) DO NOTHING",
+        "INSERT INTO identities(scope,path,sort_key) VALUES(?1,?2,?3) ON CONFLICT(scope,path) DO NOTHING",
     )?
-    .execute(params![scope, path])?;
+    .execute(params![scope, path, key(path)])?;
     Ok(conn
         .prepare_cached("SELECT id FROM identities WHERE scope=?1 AND path=?2")?
         .query_row(params![scope, path], |r| r.get(0))?)
@@ -316,19 +319,20 @@ fn live_id(conn: &Connection, id: i64) -> Result<Entry> {
 }
 fn retire(conn: &Connection, id: i64, generation: i64) -> Result<()> {
     conn.execute(
-        "UPDATE versions SET dead=?1 WHERE id=?2 AND dead IS NULL",
+        "UPDATE version_rows SET dead=?1 WHERE id=?2 AND dead IS NULL",
         params![generation, id],
     )?;
-    conn.execute("DELETE FROM live WHERE id=?1", [id])?;
+    conn.execute("DELETE FROM live_rows WHERE id=?1", [id])?;
     Ok(())
 }
 fn insert(conn: &Connection, e: &Entry, generation: i64) -> Result<()> {
-    conn.prepare_cached(&format!("INSERT INTO live({COLUMNS}) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"))?.execute(
-        params![e.id,e.parent,e.path,e.sort_key,e.kind.code(),e.flags,e.own_allocated,e.own_apparent,e.own_errors,e.mtime,e.scanned_at,e.allocated,e.apparent,e.items,e.errors,e.min_scanned_at,e.newest_mtime,e.scope,e.nlink,e.dev,e.ino])?;
+    let columns = schema::ROW_COLUMNS;
+    conn.prepare_cached(&format!("INSERT INTO live_rows({columns}) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)"))?.execute(
+        params![e.id,e.parent,e.kind.code(),e.flags,e.own_allocated,e.own_apparent,e.own_errors,e.mtime,e.scanned_at,e.allocated,e.apparent,e.items,e.errors,e.min_scanned_at,e.newest_mtime,e.nlink,e.dev,e.ino])?;
     conn.prepare_cached(&format!(
-        "INSERT INTO versions({COLUMNS},born,dead) SELECT {COLUMNS},?1,NULL FROM live WHERE id=?2"
+        "INSERT INTO version_rows({columns},born,dead,basename) SELECT {columns},?1,NULL,?3 FROM live_rows WHERE id=?2"
     ))?
-    .execute(params![generation, e.id])?;
+    .execute(params![generation, e.id, e.path.rsplit(|b| *b == b'/').next().unwrap_or(&e.path)])?;
     Ok(())
 }
 fn pair(conn: &Connection) -> Result<Option<GenerationPair>> {
@@ -346,5 +350,7 @@ fn pair(conn: &Connection) -> Result<Option<GenerationPair>> {
         .optional()?)
 }
 
+#[cfg(test)]
+mod storage_tests;
 #[cfg(test)]
 mod tests;

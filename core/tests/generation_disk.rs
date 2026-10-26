@@ -215,7 +215,7 @@ fn denied_report_streams_every_nested_path_from_its_pin() {
         .unwrap();
     // Inject unreadable directory metadata without depending on process UID.
     let conn = rusqlite::Connection::open(&db).unwrap();
-    for table in ["live", "versions"] {
+    for table in ["live_rows", "version_rows"] {
         conn.execute(
             &format!("UPDATE {table} SET flags=flags|1 WHERE parent IS NOT NULL"),
             [],

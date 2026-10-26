@@ -170,17 +170,16 @@ impl Store {
     }
 }
 
-fn old_subtree(conn: &Connection, target: &Entry) -> Result<Vec<Entry>> {
-    let upper = if target.sort_key.is_empty() {
-        vec![255]
-    } else {
-        prefix_end(&target.sort_key)
-    };
-    let mut q = conn.prepare(&format!(
-        "SELECT {COLUMNS} FROM live WHERE scope=?1 AND sort_key>=?2 AND sort_key<?3"
-    ))?;
-    Ok(
-        q.query_map(params![target.scope, target.sort_key, upper], Entry::row)?
-            .collect::<rusqlite::Result<Vec<_>>>()?,
+// Traverse only current parent links: identity ranges include retained deleted paths.
+// Sorting the collected current rows preserves component preorder for link handling.
+pub(super) fn old_subtree_sql() -> String {
+    format!(
+        "WITH RECURSIVE current_ids(id) AS (VALUES(?1) UNION ALL SELECT l.id FROM current_ids p JOIN live_rows l ON l.parent=p.id) SELECT {COLUMNS} FROM current_ids CROSS JOIN live USING(id) ORDER BY sort_key"
     )
+}
+
+pub(super) fn old_subtree(conn: &Connection, target: &Entry) -> Result<Vec<Entry>> {
+    let mut q = conn.prepare(&old_subtree_sql())?;
+    Ok(q.query_map([target.id], Entry::row)?
+        .collect::<rusqlite::Result<Vec<_>>>()?)
 }

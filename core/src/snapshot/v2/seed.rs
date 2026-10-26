@@ -127,14 +127,16 @@ impl Store {
         retention::admit_wal(&tx, &self.path)?;
         let current = pair(&tx)?.map(|p| p.current);
         let generation = next_generation(current)?;
-        let old_count: i64 = tx.query_row("SELECT count(*) FROM live", [], |r| r.get(0))?;
-        for table in ["versions", "root_versions", "mount_versions"] {
+        let old_count: i64 = tx.query_row("SELECT count(*) FROM live_rows", [], |r| r.get(0))?;
+        for table in ["version_rows", "root_versions", "mount_versions"] {
             tx.execute(
                 &format!("UPDATE {table} SET dead=?1 WHERE dead IS NULL"),
                 [generation],
             )?;
         }
-        tx.execute_batch("DELETE FROM live; DELETE FROM live_roots; DELETE FROM live_mounts;")?;
+        tx.execute_batch(
+            "DELETE FROM live_rows; DELETE FROM live_roots; DELETE FROM live_mounts;",
+        )?;
         write(&tx, generation)?;
         let previous = current.filter(|_| seed.keep_previous);
         publish(&tx, &seed, generation, previous)?;

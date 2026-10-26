@@ -101,8 +101,8 @@ impl Fixture {
         [
             "control",
             "identities",
-            "live",
-            "versions",
+            "live_rows",
+            "version_rows",
             "live_roots",
             "root_versions",
             "live_mounts",
@@ -143,7 +143,7 @@ impl Fixture {
         let mut actual = 0i64;
         for table in [
             "identities",
-            "versions",
+            "version_rows",
             "root_versions",
             "mount_versions",
             "generation_meta",
