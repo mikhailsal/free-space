@@ -277,19 +277,7 @@ fn finish_mounts(tree: &mut Tree, mounts: &[MountInfo]) {
 
 fn worker(ctx: &Ctx, tx: mpsc::Sender<DirResult>) {
     loop {
-        let job = {
-            let mut q = ctx.queue.lock().unwrap();
-            loop {
-                if let Some(j) = q.jobs.pop() {
-                    break Some(j);
-                }
-                if q.pending == 0 {
-                    break None;
-                }
-                q = ctx.cv.wait(q).unwrap();
-            }
-        };
-        let Some(job) = job else {
+        let Some(job) = next_job(ctx) else {
             ctx.cv.notify_all();
             return;
         };
@@ -310,6 +298,19 @@ fn worker(ctx: &Ctx, tx: mpsc::Sender<DirResult>) {
                 ctx.cv.notify_all();
             }
         }
+    }
+}
+
+fn next_job(ctx: &Ctx) -> Option<Job> {
+    let mut q = ctx.queue.lock().unwrap();
+    loop {
+        if let Some(job) = q.jobs.pop() {
+            return Some(job);
+        }
+        if q.pending == 0 {
+            return None;
+        }
+        q = ctx.cv.wait(q).unwrap();
     }
 }
 
