@@ -10,6 +10,9 @@ homepage.workspace = true
 authors.workspace = true
 readme = "../README.md"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "freespace"
 path = "src/main.rs"
