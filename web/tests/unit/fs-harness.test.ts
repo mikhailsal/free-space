@@ -76,7 +76,7 @@ for (const script of scripts) {
   for (const fakeCaller of [false, true]) {
     test(`${script}: direct internal arguments${fakeCaller ? " with fake caller ID" : ""} cannot bypass nested caller isolation`, () => {
       const { dir, bin, scratch, env } = fixture();
-      executable(join(bin, "mount"), 'echo unsafe-mount >&2; exit 99');
+      executable(join(bin, "mount"), "echo unsafe-mount >&2; exit 99");
       try {
         const args = ["sh", join(repo, "scripts", script), "--private-mount-namespace"];
         if (fakeCaller) args.push("fake-id");
@@ -99,7 +99,7 @@ for (const script of scripts) {
     test(`${script}: ${label} refuses to create fixtures`, () => {
       const { dir, bin, scratch, env } = fixture();
       executable(join(bin, "unshare"), launcher);
-      executable(join(bin, "mount"), 'echo unsafe-mount >&2; exit 99');
+      executable(join(bin, "mount"), "echo unsafe-mount >&2; exit 99");
       try {
         const result = Bun.spawnSync(["sh", join(repo, "scripts", script), "/bin/false"], { env });
         expect(result.exitCode).toBe(launcher === "exit 73" ? 73 : 1);
