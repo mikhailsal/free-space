@@ -1,7 +1,13 @@
 //! Physical ENOSPC on bounded, private-namespace tmpfs; no host disk is filled.
-//! Requires Linux, cc, passwordless sudo, and mount namespaces. Missing namespace
+//! Requires dynamic glibc on Linux, cc, passwordless sudo, and mount namespaces.
+//! The barrier uses LD_PRELOAD, which static release test binaries cannot load.
+//! Missing namespace
 //! privilege produces an explicit skip; once available, every assertion is required.
-#![cfg(target_os = "linux")]
+#![cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+    not(target_feature = "crt-static")
+))]
 use freespace_core::snapshot::v2::{Reader, Store};
 use std::{
     fs,

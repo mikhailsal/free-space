@@ -1,7 +1,11 @@
-//! Linux syscall-boundary verification. Requires a C compiler and dynamic libc.
+//! Linux syscall-boundary verification. Requires a C compiler and dynamic glibc.
 //! ENOSPC is injected at pwrite/pwrite64, not simulated with max_page_count and
 //! not physical disk exhaustion. No fault hooks or production changes needed.
-#![cfg(target_os = "linux")]
+#![cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+    not(target_feature = "crt-static")
+))]
 
 use freespace_core::snapshot::v2::{Reader, Store};
 use std::{
