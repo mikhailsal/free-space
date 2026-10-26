@@ -131,7 +131,8 @@ accounting and retries. `generation_volume` separately passed actual ENOSPC for
 staging, final WAL and checkpoint writes on a private 768 MiB tmpfs. Its barrier
 resumes a real write after filling that isolated volume; it never substitutes an
 errno. Published views/accounting survive and retries work after filler removal.
-The test requires Linux, a C compiler, passwordless sudo and private mount
+The preload barrier requires dynamically linked glibc on Linux, a C compiler,
+passwordless sudo and private mount
 namespaces; it explicitly skips when namespace privileges are unavailable.
 This verifies the bounded tmpfs fixture, not every filesystem's failure modes.
 
