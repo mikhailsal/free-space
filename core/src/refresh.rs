@@ -15,7 +15,7 @@ use std::time::Instant;
 use rusqlite::params;
 
 #[path = "refresh_mounts.rs"]
-mod mounts;
+pub(crate) mod mounts;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::job::{denied_paths, denied_warning};

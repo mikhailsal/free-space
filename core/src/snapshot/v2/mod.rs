@@ -4,7 +4,12 @@
 //! Identity means exact raw path; traversal order and generation are independent.
 //! History is retained indefinitely until the separate retention milestone lands.
 
+mod aggregate;
+mod hardlinks;
+mod metadata;
 mod reader;
+mod staging;
+pub use metadata::{Mount, Root};
 mod schema;
 pub use reader::{Change, GenerationPair, Reader};
 
@@ -12,14 +17,20 @@ use crate::scan::{self, Kind, Tree, WalkOptions};
 use crate::{Error, ErrorCode, Result};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use schema::COLUMNS;
+use staging::{fold, stage};
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// Configured root; distinguishes nested-root entries from mount placeholders.
+    pub scope: Vec<u8>,
+    pub nlink: i64,
+    pub dev: Option<i64>,
+    pub ino: Option<i64>,
     pub id: i64,
     pub parent: Option<i64>,
     pub path: Vec<u8>,
@@ -60,6 +71,10 @@ impl Entry {
             errors: r.get(14)?,
             min_scanned_at: r.get(15)?,
             newest_mtime: r.get(16)?,
+            scope: r.get(17)?,
+            nlink: r.get(18)?,
+            dev: r.get(19)?,
+            ino: r.get(20)?,
         })
     }
 }
@@ -71,6 +86,8 @@ pub struct WriteReport {
     pub old_subtree_entries: usize,
     pub new_subtree_entries: usize,
     pub ancestors: usize,
+    pub touched_inode_groups: usize,
+    pub known_inode_members: usize,
     pub sql_changes: u64,
     pub walk: Duration,
     pub transaction: Duration,
@@ -78,6 +95,15 @@ pub struct WriteReport {
 
 pub struct Store {
     conn: Connection,
+}
+
+struct PreparedRefresh {
+    base_generation: i64,
+    target: Entry,
+    root: Root,
+    staged: staging::Staged,
+    started: i64,
+    walk: Duration,
 }
 
 impl Store {
@@ -101,9 +127,9 @@ impl Store {
             }
             conn.execute_batch(schema::CREATE)?;
             conn.pragma_update(None, "application_id", schema::APP_ID)?;
-            conn.pragma_update(None, "user_version", 2)?;
+            conn.pragma_update(None, "user_version", schema::REVISION)?;
             conn.execute_batch("COMMIT")?;
-        } else if app != schema::APP_ID || version != 2 {
+        } else if app != schema::APP_ID || version != schema::REVISION {
             return Err(unsupported("refusing non-v2 database"));
         }
         conn.execute_batch(
@@ -132,13 +158,36 @@ impl Store {
         Ok(())
     }
 
-    /// A full scan seeds/rotates the store. Existing path identities survive.
+    /// A full scan seeds/rotates the store. Existing root/path identities survive.
     pub fn scan(&mut self, root: &Path, workers: usize) -> Result<WriteReport> {
+        self.scan_roots(&[root.to_path_buf()], true, workers)
+    }
+    /// Root normalization and overlap validation are shared with the v1 walker.
+    pub fn scan_roots(
+        &mut self,
+        roots: &[PathBuf],
+        one_file_system: bool,
+        workers: usize,
+    ) -> Result<WriteReport> {
+        if roots.is_empty() {
+            return Err(Error::usage("at least one scan root is required"));
+        }
         let start = Instant::now();
-        let root = std::fs::canonicalize(root).map_err(|e| Error::io("canonicalize root", e))?;
-        let tree = walk(&root, workers)?;
-        let root_dev = tree.roots[0].dev;
-        let mut entries = stage(tree)?;
+        let mut opts = WalkOptions::new(roots.to_vec());
+        opts.workers = workers;
+        opts.one_file_system = one_file_system;
+        let tree = scan::walk(&opts).map_err(|e| Error::io("v2 walk", e))?;
+        self.seed_tree(tree, one_file_system, start)
+    }
+    fn seed_tree(
+        &mut self,
+        tree: Tree,
+        one_file_system: bool,
+        start: Instant,
+    ) -> Result<WriteReport> {
+        let mut staged = stage(tree, None)?;
+        hardlinks::scan(&mut staged.entries);
+        fold(&mut staged.entries)?;
         let walk = start.elapsed();
         let start = Instant::now();
         let before = self.conn.total_changes();
@@ -152,137 +201,197 @@ impl Store {
             "UPDATE versions SET dead=?1 WHERE dead IS NULL",
             [generation],
         )?;
-        tx.execute("DELETE FROM live", [])?;
-        assign_ids(&tx, &mut entries, None)?;
-        for e in &entries {
+        tx.execute(
+            "UPDATE root_versions SET dead=?1 WHERE dead IS NULL",
+            [generation],
+        )?;
+        tx.execute(
+            "UPDATE mount_versions SET dead=?1 WHERE dead IS NULL",
+            [generation],
+        )?;
+        tx.execute_batch("DELETE FROM live; DELETE FROM live_roots; DELETE FROM live_mounts;")?;
+        let ids = assign_ids(&tx, &mut staged.entries, None)?;
+        for e in &staged.entries {
             insert(&tx, e, generation)?;
         }
-        tx.execute("INSERT INTO control VALUES(1,?1,?2,?3,?1,?4) ON CONFLICT(singleton) DO UPDATE SET current=excluded.current,prev=excluded.prev,root=excluded.root,full_scan=excluded.full_scan,root_dev=excluded.root_dev",
-            params![generation,current,root.as_os_str().as_bytes(),root_dev as i64])?;
+        for mut root in staged.roots {
+            root.entry_id = ids[&root.entry_id];
+            metadata::insert_root(&tx, &root, generation)?;
+        }
+        for mut mount in staged.mounts {
+            mount.entry_id = ids[&mount.entry_id];
+            metadata::insert_mount(&tx, &mount, generation)?;
+        }
+        tx.execute("INSERT INTO control VALUES(1,?1,?2,?1,?3) ON CONFLICT(singleton) DO UPDATE SET current=excluded.current,prev=excluded.prev,full_scan=excluded.full_scan,one_file_system=excluded.one_file_system",params![generation,current,one_file_system])?;
         tx.commit()?;
         Ok(WriteReport {
             generation,
             old_subtree_entries: old_count as usize,
-            new_subtree_entries: entries.len(),
+            new_subtree_entries: staged.entries.len(),
             ancestors: 0,
+            touched_inode_groups: 0,
+            known_inode_members: 0,
             sql_changes: self.conn.total_changes() - before,
             walk,
             transaction: start.elapsed(),
         })
     }
 
-    /// Replaces an existing non-root directory, or removes it if absent on disk.
-    /// All database work is confined to old/new subtree rows and ancestor paths.
+    /// Replaces an existing directory, including a configured root. Missing
+    /// non-root directories are removed; root deletion still requires a full scan.
     pub fn refresh(&mut self, path: &Path, workers: usize) -> Result<WriteReport> {
+        let prepared = self.prepare_refresh(path, workers)?;
+        self.publish_refresh(prepared)
+    }
+    fn prepare_refresh(&mut self, path: &Path, workers: usize) -> Result<PreparedRefresh> {
         let bytes = path.as_os_str().as_bytes();
         validate_path(bytes)?;
-        // Lock before walking: competing writers cannot publish against a stale base.
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let pair = pair(&tx)?.ok_or_else(|| unsupported("seed the store first"))?;
+        let target = live_path(&tx, bytes)?
+            .ok_or_else(|| Error::usage("path is absent from current generation"))?;
+        if target.kind != Kind::Dir {
+            return Err(Error::usage(
+                "refresh requires a directory within its root filesystem",
+            ));
+        }
+        let mut root = metadata::live_root(&tx, &target.scope)?;
+        let one_file_system: bool = tx.query_row(
+            "SELECT one_file_system FROM control WHERE singleton=1",
+            [],
+            |r| r.get(0),
+        )?;
+        tx.commit()?;
+        let target_meta = match std::fs::symlink_metadata(path) {
+            Ok(m) if m.is_dir() => Some(m),
+            Ok(_) => {
+                return Err(Error::usage(
+                    "refresh directory replaced by non-directory; refresh its parent",
+                ));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(Error::io("refresh path", e)),
+        };
+        crate::refresh::mounts::check(
+            path,
+            target_meta.as_ref().map(|m| m.dev()),
+            &[root.info()],
+            one_file_system,
+            &String::from_utf8_lossy(bytes),
+        )?;
+        if target_meta.is_none() && target.parent.is_none() {
+            return Err(Error::usage("root is missing; run a full scan"));
+        }
+        let started = crate::platform::now_secs();
+        let start = Instant::now();
+        let staged = if target_meta.is_some() {
+            let mut opts = WalkOptions::new(vec![path.to_path_buf()]);
+            opts.workers = workers;
+            opts.one_file_system = one_file_system;
+            stage(
+                scan::walk(&opts).map_err(|e| Error::io("v2 refresh walk", e))?,
+                Some(&target.scope),
+            )?
+        } else {
+            staging::Staged {
+                entries: Vec::new(),
+                roots: Vec::new(),
+                mounts: Vec::new(),
+            }
+        };
+        if staged.entries.first().is_some_and(|e| e.path != bytes) {
+            return Err(Error::usage("refresh path resolves to another location"));
+        }
+        // Preserve the original root type and refresh its df numbers as v1 does.
+        if scan::walk::statvfs_safe(&root.fs_type)
+            && let Ok(stats) = crate::platform::statvfs(&root.info().path)
+        {
+            root.stats = stats;
+        }
+        if target.parent.is_none()
+            && let Some(m) = target_meta
+        {
+            root.dev = m.dev();
+        }
+        Ok(PreparedRefresh {
+            base_generation: pair.current,
+            target,
+            root,
+            staged,
+            started,
+            walk: start.elapsed(),
+        })
+    }
+    fn publish_refresh(&mut self, prepared: PreparedRefresh) -> Result<WriteReport> {
+        let PreparedRefresh {
+            base_generation,
+            target,
+            root,
+            mut staged,
+            started,
+            walk,
+        } = prepared;
+        let start = Instant::now();
         let before = self.conn.total_changes();
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let pair = pair(&tx)?.ok_or_else(|| unsupported("seed the store first"))?;
-        let generation = next_generation(Some(pair.current))?;
-        let target = live_path(&tx, bytes)?
-            .ok_or_else(|| Error::usage("path is absent from current generation"))?;
-        if target.parent.is_none() || target.kind != Kind::Dir {
-            return Err(unsupported("refresh requires a non-root directory"));
+        if pair(&tx)?.map(|p| p.current) != Some(base_generation) {
+            return Err(Error::new(
+                ErrorCode::Rotated,
+                "v2 generation changed during refresh walk; retry against the new generation",
+            ));
         }
-        let (root, root_dev): (Vec<u8>, i64) = tx.query_row(
-            "SELECT root,root_dev FROM control WHERE singleton=1",
-            [],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )?;
-        let root = Path::new(std::ffi::OsStr::from_bytes(&root));
-        if crate::platform::visible_mountinfo().iter().any(|m| {
-            m.mount_point != root
-                && m.mount_point.starts_with(root)
-                && path.starts_with(&m.mount_point)
-        }) {
-            return Err(unsupported("v2 refresh cannot cross a mount boundary"));
-        }
-        // Reject symlinked ancestors, rather than following a path outside the root.
-        let mut ancestor = target.parent;
-        while let Some(id) = ancestor {
-            let entry = live_id(&tx, id)?;
-            let p = Path::new(std::ffi::OsStr::from_bytes(&entry.path));
-            let meta =
-                std::fs::symlink_metadata(p).map_err(|e| Error::io("refresh ancestor", e))?;
-            if !meta.is_dir() || meta.dev() != root_dev as u64 {
-                return Err(unsupported("refresh ancestor is no longer a directory"));
-            }
-            ancestor = entry.parent;
-        }
-        let start = Instant::now();
-        let mut entries = match std::fs::symlink_metadata(path) {
-            Ok(m) if m.is_dir() && m.dev() == root_dev as u64 => stage(walk(path, workers)?)?,
-            Ok(_) => return Err(unsupported("refresh directory replaced by non-directory")),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-            Err(e) => return Err(Error::io("refresh path", e)),
+        let generation = next_generation(Some(base_generation))?;
+        let bytes = &target.path;
+        let upper = if target.sort_key.is_empty() {
+            vec![255]
+        } else {
+            prefix_end(&target.sort_key)
         };
-        if entries.first().is_some_and(|e| e.path != bytes) {
-            return Err(unsupported("refresh path resolved to another location"));
-        }
-        let walk = start.elapsed();
-        let start = Instant::now();
-        let upper = prefix_end(&target.sort_key);
-        let old_ids = {
-            let mut q = tx.prepare("SELECT id FROM live WHERE sort_key>=?1 AND sort_key<?2")?;
-            q.query_map(params![target.sort_key, upper], |r| r.get::<_, i64>(0))?
+        let old = {
+            let mut q = tx.prepare(&format!(
+                "SELECT {COLUMNS} FROM live WHERE scope=?1 AND sort_key>=?2 AND sort_key<?3"
+            ))?;
+            q.query_map(params![target.scope, target.sort_key, upper], Entry::row)?
                 .collect::<rusqlite::Result<Vec<_>>>()?
         };
-        for id in &old_ids {
-            retire(&tx, *id, generation)?;
+        let links = hardlinks::refresh(&tx, &old, &mut staged.entries)?;
+        fold(&mut staged.entries)?;
+        let mut changes = vec![(
+            target.parent,
+            aggregate::Delta::between(&target, staged.entries.first()),
+        )];
+        for (previous, replacement) in links.entries {
+            changes.push((
+                previous.parent,
+                aggregate::Delta::between(&previous, Some(&replacement)),
+            ));
+            retire(&tx, previous.id, generation)?;
+            insert(&tx, &replacement, generation)?;
         }
-        assign_ids(&tx, &mut entries, target.parent)?;
-        for e in &entries {
+        for e in &old {
+            retire(&tx, e.id, generation)?;
+            if e.kind == Kind::Mount {
+                metadata::retire_mount(&tx, e.id, generation)?;
+            }
+        }
+        let ids = assign_ids(&tx, &mut staged.entries, target.parent)?;
+        for e in &staged.entries {
             insert(&tx, e, generation)?;
         }
-        let replacement = entries.first();
-        let mut old_child = target;
-        let mut new_child = replacement.cloned();
-        let mut ancestors = 0;
-        while let Some(id) = old_child.parent {
-            let old_parent = live_id(&tx, id)?;
-            let mut parent = old_parent.clone();
-            parent.allocated = replace_sum(
-                parent.allocated,
-                old_child.allocated,
-                new_child.as_ref().map_or(0, |e| e.allocated),
-            )?;
-            parent.apparent = replace_sum(
-                parent.apparent,
-                old_child.apparent,
-                new_child.as_ref().map_or(0, |e| e.apparent),
-            )?;
-            parent.errors = replace_sum(
-                parent.errors,
-                old_child.errors,
-                new_child.as_ref().map_or(0, |e| e.errors),
-            )?;
-            parent.items = replace_sum(
-                parent.items,
-                add(old_child.items, 1)?,
-                new_child
-                    .as_ref()
-                    .map(|e| add(e.items, 1))
-                    .transpose()?
-                    .unwrap_or(0),
-            )?;
-            let min:Option<i64>=tx.query_row("SELECT min_scanned_at FROM live WHERE parent=?1 ORDER BY min_scanned_at LIMIT 1",[id],|r|r.get(0)).optional()?;
-            let newest:Option<i64>=tx.query_row("SELECT newest_mtime FROM live WHERE parent=?1 AND newest_mtime IS NOT NULL ORDER BY newest_mtime DESC LIMIT 1",[id],|r|r.get(0)).optional()?;
-            parent.min_scanned_at = parent.scanned_at.min(min.unwrap_or(parent.scanned_at));
-            parent.newest_mtime = newest;
-            retire(&tx, id, generation)?;
-            insert(&tx, &parent, generation)?;
-            old_child = old_parent;
-            new_child = Some(parent);
-            ancestors += 1;
+        for mut mount in staged.mounts {
+            mount.entry_id = ids[&mount.entry_id];
+            metadata::insert_mount(&tx, &mount, generation)?;
         }
-        let scanned_at = crate::platform::now_secs();
+        let ancestors = aggregate::update(&tx, changes, generation)?;
+        metadata::retire_root(&tx, root.entry_id, generation)?;
+        metadata::insert_root(&tx, &root, generation)?;
         tx.execute(
             "INSERT INTO refreshes VALUES(?1,?2,?3)",
-            params![generation, bytes, scanned_at],
+            params![generation, bytes, started],
         )?;
         tx.execute(
             "UPDATE control SET current=?1 WHERE singleton=1",
@@ -291,9 +400,11 @@ impl Store {
         tx.commit()?;
         Ok(WriteReport {
             generation,
-            old_subtree_entries: old_ids.len(),
-            new_subtree_entries: entries.len(),
+            old_subtree_entries: old.len(),
+            new_subtree_entries: staged.entries.len(),
             ancestors,
+            touched_inode_groups: links.groups,
+            known_inode_members: links.members,
             sql_changes: self.conn.total_changes() - before,
             walk,
             transaction: start.elapsed(),
@@ -314,20 +425,8 @@ fn add(a: i64, b: i64) -> Result<i64> {
     a.checked_add(b)
         .ok_or_else(|| Error::generic("aggregate overflow"))
 }
-fn replace_sum(total: i64, old: i64, new: i64) -> Result<i64> {
-    let value = total
-        .checked_sub(old)
-        .filter(|v| *v >= 0)
-        .ok_or_else(|| Error::generic("invalid aggregate delta"))?;
-    add(value, new)
-}
 fn size(value: u64) -> Result<i64> {
     i64::try_from(value).map_err(|_| Error::generic("size exceeds v2 integer range"))
-}
-fn walk(root: &Path, workers: usize) -> Result<Tree> {
-    let mut opts = WalkOptions::new(vec![root.to_path_buf()]);
-    opts.workers = workers;
-    scan::walk(&opts).map_err(|e| Error::io("v2 walk", e))
 }
 fn validate_path(path: &[u8]) -> Result<()> {
     if !path.starts_with(b"/")
@@ -361,88 +460,36 @@ fn prefix_end(prefix: &[u8]) -> Vec<u8> {
     *end.last_mut().expect("non-root subtree key") += 1;
     end
 }
-fn stage(tree: Tree) -> Result<Vec<Entry>> {
-    if tree.roots.len() != 1 || !tree.hardlinks.is_empty() || !tree.mounts.is_empty() {
-        return Err(unsupported(
-            "v2 experiment supports one root without hardlinks or mounts",
-        ));
-    }
-    let mut out: Vec<Entry> = Vec::with_capacity(tree.nodes.len());
-    let mut stack: Vec<(u32, Option<usize>)> = vec![(0u32, None)];
-    while let Some((raw, parent)) = stack.pop() {
-        let n = tree.nodes[raw as usize];
-        if n.kind() == Kind::Mount || (n.kind() != Kind::Dir && n.nlink > 1) {
-            return Err(unsupported("v2 hardlinks/mounts are not implemented"));
-        }
-        let path = if let Some(p) = parent {
-            let mut path = out[p].path.clone();
-            crate::scan::tree::push_component(&mut path, tree.name(&n));
-            path
-        } else {
-            tree.name(&n).to_vec()
-        };
-        validate_path(&path)?;
-        let id = out.len();
-        out.push(Entry {
-            id: id as i64,
-            parent: parent.map(|p| p as i64),
-            sort_key: key(&path),
-            path,
-            kind: n.kind(),
-            flags: n.flags,
-            own_allocated: size(n.allocated)?,
-            own_apparent: size(n.apparent)?,
-            own_errors: n.errors as i64,
-            mtime: n.mtime,
-            scanned_at: n.scanned_at,
-            allocated: size(n.allocated)?,
-            apparent: size(n.apparent)?,
-            items: 0,
-            errors: n.errors as i64,
-            min_scanned_at: n.scanned_at,
-            newest_mtime: (n.kind() == Kind::File).then_some(n.mtime.min(n.scanned_at)),
-        });
-        for child in (n.child_start..n.child_start + n.child_count).rev() {
-            stack.push((child, Some(id)));
-        }
-    }
-    for i in (0..out.len()).rev() {
-        if let Some(p) = out[i].parent {
-            let c = out[i].clone();
-            let p = &mut out[p as usize];
-            p.allocated = add(p.allocated, c.allocated)?;
-            p.apparent = add(p.apparent, c.apparent)?;
-            p.items = add(p.items, add(c.items, 1)?)?;
-            p.errors = add(p.errors, c.errors)?;
-            p.min_scanned_at = p.min_scanned_at.min(c.min_scanned_at);
-            p.newest_mtime = p.newest_mtime.max(c.newest_mtime);
-        }
-    }
-    Ok(out)
-}
-fn assign_ids(conn: &Connection, entries: &mut [Entry], parent: Option<i64>) -> Result<()> {
+fn assign_ids(
+    conn: &Connection,
+    entries: &mut [Entry],
+    parent: Option<i64>,
+) -> Result<HashMap<i64, i64>> {
     let mut ids = HashMap::with_capacity(entries.len());
     for entry in entries {
         conn.execute(
-            "INSERT INTO identities(path) VALUES(?1) ON CONFLICT(path) DO NOTHING",
-            [&entry.path],
+            "INSERT INTO identities(scope,path) VALUES(?1,?2) ON CONFLICT(scope,path) DO NOTHING",
+            params![entry.scope, entry.path],
         )?;
         let id = conn.query_row(
-            "SELECT id FROM identities WHERE path=?1",
-            [&entry.path],
+            "SELECT id FROM identities WHERE scope=?1 AND path=?2",
+            params![entry.scope, entry.path],
             |r| r.get(0),
         )?;
         ids.insert(entry.id, id);
         entry.parent = entry.parent.map(|p| ids[&p]).or(parent);
         entry.id = id;
     }
-    Ok(())
+    Ok(ids)
 }
 fn live_path(conn: &Connection, path: &[u8]) -> Result<Option<Entry>> {
+    let Some(scope) = metadata::scope(conn, path, None)? else {
+        return Ok(None);
+    };
     Ok(conn
         .query_row(
-            &format!("SELECT {COLUMNS} FROM live WHERE path=?1"),
-            [path],
+            &format!("SELECT {COLUMNS} FROM live WHERE scope=?1 AND path=?2"),
+            params![scope, path],
             Entry::row,
         )
         .optional()?)
@@ -463,8 +510,8 @@ fn retire(conn: &Connection, id: i64, generation: i64) -> Result<()> {
     Ok(())
 }
 fn insert(conn: &Connection, e: &Entry, generation: i64) -> Result<()> {
-    conn.execute(&format!("INSERT INTO live({COLUMNS}) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)"),
-        params![e.id,e.parent,e.path,e.sort_key,e.kind.code(),e.flags,e.own_allocated,e.own_apparent,e.own_errors,e.mtime,e.scanned_at,e.allocated,e.apparent,e.items,e.errors,e.min_scanned_at,e.newest_mtime])?;
+    conn.execute(&format!("INSERT INTO live({COLUMNS}) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"),
+        params![e.id,e.parent,e.path,e.sort_key,e.kind.code(),e.flags,e.own_allocated,e.own_apparent,e.own_errors,e.mtime,e.scanned_at,e.allocated,e.apparent,e.items,e.errors,e.min_scanned_at,e.newest_mtime,e.scope,e.nlink,e.dev,e.ino])?;
     conn.execute(&format!("INSERT INTO versions({COLUMNS},born,dead) SELECT {COLUMNS},?1,NULL FROM live WHERE id=?2"),params![generation,e.id])?;
     Ok(())
 }
@@ -482,3 +529,6 @@ fn pair(conn: &Connection) -> Result<Option<GenerationPair>> {
         )
         .optional()?)
 }
+
+#[cfg(test)]
+mod tests;

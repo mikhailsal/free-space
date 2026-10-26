@@ -1,4 +1,6 @@
-use super::{Entry, key, pair, prefix_end, schema, unsupported, validate_path};
+use super::{
+    Entry, Mount, Root, key, metadata, pair, prefix_end, schema, unsupported, validate_path,
+};
 use crate::{Error, Result};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use schema::COLUMNS;
@@ -32,7 +34,7 @@ impl Reader {
         conn.execute_batch("BEGIN")?;
         let app: i64 = conn.pragma_query_value(None, "application_id", |r| r.get(0))?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if app != schema::APP_ID || version != 2 {
+        if app != schema::APP_ID || version != schema::REVISION {
             return Err(unsupported("not a v2 store"));
         }
         let generations = pair(&conn)?.ok_or_else(|| unsupported("v2 store has no scan"))?;
@@ -58,20 +60,26 @@ impl Reader {
     pub fn get(&self, path: &[u8], previous: bool) -> Result<Option<Entry>> {
         validate_path(path)?;
         let g = self.generation(previous)?;
-        Ok(self.conn.query_row(&format!("SELECT {COLUMNS} FROM versions WHERE path=?1 AND born<=?2 AND (dead IS NULL OR dead>?2)"),params![path,g],Entry::row).optional()?)
+        let Some(scope) = metadata::scope(&self.conn, path, Some(g))? else {
+            return Ok(None);
+        };
+        Ok(self.conn.query_row(&format!("SELECT {COLUMNS} FROM versions WHERE scope=?1 AND path=?2 AND born<=?3 AND (dead IS NULL OR dead>?3)"),params![scope,path,g],Entry::row).optional()?)
     }
     /// Component-wise name-ordered DFS, independent of stable IDs.
     pub fn subtree(&self, path: &[u8], previous: bool) -> Result<Vec<Entry>> {
         validate_path(path)?;
         let g = self.generation(previous)?;
+        let Some(scope) = metadata::scope(&self.conn, path, Some(g))? else {
+            return Ok(Vec::new());
+        };
         let lower = key(path);
         let upper = if lower.is_empty() {
             vec![255]
         } else {
             prefix_end(&lower)
         };
-        let mut q=self.conn.prepare(&format!("SELECT {COLUMNS} FROM versions WHERE sort_key>=?1 AND sort_key<?2 AND born<=?3 AND (dead IS NULL OR dead>?3) ORDER BY sort_key"))?;
-        Ok(q.query_map(params![lower, upper, g], Entry::row)?
+        let mut q=self.conn.prepare(&format!("SELECT {COLUMNS} FROM versions WHERE scope=?1 AND sort_key>=?2 AND sort_key<?3 AND born<=?4 AND (dead IS NULL OR dead>?4) ORDER BY sort_key"))?;
+        Ok(q.query_map(params![scope, lower, upper, g], Entry::row)?
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
     pub fn children(&self, path: &[u8], previous: bool) -> Result<Vec<Entry>> {
@@ -106,6 +114,53 @@ impl Reader {
             change.after = Some(e);
         }
         Ok(rows.into_values().filter(|r| r.before != r.after).collect())
+    }
+    pub fn roots(&self, previous: bool) -> Result<Vec<Root>> {
+        let g = self.generation(previous)?;
+        let mut q=self.conn.prepare(&format!("SELECT {} FROM root_versions WHERE born<=?1 AND (dead IS NULL OR dead>?1) ORDER BY path",metadata::ROOT_COLS))?;
+        Ok(q.query_map([g], Root::row)?
+            .collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+    /// Entry ID disambiguates a mount placeholder from a configured nested root.
+    pub fn mount(&self, entry_id: i64, previous: bool) -> Result<Option<Mount>> {
+        let g = self.generation(previous)?;
+        Ok(self.conn.query_row(&format!("SELECT {} FROM mount_versions WHERE entry_id=?1 AND born<=?2 AND (dead IS NULL OR dead>?2)",metadata::MOUNT_COLS),params![entry_id,g],Mount::row).optional()?)
+    }
+    pub fn hardlink_owner(&self, path: &[u8], previous: bool) -> Result<Option<Vec<u8>>> {
+        let Some(entry) = self.get(path, previous)? else {
+            return Ok(None);
+        };
+        let Some((dev, ino)) = entry.dev.zip(entry.ino) else {
+            return Ok(None);
+        };
+        let g = self.generation(previous)?;
+        Ok(self.conn.query_row("SELECT path FROM versions WHERE dev=?1 AND ino=?2 AND (flags & 2)=0 AND born<=?3 AND (dead IS NULL OR dead>?3) LIMIT 1",params![dev,ino,g],|r|r.get(0)).optional()?)
+    }
+    /// Global incompleteness and capped non-nested denied paths, from the pin.
+    pub fn unknown_subtrees(&self, previous: bool, cap: usize) -> Result<(bool, Vec<Vec<u8>>)> {
+        let g = self.generation(previous)?;
+        let mut q=self.conn.prepare("SELECT scope,sort_key,path FROM versions WHERE (flags & 1)!=0 AND born<=?1 AND (dead IS NULL OR dead>?1) ORDER BY scope,sort_key")?;
+        let mut rows = q.query([g])?;
+        let mut paths = Vec::new();
+        let mut enclosing: Option<(Vec<u8>, Vec<u8>)> = None;
+        let mut incomplete = false;
+        while let Some(row) = rows.next()? {
+            incomplete = true;
+            if paths.len() == cap {
+                break;
+            }
+            let scope: Vec<u8> = row.get(0)?;
+            let key: Vec<u8> = row.get(1)?;
+            if enclosing
+                .as_ref()
+                .is_some_and(|(s, k)| *s == scope && key.starts_with(k))
+            {
+                continue;
+            }
+            paths.push(row.get(2)?);
+            enclosing = Some((scope, key));
+        }
+        Ok((incomplete, paths))
     }
     /// Refreshes since the current full scan, from the same pinned read transaction.
     pub fn refresh_history(&self) -> Result<Vec<(i64, Vec<u8>, i64)>> {
