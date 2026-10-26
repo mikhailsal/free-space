@@ -279,6 +279,21 @@ impl Tree {
     }
 
     pub fn finalize_with(&mut self, policy: &LinkPolicy) -> Finalized {
+        let walk = self.build_preorder(policy);
+        let hardlinks = self.attribute_hardlinks(policy, &walk);
+        self.aggregate_subtrees(&walk.order);
+        let denied = self.denied_rows(&walk.rank);
+
+        Finalized {
+            order: walk.order,
+            rank: walk.rank,
+            path_hash: walk.path_hash,
+            hardlinks,
+            denied,
+        }
+    }
+
+    fn build_preorder(&self, policy: &LinkPolicy) -> Preorder {
         let n = self.nodes.len();
         let mut order = Vec::with_capacity(n);
         let mut rank = vec![u32::MAX; n];
@@ -317,56 +332,44 @@ impl Tree {
             path_hash_v.push(path_hash(&path));
 
             if let Some(&key) = link_of.get(&raw) {
-                if policy
-                    .forced_path
-                    .get(&key)
-                    .is_some_and(|fp| fp.as_slice() == path.as_slice())
-                {
-                    forced_found.insert(key, raw);
-                }
-                match best.get_mut(&key) {
-                    Some((w, p)) => {
-                        if path.as_slice() < p.as_slice() {
-                            *w = raw;
-                            p.clear();
-                            p.extend_from_slice(&path);
-                        }
-                    }
-                    None => {
-                        best.insert(key, (raw, path.clone()));
-                    }
-                }
+                record_hardlink_candidate(key, raw, &path, policy, &mut best, &mut forced_found);
             }
-            for c in self.children(&node).rev() {
-                if self.nodes[c as usize].flags & flags::REMOVED == 0 {
-                    stack.push((c, depth as u32 + 1));
-                }
-            }
+            self.push_live_children(&node, depth as u32 + 1, &mut stack);
         }
 
+        Preorder {
+            order,
+            rank,
+            path_hash: path_hash_v,
+            best,
+            forced_found,
+        }
+    }
+
+    fn attribute_hardlinks(&mut self, policy: &LinkPolicy, walk: &Preorder) -> Vec<HardlinkRow> {
         let winner = |key: &(u64, u64)| -> Option<u32> {
             if policy.zeroed.contains(key) {
                 return None;
             }
             if let Some(&r) = policy.forced_raw.get(key)
-                && rank[r as usize] != u32::MAX
+                && walk.rank[r as usize] != u32::MAX
             {
                 return Some(r);
             }
-            if let Some(&r) = forced_found.get(key) {
+            if let Some(&r) = walk.forced_found.get(key) {
                 return Some(r);
             }
-            best.get(key).map(|b| b.0)
+            walk.best.get(key).map(|b| b.0)
         };
         let mut hardlinks = Vec::with_capacity(self.hardlinks.len());
         for &(raw, dev, ino) in &self.hardlinks {
-            if rank[raw as usize] == u32::MAX {
+            if walk.rank[raw as usize] == u32::MAX {
                 continue; // dropped by refresh
             }
             let owner = winner(&(dev, ino));
             let node = &mut self.nodes[raw as usize];
             hardlinks.push(HardlinkRow {
-                entry_id: rank[raw as usize],
+                entry_id: walk.rank[raw as usize],
                 dev,
                 ino,
                 allocated: node.allocated,
@@ -379,7 +382,10 @@ impl Tree {
             }
         }
         hardlinks.sort_by_key(|h| h.entry_id);
+        hardlinks
+    }
 
+    fn aggregate_subtrees(&mut self, order: &[u32]) {
         // Fold in place: leaf aggregates first, then children into parents in
         // reverse preorder (every descendant has a larger preorder id).
         for nd in self.nodes.iter_mut() {
@@ -402,6 +408,9 @@ impl Tree {
                 agg.store(p);
             }
         }
+    }
+
+    fn denied_rows(&mut self, rank: &[u32]) -> Vec<u32> {
         let mut denied = Vec::new();
         for (raw, nd) in self.nodes.iter_mut().enumerate() {
             if nd.newest_mtime == i64::MIN {
@@ -413,147 +422,54 @@ impl Tree {
         }
         denied.sort_unstable();
 
-        Finalized {
-            order,
-            rank,
-            path_hash: path_hash_v,
-            hardlinks,
-            denied,
+        denied
+    }
+
+    fn push_live_children(&self, node: &Node, depth: u32, stack: &mut Vec<(u32, u32)>) {
+        for child in self.children(node).rev() {
+            if self.nodes[child as usize].flags & flags::REMOVED == 0 {
+                stack.push((child, depth));
+            }
+        }
+    }
+}
+
+struct Preorder {
+    order: Vec<u32>,
+    rank: Vec<u32>,
+    path_hash: Vec<i64>,
+    best: HashMap<(u64, u64), (u32, Vec<u8>)>,
+    forced_found: HashMap<(u64, u64), u32>,
+}
+
+fn record_hardlink_candidate(
+    key: (u64, u64),
+    raw: u32,
+    path: &Vec<u8>,
+    policy: &LinkPolicy,
+    best: &mut HashMap<(u64, u64), (u32, Vec<u8>)>,
+    forced_found: &mut HashMap<(u64, u64), u32>,
+) {
+    if policy
+        .forced_path
+        .get(&key)
+        .is_some_and(|fp| fp.as_slice() == path)
+    {
+        forced_found.insert(key, raw);
+    }
+    match best.get_mut(&key) {
+        Some((winner, winner_path)) if path.as_slice() < winner_path.as_slice() => {
+            *winner = raw;
+            winner_path.clear();
+            winner_path.extend_from_slice(path);
+        }
+        Some(_) => {}
+        None => {
+            best.insert(key, (raw, path.clone()));
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn add(t: &mut Tree, parent: u32, name: &str, kind: Kind, alloc: u64, mtime: i64) -> u32 {
-        let (off, len) = t.push_name(name.as_bytes());
-        t.nodes.push(Node {
-            allocated: alloc,
-            apparent: alloc,
-            mtime,
-            scanned_at: 1000,
-            name_off: off,
-            name_len: len,
-            parent,
-            kind: kind.code(),
-            nlink: 1,
-            ..Default::default()
-        });
-        (t.nodes.len() - 1) as u32
-    }
-
-    fn set_children(t: &mut Tree, dir: u32, start: u32, count: u32) {
-        t.nodes[dir as usize].child_start = start;
-        t.nodes[dir as usize].child_count = count;
-    }
-
-    /// /            (0)
-    ///   a/         (1)  children 3,4
-    ///   b          (2)  file 10
-    ///   a/x        (3)  file 5 mtime 50
-    ///   a/y        (4)  file 7 mtime 2000 (future vs scanned_at 1000)
-    fn sample() -> Tree {
-        let mut t = Tree {
-            roots: vec![RootInfo {
-                path: "/".into(),
-                dev: 1,
-                fs_type: "ext4".into(),
-                stats: FsStats::default(),
-            }],
-            ..Default::default()
-        };
-        add(&mut t, NO_PARENT, "/", Kind::Dir, 4, 0);
-        add(&mut t, 0, "a", Kind::Dir, 4, 9999);
-        add(&mut t, 0, "b", Kind::File, 10, 100);
-        add(&mut t, 1, "x", Kind::File, 5, 50);
-        add(&mut t, 1, "y", Kind::File, 7, 2000);
-        set_children(&mut t, 0, 1, 2);
-        set_children(&mut t, 1, 3, 2);
-        t
-    }
-
-    #[test]
-    fn preorder_and_aggregates() {
-        let mut t = sample();
-        let f = t.finalize();
-        assert_eq!(f.order, vec![0, 1, 3, 4, 2]);
-        let root = t.nodes[0];
-        assert_eq!(root.allocated, 4 + 4 + 10 + 5 + 7);
-        assert_eq!(root.items, 4);
-        let a = t.nodes[1];
-        assert_eq!(a.allocated, 16);
-        assert_eq!(a.items, 2);
-        // y is future-dated: clamped to its scanned_at (D4); dir mtimes are excluded (D5).
-        assert_eq!(a.newest_mtime, 1000);
-        assert_eq!(root.newest_mtime, 1000);
-        assert_eq!(f.path_hash[1], path_hash(b"/a"));
-        assert_eq!(f.path_hash[2], path_hash(b"/a/x"));
-        assert_eq!(f.path_hash[4], path_hash(b"/b"));
-    }
-
-    #[test]
-    fn newest_mtime_identity_is_min_not_zero() {
-        // A dir whose only file has a negative mtime keeps the negative value;
-        // a dir without files stores 0 ("unknown").
-        let mut t = Tree {
-            roots: vec![RootInfo {
-                path: "/".into(),
-                dev: 1,
-                fs_type: "ext4".into(),
-                stats: FsStats::default(),
-            }],
-            ..Default::default()
-        };
-        add(&mut t, NO_PARENT, "/", Kind::Dir, 0, 0);
-        add(&mut t, 0, "empty", Kind::Dir, 0, 500);
-        add(&mut t, 0, "old", Kind::File, 1, -86400);
-        set_children(&mut t, 0, 1, 2);
-        t.finalize();
-        assert_eq!(t.nodes[0].newest_mtime, -86400);
-        assert_eq!(t.nodes[1].newest_mtime, 0);
-    }
-
-    #[test]
-    fn hardlink_smallest_path_wins() {
-        let mut t = sample();
-        // b and a/x are the same inode; "/a/x" < "/b" byte-wise.
-        t.nodes[2].nlink = 2;
-        t.nodes[3].nlink = 2;
-        t.nodes[2].allocated = 5;
-        t.hardlinks = vec![(2, 1, 77), (3, 1, 77)];
-        let f = t.finalize();
-        assert_eq!(t.nodes[3].flags & flags::ALIAS, 0);
-        assert_ne!(t.nodes[2].flags & flags::ALIAS, 0);
-        assert_eq!(t.nodes[2].allocated, 0);
-        assert_eq!(t.nodes[0].allocated, 4 + 4 + 5 + 7);
-        assert_eq!(f.hardlinks.len(), 2);
-        assert!(f.hardlinks.iter().all(|h| h.allocated == 5));
-    }
-
-    #[test]
-    fn byte_order_not_dfs_order_for_hardlinks() {
-        // "/a-c" < "/a/b" byte-wise ('-' = 0x2d < '/' = 0x2f), although DFS visits a/b first.
-        let mut t = Tree {
-            roots: vec![RootInfo {
-                path: "/".into(),
-                dev: 1,
-                fs_type: "ext4".into(),
-                stats: FsStats::default(),
-            }],
-            ..Default::default()
-        };
-        add(&mut t, NO_PARENT, "/", Kind::Dir, 0, 0);
-        add(&mut t, 0, "a", Kind::Dir, 0, 0);
-        add(&mut t, 0, "a-c", Kind::File, 8, 0);
-        add(&mut t, 1, "b", Kind::File, 8, 0);
-        set_children(&mut t, 0, 1, 2);
-        set_children(&mut t, 1, 3, 1);
-        t.hardlinks = vec![(2, 1, 5), (3, 1, 5)];
-        t.finalize();
-        assert_eq!(t.nodes[2].flags & flags::ALIAS, 0, "/a-c wins");
-        assert_ne!(t.nodes[3].flags & flags::ALIAS, 0);
-        assert_eq!(t.nodes[1].allocated, 0);
-    }
-}
+#[path = "tree_tests.rs"]
+mod tests;
