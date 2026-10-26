@@ -17,7 +17,7 @@ use crate::{Error, ErrorCode, Result};
 struct Ranked {
     entry: DiffEntry,
     name: Vec<u8>,
-    order_key: Vec<u8>,
+    traversal_order: Vec<u8>,
     gone: bool,
 }
 
@@ -31,7 +31,7 @@ impl Ord for Ranked {
             .then((other.entry.delta > 0).cmp(&(self.entry.delta > 0)))
             .then(self.name.cmp(&other.name))
             .then(self.gone.cmp(&other.gone))
-            .then(self.order_key.cmp(&other.order_key))
+            .then(self.traversal_order.cmp(&other.traversal_order))
     }
 }
 impl PartialOrd for Ranked {
@@ -282,7 +282,7 @@ fn ranked(current: Option<&Entry>, previous: Option<&Entry>) -> Ranked {
     };
     Ranked {
         name: name(source).to_vec(),
-        order_key: source.sort_key.clone(),
+        traversal_order: source.sort_key.clone(),
         gone: current.is_none(),
         entry: DiffEntry {
             path: lossy(&source.path),

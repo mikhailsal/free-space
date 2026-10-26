@@ -18,7 +18,7 @@ use crate::snapshot::v2::{ENTRY_COLUMNS, Entry, Reader};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ranked {
     pub key: i64,
-    pub order_key: Vec<u8>,
+    pub traversal_order: Vec<u8>,
     pub id: i64,
     pub nested: bool,
 }
@@ -27,7 +27,7 @@ impl Ord for Ranked {
     fn cmp(&self, other: &Self) -> Ordering {
         self.key
             .cmp(&other.key)
-            .then(self.order_key.cmp(&other.order_key))
+            .then(self.traversal_order.cmp(&other.traversal_order))
             .then(self.id.cmp(&other.id))
             .then(self.nested.cmp(&other.nested))
     }
@@ -113,7 +113,7 @@ fn run_pinned(reader: &Reader, scope: &Entry, filter: &Filter, order: &Order) ->
             &mut page,
             Ranked {
                 key,
-                order_key: entry.sort_key,
+                traversal_order: entry.sort_key,
                 id: entry.id,
                 nested,
             },
