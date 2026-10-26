@@ -1,6 +1,6 @@
 # Code quality gates
 
-Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Lane B is merged (B0-B4 as #15-#19, B5 as #20); in lane A, A0 is in review and A1-A4 are open. Date: 2026-10-23.
+Status: reviewed by /plan-eng-review 2026-10-23 (decisions D1-D27, ledger below). PR 1 (#12) and PR 2 (#13) merged; the debt lanes started 2026-10-24 (PR list under "PR 3…n"). Lane B is merged (B0-B4 as #15-#19, B5 as #20); in lane A, A0 is merged (#21), A1's D0 tests and mount script are in review, and the rest of A1 (`install-timer` as root in rust-diff) and A2-A4 are open. Date: 2026-10-23.
 
 ## Problem
 
@@ -1617,14 +1617,17 @@ Effort assumption: scaffolding and config ~20x, tests ~20x, refactors behind a d
   - Surfaced by: re-measurement 2026-10-24 (Current violations; correction to S2a)
   - Files: the files listed in Current violations
   - Verify: clippy with `excessive-nesting-threshold = 4` in a scratch `clippy.toml` and a fresh target dir reports none; refactor-guard green
-- [ ] **T3 (P1, human: ~2 days / CC: ~1.5h)** — core, cli — Characterization tests for unreached branches
+- [x] **T3 (P1, human: ~2 days / CC: ~1.5h)** — core, cli — Characterization tests for unreached branches
   - Surfaced by: Section 3 — T1 (D15): status.rs:129, query.rs, doctor.rs:259, refresh.rs:270,445,455, diff.rs:180,254, job.rs:155
-  - Files: cli/tests/cli.rs, core/tests/queries.rs, core/tests/publish.rs
+  - Files: cli/tests/text.rs, cli/tests/doctor.rs, core/tests/edges.rs (new files: core/tests/queries.rs has 978 of its 1000 lines)
   - Verify: `cargo test --workspace` green on master before any split; `cargo llvm-cov` shows those lines reached
-- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — scripts, CI — Mount-point test under sudo
+  - Measured (A1, 2026-10-25, `cargo llvm-cov --workspace` as user tass, no root; 11 test binaries, 0 failed): every listed line is reached on this branch: status.rs:108 1 (the new doctor test), status.rs:129 12, doctor.rs:259 20 (failing checks :270 2, :290 7, :316 6, :332 4, :358 2), refresh.rs:270 1, :445 1, :455 2, diff.rs:180 1, :254 1, job.rs:155 1. Lines hit, master -> branch: status.rs 50/205 -> 204/205, query.rs 177/351 -> 341/351, doctor.rs 162/284 -> 212/284, job.rs 160/193 -> 172/193, diff.rs 261/305 -> 276/305, refresh.rs 369/431 -> 385/431; workspace 5261/6923 (76.0%) -> 5717/6923 (82.6%). Still 0 as a user: refresh.rs:402-404 (the mount-point refusal); `scripts/mount-fs.sh` reaches it under sudo in CI, which llvm-cov does not count because that build is not instrumented.
+- [x] **T4 (P1, human: ~2h / CC: ~15min)** — scripts, CI — Mount-point test under sudo
   - Surfaced by: TODO candidates — TD2 (D25): refresh.rs:402, walk.rs:392
-  - Files: scripts/ (new script), .github/workflows/ci.yml
+  - Files: scripts/mount-fs.sh, .github/workflows/ci.yml
   - Verify: `sudo scripts/<script>.sh` passes locally; rust job green
+  - Measured (A1, 2026-10-26, local, after the cycle-3 fixes): `sudo -n scripts/mount-fs.sh target/debug/freespace` and `sudo -n scripts/fault-fs.sh target/debug/freespace` both exit 0 and leave no mount or temp dir behind; a TERM during fault-fs's pause leaves none either. mount-fs.sh's four steps pass: the scan stops at the mount and at a bind mount of the same filesystem, refresh of the mount point is refused, refresh of the parent and of a sibling keep the mounts. Against four mutants (scratch builds, not CI) it fails at step 1 when the walk's bind-mount or device check (walk.rs:391) is removed or a mount's apparent size is not zeroed (walk.rs:394), and at step 4 when the mount retain at refresh.rs:265 is inverted. Not covered: a mount that appears after the scan (refresh.rs:399-407, TODOS P1). The rust job runs both on the PR; its result is the PR's CI run, not this one.
+  - A1 follow-up (2026-10-26): shared fixtures now live in `cli/tests/common/mod.rs` and `core/tests/common/mod.rs`; all 40 affected CLI tests and 24 core tests pass; the original 39 CLI cases also passed with inherited fault/pause variables. Stub mount tests cover cleanup failures and signal traps without root and run when either filesystem harness changes.
 - [x] **T5 (P1, human: ~6h / CC: ~40min)** — web tests — e2e for the six keys, Show more, cancel; mock hold-and-release; out-of-order e2e
   - Surfaced by: Section 3 — T2 (D16); Outside voice — O1 (D19)
   - Files: web/tests/e2e/mock.ts, web/tests/e2e/browse.spec.ts, web/tests/e2e/find.spec.ts

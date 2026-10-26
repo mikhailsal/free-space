@@ -36,9 +36,9 @@ bunx playwright test
 
 `bun test tests/unit` also runs `scripts/rust-diff.sh` and `scripts/coverage-functions.sh` on made-up input, so `jq`, `curl`, `perl`, `sqlite3`, `script`, `flock` and `setsid` (util-linux), `c++filt` (binutils) and tzdata must be installed.
 
-The unit tests of `scripts/test-files.sh`, the pre-gate runner, need `flock` and `setsid` from util-linux, as the runner itself needs `flock` for e2e, shots and guard files.
+The pre-gate runner, `scripts/test-files.sh`, routes selected Rust files (including integration helpers and source modules with unit tests) to one Cargo run per crate. Cargo runs at low priority with two build jobs and one test thread. It needs `setsid` from util-linux to stop Cargo and its descendants together; e2e, shots and guard runs need `flock` too. Its unit tests also use these tools.
 
-A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh` must be clean (`.shellcheckrc` lets it follow sourced files).
+A few tests need root or a real systemd and run only in CI: `sudo scripts/fault-fs.sh target/debug/freespace` fills a tmpfs during a scan, `sudo scripts/mount-fs.sh target/debug/freespace` mounts one inside a scanned root and refreshes around it, and the `install` job runs `install.sh` end to end on the runner. `shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh` must be clean (`.shellcheckrc` lets it follow sourced files).
 
 Scanning your whole disk while developing is slow; point commands at a small tree with a private snapshot instead:
 

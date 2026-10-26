@@ -6,8 +6,8 @@
 
 use std::fs;
 use std::os::unix::process::ExitStatusExt;
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::path::Path;
+use std::process::{Child, Output, Stdio};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -21,16 +21,14 @@ const STEPS: [&str; 6] = [
     "published",
 ];
 
-struct Env {
-    tmp: tempfile::TempDir,
-}
+mod common;
+
+use common::Env;
 
 impl Env {
     /// Two published generations of a small tree, then a change for the third.
     fn with_two_generations() -> Env {
-        let e = Env {
-            tmp: tempfile::tempdir().unwrap(),
-        };
+        let e = Env::new();
         let r = e.root();
         fs::create_dir_all(r.join("a/b")).unwrap();
         fs::write(r.join("a/b/one"), vec![1u8; 64 << 10]).unwrap();
@@ -40,28 +38,6 @@ impl Env {
         e.ok(&["scan", s(&r)]);
         fs::write(r.join("a/b/three"), vec![1u8; 256 << 10]).unwrap();
         e
-    }
-
-    fn root(&self) -> PathBuf {
-        self.tmp.path().join("r")
-    }
-
-    fn snap(&self) -> PathBuf {
-        self.tmp.path().join("snap")
-    }
-
-    fn cmd(&self, args: &[&str]) -> Command {
-        let mut c = Command::new(env!("CARGO_BIN_EXE_freespace"));
-        c.args(args)
-            .env("FREESPACE_CONFIG", self.tmp.path().join("none.toml"))
-            .env("FREESPACE_SNAPSHOT_DIR", self.snap())
-            .env_remove("FREESPACE_FAULT")
-            .env_remove("FREESPACE_PAUSE");
-        c
-    }
-
-    fn run(&self, args: &[&str]) -> Output {
-        self.cmd(args).output().unwrap()
     }
 
     fn ok(&self, args: &[&str]) -> Output {

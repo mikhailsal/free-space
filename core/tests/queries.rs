@@ -4,84 +4,41 @@
 
 use std::fs::{self, File};
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
 use freespace_core::ErrorCode;
-use freespace_core::job::{self, ScanReport, ScanRequest};
+use freespace_core::job::ScanReport;
 use freespace_core::platform::now_secs;
 use freespace_core::queries::pass::{self, Filter, Order};
 use freespace_core::queries::{self, diff, params::*, types::*};
 use freespace_core::refresh::{self, RefreshReport, RefreshRequest};
 use freespace_core::scan::Kind;
-use freespace_core::snapshot::SnapshotDir;
 use freespace_core::snapshot::reader::Snapshot;
 
 const DAY: i64 = 86_400;
 
-struct Fx {
-    _tmp: tempfile::TempDir,
-    root: PathBuf,
-    dir: SnapshotDir,
-}
-
-fn fx() -> Fx {
-    let tmp = tempfile::tempdir().unwrap();
-    let root = tmp.path().join("r");
-    fs::create_dir(&root).unwrap();
-    let dir = SnapshotDir::new(tmp.path().join("snap"));
-    Fx {
-        _tmp: tmp,
-        root,
-        dir,
-    }
-}
+mod common;
+use common::{Fx, fx};
 
 impl Fx {
-    fn p(&self, rel: &str) -> PathBuf {
-        if rel.is_empty() {
-            self.root.clone()
-        } else {
-            self.root.join(rel)
-        }
-    }
-
-    fn s(&self, rel: &str) -> String {
-        self.p(rel).to_str().unwrap().to_owned()
-    }
-
     fn mkdir(&self, rel: &str) {
         fs::create_dir_all(self.p(rel)).unwrap();
     }
 
     /// A file of `size` real bytes (not sparse) with the given mtime.
     fn file(&self, rel: &str, size: usize, mtime: i64) {
-        let p = self.p(rel);
-        fs::create_dir_all(p.parent().unwrap()).unwrap();
-        fs::write(&p, vec![7u8; size]).unwrap();
-        set_mtime(&p, mtime);
+        self.write_file(rel, size);
+        set_mtime(&self.p(rel), mtime);
     }
 
     fn scan(&self, keep_previous: bool) -> ScanReport {
-        job::run_scan(ScanRequest {
-            roots: vec![self.root.clone()],
-            one_file_system: true,
-            workers: 4,
-            dir: self.dir.clone(),
-            keep_previous,
-            on_progress: None,
-        })
-        .unwrap()
+        self.scan_roots(vec![self.root.clone()], 4, keep_previous)
+            .unwrap()
     }
 
     fn refresh(&self, rel: &str) -> RefreshReport {
-        refresh::run_refresh(RefreshRequest {
-            path: self.p(rel).as_os_str().as_bytes().to_vec(),
-            workers: 2,
-            dir: self.dir.clone(),
-            on_progress: None,
-        })
-        .unwrap()
+        self.try_refresh(rel).unwrap()
     }
 
     fn snap(&self) -> Snapshot {

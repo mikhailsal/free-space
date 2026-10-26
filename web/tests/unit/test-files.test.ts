@@ -1,7 +1,7 @@
-// scripts/test-files.sh, the pre-gate runner: each test file goes to its own runner in web/, a failing runner's
+// scripts/test-files.sh, the pre-gate runner: Rust runs once per crate in the repo root, web files use their runners in web/. A failing runner's
 // status is the script's, shots and guard shots render into web/pregate-shots (cleared under the lock, gone at exit),
 // a signal reaches the running runner before the script exits, and bad input exits 2 before anything runs.
-// Stub bun and bunx stand in for the real runners; they record argv, cwd, $SHOTS_DIR, $E2E_PORT, an open fd 9,
+// Stub cargo, bun and bunx stand in for the real runners; they record argv, cwd, $SHOTS_DIR, $E2E_PORT, an open fd 9,
 // $GUARD_SHOTS and what web/pregate-shots holds when they start.
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import {
@@ -72,7 +72,7 @@ beforeAll(() => {
   }
   mkdirSync(join(tmp, "bin"));
   mkdirSync(join(tmp, "bunx-only"));
-  for (const path of ["bin/bun", "bin/bunx", "bunx-only/bunx"]) {
+  for (const path of ["bin/bun", "bin/bunx", "bin/cargo", "bunx-only/bunx"]) {
     writeFileSync(join(tmp, path), stub);
     chmodSync(join(tmp, path), 0o755);
   }
@@ -146,6 +146,12 @@ async function readUntil(stream: ReadableStream<Uint8Array>, text: string) {
 }
 
 const testFiles = [
+  "core/src/lib.rs",
+  "core/src/scan/mod.rs",
+  "core/tests/scan.rs",
+  "cli/src/serve/gui.rs",
+  "cli/tests/cli.rs",
+  "cli/tests/common/mod.rs",
   "web/tests/unit/format.test.ts",
   "web/tests/unit/contrast.test.ts",
   "web/tests/unit/helper.ts",
@@ -167,6 +173,155 @@ const guardCall = ["bunx", "playwright test -c playwright.guard.config.ts --upda
 const guardCalls = [guardCall, guardCall];
 
 type Row = { name: string; args: string[]; calls: string[][]; code?: number; stubExit?: number; stderr?: string };
+
+const rustCore = "core/src/lib.rs";
+const rustCli = "cli/src/serve/gui.rs";
+const cargoCall = (crate: string) => ["cargo", `test -j 2 --manifest-path ${join(tmp, "repo", crate, "Cargo.toml")} -- --test-threads=1`];
+
+// Value: protects=Rust files selected by pregate reach cargo once per crate alongside web runners;
+//   fails_when=the custom runner rejects cfg(test) modules/helpers, repeats a crate, loses failures or partially runs bad input;
+//   why_new=existing runner cases cover web paths only; seam=none; no_claim=compiling or executing Rust tests (cargo is stubbed)
+const rustRows: Row[] = [
+  { name: "Rust core source runs its crate", args: [rustCore], calls: [["core"]] },
+  { name: "Rust CLI source runs its crate", args: [rustCli], calls: [["cli"]] },
+  {
+    name: "Rust source, integration tests and common helpers run each selected crate once",
+    args: [rustCli, rustCore, "cli/tests/cli.rs", "core/src/scan/mod.rs", "core/tests/scan.rs", "cli/tests/common/mod.rs", rustCli],
+    calls: [["core"], ["cli"]],
+  },
+  { name: "Rust and web files retain all runners", args: [unit, rustCli, rustCore], calls: [["core"], ["cli"], unitCall] },
+  {
+    name: "Rust cargo failure stops later crates and web runners",
+    args: [unit, rustCli, rustCore],
+    calls: [["core"]],
+    stubExit: 7,
+    code: 7,
+  },
+  ...[
+    ["core/src/gone.rs", "no such test file"],
+    ["other/src/lib.rs", "no runner for"],
+    ["core/Cargo.toml", "no runner for"],
+    ["cli/src/../main.rs", "unsafe test path"],
+    ["cli/src/bad;name.rs", "unsafe test path"],
+  ].map(([file, error]) => ({
+    name: `Rust selection rejects ${file} before any runner starts`,
+    args: [rustCore, unit, file],
+    calls: [],
+    code: 2,
+    stderr: `${error} ${file}`,
+  })),
+];
+
+for (const row of rustRows) {
+  test(row.name, () => {
+    const got = run(row.args, row.stubExit);
+    const calls = row.calls.map((call) => (call.length === 1 ? cargoCall(call[0]) : call));
+    expect(got.code, got.stderr).toBe(row.code ?? 0);
+    expect(got.calls.map((c) => [c.name, c.argv])).toEqual(calls);
+    expect(got.calls.map((c) => c.cwd)).toEqual(calls.map(([runner]) => (runner === "cargo" ? dirname(stubWeb) : stubWeb)));
+    if (row.stderr) expect(got.stderr).toContain(row.stderr);
+  });
+}
+
+// Value: protects=signals stop Cargo and its test child before the runner returns, including a TERM-resistant Cargo;
+//   fails_when=only Cargo receives TERM, group escalation is absent or a signal during session startup leaks the run;
+//   why_new=existing signal cases select web runners, and the routing Cargo stub spawns no subprocess;
+//   seam=none; no_claim=processes that deliberately escape their Cargo session
+function cargoTreeFixture(escalate: boolean, early: boolean) {
+  const dir = join(tmp, `cargo-tree-${runs++}`);
+  mkdirSync(dir);
+  const pids = join(dir, "pids");
+  const launched = join(dir, "launched");
+  const body = `#!/bin/sh
+/bin/sleep 60 &
+spawned=$!
+if [ "$CARGO_ESCALATE" = yes ]; then trap '' TERM; else trap 'wait "$spawned" 2>/dev/null || :; exit 143' TERM; fi
+echo "$$ $spawned" > "$CARGO_PIDS"
+wait "$spawned" || :
+if [ "$CARGO_ESCALATE" = yes ]; then while :; do :; done; fi
+`;
+  writeFileSync(join(dir, "cargo"), body, { mode: 0o755 });
+  if (early) {
+    writeFileSync(join(dir, "setsid"), '#!/bin/sh\necho "$$" > "$CARGO_LAUNCHED"\nkill -TERM "$PPID"\nexec "$REAL_SETSID" "$@"\n', {
+      mode: 0o755,
+    });
+  }
+  const { env } = stubEnv(0, {
+    PATH: `${dir}:${join(tmp, "bin")}:${process.env.PATH}`,
+    CARGO_PIDS: pids,
+    CARGO_LAUNCHED: launched,
+    CARGO_ESCALATE: escalate ? "yes" : "no",
+    REAL_SETSID: Bun.which("setsid") ?? "/usr/bin/setsid",
+  });
+  return { env, pids, launched };
+}
+
+function recordedPids(path: string) {
+  return existsSync(path)
+    ? readFileSync(path, "utf8")
+        .trim()
+        .split(/\s+/)
+        .map(Number)
+        .filter((pid) => pid > 1)
+    : [];
+}
+
+function signalOwned(pid: number, signal: NodeJS.Signals) {
+  try {
+    process.kill(pid, signal);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  }
+}
+
+async function stopCargoFixture(proc: ReturnType<typeof start>, pids: string, launched: string) {
+  // Kill the test child first so its Cargo parent can wait/reap it, including on the old broken runner.
+  const [cargo, child] = recordedPids(pids);
+  if (child) signalOwned(child, "SIGTERM");
+  proc.kill("SIGTERM");
+  await Promise.race([proc.exited, Bun.sleep(1000)]);
+  for (const pid of [child, cargo, ...recordedPids(launched)]) if (pid) signalOwned(pid, "SIGKILL");
+  proc.kill("SIGKILL");
+  await proc.exited;
+}
+
+for (const [signal, code, escalate, early] of [
+  ["SIGHUP", 129, false, false],
+  ["SIGINT", 130, false, false],
+  ["SIGTERM", 143, false, false],
+  ["SIGTERM", 143, true, false],
+  ["SIGTERM", 143, false, true],
+] as const) {
+  test(`Cargo tree stops on ${signal}${escalate ? " with escalation" : ""}${early ? " during session startup" : ""}`, async () => {
+    const fixture = cargoTreeFixture(escalate, early);
+    const proc = start([rustCore], fixture.env);
+    try {
+      await waitFor(() => recordedPids(early ? fixture.launched : fixture.pids).length > 0, "Cargo startup");
+      if (!early) proc.kill(signal);
+      // gstack-timing-ok: cleanup has a 0.5 s TERM grace; the unchanged runner blocks on its 60 s child.
+      expect(await Promise.race([proc.exited, Bun.sleep(2000).then(() => "still running")])).toBe(code);
+      for (const pid of [...recordedPids(fixture.pids), ...recordedPids(fixture.launched)]) {
+        expect(existsSync(`/proc/${pid}`), `Cargo/test process ${pid} remains`).toBe(false);
+      }
+    } finally {
+      await stopCargoFixture(proc, fixture.pids, fixture.launched);
+    }
+  }, 10000);
+}
+
+// Value: protects=missing setsid rejects all selected work before the first runner with an install hint;
+//   fails_when=setsid is unchecked or only checked after another runner; why_new=web selections did not require sessions;
+//   seam=none; no_claim=util-linux installation on other hosts
+test("Rust selection without setsid exits 2 naming util-linux before any runner", () => {
+  const bin = join(tmp, "no-setsid");
+  mkdirSync(bin);
+  for (const tool of ["dirname", "nice", "find", "sort", "paste", "sleep"]) symlinkSync(Bun.which(tool) ?? tool, join(bin, tool));
+  const { log, env } = stubEnv(0, { PATH: `${join(tmp, "bin")}:${bin}` });
+  const done = Bun.spawnSync(["/bin/sh", script, unit, rustCore], { cwd: tmp, env });
+  expect(done.exitCode, done.stderr.toString()).toBe(2);
+  expect(done.stderr.toString()).toContain("setsid not found (util-linux)");
+  expect(readCalls(log)).toEqual([]);
+});
 
 const rows: Row[] = [
   { name: "a unit file goes to bun test, with the path relative to web/", args: [unit], calls: [unitCall] },
