@@ -273,6 +273,32 @@ fn empty_current_retains_previous_bytes_generation_and_diff() {
     assert_corrupt_current_retains_previous(b"");
 }
 
+#[test]
+fn logically_incomplete_current_does_not_replace_previous() {
+    for mutation in [
+        "DROP TABLE entries",
+        "ALTER TABLE entries DROP COLUMN flags",
+    ] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("r");
+        let dir = SnapshotDir::new(tmp.path().join("snap"));
+        two_generations(&root, &dir);
+        let bytes = fs::read(dir.prev()).unwrap();
+        let inode = fs::metadata(dir.prev()).unwrap().ino();
+        let conn = rusqlite::Connection::open(dir.current()).unwrap();
+        conn.execute(mutation, []).unwrap();
+        drop(conn);
+        fs::write(root.join("c"), [3; 4096]).unwrap();
+
+        let rep = scan(&root, &dir, 1);
+        assert_retained(&dir, &bytes, inode);
+        assert_eq!((rep.generation, rep.prev_generation), (3, Some(1)));
+        let (current, previous) = diff::open_pair(&dir).unwrap();
+        assert_eq!(current.meta.prev_generation, Some(1));
+        assert_eq!(previous.meta.generation, 1);
+    }
+}
+
 fn assert_corrupt_current_retains_previous(corruption: &[u8]) {
     for state_case in ["normal", "missing", "corrupt", "newer_previous"] {
         let tmp = tempfile::tempdir().unwrap();
@@ -342,6 +368,7 @@ fn corrupt_current_drops_previous_only_when_unusable_or_disabled() {
             "disabled",
             "incompatible_previous",
             "corrupt_previous",
+            "missing_table_previous",
             "missing_previous",
         ] {
             let tmp = tempfile::tempdir().unwrap();
@@ -355,6 +382,10 @@ fn corrupt_current_drops_previous_only_when_unusable_or_disabled() {
                         .unwrap();
                 }
                 "corrupt_previous" => fs::write(dir.prev(), b"not SQLite").unwrap(),
+                "missing_table_previous" => {
+                    let conn = rusqlite::Connection::open(dir.prev()).unwrap();
+                    conn.execute("DROP TABLE entries", []).unwrap();
+                }
                 "missing_previous" => fs::remove_file(dir.prev()).unwrap(),
                 _ => {}
             }
