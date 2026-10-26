@@ -272,8 +272,14 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let (generation, _) = crate::job::next_generation(&req.dir);
     let meta = refresh_meta(&snap, generation, &xpath, started)?;
     let tmp = req.dir.tmp(generation);
-    let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
+    let entries = fin.order.len() as u64;
+    // Grafting/finalization and metadata copying are complete. Release the
+    // old snapshot's mapping/cache and refresh-only data before SQLite writes.
+    drop(loaded.raw_of);
+    drop(loaded.links);
+    drop(policy);
     drop(snap);
+    let ws = writer::write_snapshot(&tmp, tree, fin, &meta, &Reserve::new(req.dir.as_path()))?;
     crate::fault::point(&req.dir, "written");
 
     pw.set_stage(progress::STAGE_PUBLISH);
@@ -287,7 +293,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     Ok(RefreshReport {
         generation,
         path: label.to_string(),
-        entries: fin.order.len() as u64,
+        entries,
         subtree_entries,
         removed,
         load_seconds,
