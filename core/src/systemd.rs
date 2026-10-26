@@ -123,22 +123,26 @@ pub fn read_write_paths(unit_text: &str) -> Vec<String> {
         .lines()
         .filter_map(|l| l.strip_prefix("ReadWritePaths="))
     {
-        let mut cur = String::new();
-        let mut quoted = false;
-        for ch in v.chars().chain(std::iter::once(' ')) {
-            match ch {
-                '"' => quoted = !quoted,
-                ' ' | '\t' if !quoted => {
-                    if !cur.is_empty() {
-                        out.push(cur.trim_start_matches('-').to_owned());
-                        cur.clear();
-                    }
-                }
-                c => cur.push(c),
-            }
-        }
+        parse_read_write_paths(v, &mut out);
     }
     out
+}
+
+fn parse_read_write_paths(value: &str, out: &mut Vec<String>) {
+    let mut cur = String::new();
+    let mut quoted = false;
+    for ch in value.chars().chain(std::iter::once(' ')) {
+        match ch {
+            '"' => quoted = !quoted,
+            ' ' | '\t' if !quoted => {
+                if !cur.is_empty() {
+                    out.push(cur.trim_start_matches('-').to_owned());
+                    cur.clear();
+                }
+            }
+            c => cur.push(c),
+        }
+    }
 }
 
 #[cfg(test)]

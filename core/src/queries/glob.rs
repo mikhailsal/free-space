@@ -34,41 +34,9 @@ pub fn glob_to_regex(glob: &str, bytewise: bool) -> std::result::Result<String, 
                 }
             }
             '[' => {
-                let mut j = i + 1;
-                let mut class = String::from("[");
-                if matches!(chars.get(j), Some('!') | Some('^')) {
-                    class.push('^');
-                    j += 1;
-                }
-                let start = j;
-                let mut closed = false;
-                while j < chars.len() {
-                    let k = chars[j];
-                    if k == ']' && j > start {
-                        closed = true;
-                        break;
-                    }
-                    match k {
-                        '\\' => {
-                            j += 1;
-                            if let Some(&n) = chars.get(j) {
-                                class.push_str(&regex::escape(&n.to_string()));
-                            }
-                        }
-                        // '-' stays a range operator, but "--" would be set difference
-                        '-' if !class.ends_with('-') => class.push('-'),
-                        '[' | ']' | '^' | '&' | '~' | '-' => {
-                            class.push('\\');
-                            class.push(k);
-                        }
-                        _ => class.push(k),
-                    }
-                    j += 1;
-                }
-                if closed {
-                    class.push(']');
+                if let Some((class, end)) = character_class(&chars, i + 1) {
                     re.push_str(&class);
-                    i = j;
+                    i = end;
                 } else {
                     // unmatched '[' is a literal
                     re.push_str(r"\[");
@@ -80,6 +48,40 @@ pub fn glob_to_regex(glob: &str, bytewise: bool) -> std::result::Result<String, 
     }
     re.push('$');
     Ok(re)
+}
+
+/// Parse a bracket class, returning its closing bracket's index when present.
+fn character_class(chars: &[char], mut i: usize) -> Option<(String, usize)> {
+    let mut class = String::from("[");
+    if matches!(chars.get(i), Some('!') | Some('^')) {
+        class.push('^');
+        i += 1;
+    }
+    let start = i;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == ']' && i > start {
+            class.push(']');
+            return Some((class, i));
+        }
+        match c {
+            '\\' => {
+                i += 1;
+                if let Some(&escaped) = chars.get(i) {
+                    class.push_str(&regex::escape(&escaped.to_string()));
+                }
+            }
+            // '-' stays a range operator, but "--" would be set difference
+            '-' if !class.ends_with('-') => class.push('-'),
+            '[' | ']' | '^' | '&' | '~' | '-' => {
+                class.push('\\');
+                class.push(c);
+            }
+            _ => class.push(c),
+        }
+        i += 1;
+    }
+    None
 }
 
 /// A compiled pattern: one regex for UTF-8 names, one for the rest.
