@@ -6,6 +6,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Args;
@@ -184,25 +185,27 @@ pub fn run(a: &GuiArgs) -> Result<()> {
             });
             let st = srv.state.clone();
             let url = url.clone();
-            tokio::spawn(async move {
-                let grace = Duration::from_secs(OPEN_GRACE);
-                let start = tokio::time::Instant::now();
-                // xdg-open may stay in the foreground with the browser: stop waiting
-                match tokio::time::timeout(grace, open_browser(&f)).await {
-                    Ok(false) => {
-                        eprintln!("no browser opened; open {url}");
-                        return;
-                    }
-                    Ok(true) => tokio::time::sleep_until(start + grace).await,
-                    Err(_) => {}
-                }
-                if st.bootstrap_pending() {
-                    eprintln!("the page has not loaded yet; open {url}");
-                }
-            });
+            tokio::spawn(report_browser_status(f, url, st));
         }
         srv.run(file).await
     })
+}
+
+async fn report_browser_status(f: PathBuf, url: String, st: Arc<super::api::AppState>) {
+    let grace = Duration::from_secs(OPEN_GRACE);
+    let start = tokio::time::Instant::now();
+    // xdg-open may stay in the foreground with the browser: stop waiting
+    match tokio::time::timeout(grace, open_browser(&f)).await {
+        Ok(false) => {
+            eprintln!("no browser opened; open {url}");
+            return;
+        }
+        Ok(true) => tokio::time::sleep_until(start + grace).await,
+        Err(_) => {}
+    }
+    if st.bootstrap_pending() {
+        eprintln!("the page has not loaded yet; open {url}");
+    }
 }
 
 #[cfg(test)]
