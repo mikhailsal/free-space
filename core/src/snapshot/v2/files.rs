@@ -67,7 +67,10 @@ pub(super) fn reader_error(path: &Path, error: Error) -> Error {
         let mut file = path.as_os_str().to_os_string();
         file.push(suffix);
         let file = Path::new(&file);
-        if let Err(denied) = std::fs::File::open(file)
+        if let Err(denied) = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(file)
             && denied.kind() == std::io::ErrorKind::PermissionDenied
         {
             return crate::snapshot::reader::access_error(file, &denied).with_fix(
