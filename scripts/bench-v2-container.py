@@ -225,28 +225,69 @@ def db_breakdown(snapshot):
     return result
 
 
-def generate(root, start, stop):
+def generate(root, start, stop, checkpoint):
+    """Create deterministic fixtures with constant Python state and bounded batches.
+
+    Sync drains dirty metadata without dropping caches or moving cgroup charges.
+    It is fixture preparation, outside every measured CLI command.
+    """
+    fixed_time = (1700000000, 1700000000)
+    checkpoint(root.name, start, "start")
     for index in range(start, stop):
-        directory = root / f"d{index // 1000:06}"
-        directory.mkdir(exist_ok=True)
-        (directory / f"f{index:09}").touch(exist_ok=False)
-    for path in root.rglob("*"):
-        os.utime(path, (1700000000, 1700000000))
-    os.utime(root, (1700000000, 1700000000))
+        if index == start or index % 1000 == 0:
+            directory = root / f"d{index // 1000:06}"
+            directory.mkdir(exist_ok=True)
+        file = directory / f"f{index:09}"
+        file.touch(exist_ok=False)
+        os.utime(file, fixed_time)
+        if (index + 1) % 1000 == 0 or index + 1 == stop:
+            os.utime(directory, fixed_time)
+        if (index + 1) % 10000 == 0:
+            checkpoint(root.name, index + 1, "before_sync")
+            os.sync()
+            checkpoint(root.name, index + 1, "after_sync")
+    os.utime(root, fixed_time)
+    checkpoint(root.name, stop, "before_final_sync")
+    os.sync()
+    checkpoint(root.name, stop, "complete")
 
 
 def inside(spec_path):
     spec = json.loads(spec_path.read_text())
     group = cgroup()
     dump(Path("/results") / (spec["id"] + ".arm-start.json"), cg_read(group))
+
+    def checkpoint(subtree, created, phase):
+        selected = {"anon", "file", "kernel", "slab", "slab_reclaimable",
+                    "slab_unreclaimable", "file_dirty", "file_writeback"}
+        memory_stat = {}
+        for line in (group / "memory.stat").read_text().splitlines():
+            name, value = line.split()
+            if name in selected:
+                memory_stat[name] = int(value)
+        row = dict(subtree=subtree, created_files=created, phase=phase,
+                   unix_seconds=time.time(), cgroup=cg_read(group),
+                   memory_stat_bytes=memory_stat)
+        # Append and fsync each checkpoint so an OOM during the next batch or
+        # sync retains the last completed phase in the raw artifact.
+        with (Path("/results") / (spec["id"] + ".fixture-progress.jsonl")).open("a") as stream:
+            stream.write(json.dumps(row) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        print(f'fixture {spec["id"]} {subtree} {created} {phase}: '
+              f'memory.current={row["cgroup"]["memory.current"]} stat={memory_stat}', flush=True)
+
     tree = Path("/scratch/tree")
     (tree / "small").mkdir(parents=True)
     (tree / "unrelated").mkdir()
     # Generation happens inside this arm's cgroup, before timed commands. Its
     # inode/dentry/cache charges remain subject to the same RAM budget.
-    generate(tree / "small", 0, 16)
-    generate(tree / "unrelated", 0, spec["files"])
+    generate(tree / "small", 0, 16, checkpoint)
+    generate(tree / "unrelated", 0, spec["files"], checkpoint)
     os.utime(tree, (1700000000, 1700000000))
+    checkpoint("tree", spec["files"] + 16, "before_final_sync")
+    os.sync()
+    checkpoint("tree", spec["files"] + 16, "complete")
     dump(Path("/results") / (spec["id"] + ".fixture-ready.json"), cg_read(group))
     for index, operation in enumerate(spec["operations"]):
         command_spec = dict(spec, id=f'{spec["id"]}-{index}-{operation}', operation=operation,
@@ -298,7 +339,7 @@ def host(args):
         cpu=Path("/proc/cpuinfo").read_text(), docker=capture(["docker", "version"]),
         image=capture(["docker", "image", "inspect", image]),
         resource_policy="2 CPU quota, selected RAM MiB, memory-swap=memory, no OOM override",
-        cache_policy="fixture generated inside each fresh arm cgroup; cache retained across CLI processes and read-only post-command dbstat; no host cache dropping; alternating paired arm order",
+        cache_policy="fixture generated inside each fresh arm cgroup with immediate mtimes and constant Python state; os.sync every 10000 files and at completion drains dirty metadata outside timed commands without dropping caches; cache retained across CLI processes and read-only post-command dbstat; no host cache dropping; alternating paired arm order",
         measurement_policy="complete CLI process incl close/checkpoint; helper shares cgroup; cgroup memory.peak arm-cumulative; per-command sampled memory.current lower bound and GNU time RSS; disk peaks sampled lower bounds",
         provenance={arm: dict(sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                      source_revision=binary.with_name(binary.name + ".revision.txt").read_text().strip(),
