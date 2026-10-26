@@ -281,3 +281,32 @@ to 0.71 s; medians were 0.61 and 0.66 s. Median insert time was 0.116979 vs
 The results do not establish a memory budget or predict the musl/mimalloc
 release build's peak; larger realistic trees and controlled hosts need their
 own measurements.
+
+### Releasing refresh-only data before writing
+
+A second local glibc comparison used `3a8e80c` (which already releases the
+written tree before indexes) as the baseline. After grafting and finalization,
+refresh no longer needs the loaded snapshot-id map, old hardlink rows, or
+hardlink policy. After copying refresh metadata, it also no longer needs the
+old snapshot connection and its mapping/cache. Explicitly releasing all four
+before calling the writer further reduces the refresh peak.
+
+The same host and 2-worker configuration refreshed an unchanged 17-entry
+`small/` subtree beside 100 directories containing 1000 empty files each:
+100,119 total entries. Separate snapshot directories were initialized with the
+baseline binary. Order was baseline/candidate/candidate/baseline repeated
+three times, giving six refreshes per binary on the same tree. Every report
+was checked for total and subtree entry counts. Medians follow (RSS in KiB,
+times in seconds); caches and host load were uncontrolled.
+
+| Build | Peak RSS | Wall | Load | Walk | Finalize | Insert | Index | Publish | Total |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline | 31,630 | 0.725 | 0.115667 | 0.001581 | 0.008923 | 0.183436 | 0.318202 | 0.005315 | 0.720375 |
+| candidate | 25,802 | 0.765 | 0.144132 | 0.004616 | 0.010552 | 0.197075 | 0.331633 | 0.005917 | 0.759816 |
+
+Peak RSS falls another 18.4%, with nonoverlapping ranges: 31,484–31,784 vs
+25,480–26,008 KiB. Wall ranges overlap (0.61–0.82 vs 0.71–0.83 s), with no
+speed improvement claim. This retains the timing boundaries described above:
+refresh-only releases happen outside load/finalize/insert/index timers and
+are included in total time. This workload contains no hardlinks, so it does
+not quantify the benefit from releasing old hardlink rows or policy maps.
