@@ -51,7 +51,7 @@ fn fail(id: &str, detail: impl Into<String>, fix: impl Into<String>) -> Check {
 }
 
 /// Returns whether every check passed.
-pub fn run(a: &DoctorArgs) -> bool {
+pub fn run(a: &DoctorArgs) -> output::Result<bool> {
     let mut checks = Vec::new();
     let loaded = match config::load() {
         Ok(l) => {
@@ -98,8 +98,8 @@ pub fn run(a: &DoctorArgs) -> bool {
             ok,
             version: VERSION.into(),
             checks,
-        });
-        return ok;
+        })?;
+        return Ok(ok);
     }
     let w = checks.iter().map(|c| c.id.len()).max().unwrap_or(0);
     let mut out = String::new();
@@ -116,8 +116,8 @@ pub fn run(a: &DoctorArgs) -> bool {
     } else {
         format!("{failed} check(s) failed.\n")
     });
-    output::print(&out);
-    ok
+    output::print(&out)?;
+    Ok(ok)
 }
 
 fn systemctl_value(args: &[&str]) -> Option<String> {

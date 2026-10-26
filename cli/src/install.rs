@@ -80,10 +80,11 @@ struct Report {
     scan_reason: Option<String>,
 }
 
-pub fn run(a: InstallArgs) -> Result<()> {
+pub fn run(a: InstallArgs) -> output::Result<()> {
     if !fsutil::is_root() {
         return Err(Error::new(ErrorCode::NotRoot, "install-timer needs root")
-            .with_fix("sudo freespace install-timer"));
+            .with_fix("sudo freespace install-timer")
+            .into());
     }
     systemd::check_supported()?;
     if a.uninstall {
@@ -181,7 +182,7 @@ pub fn run(a: InstallArgs) -> Result<()> {
         scan_reason: scan_reason.clone(),
     };
     if a.json {
-        output::print_json(&report);
+        output::print_json(&report)?;
         return Ok(());
     }
     let mut out = String::new();
@@ -217,7 +218,7 @@ pub fn run(a: InstallArgs) -> Result<()> {
         (false, Some(why)) => out.push_str(&format!("{why}\n")),
         _ => {}
     }
-    output::print(&out);
+    output::print(&out)?;
     Ok(())
 }
 
@@ -465,7 +466,7 @@ fn start_scan_if_needed(dir: &SnapshotDir) -> Result<(bool, Option<String>)> {
 
 /// The DX manifest (OV-8), in order. Only files freespace writes are removed;
 /// a snapshot dir holding anything else is left in place.
-fn uninstall(a: &InstallArgs) -> Result<()> {
+fn uninstall(a: &InstallArgs) -> output::Result<()> {
     let cfg_path = config::config_path();
     let c = config::load_from(&cfg_path)
         .map(|l| l.config)
@@ -531,7 +532,7 @@ fn uninstall(a: &InstallArgs) -> Result<()> {
     if a.json {
         output::print_json(
             &serde_json::json!({"removed": removed, "kept": kept, "group_kept": fsutil::GROUP}),
-        );
+        )?;
         return Ok(());
     }
     let mut out = String::from("freespace uninstalled\n");
@@ -548,7 +549,7 @@ fn uninstall(a: &InstallArgs) -> Result<()> {
         fsutil::GROUP,
         fsutil::GROUP
     ));
-    output::print(&out);
+    output::print(&out)?;
     Ok(())
 }
 

@@ -2,7 +2,6 @@
 //! output, checked by the `schema_json_is_current` test.
 
 use clap::Args;
-use freespace_core::Result;
 use freespace_core::queries::types::schema_document;
 
 use crate::output;
@@ -14,7 +13,7 @@ pub struct SchemaArgs {
     pub json: bool,
 }
 
-pub fn run(_a: &SchemaArgs) -> Result<()> {
-    output::print_json(&schema_document());
+pub fn run(_a: &SchemaArgs) -> output::Result<()> {
+    output::print_json(&schema_document())?;
     Ok(())
 }

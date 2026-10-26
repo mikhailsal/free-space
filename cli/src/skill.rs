@@ -78,10 +78,10 @@ fn target(dir: Option<PathBuf>) -> Result<(PathBuf, Option<UserInfo>)> {
     }
 }
 
-pub fn run(a: SkillArgs) -> Result<()> {
+pub fn run(a: SkillArgs) -> output::Result<()> {
     match a.cmd {
         SkillCmd::Print => {
-            output::print(&stamped());
+            output::print(&stamped())?;
             Ok(())
         }
         SkillCmd::Install { dir } => {
