@@ -231,3 +231,90 @@ and other system/cgroup memory and cannot demonstrate a memory budget or OOM
 safety. A separately configured VM/cgroup and phase-aware profiling are needed
 for those acceptance checks. This infrastructure supplies measurements for #10
 and #11 and makes no speed or memory improvement claim.
+
+### Releasing scan data before index creation
+
+A local glibc release build on 2026-10-26 compared baseline `5a280da` with
+ownership transferred to the snapshot writer. The writer drops `Tree` and
+`Finalized` after inserting all tables, before `CREATE INDEX`. SQLite settings,
+schema, transaction boundaries, and publication order are unchanged. Report
+entry/error counts are captured before transferring ownership.
+
+Two invocations per binary used the synthetic harness above with
+`STEPS="10000 100000" REPEATS=3` and its default 2 workers, 16 small files,
+and 1000 files per directory. Order was baseline, candidate, baseline,
+candidate. The host ran Linux 5.15, glibc 2.35, on ext4, with uncontrolled
+caches and other host activity. Each cell below is the median of six runs;
+RSS is KiB and time is seconds. These are whole-command peaks, not stage RSS.
+
+| Entries | Operation | Baseline peak RSS | Candidate peak RSS | Baseline wall | Candidate wall |
+|---|---|---|---|---|---|
+| 10,030 | scan | 11,242 | 10,294 | 0.110 | 0.110 |
+| 10,030 | refresh | 11,648 | 10,478 | 0.105 | 0.115 |
+| 100,120 | scan | 36,334 | 26,456 | 0.625 | 0.770 |
+| 100,120 | refresh | 45,012 | 34,900 | 0.510 | 0.610 |
+
+Median full-scan stage timings from the same runs. These measurements used
+an earlier candidate whose insert timer included releasing the tree and
+finalized arrays. The current writer records insert time before that release,
+preserving the baseline timer boundary; deallocation is included only in total
+time, between the insert and index timers. The historical candidate insert
+numbers below and in the follow-up therefore include that extra work. RSS and
+wall measurements cover the whole command and do not depend on timer placement.
+
+| Entries | Build | Walk | Finalize | Insert | Index | Publish | Total |
+|---|---|---|---|---|---|---|---|
+| 10,030 | baseline | 0.029340 | 0.000696 | 0.013702 | 0.023299 | 0.001059 | 0.107021 |
+| 10,030 | candidate | 0.029866 | 0.000581 | 0.011065 | 0.020194 | 0.001796 | 0.112108 |
+| 100,120 | baseline | 0.246661 | 0.006558 | 0.121165 | 0.197558 | 0.001913 | 0.618723 |
+| 100,120 | candidate | 0.276694 | 0.008566 | 0.158670 | 0.248005 | 0.002714 | 0.767135 |
+
+The 100k scan peak falls 27.2%; refresh falls 22.5%. Timings in these separate
+harness runs are slower for the candidate. A follow-up used one unchanged
+100,101-entry tree (100 numbered directories, 1000 empty numbered files each),
+2 workers, and alternating baseline/candidate/candidate/baseline order three
+times, with separate snapshot directories. It confirmed the RSS reduction:
+median 34,300 to 24,528 KiB (28.5%). Both binaries' wall times ranged from 0.61
+to 0.71 s; medians were 0.61 and 0.66 s. Median insert time was 0.116979 vs
+0.132916 s, index time 0.210195 vs 0.209731 s, and total time 0.608336 vs
+0.657334 s. This is a memory improvement, with no speed improvement claim.
+The results do not establish a memory budget or predict the musl/mimalloc
+release build's peak; larger realistic trees and controlled hosts need their
+own measurements.
+
+### Releasing refresh-only data before writing
+
+A second local glibc comparison used `3a8e80c` (which already releases the
+written tree before indexes) as the baseline. After grafting and finalization,
+refresh no longer needs the loaded snapshot-id map, old hardlink rows, or
+hardlink policy. After copying refresh metadata, it also no longer needs the
+old snapshot connection and its mapping/cache. Explicitly releasing all four
+before calling the writer further reduces the refresh peak.
+
+The same host and 2-worker configuration refreshed an unchanged 17-entry
+`small/` subtree beside 100 directories containing 1000 empty files each:
+100,119 total entries. Separate snapshot directories were initialized with the
+baseline binary. Order was baseline/candidate/candidate/baseline repeated
+three times, giving six refreshes per binary on the same tree. Every report
+was checked for total and subtree entry counts. Medians follow (RSS in KiB,
+times in seconds); caches and host load were uncontrolled.
+
+| Build | Peak RSS | Wall | Load | Walk | Finalize | Insert | Index | Publish | Total |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline | 31,630 | 0.725 | 0.115667 | 0.001581 | 0.008923 | 0.183436 | 0.318202 | 0.005315 | 0.720375 |
+| candidate | 25,802 | 0.765 | 0.144132 | 0.004616 | 0.010552 | 0.197075 | 0.331633 | 0.005917 | 0.759816 |
+
+Peak RSS falls another 18.4%, with nonoverlapping ranges: 31,484–31,784 vs
+25,480–26,008 KiB. Wall ranges overlap (0.61–0.82 vs 0.71–0.83 s), with no
+speed improvement claim. This retains the timing boundaries described above:
+refresh-only releases happen outside load/finalize/insert/index timers and
+are included in total time. This workload contains no hardlinks, so it does
+not quantify the benefit from releasing old hardlink rows or policy maps.
+
+D18 allocation inventory against master `47a76ac`: no new `clone()`,
+`collect()`, or allocation inside a per-entry loop. The existing root-error
+sum moves before ownership transfer without changing its iteration or
+allocations. Writer insert loops and refresh graft/finalize loops are
+unchanged. The new report counters are scalars; transferring `Tree` and
+`Finalized` moves their existing buffers without copying them. Explicit drops
+release existing allocations and the old snapshot connection.

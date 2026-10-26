@@ -122,7 +122,7 @@ test("from a relative TMPDIR the work dir is absolute", async () => {
 //   a runner
 test("a command of the harness that fails stops the job with exit 5, naming it", async () => {
   // a base that removes the fixture snapshot the harness copies for each run, at its first question
-  const gone = 'case "$1 $dir" in "status "*/snap) rm -rf "${dir%/snap}/pristine" ;; esac';
+  const gone = 'case "$1 $dir" in "status "*/snap) rm -rf "$' + "{dir%/snap}/pristine" + '" ;; esac';
   writeStub(tmp, "unpristine", stub({ early: gone }));
   const r = await guard(tmp, "unpristine", "base");
   expect(r.code).toBe(5);
