@@ -15,6 +15,7 @@ use crate::platform;
 use crate::snapshot::fsutil;
 use crate::snapshot::writer::{self, Reserve, WriteMeta, WriteStats};
 
+pub(crate) mod visit;
 mod walk;
 mod write;
 

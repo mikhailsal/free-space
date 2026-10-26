@@ -178,6 +178,25 @@ impl Reader {
         let g = self.generation(previous)?;
         Ok(self.conn.query_row("SELECT path FROM versions WHERE dev=?1 AND ino=?2 AND (flags & 2)=0 AND born<=?3 AND (dead IS NULL OR dead>?3) LIMIT 1",params![dev,ino,g],|r|r.get(0)).optional()?)
     }
+    /// Stream every denied entry in configured-root/preorder order, including
+    /// nested denied entries. The caller chooses its report representation.
+    pub fn visit_denied(&self, mut visit: impl FnMut(&[u8]) -> Result<()>) -> Result<()> {
+        let mut q = self.conn.prepare("SELECT path FROM versions WHERE scope=?1 AND (flags & 1)!=0 AND born<=?2 AND (dead IS NULL OR dead>?2) ORDER BY sort_key,born")?;
+        for root in self.roots(false)? {
+            let mut rows = q.query(params![root.path, self.generations.current])?;
+            while let Some(row) = rows.next()? {
+                let path: Vec<u8> = row.get(0)?;
+                visit(&path)?;
+            }
+        }
+        Ok(())
+    }
+    /// Complete disk-spooled scan report; no entry-sized vector or history load.
+    pub fn denied_report(&self, dir: &Path) -> Result<crate::scan::denied::DeniedPaths> {
+        let mut report = crate::scan::denied::DeniedPaths::on_disk(dir)?;
+        self.visit_denied(|path| report.push(path))?;
+        Ok(report)
+    }
     /// Global incompleteness and capped non-nested denied paths, from the pin.
     pub fn unknown_subtrees(&self, previous: bool, cap: usize) -> Result<(bool, Vec<Vec<u8>>)> {
         let g = self.generation(previous)?;
