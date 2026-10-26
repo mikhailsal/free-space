@@ -99,6 +99,36 @@ pub fn next_generation(dir: &SnapshotDir) -> (u64, Option<u64>) {
     (base + 1, cur)
 }
 
+/// How a successful scan publishes its previous generation. Only snapshots
+/// this binary can open are eligible; unreadable current files never replace prev.
+enum Previous {
+    Rotate(u64),
+    Retain(u64),
+    Drop,
+}
+
+impl Previous {
+    fn for_scan(dir: &SnapshotDir, keep: bool, current: Option<u64>) -> Self {
+        if !keep {
+            return Self::Drop;
+        }
+        if let Some(generation) = current {
+            return Self::Rotate(generation);
+        }
+        match Snapshot::open(&dir.prev()) {
+            Ok(previous) => Self::Retain(previous.meta.generation),
+            Err(_) => Self::Drop,
+        }
+    }
+
+    fn generation(&self) -> Option<u64> {
+        match self {
+            Self::Rotate(generation) | Self::Retain(generation) => Some(*generation),
+            Self::Drop => None,
+        }
+    }
+}
+
 /// Entries a scan of `tree_roots` will find: inodes in use, once per
 /// filesystem. Filesystems that keep no inode count (vfat, exfat) add nothing;
 /// an EFI partition holds a few hundred entries next to millions.
@@ -203,12 +233,11 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
     })?;
     fault::point(&req.dir, "prechecked");
     let (generation, current_gen) = next_generation(&req.dir);
-    // D13: a snapshot this binary cannot read (an older schema) is not a
-    // previous generation; `diff` answers NO_PREV until the next scan
-    let has_current = req.dir.current().exists()
-        && !matches!(Snapshot::open_current(&req.dir), Err(e) if e.code == ErrorCode::Schema);
-    let rotate = req.keep_previous && has_current;
-    let prev_generation = if rotate { current_gen } else { None };
+    let previous = Previous::for_scan(&req.dir, req.keep_previous, current_gen);
+    let prev_generation = previous.generation();
+    // State/current may both be unreadable: the retained bytes still establish
+    // a lower bound, and diff requires distinct, correctly paired generations.
+    let generation = generation.max(prev_generation.map_or(1, |g| g + 1));
     let mut meta = WriteMeta::new(generation, prev_generation, tree.started_at);
     meta.one_file_system = req.one_file_system;
     meta.scan_seconds = Some(walk_seconds);
@@ -218,11 +247,11 @@ fn scan_locked(req: ScanRequest, label: &str) -> Result<ScanReport> {
 
     pw.set_stage(progress::STAGE_PUBLISH);
     let t = Instant::now();
-    if rotate {
+    if matches!(previous, Previous::Rotate(_)) {
         publish::rotate_prev(&req.dir)?;
     }
     publish::publish_current(&req.dir, &tmp)?;
-    if !rotate {
+    if matches!(previous, Previous::Drop) {
         publish::drop_prev(&req.dir);
     }
     let publish_seconds = t.elapsed().as_secs_f64();
