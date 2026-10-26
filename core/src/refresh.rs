@@ -14,6 +14,9 @@ use std::time::Instant;
 
 use rusqlite::params;
 
+#[path = "refresh_mounts.rs"]
+mod mounts;
+
 use crate::error::{Error, ErrorCode, Result};
 use crate::job::{denied_paths, denied_warning};
 use crate::platform::{self, FsStats};
@@ -433,8 +436,27 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
                     .with_fix(format!("sudo freespace refresh {}", parent.display())),
             );
         }
-        Ok(_) => true,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Ok(m) => {
+            use std::os::unix::fs::MetadataExt;
+            mounts::check(
+                &os_path,
+                Some(m.dev()),
+                &loaded.tree.roots,
+                snap.meta.one_file_system,
+                label,
+            )?;
+            true
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            mounts::check(
+                &os_path,
+                None,
+                &loaded.tree.roots,
+                snap.meta.one_file_system,
+                label,
+            )?;
+            false
+        }
         Err(e) => return Err(Error::io(format!("stat {label}"), e)),
     };
     let sub = if exists {

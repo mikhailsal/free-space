@@ -100,3 +100,79 @@ head -c 8192 /dev/zero > "$t/root/c/h"
 "$bin" status --json | jq -e '.generation == 3 and .last_error == null' > /dev/null ||
     fail "status after refresh c: $("$bin" status --json)"
 echo "ok: mounts inside a root are mount points of 0 bytes, and a refresh that does not reach them keeps them"
+
+# Start from ordinary directories, so their cached kind is Dir, then cover
+# both the target and a cached descendant with mounts after the scan.
+echo "5. mounts created after the scan retain the original root boundary"
+umount "$a/m"
+umount "$a/b"
+mkdir -p "$a/m/child" "$a/m/missing" "$a/b/child" "$a/b/missing" "$t/other/child"
+"$bin" scan "$t/other" "$t/root" 2> "$t/err" || fail "late baseline scan"
+"$bin" scan "$t/other" "$t/root" 2> "$t/err" || fail "late baseline previous"
+mount -t tmpfs -o size=16m tmpfs "$a/m"
+mkdir "$a/m/child"
+head -c 2097152 /dev/zero > "$a/m/child/foreign"
+mount --bind "$t/other" "$a/b"
+# A refusal must preserve even a previous failure, not merely keep null.
+jq '.last_error = {ts: 1, op: "scan", message: "retained failure"}' "$t/snap/state.json" > "$t/state"
+cp "$t/state" "$t/snap/state.json"
+
+seal() {
+    # Hashes protect contents; inode/size identity protects publication/rotation.
+    sha256sum "$t/snap/snapshot.db" "$t/snap/snapshot.prev.db" "$t/snap/state.json"
+    stat -c '%i %s' "$t/snap/snapshot.db" "$t/snap/snapshot.prev.db"
+}
+refuse_late() {
+    target=$1
+    before=$(seal)
+    code=0
+    "$bin" refresh "$target" --json > "$t/out.json" 2> "$t/err" || code=$?
+    [ "$code" = 2 ] || fail "late refresh $target: exit $code: $(cat "$t/err")"
+    msg="$target is a mount point outside this root's filesystem; refresh is per filesystem"
+    jq -e --arg m "$msg" '.error.code == "USAGE" and .error.message == $m' "$t/out.json" > /dev/null ||
+        fail "late refresh: $(cat "$t/out.json")"
+    [ "$(seal)" = "$before" ] || fail "late refusal changed snapshot or state"
+    [ ! -e "$t/snap/progress.json" ] || fail "late refusal left progress behind"
+}
+for target in "$a/m" "$a/m/child" "$a/m/missing" "$a/b" "$a/b/child" "$a/b/missing"; do
+    refuse_late "$target"
+done
+# None of the foreign names or bytes may enter the original cached subtree.
+"$bin" ls "$a/m/child" --json | jq -e '.entries | length == 0' > /dev/null || fail "late tmpfs imported foreign entries"
+"$bin" ls "$a/b/child" --json | jq -e '.entries | length == 0' > /dev/null || fail "late bind imported foreign entries"
+a_allocated=$(( $(stat -c %b "$a") * 512 + $(stat -c %b "$a/f") * 512 ))
+a_apparent=$(( $(stat -c %s "$a") + $(stat -c %s "$a/f") ))
+check_late_totals() {
+    "$bin" ls "$t/root" --json | jq -e --argjson allocated "$a_allocated" --argjson apparent "$a_apparent" \
+        '.entries[] | select(.name == "a") | .allocated == $allocated and .apparent == $apparent and .items == 3' > /dev/null ||
+        fail "late mount aggregate includes foreign bytes/items"
+}
+"$bin" refresh "$a" 2> "$t/err" || fail "late parent refresh"
+check_late_totals
+[ "$(mount_row)" = "$want" ] || fail "late parent tmpfs row"
+[ "$(bind_row)" = "$want_bind" ] || fail "late parent bind row"
+"$bin" refresh "$t/root/c" 2> "$t/err" || fail "late sibling refresh"
+check_late_totals
+[ "$(mount_row)" = "$want" ] || fail "late sibling tmpfs row"
+[ "$(bind_row)" = "$want_bind" ] || fail "late sibling bind row"
+"$bin" status --json | jq -e '.last_error == null' > /dev/null || fail "successful retry did not clear failure"
+# An explicit root, including a live mounted filesystem, is its own boundary.
+"$bin" refresh "$t/root" 2> "$t/err" || fail "configured root refresh"
+"$bin" scan "$a/m" 2> "$t/err" || fail "mounted configured root scan"
+"$bin" refresh "$a/m" 2> "$t/err" || fail "mounted configured root refresh"
+
+# Cross-mounts permits a late foreign filesystem but still stops subtree binds.
+echo "6. cross-mounts keeps the walker's distinct bind policy"
+umount "$a/m"
+umount "$a/b"
+"$bin" scan "$t/root" --cross-mounts 2> "$t/err" || fail "cross-mounts baseline"
+"$bin" scan "$t/root" --cross-mounts 2> "$t/err" || fail "cross-mounts previous"
+mount -t tmpfs -o size=16m tmpfs "$a/m"
+head -c 2097152 /dev/zero > "$a/m/foreign"
+mount --bind "$t/other" "$a/b"
+refuse_late "$a/b"
+refuse_late "$a/b/child"
+"$bin" refresh "$a/m" 2> "$t/err" || fail "cross-mounts late tmpfs refresh"
+"$bin" ls "$a/m" --json | jq -e '.entries | any(.name == "foreign" and .apparent == 2097152)' > /dev/null ||
+    fail "cross-mounts did not import the permitted foreign file"
+echo "ok: late mounts preserve scan policy and refusal leaves both snapshots and state intact"
