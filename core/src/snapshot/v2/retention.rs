@@ -65,7 +65,21 @@ pub(super) fn create_lease(path: &Path) -> Result<()> {
 }
 
 fn lock(path: &Path, exclusive: bool) -> Result<Option<File>> {
-    let file = File::open(lease_path(path)).map_err(|e| Error::io("open v2 reader lease", e))?;
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(lease_path(path))
+        .map_err(|e| Error::io("open v2 reader lease", e))?;
+    if !file
+        .metadata()
+        .map_err(|e| Error::io("inspect v2 reader lease", e))?
+        .is_file()
+    {
+        return Err(Error::new(
+            ErrorCode::Schema,
+            "v2 reader lease must be a regular file",
+        ));
+    }
     let mode = if exclusive {
         libc::LOCK_EX
     } else {

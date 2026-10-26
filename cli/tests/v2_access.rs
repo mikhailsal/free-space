@@ -65,37 +65,55 @@ fn unreadable_v2_files_preserve_the_snapshot_access_contract() {
 #[test]
 fn invalid_store_with_fifo_lease_returns_schema_error_without_hanging() {
     use std::{ffi::CString, process::Stdio, time::Duration};
-    let e = Env::new();
-    let dir = e.snap().join("v2");
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("generations.db"), b"not a SQLite database").unwrap();
-    let fifo = CString::new(
-        dir.join("generations.db.readers")
-            .as_os_str()
-            .as_encoded_bytes(),
-    )
-    .unwrap();
-    assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
-    let mut child = e
-        .cmd(&["--backend", "v2", "status", "--json"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let mut completed = false;
-    // gstack-timing-ok: bound a potentially blocked owned child; assert its error contract, not latency.
-    for _ in 0..500 {
-        if child.try_wait().unwrap().is_some() {
-            completed = true;
-            break;
+    for published in [false, true] {
+        let e = Env::new();
+        let dir = e.snap().join("v2");
+        fs::create_dir_all(&dir).unwrap();
+        if published {
+            fs::create_dir(e.root()).unwrap();
+            assert!(
+                e.run(&[
+                    "--backend",
+                    "v2",
+                    "scan",
+                    e.root().to_str().unwrap(),
+                    "--json"
+                ])
+                .status
+                .success()
+            );
+            fs::remove_file(dir.join("generations.db.readers")).unwrap();
+        } else {
+            fs::write(dir.join("generations.db"), b"not a SQLite database").unwrap();
         }
-        std::thread::sleep(Duration::from_millis(10));
+        let fifo = CString::new(
+            dir.join("generations.db.readers")
+                .as_os_str()
+                .as_encoded_bytes(),
+        )
+        .unwrap();
+        assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
+        let mut child = e
+            .cmd(&["--backend", "v2", "status", "--json"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut completed = false;
+        // gstack-timing-ok: bound a potentially blocked owned child; assert its error contract, not latency.
+        for _ in 0..500 {
+            if child.try_wait().unwrap().is_some() {
+                completed = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if !completed {
+            child.kill().unwrap();
+        }
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(output.status.code(), Some(5), "{output:?}");
+        let body: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(body["error"]["code"], "SCHEMA");
     }
-    if !completed {
-        child.kill().unwrap();
-    }
-    let output = child.wait_with_output().unwrap();
-    assert_eq!(output.status.code(), Some(5), "{output:?}");
-    let body: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(body["error"]["code"], "SCHEMA");
 }
