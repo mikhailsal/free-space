@@ -62,6 +62,8 @@ publication. Aggregation occurs during preparation or the transaction depending
 on the scan profile. Zero values indicate phases without a separate timer.
 Compare complete command time as well as the report. `snapshot_bytes`
 includes the database and WAL; shared-memory and lease files are excluded.
+The writer closes before the final size and `total_seconds` are measured, so a
+last-writer checkpoint and state-file update are included in that total.
 
 ## Reclaim old versions
 

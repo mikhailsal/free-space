@@ -136,6 +136,16 @@ fn scan_store(
 ) -> Result<freespace_core::snapshot::v2::WriteReport> {
     store.scan_roots_with_options(roots, one_file_system, workers, low_memory, keep_previous)
 }
+
+fn root_errors(reader: &Reader) -> Result<u64> {
+    let mut errors = 0;
+    for root in reader.roots(false)? {
+        errors += reader
+            .get_id(root.entry_id, false)?
+            .map_or(0, |entry| entry.errors as u64);
+    }
+    Ok(errors)
+}
 pub fn scan(
     loaded: &Loaded,
     roots: &[std::path::PathBuf],
@@ -167,15 +177,25 @@ pub fn scan(
                 low_memory,
                 loaded.config.keep_previous,
             )?;
+            // Last-writer close may checkpoint WAL; measure it before the final report.
+            drop(store);
             let reader = reader(&dir)?;
             let entries = reader.meta(false)?.entries;
             let denied = reader.denied_report(dir.as_path())?;
             let bytes = snapshot_bytes(&dir)?;
+            let errors = root_errors(&reader)?;
+            let generations = reader.generations;
+            success(
+                &dir,
+                &reader,
+                started.elapsed().as_secs_f64(),
+                denied.warning(),
+            )?;
+            drop(reader);
             let total_seconds = started.elapsed().as_secs_f64();
-            success(&dir, &reader, total_seconds, denied.warning())?;
             Ok(freespace_core::job::ScanReport {
-                generation: reader.generations.current as u64,
-                prev_generation: reader.generations.prev.map(|g| g as u64),
+                generation: generations.current as u64,
+                prev_generation: generations.prev.map(|g| g as u64),
                 entries,
                 walk_seconds: write.walk.as_secs_f64(),
                 finalize_seconds: 0.0,
@@ -188,17 +208,7 @@ pub fn scan(
                 total_seconds,
                 snapshot_bytes: bytes,
                 denied,
-                errors: reader
-                    .roots(false)?
-                    .iter()
-                    .map(|r| {
-                        reader
-                            .get_id(r.entry_id, false)
-                            .map(|e| e.map_or(0, |e| e.errors as u64))
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .into_iter()
-                    .sum(),
+                errors,
             })
         })(),
     )
@@ -223,6 +233,7 @@ pub fn refresh(
             let started = std::time::Instant::now();
             let mut store = Store::open(&database(&dir))?;
             let write = store.refresh(path, workers)?;
+            drop(store);
             let reader = reader(&dir)?;
             let entries = reader.meta(false)?.entries;
             let mut denied = Vec::new();
@@ -231,15 +242,17 @@ pub fn refresh(
                 Ok(())
             })?;
             let bytes = snapshot_bytes(&dir)?;
-            let total_seconds = started.elapsed().as_secs_f64();
+            let generation = reader.generations.current as u64;
             success(
                 &dir,
                 &reader,
-                total_seconds,
+                started.elapsed().as_secs_f64(),
                 freespace_core::job::denied_warning(&denied),
             )?;
+            drop(reader);
+            let total_seconds = started.elapsed().as_secs_f64();
             Ok(freespace_core::refresh::RefreshReport {
-                generation: reader.generations.current as u64,
+                generation,
                 path: path.display().to_string(),
                 entries,
                 subtree_entries: write.new_subtree_entries as u64,

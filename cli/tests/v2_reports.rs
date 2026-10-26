@@ -23,6 +23,14 @@ fn answer(env: &Env, args: &[&str]) -> Value {
     serde_json::from_slice(&result.stdout).unwrap()
 }
 
+fn v2_stored_bytes(env: &Env) -> u64 {
+    ["generations.db", "generations.db-wal"]
+        .into_iter()
+        .filter_map(|name| fs::metadata(env.snap().join("v2").join(name)).ok())
+        .map(|metadata| metadata.len())
+        .sum()
+}
+
 #[test]
 fn write_reports_preserve_all_denied_paths_beyond_status_limit() {
     if freespace_core::snapshot::fsutil::is_root() {
@@ -103,6 +111,7 @@ fn v2_scan_honors_config_and_cli_memory_profiles_and_previous_policy() {
         assert_eq!(scan["generation"], generation);
         assert_eq!(scan["prev_generation"], Value::Null);
         assert_eq!(scan["entries"], 2);
+        assert_eq!(scan["snapshot_bytes"], v2_stored_bytes(&env));
     }
     fs::write(env.config(), "backend = \"v2\"\n").unwrap();
     let scan = answer(
@@ -116,6 +125,7 @@ fn v2_scan_honors_config_and_cli_memory_profiles_and_previous_policy() {
     );
     assert_eq!(scan["generation"], 3);
     assert_eq!(scan["prev_generation"], 2);
+    assert_eq!(scan["snapshot_bytes"], v2_stored_bytes(&env));
     assert!(!env.snap().join("snapshot.db").exists());
     let status = answer(&env, &["status", "--json"]);
     assert_eq!(status["generation"], 3);
@@ -130,4 +140,7 @@ fn v2_scan_honors_config_and_cli_memory_profiles_and_previous_policy() {
             .iter()
             .any(|name| name.to_string_lossy().ends_with(".stage.tmp"))
     );
+    fs::write(env.root().join("new-file"), [1; 8192]).unwrap();
+    let refresh = answer(&env, &["refresh", env.root().to_str().unwrap(), "--json"]);
+    assert_eq!(refresh["snapshot_bytes"], v2_stored_bytes(&env));
 }
