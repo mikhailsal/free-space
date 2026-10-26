@@ -151,8 +151,8 @@
       "when": [
         "web/**"
       ],
-      "command": "cd web && bun install --frozen-lockfile && bunx tsc --noEmit && bunx biome format .",
-      "fix": "run the failing command in web/; bunx biome format --write . fixes the format",
+      "command": "(cd web && bun install --frozen-lockfile) && scripts/check.sh tsc biome",
+      "fix": "run scripts/check.sh tsc biome; bunx biome format --write . in web/ fixes formatting",
       "timeout_s": 600
     },
     {
@@ -166,8 +166,8 @@
         "Cargo.lock",
         "clippy.toml"
       ],
-      "command": "cargo fmt --all --check && nice -n 19 cargo clippy --workspace --all-targets -j 2 -- -D warnings && nice -n 19 cargo test --workspace -j 2",
-      "fix": "the same three commands as the CI rust job; cargo fmt --all fixes the format",
+      "command": "nice -n 19 scripts/check.sh rust && nice -n 19 cargo test --workspace -j 2",
+      "fix": "run scripts/check.sh rust and cargo test --workspace -j 2; cargo fmt --all fixes the format",
       "timeout_s": 2400
     },
     {
@@ -177,13 +177,15 @@
         "install.sh",
         ".githooks/**"
       ],
-      "command": "shellcheck install.sh scripts/*.sh scripts/rust-diff/*.sh",
-      "fix": "fix the shellcheck finding"
+      "command": "scripts/check.sh shell",
+      "fix": "run scripts/check.sh shell and fix the shellcheck finding"
     }
   ],
   "strays": {
     "allow": [
-      ".gstack"
+      ".gstack",
+      ".githooks",
+      "clippy.toml"
     ]
   },
   "serial_patterns": [
