@@ -98,6 +98,10 @@ body = "\n".join("    n += 1;" for _ in range(79))
 with path.open("a") as f:
     if sys.argv[2] == "suppress":
         f.write("\n#[allow(clippy::too_many_lines)]")
+    elif sys.argv[2] == "comment":
+        f.write("\n#[allow(clippy:: /* canary */ too_many_lines)]")
+    elif sys.argv[2] == "cfg_doc":
+        f.write('\n#[cfg_attr(all(), doc = "]", allow(clippy::too_many_lines))]')
     f.write("\n#[allow(dead_code)]\nfn canary_long_function() {\n    let mut n = 0;\n")
     f.write(body + "\n    std::hint::black_box(n);\n}\n")
 PY
@@ -204,6 +208,8 @@ done < "$tmp/rust-members.tsv"
 first_member=$(head -n 1 "$tmp/rust-members.tsv" | cut -f2)
 run_case Rust-nesting rust excessive_nesting "$first_member" inject_nested_rust
 run_case Rust-used-suppression rust too_many_lines "$first_member" inject_long_rust suppress
+run_case Rust-comment-suppression rust too_many_lines "$first_member" inject_long_rust comment
+run_case Rust-cfg-doc-suppression rust too_many_lines "$first_member" inject_long_rust cfg_doc
 run_case TypeScript-source-function-length biome noExcessiveLinesPerFunction web/src/canary-length.ts inject_ts_length
 run_case TypeScript-test-function-length biome noExcessiveLinesPerFunction web/tests/canary-length.ts inject_ts_length
 run_case TypeScript-complexity biome noExcessiveCognitiveComplexity web/src/canary-complexity.ts inject_ts_complexity

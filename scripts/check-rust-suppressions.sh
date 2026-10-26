@@ -20,6 +20,99 @@ blocked = (
     "clippy::nursery", "clippy::cargo", "clippy::perf", "clippy::style",
     "clippy::correctness", "clippy::suspicious",
 )
+
+
+def code_without_comments_or_literals(source: str) -> str:
+    """Keep source offsets while hiding tokens inside comments and literals."""
+    code = list(source)
+    length = len(source)
+
+    def hide(start: int, end: int) -> None:
+        for offset in range(start, end):
+            if code[offset] != "\n":
+                code[offset] = " "
+
+    offset = 0
+    while offset < length:
+        if source.startswith("//", offset):
+            end = source.find("\n", offset)
+            end = length if end < 0 else end
+            hide(offset, end)
+            offset = end
+            continue
+        if source.startswith("/*", offset):
+            depth = 1
+            end = offset + 2
+            while end < length and depth:
+                if source.startswith("/*", end):
+                    depth += 1
+                    end += 2
+                elif source.startswith("*/", end):
+                    depth -= 1
+                    end += 2
+                else:
+                    end += 1
+            hide(offset, end)
+            offset = end
+            continue
+
+        raw = None
+        for prefix in ("br", "cr", "r"):
+            if source.startswith(prefix, offset):
+                quote = offset + len(prefix)
+                while quote < length and source[quote] == "#":
+                    quote += 1
+                if quote < length and source[quote] == '"':
+                    raw = (quote, quote - offset - len(prefix))
+                    break
+        if raw is not None:
+            quote, hashes = raw
+            terminator = '"' + "#" * hashes
+            close = source.find(terminator, quote + 1)
+            end = length if close < 0 else close + len(terminator)
+            hide(offset, end)
+            offset = end
+            continue
+
+        if source[offset] == '"':
+            end = offset + 1
+            while end < length:
+                if source[end] == "\\":
+                    end += 2
+                elif source[end] == '"':
+                    end += 1
+                    break
+                else:
+                    end += 1
+            hide(offset, min(end, length))
+            offset = min(end, length)
+            continue
+        if source[offset] == "'":
+            # Consume one character or escape, then require its closing quote.
+            # This leaves lifetimes such as 'a visible to the attribute parser.
+            end = offset + 1
+            if end < length and source[end] == "\\":
+                end += 1
+                if source.startswith("u{", end):
+                    close = source.find("}", end + 2)
+                    end = length if close < 0 else close + 1
+                elif source.startswith("x", end):
+                    end += 3
+                else:
+                    end += 1
+            else:
+                end += 1
+            if end < length and source[end] == "'":
+                end += 1
+                hide(offset, end)
+                offset = end
+            else:
+                offset += 1
+            continue
+        offset += 1
+    return "".join(code)
+
+
 violations = 0
 for raw in tracked.split(b"\0"):
     if not raw or not raw.endswith(b".rs"):
@@ -28,23 +121,24 @@ for raw in tracked.split(b"\0"):
     if not path.is_file() or path.is_symlink():
         continue
     source = path.read_text(errors="replace")
-    for match in re.finditer(r"(?m)^[ \t]*#\s*!?\s*\[", source):
+    code = code_without_comments_or_literals(source)
+    for match in re.finditer(r"#\s*!?\s*\[", code):
         start = match.start()
         depth = 0
         end = match.end() - 1
-        while end < len(source):
-            if source[end] == "[":
+        while end < len(code):
+            if code[end] == "[":
                 depth += 1
-            elif source[end] == "]":
+            elif code[end] == "]":
                 depth -= 1
                 if depth == 0:
                     end += 1
                     break
             end += 1
-        attr = re.sub(r"\s+", "", source[start:end])
-        if not ("allow(" in attr or "expect(" in attr):
+        attr = re.sub(r"\s+", "", code[start:end])
+        if not re.search(r"(?<!\w)(?:allow|expect)\(", attr):
             continue
-        hit = next((lint for lint in blocked if lint in attr), None)
+        hit = next((lint for lint in blocked if re.search(rf"(?<!\w){re.escape(lint)}(?!\w)", attr)), None)
         if hit is None and re.search(r"(?:^|[,(])warnings(?:[,)])", attr):
             hit = "warnings"
         if hit is None:

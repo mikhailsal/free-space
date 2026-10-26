@@ -129,8 +129,14 @@ pass 'check with no arguments runs all five parts'
 printf '#[allow(clippy::too_many_lines)]\nfn suppressed() {}\n' >> "$tmp/dispatch/ok.rs"
 if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'used Rust suppression passed'; fi
 grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'Rust suppression diagnostic missing'
+printf 'ok\n#[allow(clippy:: /* canary */ too_many_lines)]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
+if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'comment-split Rust suppression passed'; fi
+grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'comment-split Rust suppression diagnostic missing'
+printf 'ok\n#[cfg_attr(all(), doc = "]", allow(clippy::too_many_lines))]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
+if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'string-bracket Rust suppression passed'; fi
+grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'string-bracket Rust suppression diagnostic missing'
 printf 'ok\n' > "$tmp/dispatch/ok.rs"
-pass 'check rejects Rust lint suppressions even when Clippy is stubbed'
+pass 'check rejects Rust lint suppressions through comments and nested attributes'
 
 mkdir -p "$tmp/dispatch/web/src"
 printf '// biome-ignore lint/complexity/noExcessiveLinesPerFunction: used suppression\n' > "$tmp/dispatch/web/src/main.ts"
