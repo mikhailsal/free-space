@@ -1,5 +1,5 @@
 /* Linux-only syscall-boundary fault injection, never actual disk exhaustion.
- * Scope: exact temporary DB/WAL path, armed only after Store::open.
+ * Scope: exact temporary DB/WAL or fixture-local scan stage paths only.
  * The event pipe (stdout) proves the selected write was reached. */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -20,7 +20,17 @@ static int hit(int fd) {
     ssize_t n = readlink(link, path, sizeof(path)-1);
     if (n < 0) return 0;
     path[n] = 0;
-    if (strcmp(path, target)) return 0;
+    if (!strcmp(target, "stage")) {
+        const char *dir = getenv("GENFAULT_STAGE_DIR");
+        if (!dir) return 0;
+        size_t prefix = strlen(dir);
+        if (strncmp(path, dir, prefix) || path[prefix] != '/') return 0;
+        const char *name = path + prefix + 1;
+        size_t len = strlen(name);
+        const char *suffix = ".stage.tmp";
+        if (strncmp(name, "scan-", 5) || strchr(name, '/') ||
+            len <= 5 + strlen(suffix) || strcmp(name + len - strlen(suffix), suffix)) return 0;
+    } else if (strcmp(path, target)) return 0;
     static unsigned count;
     unsigned at = (unsigned)strtoul(getenv("GENFAULT_AT"), NULL, 10);
     if (++count < at) return 0;

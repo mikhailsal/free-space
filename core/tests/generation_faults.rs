@@ -156,6 +156,8 @@ impl Fixture {
     fn run(&self, operation: &str, target: &str, mode: &str, at: usize) {
         let target_path = if target == "wal" {
             PathBuf::from(format!("{}-wal", self.db.display()))
+        } else if target == "stage" {
+            PathBuf::from("stage")
         } else {
             self.db.clone()
         };
@@ -164,6 +166,7 @@ impl Fixture {
             .env("LD_PRELOAD", shim())
             .env("GENFAULT_DIR", self.tmp.path())
             .env("GENFAULT_TARGET", target_path)
+            .env("GENFAULT_STAGE_DIR", self.tmp.path())
             .env("GENFAULT_ARM", self.tmp.path().join("armed"))
             .env("GENFAULT_MODE", mode)
             .env("GENFAULT_AT", at.to_string())
@@ -195,6 +198,37 @@ impl Fixture {
             assert!(status.success(), "{operation}/{target}/{at}: {status}");
         }
         reader.join().unwrap();
+    }
+    fn stages(&self) -> Vec<PathBuf> {
+        let mut paths: Vec<_> = fs::read_dir(self.tmp.path())
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| {
+                p.file_name()
+                    .unwrap()
+                    .as_encoded_bytes()
+                    .starts_with(b"scan-")
+                    && p.file_name()
+                        .unwrap()
+                        .as_encoded_bytes()
+                        .ends_with(b".stage.tmp")
+            })
+            .collect();
+        paths.sort();
+        paths
+    }
+    fn retry_low_memory(&self) {
+        let before = Reader::open(&self.db).unwrap().generations.current;
+        let mut store = Store::open(&self.db).unwrap();
+        store
+            .scan_roots_with_options(std::slice::from_ref(&self.root), true, 1, true, true)
+            .unwrap();
+        assert_eq!(
+            Reader::open(&self.db).unwrap().generations.current,
+            before + 1
+        );
+        drop(store);
+        self.accounting();
     }
     fn retry(&self) {
         let before = Reader::open(&self.db).unwrap().generations.current;
@@ -267,6 +301,44 @@ fn syscall_enospc_in_wal_commit_and_database_checkpoint_preserves_state() {
 }
 
 #[test]
+fn low_memory_stage_and_publication_faults_preserve_state_and_cleanup_on_retry() {
+    let mut leaked = Vec::new();
+    for target in ["stage", "wal"] {
+        for mode in ["kill", "enospc"] {
+            for at in [1, 3] {
+                leaked.extend(low_memory_fault(target, mode, at));
+            }
+        }
+    }
+    assert!(
+        leaked.is_empty(),
+        "interrupted stage files survived retry: {leaked:?}"
+    );
+}
+
+fn low_memory_fault(target: &str, mode: &str, at: usize) -> Vec<String> {
+    let f = Fixture::new();
+    let before = f.visible();
+    let internal = f.internal();
+    f.run("low_memory", target, mode, at);
+    assert_eq!(f.visible(), before, "{target}/{mode}/{at}");
+    assert_eq!(f.internal(), internal, "{target}/{mode}/{at}");
+    f.accounting();
+    if mode == "enospc" {
+        assert!(
+            f.stages().is_empty(),
+            "normal error cleanup: {:?}",
+            f.stages()
+        );
+    }
+    f.retry_low_memory();
+    f.stages()
+        .iter()
+        .map(|p| format!("{target}/{mode}/{at}: {}", p.display()))
+        .collect()
+}
+
+#[test]
 fn generation_fault_child() {
     let Some(dir) = std::env::var_os("GENFAULT_DIR") else {
         return;
@@ -277,6 +349,10 @@ fn generation_fault_child() {
     fs::write(dir.join("armed"), b"armed").unwrap();
     let result = if operation == "refresh" {
         store.refresh(&dir.join("root/local"), 1).map(|_| ())
+    } else if operation == "low_memory" {
+        store
+            .scan_roots_with_options(&[dir.join("root")], true, 1, true, true)
+            .map(|_| ())
     } else if operation == "scan" {
         store.scan(&dir.join("root"), 1).map(|_| ())
     } else {
