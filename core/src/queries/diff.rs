@@ -23,35 +23,107 @@ pub fn no_prev(msg: &str) -> Error {
 
 /// Open current, then prev, and validate the pair.
 pub fn open_pair(dir: &SnapshotDir) -> Result<(Snapshot, Snapshot)> {
-    let cur = Snapshot::open_current(dir)?;
+    open_pair_with_hook(dir, |_| {})
+}
+
+// The hook gives unit tests a deterministic point between opening current and
+// prev. It is deliberately private so callers cannot affect snapshot reads.
+fn open_pair_with_hook<F>(dir: &SnapshotDir, mut between_opens: F) -> Result<(Snapshot, Snapshot)>
+where
+    F: FnMut(usize),
+{
+    let first = open_pair_once(dir, 1, &mut between_opens);
+    match first {
+        Ok(pair) => Ok(pair),
+        Err((first_error, _))
+            if matches!(first_error.code, ErrorCode::NoPrev | ErrorCode::Rotated) =>
+        {
+            match open_pair_once(dir, 2, &mut between_opens) {
+                Ok(pair) => Ok(pair),
+                Err((second_error, evidence)) => {
+                    if matches!(
+                        evidence,
+                        PairFailure::MissingPrev {
+                            current_declares_prev: true
+                        } | PairFailure::SameGeneration
+                    ) {
+                        Err(Error::new(
+                            ErrorCode::Rotated,
+                            format!("snapshot rotated: {}", second_error.message),
+                        )
+                        .with_fix("retry the same command"))
+                    } else {
+                        Err(*second_error)
+                    }
+                }
+            }
+        }
+        Err((error, _)) => Err(*error),
+    }
+}
+
+fn open_pair_once<F>(
+    dir: &SnapshotDir,
+    attempt: usize,
+    between_opens: &mut F,
+) -> std::result::Result<(Snapshot, Snapshot), (Box<Error>, PairFailure)>
+where
+    F: FnMut(usize),
+{
+    let cur = Snapshot::open_current(dir).map_err(|e| (Box::new(e), PairFailure::Other))?;
+    between_opens(attempt);
+    let current_declares_prev = cur.meta.prev_generation.is_some();
     let prev_path = dir.prev();
     let prev = match Snapshot::open(&prev_path) {
         Ok(p) => p,
         Err(e) if e.code == ErrorCode::NoSnapshot => {
-            return Err(no_prev("snapshot.prev.db does not exist"));
+            return Err((
+                Box::new(no_prev("snapshot.prev.db does not exist")),
+                PairFailure::MissingPrev {
+                    current_declares_prev,
+                },
+            ));
         }
         // left from before an upgrade: there is nothing to compare with yet
         Err(e) if e.code == ErrorCode::Schema => {
-            return Err(no_prev(
-                "snapshot.prev.db is from another freespace version",
+            return Err((
+                Box::new(no_prev(
+                    "snapshot.prev.db is from another freespace version",
+                )),
+                PairFailure::LegacyPrevSchema,
             ));
         }
-        Err(e) => return Err(e),
+        Err(e) => return Err((Box::new(e), PairFailure::Other)),
     };
     if prev.meta.generation == cur.meta.generation {
-        return Err(no_prev("prev and current are the same generation"));
+        return Err((
+            Box::new(no_prev("prev and current are the same generation")),
+            PairFailure::SameGeneration,
+        ));
     }
     if Some(prev.meta.generation) != cur.meta.prev_generation {
-        return Err(Error::new(
-            ErrorCode::Rotated,
-            format!(
-                "snapshot rotated: current generation {} expects prev {:?}, found {}",
-                cur.meta.generation, cur.meta.prev_generation, prev.meta.generation
+        return Err((
+            Box::new(
+                Error::new(
+                    ErrorCode::Rotated,
+                    format!(
+                        "snapshot rotated: current generation {} expects prev {:?}, found {}",
+                        cur.meta.generation, cur.meta.prev_generation, prev.meta.generation
+                    ),
+                )
+                .with_fix("retry the same command"),
             ),
-        )
-        .with_fix("retry the same command"));
+            PairFailure::Other,
+        ));
     }
     Ok((cur, prev))
+}
+
+enum PairFailure {
+    Other,
+    MissingPrev { current_declares_prev: bool },
+    LegacyPrevSchema,
+    SameGeneration,
 }
 
 pub(crate) struct LevelRow {
@@ -206,7 +278,6 @@ pub fn diff_pair(
         Some(x) => denied_prev_ranges(cur, prev, x)?,
         None => Vec::new(),
     };
-
     let mut prev_rows: Vec<Option<LevelRow>> = prev_rows.into_iter().map(Some).collect();
     let mut prev_next = vec![None; prev_rows.len()];
     let mut prev_prev = vec![None; prev_rows.len()];
@@ -304,7 +375,6 @@ pub fn diff_pair(
     });
     let total_count = pairs.len() as u64;
     pairs.truncate(limit as usize);
-
     let mut entries = Vec::with_capacity(pairs.len());
     for (c, pv) in &pairs {
         if let (Some(c), Some(pv)) = (c, pv) {
@@ -359,7 +429,6 @@ pub fn diff_pair(
             newest_mtime: src.newest_mtime,
         });
     }
-
     let refreshed = refreshes(&cur.conn)?;
     let roots_changed = root_paths(&cur.conn)? != root_paths(&prev.conn)?;
     let x_delta = xc.as_ref().map(|r| r.allocated).unwrap_or(0)
@@ -381,9 +450,7 @@ pub fn diff_pair(
         limit,
     })
 }
-
-/// Status sentence clause "+9 G since prev in /home/tass/Downloads": descend
-/// from `start` while one child directory carries at least half of the growth.
+/// Status clause "+9 G since prev in /home/tass/Downloads": descend from `start` while one child directory carries at least half the growth.
 pub fn top_growth(cur: &Snapshot, prev: &Snapshot, start: &[u8]) -> Result<Option<(String, i64)>> {
     let (Some(mut xc), Some(mut xp)) =
         (find_path(&cur.conn, start)?, find_path(&prev.conn, start)?)
@@ -427,3 +494,7 @@ pub fn top_growth(cur: &Snapshot, prev: &Snapshot, start: &[u8]) -> Result<Optio
     }
     Ok(Some((lossy(&path), delta)))
 }
+
+#[cfg(test)]
+#[path = "diff/rotation_tests.rs"]
+mod rotation_tests;
