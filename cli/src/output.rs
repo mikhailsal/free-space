@@ -231,37 +231,42 @@ impl Table {
             }
         }
         let mut out = String::new();
-        let line = |out: &mut String, cells: &[&str]| {
-            let mut s = String::new();
-            for (i, c) in cells.iter().enumerate() {
-                if i > 0 {
-                    s.push_str("  ");
-                }
-                let pad = w[i].saturating_sub(width(c));
-                let last = i + 1 == cells.len();
-                match self.cols[i].1 {
-                    Align::Right => {
-                        s.push_str(&" ".repeat(pad));
-                        s.push_str(c);
-                    }
-                    Align::Left => {
-                        s.push_str(c);
-                        if !last {
-                            s.push_str(&" ".repeat(pad));
-                        }
-                    }
-                }
-            }
-            out.push_str(s.trim_end());
-            out.push('\n');
-        };
         let head: Vec<&str> = self.cols.iter().map(|(h, _)| *h).collect();
-        line(&mut out, &head);
+        self.render_line(&mut out, &head, &w);
         for r in &self.rows {
             let cells: Vec<&str> = r.iter().map(String::as_str).collect();
-            line(&mut out, &cells);
+            self.render_line(&mut out, &cells, &w);
         }
         out
+    }
+
+    fn render_line(&self, out: &mut String, cells: &[&str], widths: &[usize]) {
+        let mut line = String::new();
+        for (i, cell) in cells.iter().enumerate() {
+            if i > 0 {
+                line.push_str("  ");
+            }
+            let pad = widths[i].saturating_sub(width(cell));
+            let last = i + 1 == cells.len();
+            self.render_cell(&mut line, i, cell, pad, last);
+        }
+        out.push_str(line.trim_end());
+        out.push('\n');
+    }
+
+    fn render_cell(&self, line: &mut String, i: usize, cell: &str, pad: usize, last: bool) {
+        match self.cols[i].1 {
+            Align::Right => {
+                line.push_str(&" ".repeat(pad));
+                line.push_str(cell);
+            }
+            Align::Left => {
+                line.push_str(cell);
+                if !last {
+                    line.push_str(&" ".repeat(pad));
+                }
+            }
+        }
     }
 }
 
@@ -333,26 +338,35 @@ mod tests {
 
     #[test]
     fn writes_and_flushes_ignore_only_broken_pipe() {
-        for kind in [ErrorKind::BrokenPipe, ErrorKind::StorageFull] {
-            for flush_error in [false, true] {
-                for json in [false, true] {
-                    let mut out = FaultWriter {
-                        remaining: if flush_error { None } else { Some(2) },
-                        flush_error,
-                        kind,
-                        bytes: Vec::new(),
-                    };
-                    let result = if json {
-                        write_json(&mut out, &vec!["payload"])
-                    } else {
-                        write_bytes(&mut out, b"payload").map_err(CommandError::from)
-                    };
-                    assert_eq!(result.is_ok(), kind == ErrorKind::BrokenPipe);
-                    if !flush_error {
-                        assert_eq!(out.bytes.len(), 2, "short write was attempted");
-                    }
-                }
-            }
+        for (kind, flush_error, json) in [
+            (ErrorKind::BrokenPipe, false, false),
+            (ErrorKind::BrokenPipe, false, true),
+            (ErrorKind::BrokenPipe, true, false),
+            (ErrorKind::BrokenPipe, true, true),
+            (ErrorKind::StorageFull, false, false),
+            (ErrorKind::StorageFull, false, true),
+            (ErrorKind::StorageFull, true, false),
+            (ErrorKind::StorageFull, true, true),
+        ] {
+            assert_write_behavior(kind, flush_error, json);
+        }
+    }
+
+    fn assert_write_behavior(kind: ErrorKind, flush_error: bool, json: bool) {
+        let mut out = FaultWriter {
+            remaining: if flush_error { None } else { Some(2) },
+            flush_error,
+            kind,
+            bytes: Vec::new(),
+        };
+        let result = if json {
+            write_json(&mut out, &vec!["payload"])
+        } else {
+            write_bytes(&mut out, b"payload").map_err(CommandError::from)
+        };
+        assert_eq!(result.is_ok(), kind == ErrorKind::BrokenPipe);
+        if !flush_error {
+            assert_eq!(out.bytes.len(), 2, "short write was attempted");
         }
     }
 

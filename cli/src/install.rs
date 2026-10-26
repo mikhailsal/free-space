@@ -18,10 +18,14 @@ use freespace_core::snapshot::schema::SCHEMA_VERSION;
 use freespace_core::snapshot::{SnapshotDir, fsutil, lock};
 use freespace_core::systemd::{self, BIN_TARGET, SERVICE, TIMER};
 use freespace_core::{Error, ErrorCode, Result};
-use serde::Serialize;
 
 use crate::output;
-use crate::skill;
+
+mod report;
+mod uninstall;
+
+use report::Report;
+use uninstall::uninstall;
 
 /// Completion files install.sh writes (D19); uninstall removes them.
 pub const COMPLETIONS: [&str; 3] = [
@@ -60,26 +64,6 @@ pub struct InstallArgs {
     pub json: bool,
 }
 
-#[derive(Serialize)]
-struct Report {
-    binary: String,
-    /// Where the binary was copied from; null when it already ran from there.
-    copied_from: Option<String>,
-    config: String,
-    roots: Vec<String>,
-    interval: String,
-    at: String,
-    keep_previous: bool,
-    snapshot_dir: String,
-    user: Option<String>,
-    /// "acl", "group" (re-login needed) or "none".
-    access: String,
-    relogin_needed: bool,
-    next_run: Option<String>,
-    scan_started: bool,
-    scan_reason: Option<String>,
-}
-
 pub fn run(a: InstallArgs) -> output::Result<()> {
     if !fsutil::is_root() {
         return Err(Error::new(ErrorCode::NotRoot, "install-timer needs root")
@@ -92,24 +76,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
     }
     let cfg_path = config::config_path();
     let mut c = config::load_from(&cfg_path)?.config;
-    if !a.roots.is_empty() {
-        c.roots = a.roots.clone();
-    }
-    if let Some(v) = &a.interval {
-        c.interval = v.clone();
-    }
-    if let Some(v) = &a.at {
-        c.at = v.clone();
-    }
-    if let Some(v) = a.keep_previous {
-        c.keep_previous = v;
-    }
-    if let Some(v) = &a.snapshot_dir {
-        c.snapshot_dir = v.clone();
-    }
-    if c.roots.is_empty() {
-        c.roots = platform::default_roots(&platform::mountinfo());
-    }
+    apply_config_overrides(&a, &mut c);
     let text = config::render(&c);
     // the file we write must load back: catches a bad --at or a relative path
     config::parse(&text, &cfg_path)?;
@@ -146,21 +113,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         }
     };
 
-    let unit_dir = systemd::unit_dir();
-    write_root_file(
-        &unit_dir.join(SERVICE),
-        systemd::render_service(&c, &cfg_path).as_bytes(),
-        0o644,
-    )?;
-    write_root_file(
-        &unit_dir.join(TIMER),
-        systemd::render_timer(&c).as_bytes(),
-        0o644,
-    )?;
-    verify_units(&unit_dir);
-    systemctl(&["daemon-reload"])?;
-    systemctl(&["enable", "--now", TIMER])?;
-    let next_run = timer_next_run();
+    let next_run = install_units(&c, &cfg_path)?;
 
     let (scan_started, scan_reason) = if a.no_start {
         (false, None)
@@ -184,49 +137,46 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         scan_started,
         scan_reason: scan_reason.clone(),
     };
-    if a.json {
-        output::print_json(&report)?;
-        return Ok(());
+    report::print(&report, a.json)
+}
+
+fn install_units(c: &Config, cfg_path: &Path) -> Result<Option<String>> {
+    let unit_dir = systemd::unit_dir();
+    write_root_file(
+        &unit_dir.join(SERVICE),
+        systemd::render_service(c, cfg_path).as_bytes(),
+        0o644,
+    )?;
+    write_root_file(
+        &unit_dir.join(TIMER),
+        systemd::render_timer(c).as_bytes(),
+        0o644,
+    )?;
+    verify_units(&unit_dir);
+    systemctl(&["daemon-reload"])?;
+    systemctl(&["enable", "--now", TIMER])?;
+    Ok(timer_next_run())
+}
+
+fn apply_config_overrides(a: &InstallArgs, c: &mut Config) {
+    if !a.roots.is_empty() {
+        c.roots = a.roots.clone();
     }
-    let mut out = String::new();
-    out.push_str(&format!(
-        "freespace {} timer installed\n  config     {} (roots {}, {} at {}, keep_previous {})\n",
-        freespace_core::VERSION,
-        output::escape(&report.config),
-        output::escape(&report.roots.join(" ")),
-        output::escape(&report.interval),
-        output::escape(&report.at),
-        report.keep_previous
-    ));
-    let who = match (&report.user, access) {
-        (Some(u), "acl") => format!("read access for {} (ACL)", output::escape(u)),
-        (Some(u), "group") => format!("read access for {} via group freespace", output::escape(u)),
-        _ => "root only".into(),
-    };
-    out.push_str(&format!(
-        "  snapshots  {} ({who})\n",
-        output::escape(&report.snapshot_dir)
-    ));
-    out.push_str(&format!(
-        "  timer      {TIMER}, next run {}\n",
-        output::escape(next_run.as_deref().unwrap_or("unknown"))
-    ));
-    if relogin {
-        out.push_str(&format!(
-            "Log out and back in once so {} picks up the freespace group.\n",
-            output::escape(report.user.as_deref().unwrap_or("the user"))
-        ));
+    if let Some(v) = &a.interval {
+        c.interval = v.clone();
     }
-    match (scan_started, scan_reason.as_deref()) {
-        (true, Some(why)) => out.push_str(&format!(
-            "First scan started ({}) · Open: freespace gui\n",
-            output::escape(why)
-        )),
-        (false, Some(why)) => out.push_str(&format!("{}\n", output::escape(why))),
-        _ => {}
+    if let Some(v) = &a.at {
+        c.at = v.clone();
     }
-    output::print(&out)?;
-    Ok(())
+    if let Some(v) = a.keep_previous {
+        c.keep_previous = v;
+    }
+    if let Some(v) = &a.snapshot_dir {
+        c.snapshot_dir = v.clone();
+    }
+    if c.roots.is_empty() {
+        c.roots = platform::default_roots(&platform::mountinfo());
+    }
 }
 
 /// D22: the unit runs /usr/local/bin/freespace; copy ourselves there unless we
@@ -469,110 +419,4 @@ fn start_scan_if_needed(dir: &SnapshotDir) -> Result<(bool, Option<String>)> {
     }
     // a slow start is not a failure: the unit is queued
     Ok((true, Some(reason)))
-}
-
-/// The DX manifest (OV-8), in order. Only files freespace writes are removed;
-/// a snapshot dir holding anything else is left in place.
-fn uninstall(a: &InstallArgs) -> output::Result<()> {
-    let cfg_path = config::config_path();
-    let c = config::load_from(&cfg_path)
-        .map(|l| l.config)
-        .unwrap_or_else(|_| Config::default());
-    let mut removed: Vec<String> = Vec::new();
-    let mut kept: Vec<String> = Vec::new();
-
-    let _ = systemctl(&["disable", "--now", TIMER]);
-    let _ = systemctl(&["stop", SERVICE]);
-    let unit_dir = systemd::unit_dir();
-    for u in [TIMER, SERVICE] {
-        remove_file(&unit_dir.join(u), &mut removed);
-    }
-    let _ = systemctl(&["daemon-reload"]);
-    let _ = systemctl(&["reset-failed", SERVICE]);
-
-    remove_file(&cfg_path, &mut removed);
-    if let Some(parent) = cfg_path.parent()
-        && parent == Path::new("/etc/freespace")
-    {
-        remove_empty_dir(parent, &mut removed, &mut kept);
-    }
-
-    let dir = SnapshotDir::new(&c.snapshot_dir);
-    for f in [
-        dir.current(),
-        dir.prev(),
-        dir.prev_tmp(),
-        dir.state(),
-        dir.lock(),
-        dir.progress(),
-    ] {
-        remove_file(&f, &mut removed);
-    }
-    if let Ok(rd) = fs::read_dir(dir.as_path()) {
-        for e in rd.flatten() {
-            let n = e.file_name().to_string_lossy().into_owned();
-            let ours = (n.starts_with("snapshot.") && n.ends_with(".tmp"))
-                || (n.starts_with("crash-") && n.ends_with(".log"));
-            if ours {
-                remove_file(&e.path(), &mut removed);
-            }
-        }
-    }
-    remove_empty_dir(dir.as_path(), &mut removed, &mut kept);
-
-    for p in COMPLETIONS {
-        remove_file(Path::new(p), &mut removed);
-    }
-    let user = match &a.user {
-        Some(n) => platform::user_by_name(n),
-        None => platform::invoking_user(),
-    };
-    if let Some(u) = &user {
-        let sd = skill::default_dir_for(u);
-        for f in skill::FILES {
-            remove_file(&sd.join(f), &mut removed);
-        }
-        remove_empty_dir(&sd, &mut removed, &mut kept);
-    }
-    remove_file(Path::new(BIN_TARGET), &mut removed);
-
-    if a.json {
-        output::print_json(
-            &serde_json::json!({"removed": removed, "kept": kept, "group_kept": fsutil::GROUP}),
-        )?;
-        return Ok(());
-    }
-    let mut out = String::from("freespace uninstalled\n");
-    for r in &removed {
-        out.push_str(&format!("  removed  {}\n", output::escape(r)));
-    }
-    for k in &kept {
-        out.push_str(&format!(
-            "  kept     {} (not empty: holds files freespace did not write)\n",
-            output::escape(k)
-        ));
-    }
-    out.push_str(&format!(
-        "The group {} stays (harmless): sudo groupdel {} removes it.\n",
-        fsutil::GROUP,
-        fsutil::GROUP
-    ));
-    output::print(&out)?;
-    Ok(())
-}
-
-fn remove_file(p: &Path, removed: &mut Vec<String>) {
-    if fs::remove_file(p).is_ok() {
-        removed.push(p.display().to_string());
-    }
-}
-
-fn remove_empty_dir(p: &Path, removed: &mut Vec<String>, kept: &mut Vec<String>) {
-    if !p.exists() {
-        return;
-    }
-    match fs::remove_dir(p) {
-        Ok(()) => removed.push(format!("{}/", p.display())),
-        Err(_) => kept.push(format!("{}/", p.display())),
-    }
 }
