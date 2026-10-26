@@ -10,7 +10,9 @@ here=$(dirname "$(realpath "$0")")
 . "$here/rust-diff/install-kept.sh"
 [[ $# = 6 && $1 = --github-disposable-runner ]] || fail 'expected --github-disposable-runner BASE HEAD OUT SCRATCH USER'
 install_require_runner
-base=$(realpath -e "$2") head=$(realpath -e "$3") out=$4 scratch=$5 human=$6
+base=$(realpath -e "$2") || fail 'BASE path must exist'
+head=$(realpath -e "$3") || fail 'HEAD path must exist'
+out=$4 scratch=$5 human=$6
 install_check_inputs
 out=$(realpath -m "$out") scratch=$(realpath -m "$scratch")
 [ -d /run/systemd/system ] || fail 'real systemd required'
@@ -47,7 +49,7 @@ cleanup() {
     fi
     systemctl stop freespace.service >/dev/null 2>&1 || true
     rm -f -- /etc/systemd/system/freespace.service /etc/systemd/system/freespace.timer /etc/systemd/system/timers.target.wants/freespace.timer /var/lib/systemd/timers/stamp-freespace.timer /usr/local/bin/freespace "${completions[@]}" || cleanup_status=1
-    rm -rf -- /etc/freespace "$home/.claude" "$scratch" || cleanup_status=1
+    rm -rf -- /etc/freespace /var/lib/freespace "$home/.claude" "$scratch" || cleanup_status=1
     systemctl daemon-reload || cleanup_status=1
     systemctl reset-failed freespace.service >/dev/null 2>&1 || true
     if getent group freespace >/dev/null; then groupdel freespace || cleanup_status=1; fi

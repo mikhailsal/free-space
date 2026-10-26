@@ -84,7 +84,7 @@ install_remove_empty_parents() { # directories in parent-before-child order; nev
 run() {
   local home=${home:?} human=${human:?}
   env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME="$home" SUDO_USER="$human" TZ=UTC LC_ALL=C \
-    timeout --foreground -k 10 120 "$@" </dev/null
+    timeout -k 10 120 "$@" </dev/null
 }
 
 unit_state() {

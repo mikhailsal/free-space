@@ -455,7 +455,7 @@ test("run isolates environment and invokes the fixed timeout policy while preser
   const failed = shell('home=$1 human=owned-human; run "$2" <<< caller-input; echo must-not-reach', tmp, command);
   expect(failed.exitCode).toBe(37);
   expect(failed.stderr.toString()).toBe("owned failure\n");
-  expect(failed.stdout.toString().trim().split("\n")).toEqual(["timeout", "--foreground", "-k", "10", "120", command]);
+  expect(failed.stdout.toString().trim().split("\n")).toEqual(["timeout", "-k", "10", "120", command]);
 });
 
 // Value: protects=prerequisite/executable/confinement refusals and runner/user context contracts before writes;
