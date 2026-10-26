@@ -1,0 +1,192 @@
+{
+  "source_revision": "e89c298e83c00c817892549df5a868d46902ea25",
+  "binary_sha256": "920945300a71f514b1e8bf3b992b1fa43bf77eb38668440f5845f1adcb1a1338",
+  "profile": "cargo build --release -p freespace",
+  "date": "2026-10-26",
+  "platform": "Linux-5.15.0-136-generic-x86_64-with-glibc2.35",
+  "filesystem": "ext4",
+  "host_memory_total_kib": 16336140,
+  "memory_max_bytes": 134217728,
+  "memory_swap_max_bytes": 0,
+  "fixture": "Empty files in one wide directory below the scanned root; snapshots outside the tree.",
+  "file_steps": [
+    100000,
+    1000000
+  ],
+  "files_per_dir": 1000000,
+  "repeats": 1,
+  "sampling_interval_ms": 20,
+  "cache_policy": "uncontrolled, freshly generated metadata",
+  "limitations": [
+    "One run per case on one x86_64 host; elapsed times are illustrative.",
+    "Linux 5.15 has no memory.peak here; cgroup peaks are sampled memory.current.",
+    "Cgroup usage includes the Python measurement helper and filesystem cache.",
+    "Snapshot-directory disk occupancy is sampled and may miss brief peaks.",
+    "No per-phase RSS attribution or Raspberry Pi hardware measurement."
+  ],
+  "records": [
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json"
+      ],
+      "entries": 100002,
+      "exit_code": 0,
+      "wall_seconds": 1.1348100489994977,
+      "peak_rss_kib": 38576,
+      "sampled_peak_rss_kib": 38576,
+      "sampled_peak_snapshot_disk_bytes": 11227136,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 100002,
+        "roots": [
+          "$TREE"
+        ],
+        "workers": 1,
+        "walk_seconds": 0.63155862,
+        "finalize_seconds": 0.011307032,
+        "insert_seconds": 0.141448403,
+        "index_seconds": 0.238125549,
+        "publish_seconds": 0.001125295,
+        "total_seconds": 1.111713593,
+        "snapshot_bytes": 11214848,
+        "snapshot_path": "$SNAPSHOT_DIR/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      },
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0",
+        "memory.max": "134217728",
+        "memory.swap.max": "0"
+      },
+      "sampled_peak_cgroup_bytes": 51781632,
+      "sampled_peak_swap_bytes": 0,
+      "mode": "fast",
+      "repeat": 1
+    },
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json",
+        "--low-memory"
+      ],
+      "entries": 100002,
+      "exit_code": 0,
+      "wall_seconds": 2.6456602119869785,
+      "peak_rss_kib": 25068,
+      "sampled_peak_rss_kib": 25064,
+      "sampled_peak_snapshot_disk_bytes": 16646144,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 100002,
+        "roots": [
+          "$TREE"
+        ],
+        "workers": 1,
+        "walk_seconds": 0.977258344,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 1.527324652,
+        "index_seconds": 0.008089719,
+        "publish_seconds": 0.001039706,
+        "total_seconds": 2.619037835,
+        "snapshot_bytes": 11808768,
+        "snapshot_path": "$SNAPSHOT_DIR/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      },
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0",
+        "memory.max": "134217728",
+        "memory.swap.max": "0"
+      },
+      "sampled_peak_cgroup_bytes": 43470848,
+      "sampled_peak_swap_bytes": 0,
+      "mode": "disk",
+      "repeat": 1
+    },
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json"
+      ],
+      "entries": 1000002,
+      "exit_code": -9,
+      "wall_seconds": 12.33479628500936,
+      "peak_rss_kib": 125908,
+      "sampled_peak_rss_kib": 125812,
+      "sampled_peak_snapshot_disk_bytes": 8192,
+      "report": null,
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 5647\noom 2\noom_kill 1",
+        "memory.max": "134217728",
+        "memory.swap.max": "0"
+      },
+      "sampled_peak_cgroup_bytes": 134217728,
+      "sampled_peak_swap_bytes": 0,
+      "mode": "fast",
+      "repeat": 1
+    },
+    {
+      "command": [
+        "freespace",
+        "scan",
+        "$TREE",
+        "--workers",
+        "1",
+        "--json",
+        "--low-memory"
+      ],
+      "entries": 1000002,
+      "exit_code": 0,
+      "wall_seconds": 73.07427333500527,
+      "peak_rss_kib": 24656,
+      "sampled_peak_rss_kib": 23444,
+      "sampled_peak_snapshot_disk_bytes": 189104128,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 1000002,
+        "roots": [
+          "$TREE"
+        ],
+        "workers": 1,
+        "walk_seconds": 28.740722556,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 41.653477475,
+        "index_seconds": 2.53440766,
+        "publish_seconds": 0.001993343,
+        "total_seconds": 73.016062371,
+        "snapshot_bytes": 119500800,
+        "snapshot_path": "$SNAPSHOT_DIR/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      },
+      "cgroup": {
+        "memory.events": "low 0\nhigh 0\nmax 1793\noom 0\noom_kill 0",
+        "memory.max": "134217728",
+        "memory.swap.max": "0"
+      },
+      "sampled_peak_cgroup_bytes": 134217728,
+      "sampled_peak_swap_bytes": 0,
+      "mode": "disk",
+      "repeat": 1
+    }
+  ]
+}

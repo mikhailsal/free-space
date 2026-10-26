@@ -293,3 +293,33 @@ not contribute material disk usage. The harness measures whole-command RSS;
 it does not claim per-phase RSS. Cache state is uncontrolled and fixture creation
 warms metadata. Record source revision, filesystem, load and repetitions alongside
 results before generalizing to a VPS or Raspberry Pi.
+
+### Constrained wide-directory result (2026-10-26)
+
+Release build of `e89c298`, Linux 5.15 x86_64/glibc, ext4, one run per case, one
+walker, empty files in a single wide directory. Each scanner and its measurement
+helper ran in a fresh **128 MiB cgroup with swap disabled**. The snapshot directory
+was outside the tree. [Machine-readable results](benchmark-results/disk-scan-2026-10-26.json)
+include the binary SHA-256, reports, sampled cgroup/disk peaks and OOM counters.
+
+| Entries | Engine | Peak process RSS | Elapsed | Result |
+|---:|---|---:|---:|---|
+| 100,002 | default | 37.7 MiB | 1.13 s | completed |
+| 100,002 | low-memory | 24.5 MiB | 2.65 s | completed |
+| 1,000,002 | default | 123.0 MiB | 12.33 s | OOM-killed |
+| 1,000,002 | low-memory | 24.1 MiB | 73.07 s | completed |
+
+The million-file low-memory run used approximately **180.3 MiB** of sampled peak
+snapshot-directory disk space, including staging and output. Its cgroup reached
+the 128 MiB limit while reclaiming filesystem cache, with zero OOM events and zero
+swap use. The default engine recorded an OOM kill on the same fixture. Linux 5.15
+on this host does not expose `memory.peak`, so cgroup peaks were sampled every
+20 ms from `memory.current`; they are not exact high-water marks.
+
+This verifies one practical constrained workload, including a directory whose
+entire contents cannot fit in the old walker's budget. It does not establish a
+universal 128 MiB requirement. Repeat on the target filesystem/hardware, especially
+for deep paths, many hardlinks or slow storage. At 100,002 entries the disk engine
+was about 2.3 times slower; the million-file default scan did not complete, so
+there is no comparable full-scan time at that size. Phase-specific RSS profiling
+and Raspberry Pi measurements remain follow-up work for #11.

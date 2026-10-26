@@ -27,3 +27,9 @@ The working set should scale with SQLite caches and traversal depth rather than
 entry count. Temporary disk space scales with entries, directory path lengths,
 and hardlink paths. `temp_store=FILE` and a cache target are not hard memory limits;
 all SQL traversals must have supporting indexes and bounded result consumption.
+
+Implemented in `e89c298`: both engines share snapshot v1 publication and metadata
+classification. Differential and crash/retry tests pass. The constrained
+wide-directory benchmark documented in `docs/benchmarks.md` completed one million
+files under a 128 MiB/no-swap cgroup while the default engine was OOM-killed.
+Per-phase RSS attribution remains outside this implementation.
