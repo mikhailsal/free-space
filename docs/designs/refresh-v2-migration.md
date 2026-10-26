@@ -1,7 +1,7 @@
 # Issue #10: experimental generation-store migration
 
-Status: opt-in Rust API on an implementation branch. The production CLI, HTTP
-API, published snapshot files and v1 query contracts remain unchanged. Issue #10
+Status: opt-in Rust API and explicit CLI/HTTP backend on an implementation
+branch. V1 remains the default; published v1 snapshots are unchanged. Issue #10
 is not complete until the remaining production gates below are satisfied.
 
 ## Executable stages
@@ -34,9 +34,12 @@ is not complete until the remaining production gates below are satisfied.
 6. **Implemented:** conservative read-only reader leases, bounded cursor GC,
    persisted record accounting/admission limits and explicit checkpoint upkeep.
    Test public query parity while pinned, after GC, and through capacity recovery.
-7. **Remaining:** CLI/HTTP routing, a bounded-RSS v2 full-scan seed compatible with
-   v1 `--low-memory`, process-crash/real ENOSPC coverage and production integration.
-   Measure physical I/O, memory, long-run history and target-machine budgets.
+7. **Implemented:** disk-staged v2 seed with raw own values and exact aggregates,
+   using the existing bounded-memory walker. Both seed profiles share atomic
+   publication and honor `keep_previous`. Complete denied reports stream to disk.
+8. **Remaining:** integrate scan options into opt-in CLI routing, complete
+   process-crash/real ENOSPC coverage and production acceptance. Measure physical
+   I/O, constrained memory, long-run history and target-machine budgets.
 
 Validation commands:
 
@@ -206,13 +209,47 @@ physical device I/O.
 
 ### Allocation review
 
-Experimental staging constructs raw paths and order keys per entry, maps raw IDs
-and inode metadata, and clones entries during its bottom-up fold. Stable ID
-assignment builds a subtree-sized map. Refresh collects old subtree rows and
-loads only touched inode groups; the ancestor map contains only the union of
-affected paths. Readers materialize requested result sets; raw diff uses a
-path-keyed map. Full scan materializes the full seed. These allocations do not
-change the production v1 scanner.
+The memory scan and local-refresh profile construct one raw path and encoded
+order key per staged entry, raw-ID and inode maps, and a cloned entry during each
+bottom-up fold. Stable-ID assignment retains a subtree-sized map. Refresh loads
+only the old subtree and touched inode groups; ancestor state contains only the
+union of affected paths. Experimental `Reader::diff` materializes path maps;
+the public query adapter streams and uses bounded result heaps.
+
+The disk scan profile has no entry-count-sized Rust collection. Its allocations
+and lifetimes are:
+
+| Allocation | Bound and lifetime |
+| --- | --- |
+| Raw staging SQLite pages | 8 MiB target cache; disk B-trees contain raw rows, jobs, links and mounts throughout the scan |
+| V2 SQLite pages | 8 MiB target cache, mmap disabled, temp storage on disk; retained for the Store connection |
+| Root metadata | One record per configured root, through the staged scan |
+| DFS path buffer | One growing raw path, reused during the visitor |
+| Raw row/name and link/mount metadata | One row at a time; owner lookup uses `(dev,ino,path,root,id)` index |
+| Visitor stack | One cursor/name and Entry per active depth; each Entry holds ancestor path, scope and encoded key until its children finish |
+| Stable identity | Indexed lookup/insert per row; parent ID lives in the depth stack, with no full raw-to-stable map |
+| Entry SQL | Cached fixed-size statements; bound path/key blobs live for one call; live/version rows are inserted once on subtree exit |
+| Denied report | One raw path/string at a time plus five warning examples; complete records go to an unlinked disk spool |
+
+SQLite cache values are targets, not process RSS caps. Ancestor path/key storage
+can grow quadratically with extreme depth, but not with unrelated entry count.
+Per-row SQL formatting currently allocates short fixed-size statement strings.
+Staging and publication check the existing filesystem reserve at least every
+1,024 visitor steps and once after visiting. Staging uses a secure 0640 file named
+`scan-<16 lowercase hex digits>.stage.tmp` beside the v2 database; normal success
+and error paths unlink it. A killed process can leave that staging file for
+explicit lifecycle cleanup. The v2 transaction rolls back all generation rows on
+visitor, reserve, admission or SQLite failure. Full scan writer locks span the
+staged database traversal, but never its earlier filesystem walk.
+
+`Store::scan_roots_with_options(roots, one_file_system, workers, low_memory,
+keep_previous)` selects the profile. Existing `scan`/`scan_roots` keep memory/prev
+defaults. `keep_previous=false` atomically clears the public prev pointer and
+header; already pinned readers retain both old generations until dropped, then
+bounded maintenance may reclaim their rows. It does not synchronously delete
+retained history. `Reader::denied_report` and `visit_denied` emit every denied
+entry, including nested ones, without loading refresh history or imposing the
+status response's 100-item cap.
 
 ## Public query adapter and remaining release dependencies
 
@@ -236,9 +273,10 @@ Remaining gates:
 
 - CLI/HTTP routing and operational maintenance commands with end-to-end v1
   response parity. Production remains v1 by default.
-- A bounded-RSS full-scan seed for v2 preserving the merged `--low-memory`
-  capability. Importing v1 aggregates alone is insufficient: exact raw own
-  directory metadata must survive, including counter saturation cases.
+- Constrained-memory measurement of the implemented disk-staged full-scan seed
+  through the exact integrated CLI binary. Differential tests already cover raw
+  own values beyond u32 aggregate saturation, scoped hardlink ties, mount/denied
+  metadata, negative timestamps, byte paths, refresh and both keep-prev modes.
 - Writer process-kill and actual ENOSPC at staging, WAL/index writes, publication
   and maintenance. SQLite `max_page_count` FULL rollback and reader-process death
   are tested, but do not substitute for these fault modes.

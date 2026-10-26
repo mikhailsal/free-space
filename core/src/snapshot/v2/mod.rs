@@ -5,11 +5,13 @@
 //! Reader leases, bounded reclamation and explicit admission limits protect history.
 
 mod aggregate;
+mod disk;
 mod files;
 mod hardlinks;
 mod metadata;
 mod reader;
 mod retention;
+mod seed;
 mod writer;
 pub use retention::{MaintenanceReport, RetentionPolicy};
 mod staging;
@@ -153,6 +155,10 @@ impl Store {
     pub fn configure_retention(&mut self, policy: RetentionPolicy) -> Result<()> {
         retention::configure(&self.conn, policy)
     }
+    /// Read the persisted admission budgets before an operational adjustment.
+    pub fn retention_policy(&self) -> Result<RetentionPolicy> {
+        retention::policy(&self.conn)
+    }
     pub fn retained_records(&self) -> Result<u64> {
         retention::rows(&self.conn)
     }
@@ -272,20 +278,21 @@ fn assign_ids(
 ) -> Result<HashMap<i64, i64>> {
     let mut ids = HashMap::with_capacity(entries.len());
     for entry in entries {
-        conn.execute(
-            "INSERT INTO identities(scope,path) VALUES(?1,?2) ON CONFLICT(scope,path) DO NOTHING",
-            params![entry.scope, entry.path],
-        )?;
-        let id = conn.query_row(
-            "SELECT id FROM identities WHERE scope=?1 AND path=?2",
-            params![entry.scope, entry.path],
-            |r| r.get(0),
-        )?;
+        let id = identity(conn, &entry.scope, &entry.path)?;
         ids.insert(entry.id, id);
         entry.parent = entry.parent.map(|p| ids[&p]).or(parent);
         entry.id = id;
     }
     Ok(ids)
+}
+fn identity(conn: &Connection, scope: &[u8], path: &[u8]) -> Result<i64> {
+    conn.prepare_cached(
+        "INSERT INTO identities(scope,path) VALUES(?1,?2) ON CONFLICT(scope,path) DO NOTHING",
+    )?
+    .execute(params![scope, path])?;
+    Ok(conn
+        .prepare_cached("SELECT id FROM identities WHERE scope=?1 AND path=?2")?
+        .query_row(params![scope, path], |r| r.get(0))?)
 }
 fn live_path(conn: &Connection, path: &[u8]) -> Result<Option<Entry>> {
     let Some(scope) = metadata::scope(conn, path, None)? else {
@@ -315,9 +322,12 @@ fn retire(conn: &Connection, id: i64, generation: i64) -> Result<()> {
     Ok(())
 }
 fn insert(conn: &Connection, e: &Entry, generation: i64) -> Result<()> {
-    conn.execute(&format!("INSERT INTO live({COLUMNS}) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"),
+    conn.prepare_cached(&format!("INSERT INTO live({COLUMNS}) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"))?.execute(
         params![e.id,e.parent,e.path,e.sort_key,e.kind.code(),e.flags,e.own_allocated,e.own_apparent,e.own_errors,e.mtime,e.scanned_at,e.allocated,e.apparent,e.items,e.errors,e.min_scanned_at,e.newest_mtime,e.scope,e.nlink,e.dev,e.ino])?;
-    conn.execute(&format!("INSERT INTO versions({COLUMNS},born,dead) SELECT {COLUMNS},?1,NULL FROM live WHERE id=?2"),params![generation,e.id])?;
+    conn.prepare_cached(&format!(
+        "INSERT INTO versions({COLUMNS},born,dead) SELECT {COLUMNS},?1,NULL FROM live WHERE id=?2"
+    ))?
+    .execute(params![generation, e.id])?;
     Ok(())
 }
 fn pair(conn: &Connection) -> Result<Option<GenerationPair>> {
