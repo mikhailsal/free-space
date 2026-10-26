@@ -292,8 +292,15 @@ to build the supplied binary to retain it in the manifest.
 The measurement helper shares the cgroup, so its memory is included in cgroup
 usage; process RSS is the scanner's own peak. Sampling every 20 ms can miss brief
 disk peaks. This fixture has no denied paths, so the unlinked report spool does
-not contribute material disk usage. The harness measures whole-command RSS;
-it does not claim per-phase RSS. Cache state is uncontrolled and fixture creation
+not contribute material disk usage. The harness opts into `FREESPACE_MEMORY_PROFILE`
+markers for walk, finalize, write and index phases. Each boundary records RSS and
+cumulative VmHWM; periodic 20 ms RSS samples are attributed to the active phase.
+`phase_rss.observed_peak_rss_kib` is the largest boundary/periodic sample, a lower
+bound on the true phase peak. Short phases can have no periodic samples; their
+start/end RSS still supplies phase evidence. VmHWM remains cumulative and is never
+presented as a phase peak. Low-memory finalization and incremental index updates
+are fused into write; its index phase covers final analysis/closing. Failed runs
+mark the last phase incomplete. Cache state is uncontrolled and fixture creation
 warms metadata. Record source revision, filesystem, load and repetitions alongside
 results before generalizing to a VPS or Raspberry Pi.
 
@@ -326,3 +333,22 @@ for deep paths, many hardlinks or slow storage. At 100,002 entries the disk engi
 was about 2.3 times slower; the million-file default scan did not complete, so
 there is no comparable full-scan time at that size. Phase-specific RSS profiling
 and Raspberry Pi measurements remain follow-up work for #11.
+
+
+### Small VPS and Raspberry Pi deployment
+
+On a 512 MiB–2 GiB machine, enable `low_memory = true` for scheduled full scans.
+The option uses a fixed small SQLite working set; it does not reserve memory or
+enforce a process limit. Leave capacity for the OS and other services, and verify
+completion with a cgroup limit appropriate to the RAM available on that machine.
+The 128 MiB test above is one x86_64 workload, not a Raspberry Pi requirement or
+a promise of spare memory within that limit. A successful run can still encounter
+heavy cgroup memory pressure and reclaim, which affects elapsed time.
+
+Use persistent disk space for `snapshot_dir` and staging, not a RAM-backed tmpfs.
+Budget for staging and the new snapshot alongside retained generations; long paths
+and many hardlinks increase the temporary space needed. If storage is tight,
+`keep_previous = false` reduces retained generations at the cost of historical
+comparison. Measure both elapsed time and disk occupancy on the target storage,
+and allow scheduled scans to finish before the next interval. `refresh` still
+uses the in-memory engine and does not inherit the full-scan memory behavior.

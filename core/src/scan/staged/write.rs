@@ -88,6 +88,7 @@ impl StagedTree {
         }
         conn.execute_batch("COMMIT")?;
         let insert_seconds = begin.elapsed().as_secs_f64();
+        crate::scan::profile::phase("index");
         let index = Instant::now();
         conn.execute_batch("PRAGMA analysis_limit=1000; ANALYZE;")?;
         guard.check()?;

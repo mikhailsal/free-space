@@ -72,6 +72,30 @@ def sample(pid, snapshot):
     return rss, allocated
 
 
+def phase_events(path):
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines(keepends=True)
+            if line.endswith("\n")]
+
+
+def phase_summary(events, periodic):
+    summary = {}
+    for index, current in enumerate(events):
+        name = current["phase"]
+        if name == "done":
+            continue
+        following = events[index + 1] if index + 1 < len(events) else None
+        peak, count = periodic.get(name, (0, 0))
+        end_rss = following["rss_kib"] if following else None
+        elapsed = following["elapsed_seconds"] - current["elapsed_seconds"] if following else None
+        summary[name] = {"start_rss_kib": current["rss_kib"], "end_rss_kib": end_rss,
+                         "observed_peak_rss_kib": max(peak, current["rss_kib"], end_rss or 0),
+                         "periodic_samples": count, "elapsed_seconds": elapsed,
+                         "incomplete": following is None}
+    return summary
+
+
 def measured_run(spec_path):
     spec = json.loads(spec_path.read_text())
     prefix = Path(spec["prefix"])
@@ -79,10 +103,17 @@ def measured_run(spec_path):
     started = time.monotonic()
     rss_peak, disk_peak, group_peak, swap_peak = 0, 0, 0, 0
     group = cgroup_folder() if spec["constrained"] else None
+    trace_path = prefix.with_suffix(".phases.jsonl")
+    periodic = {}
     with prefix.with_suffix(".stdout").open("w") as stdout, prefix.with_suffix(".stderr").open("w") as stderr:
         proc = subprocess.Popen(spec["command"], env=dict(os.environ, **spec["env"]), stdout=stdout, stderr=stderr)
         while proc.poll() is None:
+            events = phase_events(trace_path)
             rss, disk = sample(proc.pid, snapshot)
+            if events:
+                phase = events[-1]["phase"]
+                peak, count = periodic.get(phase, (0, 0))
+                periodic[phase] = max(peak, rss), count + 1
             rss_peak, disk_peak = max(rss_peak, rss), max(disk_peak, disk)
             if group:
                 group_peak = max(group_peak, int((group / "memory.current").read_text()))
@@ -91,7 +122,10 @@ def measured_run(spec_path):
     _, disk = sample(proc.pid, snapshot)
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     report = None
+    events = phase_events(trace_path)
     if proc.returncode == 0:
+        if not events or events[-1]["phase"] != "done":
+            raise RuntimeError("successful scan has missing/incomplete phase trace")
         report = json.loads(prefix.with_suffix(".stdout").read_text())
         if report["entries"] != spec["expected_entries"] or report["errors"] or report["incomplete"]:
             raise RuntimeError("scan report does not match generated fixture")
@@ -100,7 +134,8 @@ def measured_run(spec_path):
            "sampled_peak_rss_kib": rss_peak, "sampled_peak_snapshot_disk_bytes": max(disk_peak, disk),
            "report": report, "cgroup": cgroup_metrics() if spec["constrained"] else None,
            "sampled_peak_cgroup_bytes": group_peak if group else None,
-           "sampled_peak_swap_bytes": swap_peak if group else None}
+           "sampled_peak_swap_bytes": swap_peak if group else None,
+           "phase_boundaries": events, "phase_rss": phase_summary(events, periodic)}
     write_json(prefix.with_suffix(".metrics.json"), row)
 
 
@@ -113,7 +148,8 @@ def generate(root, start, stop, per_dir):
 
 def run_case(binary, output, tree, snapshot, count, mode, repeat, limit):
     prefix = output / f"{count}-{mode}-{repeat}"
-    env = dict(FREESPACE_CONFIG=str(output / "config.toml"), FREESPACE_SNAPSHOT_DIR=str(snapshot), LC_ALL="C")
+    env = dict(FREESPACE_CONFIG=str(output / "config.toml"), FREESPACE_SNAPSHOT_DIR=str(snapshot), LC_ALL="C",
+               FREESPACE_MEMORY_PROFILE=str(prefix.with_suffix(".phases.jsonl")))
     command = [str(binary), "scan", str(tree), "--workers", "1", "--json"]
     if mode == "disk":
         command.append("--low-memory")

@@ -1,4 +1,5 @@
 pub mod denied;
+pub(crate) mod profile;
 pub mod staged;
 pub mod tree;
 pub mod walk;

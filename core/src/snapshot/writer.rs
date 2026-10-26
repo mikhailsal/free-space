@@ -160,6 +160,7 @@ fn write_inner(
     insert_denied(&conn, tree, fin, &map_err)?;
     insert_refreshes(&conn, meta, &map_err)?;
     stats.insert_seconds = t0.elapsed().as_secs_f64();
+    crate::scan::profile::phase("index");
     let t1 = Instant::now();
     for sql in CREATE_INDEXES {
         conn.execute_batch(sql).map_err(map_err)?;

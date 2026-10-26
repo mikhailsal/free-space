@@ -284,6 +284,7 @@ fn scan_locked(mut req: ScanRequest, label: &str) -> Result<ScanReport> {
     st.last_scan_seconds = Some(t_all.elapsed().as_secs_f64());
     state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
 
+    scan::profile::phase("done");
     Ok(ScanReport {
         generation: published.generation,
         prev_generation: published.prev_generation,
@@ -335,9 +336,11 @@ fn publish_scan(
     meta.one_file_system = req.one_file_system;
     meta.scan_seconds = Some(walk_seconds);
     let tmp = req.dir.tmp(generation);
+    scan::profile::phase("write");
     let (ws, denied, errors) = data.write(&tmp, &meta, &Reserve::new(req.dir.as_path()))?;
     fault::point(&req.dir, "written");
 
+    scan::profile::phase("publish");
     pw.set_stage(progress::STAGE_PUBLISH);
     let t = Instant::now();
     if matches!(previous, Previous::Rotate(_)) {
@@ -391,6 +394,7 @@ fn walk_scan(req: &mut ScanRequest, label: &str) -> Result<ScanWalk> {
         seen,
         expected,
     };
+    scan::profile::phase("walk");
     let t = Instant::now();
     let (data, walk_seconds, finalize_seconds) = if req.low_memory {
         // Reserve disk space before staging starts. Its own guards continue to
@@ -402,6 +406,7 @@ fn walk_scan(req: &mut ScanRequest, label: &str) -> Result<ScanWalk> {
     } else {
         let mut tree = scan::walk(&opts).map_err(scan::walk_error)?;
         let walk_seconds = t.elapsed().as_secs_f64();
+        scan::profile::phase("finalize");
         let finalize = Instant::now();
         let fin = tree.finalize();
         (
