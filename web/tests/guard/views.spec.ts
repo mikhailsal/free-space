@@ -199,6 +199,7 @@ const STATES: State[] = [
     go: async (p, api) => {
       await open(p);
       // Drain the initial inspector fetch so the next count increase belongs to the selection change below.
+      await expect.poll(() => inspectorCalls(api)).toBe(1);
       await expect(p.locator('.biggest [aria-busy="true"]')).toHaveCount(0);
       const callsBeforeHide = inspectorCalls(api);
       await p.keyboard.press("h");
