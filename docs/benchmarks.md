@@ -393,34 +393,54 @@ results before generalizing to a VPS or Raspberry Pi.
 
 ### Constrained wide-directory result (2026-10-26)
 
-Release build of `e89c298`, Linux 5.15 x86_64/glibc, ext4, one run per case, one
-walker, empty files in a single wide directory. Each scanner and its measurement
-helper ran in a fresh **128 MiB cgroup with swap disabled**. The snapshot directory
-was outside the tree. [Machine-readable results](benchmark-results/disk-scan-2026-10-26.json)
-include the binary SHA-256, reports, sampled cgroup/disk peaks and OOM counters.
+Release build of final integrated source `6755725` (including master `8dbb8d4`,
+the hardlink/spool review fixes and phase tracing), Linux 5.15 x86_64/glibc, ext4,
+one run per case, one walker, empty files in a single wide directory. Each scanner
+and its measurement helper ran in a fresh **128 MiB cgroup with swap disabled**.
+The snapshot directory and phase trace were outside the tree.
+[Machine-readable results](benchmark-results/disk-scan-2026-10-26.json) include the
+full source/tree hashes, final binary SHA-256, reports, phase boundaries, sampled
+phase/cgroup/disk peaks and OOM/limit-pressure counters.
 
 | Entries | Engine | Peak process RSS | Elapsed | Result |
 |---:|---|---:|---:|---|
-| 100,002 | default | 37.7 MiB | 1.13 s | completed |
-| 100,002 | low-memory | 24.5 MiB | 2.65 s | completed |
-| 1,000,002 | default | 123.0 MiB | 12.33 s | OOM-killed |
-| 1,000,002 | low-memory | 24.1 MiB | 73.07 s | completed |
+| 100,002 | default | 33.7 MiB | 1.36 s | completed |
+| 100,002 | low-memory | 24.6 MiB | 3.07 s | completed |
+| 1,000,002 | default | 121.7 MiB | 3.85 s | OOM-killed during walk |
+| 1,000,002 | low-memory | 24.9 MiB | 90.10 s | completed |
+
+Observed phase RSS below is the largest boundary/20 ms sample, **not an exact
+phase peak**. It can be lower than the whole-command peak above. The JSON retains
+boundary values, durations and periodic sample counts so short phases can be
+identified. `finalize` is part of `write` in low-memory mode; that engine's `write`
+also maintains indexes incrementally, while `index` performs final analysis and
+closing. Default-mode phase boundaries include releasing the tree between insert
+and index timing, so profile durations need not equal the CLI's phase timers.
+
+| Entries | Engine | Walk | Finalize | Write | Index |
+|---:|---|---:|---:|---:|---:|
+| 100,002 | default | 29.5 MiB | 21.1 MiB | 28.5 MiB | 26.8 MiB |
+| 100,002 | low-memory | 14.6 MiB | fused | 24.5 MiB | 24.5 MiB |
+| 1,000,002 | default | 121.4 MiB, incomplete | not reached | not reached | not reached |
+| 1,000,002 | low-memory | 15.6 MiB | fused | 24.9 MiB | 24.9 MiB |
 
 The million-file low-memory run used approximately **180.3 MiB** of sampled peak
-snapshot-directory disk space, including staging and output. Its cgroup reached
-the 128 MiB limit while reclaiming filesystem cache, with zero OOM events and zero
-swap use. The default engine recorded an OOM kill on the same fixture. Linux 5.15
-on this host does not expose `memory.peak`, so cgroup peaks were sampled every
-20 ms from `memory.current`; they are not exact high-water marks.
+snapshot-directory disk space, including staging and output. **Its cgroup reached
+the 128 MiB cap and recorded 1,139 `memory.events` max events**, with zero OOM
+or OOM-kill events and zero sampled swap use. Low process RSS therefore does not
+mean the cgroup had spare memory: the run completed under limit pressure, with
+helper/kernel/filesystem-cache memory included in the cgroup. The default engine
+recorded an OOM kill on the same fixture. Linux 5.15 on this host does not expose
+`memory.peak`; cgroup peaks are 20 ms samples of `memory.current`, not exact
+high-water marks. Available memory-pressure statistics are retained in the JSON.
 
 This verifies one practical constrained workload, including a directory whose
-entire contents cannot fit in the old walker's budget. It does not establish a
-universal 128 MiB requirement. Repeat on the target filesystem/hardware, especially
-for deep paths, many hardlinks or slow storage. At 100,002 entries the disk engine
-was about 2.3 times slower; the million-file default scan did not complete, so
-there is no comparable full-scan time at that size. Phase-specific RSS profiling
-and Raspberry Pi measurements remain follow-up work for #11.
-
+entire contents cannot fit in the default walker's budget. It does not establish
+a universal 128 MiB requirement. Repeat on the target filesystem/hardware,
+especially for deep paths, many hardlinks or slow storage. At 100,002 entries the
+disk engine was about 2.3 times slower; the million-file default scan did not
+complete, so there is no comparable full-scan time at that size. Raspberry Pi
+hardware measurements remain follow-up work.
 
 ### Small VPS and Raspberry Pi deployment
 

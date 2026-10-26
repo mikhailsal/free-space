@@ -1,6 +1,9 @@
 # Opt-in disk-backed full scan (#11)
 
-Implementation plan, based on origin/master 47a76ac.
+Implementation and verification against integrated source `6755725`, including
+master `8dbb8d4` (PR #41), hardlink/spool review fixes and phase tracing.
+
+The implementation follows this sequence:
 
 1. Add a separate `scan --low-memory` engine and config setting; leave the fast
    in-memory walker and refresh unchanged. The mode uses one enumerator regardless
@@ -28,11 +31,15 @@ entry count. Temporary disk space scales with entries, directory path lengths,
 and hardlink paths. `temp_store=FILE` and a cache target are not hard memory limits;
 all SQL traversals must have supporting indexes and bounded result consumption.
 
-Implemented in `e89c298`: both engines share snapshot v1 publication and metadata
-classification. Differential and crash/retry tests pass. The constrained
-wide-directory benchmark documented in `docs/benchmarks.md` completed one million
-files under a 128 MiB/no-swap cgroup while the default engine was OOM-killed.
-Per-phase RSS attribution remains outside this implementation.
+Verified at `6755725`: both engines share snapshot v1 publication and metadata
+classification. Differential and crash/retry tests pass. The final-binary
+wide-directory benchmark in `docs/benchmarks.md` completed one million files
+under a 128 MiB/no-swap cgroup while the default engine was OOM-killed. The
+successful run reached the cgroup limit with max events; it establishes completion
+under pressure, not spare memory within that limit. Optional phase markers and
+periodic sampling provide walk/finalize/write/index RSS evidence; observed phase
+maxima are sampled lower bounds, and cumulative VmHWM is labeled separately.
+Low-memory finalization and incremental index updates are fused into write.
 
 ## D18 allocation inventory
 
