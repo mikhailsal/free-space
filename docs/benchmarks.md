@@ -572,3 +572,106 @@ and many hardlinks increase the temporary space needed. If storage is tight,
 comparison. Measure both elapsed time and disk occupancy on the target storage,
 and allow scheduled scans to finish before the next interval. `refresh` still
 uses the in-memory engine and does not inherit the full-scan memory behavior.
+
+## GitHub container storage balance (2026-10-27)
+
+Revision 5 stores immutable scope/path/compact traversal keys in
+`identities` and its lookup indexes, numeric metadata in `live_rows` and `version_rows`, and raw
+basenames in the historical child index. History uses `WITHOUT ROWID`. Current
+refresh traverses current parent links, preserving its locality after deletion;
+child/diff streams retain indexed byte ordering. The shared staged visitor also
+skips empty child probes for non-directory entries. This comparison measures the
+combined changes, not the isolated contribution of each change.
+
+### Paired 100k pilot
+
+[GitHub run 40414910069](https://github.com/mikhailsal/free-space/actions/runs/40414910069)
+compares baseline `036fd2b7cb223a212dc3c68d78d4400d74ab793a` against
+`7871961c5b06ed73b4191eb84858c2a97d0549ca`. Both GNU release builds use Rust/Cargo
+1.99.1, Bun 1.4.2 and `cargo build --release --locked -p freespace`.
+The candidate binary SHA-256 is
+`ef5d5e9b773ff1e427c59a8a79e1d052ff23e2f89db7251b9e5171d7b06608b7`;
+full provenance is in the [raw pilot records](benchmark-results/v2-storage-pilot-2026-10-27.json).
+These are GNU/glibc builds, not measurements of the distributed static musl binary.
+
+All comparison arms run sequentially on the same GitHub-hosted VM, each in a
+fresh Docker container with a 2-CPU quota, 256 MiB memory limit, zero swap,
+network disabled, and bind-mounted fixture/snapshot storage. The fixture has
+100,000 unrelated files and a fixed 18-entry refresh target: 100,120 entries in
+total. There are two paired repeats with alternating arm order, three complete
+`scan --low-memory --workers 1` commands, then a full CLI refresh. Both
+`keep_previous` settings are measured. All 48 commands validate with no errors,
+incompleteness, timeout, sampler failure or OOM; all 48 immutable post-command
+SQLite observations leave file occupancy unchanged. Candidate verification
+passed 291 Rust tests, with zero failures and one ignored test.
+
+This pilot generates fixtures inside each arm cgroup and retains cache across
+fixture creation, scans and immutable SQLite observations. It makes no cold-cache
+claim. GNU time reports each CLI's peak RSS; cgroup peak includes preparation and
+all earlier activity in that arm. Complete wall time includes process start and
+last-writer close/checkpoint, while observations run outside timed spans. Disk
+peaks sampled every 20 ms are lower bounds. Class maxima must not be added to
+reconstruct a simultaneous total; the reported total is sampled concurrently.
+Short refresh WAL activity can be missed entirely by this sampler.
+
+For `keep_previous=true`, medians of the two repeats are:
+
+| Phase | Baseline v2 snapshot allocation | Revision 5 snapshot allocation | Baseline sampled total peak | Revision 5 sampled total peak |
+| --- | ---: | ---: | ---: | ---: |
+| First full scan | 111.18 MB | 44.95 MB | 223.10 MB | 90.14 MB |
+| Second full scan | 165.11 MB | 55.41 MB | 315.44 MB | 84.87 MB |
+| Third full scan | 220.47 MB | 65.81 MB | 406.16 MB | 104.53 MB |
+
+MB means 1,000,000 bytes. Endpoint values include the snapshot directory's main
+DB, sidecars and state files. Exact logical DB size falls from 111,136,768 to
+44,912,640 bytes after the first scan (**59.6% smaller**), and from 220,430,336 to
+65,769,472 after the third (**70.2% smaller**). Both layouts retain 100,120
+identities/current rows and 300,360 history rows after three scans: the saving
+does not discard history. The initial baseline has roughly 111.7 MB of sampled
+WAL alongside its 111.1 MB DB; staging peaks around 7.1 MB. The large peak is
+primarily DB/WAL overlap, not a separate multi-gigabyte cache.
+
+| Command (`keep_previous=true`) | Baseline v1 | Baseline v2 | Revision 5 v2 |
+| --- | ---: | ---: | ---: |
+| First full scan, seconds | 1.663 | 15.897 | 7.129 |
+| Second full scan, seconds | 1.708 | 23.012 | 6.787 |
+| Third full scan, seconds | 1.658 | 27.981 | 7.714 |
+| 18-entry refresh, milliseconds | 306.30 | 15.35 | 9.53 |
+
+Revision-5 fresh scan ranges are 6.140–8.119 seconds versus baseline v2
+13.838–17.955; third scan ranges are 7.700–7.729 versus 27.927–28.035. Observed
+refresh medians are 32.1 times faster than baseline v1 with previous history,
+and 38.3 times faster without it (9.30 versus 356.07 ms). The new full scan still
+takes about four to five times as long as baseline v1 on this fixture. Scan RSS
+remains roughly 25–26 MiB; refresh RSS is about 8.4 MiB, versus about 31 MiB for
+baseline v1. Cgroup peaks approach the 256 MiB limit because they include helper
+and filesystem cache; RSS is not total container memory.
+
+The [identical-binary control](https://github.com/mikhailsal/free-space/actions/runs/40412597121)
+validated all 48 commands with the same executable in both v2 arms. Individual
+paired fresh-scan timings differed by approximately −42% to +48%, showing that
+this resource-constrained setup is noisy. That control used Rust 1.94, so it is
+method evidence, not the optimized candidate's timing baseline. The candidate
+pilot builds its own paired baseline with Rust 1.99.1. Its disk reductions are
+consistent across both repeats/settings, and measured timing ranges improve
+substantially, but two repeats do not establish tight confidence intervals or
+predict another machine's latency. [Raw control records](benchmark-results/v2-storage-control-2026-10-27.json)
+preserve the unchanged-arm evidence.
+
+### Million-file confirmation
+
+Confirmation with the same scanner binaries and a 128 MiB no-swap container is
+pending. Initial attempts exhausted memory while creating fixtures, before any
+freespace command; they provide no scanner performance or memory-limit result.
+The repaired protocol prepares fixtures on the dedicated GitHub-hosted VM,
+syncs closed files, and requests an OS page/dentry/inode cache drop before each
+arm. CLI/helper/observer memory remains constrained; setup memory is excluded.
+Active pages and hardware caches are not reset. This protocol differs from the
+warm 256 MiB pilot and its timings must not be pooled with that pilot.
+
+History still grows on repeated full scans, including `keep_previous=false`:
+that option removes the public comparison generation, while obsolete physical
+versions await explicit bounded maintenance. This experiment does not measure
+maintenance steady state or promise a fixed-size cache. Revision 4 and 5 stores
+are incompatible; seed a new state directory following the
+[upgrade guide](refresh-v2.md#upgrade-an-earlier-experimental-store).

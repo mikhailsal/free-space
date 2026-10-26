@@ -83,8 +83,9 @@ snapshots in the configured directory; it does not select an earlier v2 format.
 
 ## Revision-5 storage tradeoffs
 
-The store keeps immutable paths and compact traversal keys once per stable
-identity. Historical child indexes retain short names instead of full absolute
+The store keeps immutable paths and compact traversal keys in the identity table
+and its lookup indexes, removing copies from current and historical metadata.
+Historical child indexes retain short names instead of full absolute
 keys. Local refresh traverses only current descendants, so retained deleted
 paths do not expand that traversal. Disk staging avoids empty child queries for
 files and other leaves.

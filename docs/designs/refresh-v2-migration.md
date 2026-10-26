@@ -94,7 +94,8 @@ with `(parent, basename, born)` history access before joining identities. Raw
 basename BLOB order equals full traversal-key order among siblings, avoiding a
 sort of those streams without repeating absolute keys in history indexes.
 
-Normalization trades repeated absolute blobs for joins. Basenames still repeat
+Normalization trades repeated absolute blobs for joins. Identity lookup indexes
+still repeat scope/path or scope/key bytes. Basenames also repeat
 in each retained version and its child index. Current subtree traversal has a
 recursive queue and a sort proportional to the current subtree. Historical
 subtree ranges can visit retained deleted identities before visibility filtering;
