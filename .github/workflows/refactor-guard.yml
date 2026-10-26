@@ -48,7 +48,7 @@ jobs:
       - name: harness files this PR changes
         run: |
           git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA" -- \
-            .github/workflows/refactor-guard.yml scripts/rust-diff.sh scripts/rust-diff scripts/coverage-functions.sh \
+            .github/workflows/refactor-guard.yml scripts/rust-diff.sh scripts/rust-diff-install.sh scripts/rust-diff scripts/coverage-functions.sh \
             web/playwright.guard.config.ts web/playwright.config.ts web/tests/guard web/tests/e2e/mock.ts web/tests/e2e/serve.ts \
             web/tests/shots/home.ts |
             while read -r f; do
@@ -82,6 +82,61 @@ jobs:
           path: ${{ runner.temp }}/rust-diff
           retention-days: 14
           # a re-run of the job uploads under the same name
+          overwrite: true
+
+  # Real installer writes only on a fresh disposable VM. Ordinary rust-diff stays non-root.
+  rust-install-diff:
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: base checkout
+        run: git worktree add --detach "$RUNNER_TEMP/base" "$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: build each checkout into its own target
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cargo build --release --locked --bin freespace
+          cp target/release/freespace "$RUNNER_TEMP/bin/head"
+          (cd "$RUNNER_TEMP/base" && cargo build --release --locked --bin freespace --target-dir "$RUNNER_TEMP/base-target")
+          cp "$RUNNER_TEMP/base-target/release/freespace" "$RUNNER_TEMP/bin/base"
+      - name: prepare disposable runner prerequisites
+        run: |
+          sudo timeout 180 apt-get update -q
+          sudo env DEBIAN_FRONTEND=noninteractive timeout 180 apt-get install -yq acl
+          # Match the comparator's root-only ancestor check on this disposable VM.
+          sudo chown root:root /usr/local /usr/local/bin
+          sudo chmod go-w /usr/local /usr/local/bin
+          for path in /usr/local/share \
+            /usr/local/share/bash-completion /usr/local/share/bash-completion/completions \
+            /usr/local/share/zsh /usr/local/share/zsh/site-functions \
+            /usr/local/share/fish /usr/local/share/fish/vendor_completions.d; do
+            if [ -e "$path" ] || [ -L "$path" ]; then
+              [ -d "$path" ] && [ ! -L "$path" ] || { echo "unsafe completion ancestor: $path" >&2; exit 1; }
+              sudo chown root:root -- "$path"
+              sudo chmod go-w -- "$path"
+            fi
+          done
+      - name: compare real installation and uninstall, base self-check first
+        run: |
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" RUNNER_TEMP="$RUNNER_TEMP" \
+            scripts/rust-diff-install.sh --github-disposable-runner \
+            "$RUNNER_TEMP/bin/base" "$RUNNER_TEMP/bin/head" "$RUNNER_TEMP/rust-install-diff" "$RUNNER_TEMP/install-scratch" "$USER"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-install-diff
+          path: ${{ runner.temp }}/rust-install-diff
+          retention-days: 14
           overwrite: true
 
   pixel-diff:

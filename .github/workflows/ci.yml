@@ -68,8 +68,12 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
-      # tests/unit runs scripts/rust-diff.sh on stub builds, which needs sqlite3 as well
-      - run: command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq sqlite3; }
+      # The non-root install manifest tests read real ACLs; rust-diff stubs also need sqlite3.
+      - run: |
+          if ! command -v sqlite3 >/dev/null || ! command -v getfacl >/dev/null || ! command -v setfacl >/dev/null; then
+            sudo timeout 180 apt-get update -q
+            sudo env DEBIAN_FRONTEND=noninteractive timeout 180 apt-get install -yq sqlite3 acl
+          fi
       - run: bun test tests/unit
       - run: bunx playwright install --with-deps chromium
       - run: bunx playwright test

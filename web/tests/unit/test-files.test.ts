@@ -893,6 +893,10 @@ const e2eInputs = [
   "web/tests/e2e/serve.ts",
 ];
 
+// Value: protects=both install comparator inputs select their focused test through the public dependency mapping;
+// fails_when=either mapping drops/misnames that test; why_new=existence alone allowed an unmapped script;
+// seam=none (actual checked-in config); non-testcaller=pre-gate consumes this dependencies contract;
+// no_claim=external selector implementation, selected test outcomes or CI execution.
 // .gstack/pregate.json lists test paths literally (no globs), so a new e2e spec must be added to every list by hand.
 // A list may name other tests besides (serve.ts also selects the test of its $GUARD_DIST).
 test("every pregate dependency that selects e2e specs selects all of them, and every listed test exists", () => {
@@ -907,4 +911,7 @@ test("every pregate dependency that selects e2e specs selects all of them, and e
     if (tests.some((t) => t.startsWith("web/tests/e2e/"))) expect(e2e(tests), glob).toEqual(specs);
   }
   for (const input of e2eInputs) expect(e2e(config.dependencies[input] ?? []), input).toEqual(specs);
+  for (const input of ["scripts/rust-diff-install.sh", "scripts/rust-diff/install-kept.sh"]) {
+    expect(config.dependencies[input], input).toContain("web/tests/unit/rust-diff-install.test.ts");
+  }
 });
