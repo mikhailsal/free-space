@@ -391,6 +391,43 @@ fn diff_matches_repeated_names_by_exact_parent_path() {
 }
 
 #[test]
+fn top_growth_matches_child_names_despite_path_hash_collision() {
+    let f = fx();
+    f.write_file("a/old", 4096);
+    f.write_file("b/stable", 512 * 1024);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+    f.write_file("a/new", 128 * 1024);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+
+    // A duplicate previous hash used to overwrite a/ with b/. That made the
+    // unchanged b/ appear to be the largest growth under the root.
+    let prev = rusqlite::Connection::open(f.dir.prev()).unwrap();
+    let hash: i64 = prev
+        .query_row(
+            "SELECT path_hash FROM entries WHERE name = ?1 AND kind = 1",
+            [b"a".as_slice()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        prev.execute(
+            "UPDATE entries SET path_hash = ?1 WHERE name = ?2 AND kind = 1",
+            rusqlite::params![hash, b"b".as_slice()],
+        )
+        .unwrap(),
+        1
+    );
+    drop(prev);
+
+    let (cur, prev) = diff::open_pair(&f.dir).unwrap();
+    let (path, delta) = diff::top_growth(&cur, &prev, f.s("").as_bytes())
+        .unwrap()
+        .unwrap();
+    assert_eq!(path, f.s("a"));
+    assert!(delta >= 128 * 1024);
+}
+
+#[test]
 fn a_scan_of_no_roots_is_a_config_error_kept_in_state() {
     let f = fx();
     let e = f.scan_roots(Vec::new(), 2, true).unwrap_err();

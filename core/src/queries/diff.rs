@@ -464,14 +464,15 @@ pub fn top_growth(cur: &Snapshot, prev: &Snapshot, start: &[u8]) -> Result<Optio
     }
     for _ in 0..12 {
         let pc = level(&cur.conn, xc.id, 1, KindFilter::Dir)?;
-        let pp: HashMap<i64, LevelRow> = level(&prev.conn, xp.id, 1, KindFilter::Dir)?
-            .into_iter()
-            .map(|r| (r.hash, r))
+        let prev_children = level(&prev.conn, xp.id, 1, KindFilter::Dir)?;
+        let pp: HashMap<&[u8], &LevelRow> = prev_children
+            .iter()
+            .map(|r| (r.row.name.as_slice(), r))
             .collect();
         let best = pc
             .into_iter()
             .map(|c| {
-                let p = pp.get(&c.hash).map(|p| p.row.clone());
+                let p = pp.get(c.row.name.as_slice()).map(|p| p.row.clone());
                 (
                     c.row.allocated - p.as_ref().map_or(0, |p| p.allocated),
                     c,
