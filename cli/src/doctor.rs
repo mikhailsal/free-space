@@ -315,6 +315,22 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) ->
         },
     }
 
+    v.push(recorded_error_check(dir));
+
+    // the next scan's precheck, computed the same way scan does it; before the
+    // first snapshot, from the inodes in use on the roots (the fallback, 2 % of
+    // the used space, asked for 8.1 G per snapshot where the real one is 1 G)
+    let entries = match &snap {
+        Ok(s) => Some(s.meta.entries),
+        Err(_) => freespace_core::job::expected_entries(roots),
+    };
+    if let Some(check) = next_scan_space_check(dir, entries, keep_previous) {
+        v.push(check);
+    }
+    v
+}
+
+fn recorded_error_check(dir: &SnapshotDir) -> Check {
     match state::read(dir) {
         Ok(Some(st)) => match &st.last_error {
             Some(le) => {
@@ -325,50 +341,49 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) ->
                     ),
                     _ => format!("journalctl -u {SERVICE} -n 50"),
                 };
-                v.push(fail(
+                fail(
                     "last_error",
                     format!("{} {}: {}", format::local_date(le.ts), le.op, le.message),
                     fix,
-                ));
+                )
             }
-            None => v.push(pass("last_error", "none since the last successful scan")),
+            None => pass("last_error", "none since the last successful scan"),
         },
-        Ok(None) => v.push(pass("last_error", "no state.json yet")),
-        Err(e) => v.push(fail(
+        Ok(None) => pass("last_error", "no state.json yet"),
+        Err(e) => fail(
             "last_error",
             format!("state.json unreadable: {e}"),
             "sudo freespace install-timer",
-        )),
+        ),
     }
+}
 
-    // the next scan's precheck, computed the same way scan does it; before the
-    // first snapshot, from the inodes in use on the roots (the fallback, 2 % of
-    // the used space, asked for 8.1 G per snapshot where the real one is 1 G)
-    let entries = match &snap {
-        Ok(s) => Some(s.meta.entries),
-        Err(_) => freespace_core::job::expected_entries(roots),
-    };
-    let factor = if keep_previous { 3 } else { 2 };
-    if dir.as_path().is_dir() {
-        match publish::precheck(dir, entries, factor) {
-            Ok(i) => v.push(pass(
-                "space",
-                format!(
-                    "next scan needs {} free, {} available",
-                    format::size(i.need),
-                    format::size(i.avail)
-                ),
-            )),
-            Err(e) => v.push(fail(
-                "space",
-                e.message.clone(),
-                e.fix
-                    .clone()
-                    .unwrap_or_else(|| "free space or move snapshot_dir".into()),
-            )),
-        }
+fn next_scan_space_check(
+    dir: &SnapshotDir,
+    entries: Option<u64>,
+    keep_previous: bool,
+) -> Option<Check> {
+    if !dir.as_path().is_dir() {
+        return None;
     }
-    v
+    let factor = if keep_previous { 3 } else { 2 };
+    Some(match publish::precheck(dir, entries, factor) {
+        Ok(i) => pass(
+            "space",
+            format!(
+                "next scan needs {} free, {} available",
+                format::size(i.need),
+                format::size(i.avail)
+            ),
+        ),
+        Err(e) => fail(
+            "space",
+            e.message.clone(),
+            e.fix
+                .clone()
+                .unwrap_or_else(|| "free space or move snapshot_dir".into()),
+        ),
+    })
 }
 
 fn whoami() -> String {
