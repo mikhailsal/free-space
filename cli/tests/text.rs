@@ -610,6 +610,28 @@ fn diff_shows_changes_with_badges() {
 }
 
 #[test]
+fn diff_reports_hidden_changes_when_unchanged_rows_are_present() {
+    let e = Env::new();
+    let root = e.root();
+    fs::create_dir_all(&root).unwrap();
+    for name in ["a", "b", "c"] {
+        fs::write(root.join(name), b"same").unwrap();
+    }
+    e.scan(0);
+    for name in ["d", "e"] {
+        fs::write(root.join(name), b"").unwrap();
+    }
+    e.scan(0);
+
+    let t = e.ok(&["diff", &e.p(""), "--kind", "any", "--limit", "4"]);
+    assert!(t.contains("3 unchanged not shown"), "{t}");
+    assert!(t.contains("… 1 more (show them with --limit 5)"), "{t}");
+
+    let t = e.ok(&["diff", &e.p(""), "--kind", "any", "--limit", "1"]);
+    assert!(t.contains("… 4 more (show them with --limit 5)"), "{t}");
+}
+
+#[test]
 fn diff_notes_a_refreshed_folder_and_other_roots() {
     let e = changed_tree();
     let root = e.p("");
