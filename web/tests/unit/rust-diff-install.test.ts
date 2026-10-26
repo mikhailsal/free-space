@@ -681,7 +681,7 @@ test("workflow routes the refactor guard to independent builds and the disposabl
   expect(job["timeout-minutes"]).toBeGreaterThan(0);
   const checkout = job.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
   expect(checkout?.with).toMatchObject({
-    ref: "${{ github.event.pull_request.head.sha }}",
+    ref: "$" + "{{ github.event.pull_request.head.sha }}",
     "fetch-depth": 0,
     "persist-credentials": false,
   });
@@ -732,6 +732,6 @@ ${jobRun(job, "compare real installation and uninstall, base self-check first")}
   ]);
   const upload = job.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
   expect(upload?.if).toBe("always()");
-  expect(upload?.with).toMatchObject({ name: "rust-install-diff", path: "${{ runner.temp }}/rust-install-diff", overwrite: true });
+  expect(upload?.with).toMatchObject({ name: "rust-install-diff", path: "$" + "{{ runner.temp }}/rust-install-diff", overwrite: true });
   expect(Number(upload?.with?.["retention-days"])).toBeGreaterThan(0);
 });

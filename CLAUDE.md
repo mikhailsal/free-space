@@ -4,10 +4,20 @@ Linux disk-usage tool: fast scan, cached SQLite snapshot, scheduled refresh, emb
 
 ## Checks
 
-Until the gates PR of `docs/designs/code-quality-gates.md`:
-- `web/biome.json`: the format is checked by the pre-gate's `web` guard, not yet by CI (`cd web && bunx biome format .`; `--write` fixes it). Its two lint rules (functions over 80 lines, cognitive complexity over 25) report no errors (`cd web && bunx biome lint --error-on-warnings .`); nothing enforces them until the gates PR runs `biome ci --error-on-warnings` in CI and the pre-push hook.
-- `/ship`'s pre-gate reads `.gstack/pregate.json`. Its runner `scripts/test-files.sh <test files>` runs each file with its own runner (bun, Playwright, the shots config, the guard config), shooting into the ignored `web/pregate-shots/`; Rust selections run once per crate with bounded Cargo concurrency and need `setsid`; e2e, shots and guard files need `flock` (both util-linux). A new e2e spec goes into every e2e list under `dependencies`; `web/tests/unit/test-files.test.ts` fails until it does. The rust-diff unit files run one `bun test` each (`serial_patterns`): bun prints nothing until its run ends, and together they stay silent past the pre-gate's stall timeout (300 s), while each alone ends within it.
-- A PR that intends no behavior change (every debt PR) carries the `refactor` label (title it `refactor:`; `.github/workflows/refactor-label.yml` fails a `refactor:` title or `refactor/` branch without it), so `.github/workflows/refactor-guard.yml` compares base and head on GitHub: real `install-timer` and uninstall results on a disposable runner (`scripts/rust-diff-install.sh`), CLI answers and the snapshot folder's files, its databases row by row (`scripts/rust-diff.sh`; text byte for byte, `--json` as `jq` prints it), GUI shots as byte-identical PNGs and the API requests behind each (`web/tests/guard/views.spec.ts`), and per-function coverage of the touched Rust files. These heavy comparisons run on GitHub, not on this machine.
+Keep files within these limits:
+
+- Source files: 500 physical lines. Test files (`*/tests/**`, `*/tests.rs`, `web/tests/**`): 1000 lines.
+- Rust functions: 80 lines; Rust nesting: 4 levels.
+- TypeScript functions: 80 lines; cognitive complexity: 25.
+- Biome uses the recommended rules and formats with 2-space indentation and a 140-character line width. Rust uses rustfmt.
+
+The size check counts tracked `*.rs`, `*.ts`, `*.js`, `*.css`, `*.html`, `*.sh`, and files under `.githooks/`; it skips `docs/**`. Add a new language to the count only together with its linter. Split code before crossing a limit. Never raise a limit or add an exception without the user's agreement. Put long Rust tests in a `tests.rs` submodule.
+
+Run the shared checks with `scripts/check.sh [rust|size|shell|tsc|biome]...` from the repository root, or use the path to that script from a subdirectory (for example, `../scripts/check.sh` from `web/`). The script then runs at the repository root. With no parts it runs all five. Install the pre-push hook with `git config core.hooksPath .githooks`. The hook checks the current work tree, while CI checks the pushed commit. Run the relevant local tests while changing code; the full e2e suite, gate canary, and `refactor-guard` comparisons run on GitHub.
+
+`/ship`'s pre-gate reads `.gstack/pregate.json`. Its runner `scripts/test-files.sh <test files>` runs each selected file with its own runner (bun, Playwright, the shots config, the guard config), shooting into ignored `web/pregate-shots/`; Rust selections run once per crate with bounded Cargo concurrency and need `setsid`; e2e, shots and guard files need `flock` (both util-linux). Add new e2e specs to every e2e list under `dependencies`; `web/tests/unit/test-files.test.ts` checks these literal paths. Rust-diff unit files run one `bun test` each (`serial_patterns`), since bun prints nothing until the run ends.
+
+A behavior-preserving refactor PR carries the `refactor` label. `.github/workflows/refactor-label.yml` requires it for a `refactor:` title or `refactor/` branch. `.github/workflows/refactor-guard.yml` compares base and head on GitHub, including CLI answers, installation results, GUI screenshots and API requests.
 
 ## Skill routing
 

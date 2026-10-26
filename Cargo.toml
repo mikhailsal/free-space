@@ -2,6 +2,9 @@
 resolver = "3"
 members = ["core", "cli"]
 
+[workspace.lints.clippy]
+too_many_lines = "warn"
+
 [workspace.package]
 version = "0.1.1"
 edition = "2024"
