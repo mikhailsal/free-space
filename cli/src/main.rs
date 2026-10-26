@@ -4,6 +4,7 @@ mod completions;
 mod crash;
 mod doctor;
 mod install;
+mod maintain;
 mod output;
 mod query;
 mod refresh;
@@ -40,6 +41,7 @@ Look:
 Maintain:
   status          Snapshot age, free space, last error, running scan
   doctor          Check the timer, binary, access and space; print fixes
+  maintain        Reclaim retired v2 records and optionally checkpoint the WAL
   scan            Scan and publish a new snapshot (root)
   refresh         Rescan one folder into the current snapshot (root)
 
@@ -115,6 +117,14 @@ enum Command {
         after_help = "Examples:\n  sudo freespace refresh /home/tass/.cache\n  sudo freespace refresh /var/log --json"
     )]
     Refresh(refresh::RefreshArgs),
+    /// Reclaim retired v2 records and optionally checkpoint the WAL
+    #[command(
+        after_help = "V2 only. Policy changes persist even when readers defer cleanup.
+Examples:
+  freespace --backend v2 maintain --budget 1000 --json
+  freespace --backend v2 maintain --checkpoint --max-records 1000000"
+    )]
+    Maintain(maintain::MaintainArgs),
     /// Nightly scan, read access for you, first scan now (root)
     #[command(
         name = "install-timer",
@@ -184,6 +194,7 @@ fn main() -> ExitCode {
             let json = a.json;
             (refresh::run(a), json)
         }
+        Some(Command::Maintain(a)) => (maintain::run(&a), a.json),
         Some(Command::InstallTimer(a)) => {
             let json = a.json;
             (install::run(a), json)
