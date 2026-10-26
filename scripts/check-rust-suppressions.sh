@@ -151,7 +151,7 @@ for raw in tracked.split(b"\0"):
                 pos += 1
             args = attr[args_start:pos - 1] if parens == 0 else attr[args_start:]
             hit = next((lint for lint in blocked if re.search(rf"(?<!\w){re.escape(lint)}(?!\w)", args)), None)
-            if hit is None and re.search(r"(?:^|[,(])warnings(?:[,)])", args):
+            if hit is None and re.search(r"(?<!\w)warnings(?!\w)", args):
                 hit = "warnings"
             if hit is None:
                 continue

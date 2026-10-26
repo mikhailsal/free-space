@@ -138,6 +138,12 @@ grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines supp
 printf 'ok\n#[allow(clippy::r#too_many_lines)]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
 if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'raw-identifier Rust suppression passed'; fi
 grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'raw-identifier Rust suppression diagnostic missing'
+printf 'ok\n#[allow(warnings)]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
+if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'warnings Rust suppression passed'; fi
+grep -F 'check-rust-suppressions: ok.rs:2: forbidden warnings suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'warnings suppression diagnostic missing'
+printf 'ok\n#[allow(dead_code, warnings)]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
+if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'combined warnings Rust suppression passed'; fi
+grep -F 'check-rust-suppressions: ok.rs:2: forbidden warnings suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'combined warnings suppression diagnostic missing'
 printf 'ok\n#[cfg_attr(all(), allow(dead_code), deny(clippy::too_many_lines))]\nfn short() {}\n' > "$tmp/dispatch/ok.rs"
 if ! (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then cat "$tmp/rust-suppression.out" >&2; fail 'unrelated allow plus deny was rejected'; fi
 printf 'ok\n' > "$tmp/dispatch/ok.rs"
