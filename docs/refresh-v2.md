@@ -4,6 +4,10 @@ The v2 backend stores stable entry identities and versioned generations in
 SQLite. A local refresh replaces the selected subtree and updates its ancestors
 and affected hardlink groups. It does not load or rewrite unrelated entries.
 Full scans support `--low-memory`, using disk staging and a depth stack.
+V2 trades slower full scans and larger retained storage for local updates; see
+the [measured CLI comparison](benchmarks.md#complete-cli-refresh-with-v2-2026-10-26).
+Enable disk staging on machines with limited RAM and budget for database/WAL
+space as well as the temporary staging file.
 
 V1 remains the default. Select v2 explicitly and create a new full scan; v1
 snapshots are not converted. V2 uses `<snapshot_dir>/v2/generations.db` with its

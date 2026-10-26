@@ -339,6 +339,55 @@ unchanged. The new report counters are scalars; transferring `Tree` and
 `Finalized` moves their existing buffers without copying them. Explicit drops
 release existing allocations and the old snapshot connection.
 
+## Complete CLI refresh with v2 (2026-10-26)
+
+Release binary from `575044b6d2e9fba3aa7467489ed19afa9088e4e0`, SHA-256
+`ee58e9af394599f86457b34debdd9309961f4e90573aefe8b387a39fcd295b7c`.
+Linux 5.15 x86_64/glibc, Intel Core i7-4770S, ext4, two walker workers. No other
+agent builds or benchmarks ran during this series; other host activity and
+cache state were not controlled. The small refresh target contains 18 entries;
+only the unrelated sibling grows. Three repetitions per size/backend alternate
+backend order. Each repetition scans, then refreshes unchanged data. Timings
+include process startup, writer close/checkpoint, state update and the GNU time
+wrapper. These are warm synthetic measurements, not cold-disk promises.
+
+```sh
+SOURCE_REVISION=575044b6d2e9fba3aa7467489ed19afa9088e4e0 \
+  BACKENDS="v1 v2" STEPS="1000 10000 100000" REPEATS=3 WORKERS=2 \
+  SMALL_FILES=16 scripts/bench-refresh-memory.sh target/release/freespace ./bench-results
+```
+
+| Unrelated files | V1 refresh median | V2 refresh median | V1 refresh RSS | V2 refresh RSS |
+|---:|---:|---:|---:|---:|
+| 1,000 | 115.6 ms | 29.0 ms | 8,696 KiB | 8,840 KiB |
+| 10,000 | 116.1 ms | 31.7 ms | 10,372 KiB | 8,880 KiB |
+| 100,000 | 520.3 ms | 29.4 ms | 28,272 KiB | 8,804 KiB |
+
+All 36 scan/refresh reports passed entry/error/incompleteness checks. At 100,000
+unrelated files, v2 refresh is about **17.7 times faster** with **69% lower peak
+process RSS** in this workload. Its wall-time range is 27.1–30.8 ms, versus
+519.4–617.6 ms for v1. Median kernel output-operation counts are 1,512 versus
+23,072. Those counters provide OS-level I/O evidence; they are not direct
+physical-device byte measurements. The roughly constant v2 refresh time/RSS as
+unrelated entries grow supports the locality tests' SQL evidence.
+
+The tradeoff is substantial full-scan and storage overhead. At 100,000 unrelated
+files, the ordinary memory-profile v2 scan took 14.79 s and 77,068 KiB RSS versus
+0.72 s and 27,252 KiB for v1. Endpoint snapshot-directory allocation was about
+300.8 MB for v2 versus 23.6 MB for v1 after repeated scans. V2 retains obsolete
+versions until explicit maintenance; this series reused stores across all sizes
+and repeats without running maintenance, while v1 retains only current/prev.
+These endpoint sizes therefore include different physical retention states.
+Use `--low-memory` for a bounded full-scan working set, plan additional disk
+capacity, and run maintenance to reclaim eligible records. Local-refresh gains
+do not imply faster full scans or smaller databases.
+
+[Raw reports, stage timings and manifest](benchmark-results/refresh-v2-cli-2026-10-26.json)
+include source/tree/binary hashes, all repetitions, monotonic/GNU wall times,
+RSS, kernel I/O counters and endpoint disk occupancy. Connection-close costs are
+included in complete command time; older experimental Store-only timings in the
+migration design exclude them and must not be substituted for this result.
+
 ## Disk-backed full scan
 
 `scan --low-memory` (or config `low_memory = true`) streams individual entries and
