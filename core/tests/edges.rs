@@ -66,6 +66,80 @@ fn refresh_of_a_deleted_folder_drops_it() {
     assert_eq!(e.code, ErrorCode::PathNotFound, "{}", e.message);
 }
 
+/// A permission guard restores access even when an assertion panics.
+struct RestorePermissions(std::path::PathBuf, fs::Permissions);
+
+impl Drop for RestorePermissions {
+    fn drop(&mut self) {
+        fs::set_permissions(&self.0, self.1.clone()).unwrap();
+    }
+}
+
+#[test]
+fn refresh_stat_errors_do_not_publish_deletion() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    for permission_denied in [true, false] {
+        if permission_denied && unsafe { libc::geteuid() } == 0 {
+            continue; // root can stat through the inaccessible ancestor
+        }
+        let f = fx();
+        f.write_file("a/b/c", 8192);
+        f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+        f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+        let snapshot =
+            |path: &std::path::Path| (fs::read(path).unwrap(), fs::metadata(path).unwrap().ino());
+        let current = snapshot(&f.dir.current());
+        let previous = snapshot(&f.dir.prev());
+        let before = state::read(&f.dir).unwrap().unwrap();
+        let a = f.p("a");
+        let restore = if permission_denied {
+            let permissions = fs::metadata(&a).unwrap().permissions();
+            let restore = RestorePermissions(a.clone(), permissions);
+            fs::set_permissions(&a, fs::Permissions::from_mode(0o000)).unwrap();
+            Some(restore)
+        } else {
+            fs::rename(&a, f.p("moved")).unwrap();
+            fs::write(&a, b"now a file").unwrap();
+            None
+        };
+        let stat_error = fs::symlink_metadata(f.p("a/b")).unwrap_err();
+        assert_eq!(
+            stat_error.raw_os_error(),
+            Some(if permission_denied {
+                libc::EACCES
+            } else {
+                libc::ENOTDIR
+            })
+        );
+        let result = f.try_refresh("a/b");
+        drop(restore);
+        let e = result.unwrap_err();
+        assert_eq!(e.code, ErrorCode::Generic, "{}", e.message);
+        assert!(e.message.contains(&f.s("a/b")), "{}", e.message);
+        assert!(e.message.contains(&stat_error.to_string()), "{}", e.message);
+        assert_eq!(snapshot(&f.dir.current()), current);
+        assert_eq!(snapshot(&f.dir.prev()), previous);
+        assert_eq!(f.names("a/b"), ["c"]);
+        let mut after = state::read(&f.dir).unwrap().unwrap();
+        let failure = after.last_error.take().unwrap();
+        assert_eq!(failure.op, "refresh");
+        assert_eq!(failure.message, e.message);
+        assert_eq!(after, before);
+        assert!(!f.dir.progress().exists());
+
+        // Recovery also verifies the failed refresh released its lock.
+        if !permission_denied {
+            fs::remove_file(&a).unwrap();
+            fs::rename(f.p("moved"), &a).unwrap();
+        }
+        assert_eq!(fs::metadata(f.p("a/b/c")).unwrap().len(), 8192);
+        assert_eq!(f.try_refresh("a/b").unwrap().generation, 3);
+        assert_eq!(f.last_error(), None);
+        assert_eq!(snapshot(&f.dir.prev()), previous);
+    }
+}
+
 #[test]
 fn refresh_refuses_what_it_cannot_rescan_in_place() {
     let f = fx();
