@@ -57,3 +57,23 @@ pub(super) fn persist_wal(conn: &Connection) -> Result<()> {
     }
     Ok(())
 }
+
+/// SQLite can lose the filesystem errno or report an unreadable WAL as a
+/// schema failure. Probe only after a failed open, leaving healthy readers'
+/// I/O unchanged and retaining the original error unless access is denied.
+pub(super) fn reader_error(path: &Path, error: Error) -> Error {
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    for suffix in ["", ".readers", "-wal", "-shm"] {
+        let mut file = path.as_os_str().to_os_string();
+        file.push(suffix);
+        let file = Path::new(&file);
+        if let Err(denied) = std::fs::File::open(file)
+            && denied.kind() == std::io::ErrorKind::PermissionDenied
+        {
+            return crate::snapshot::reader::access_error(file, &denied).with_fix(
+                "ask a human to run: sudo freespace --backend v2 install-timer (grants this user read access)",
+            );
+        }
+    }
+    error
+}

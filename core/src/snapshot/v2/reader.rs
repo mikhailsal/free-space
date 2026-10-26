@@ -30,6 +30,10 @@ pub struct Change {
 
 impl Reader {
     pub fn open(path: &Path) -> Result<Self> {
+        Self::open_inner(path).map_err(|error| super::files::reader_error(path, error))
+    }
+
+    fn open_inner(path: &Path) -> Result<Self> {
         if let Err(e) = std::fs::metadata(path) {
             return Err(if e.kind() == std::io::ErrorKind::NotFound {
                 Error::new(
