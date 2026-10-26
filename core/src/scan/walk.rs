@@ -130,7 +130,7 @@ pub fn statvfs_safe(fs_type: &str) -> bool {
 }
 
 pub fn walk(opts: &WalkOptions) -> io::Result<Tree> {
-    let mounts = platform::mountinfo();
+    let mounts = platform::visible_mountinfo();
     walk_with_mounts(opts, &mounts)
 }
 
@@ -475,7 +475,7 @@ fn apply(tree: &mut Tree, res: DirResult) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::{PermissionsExt, symlink};
+    use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 
     fn walk_dir(p: &Path, workers: usize) -> Tree {
         let mut o = WalkOptions::new(vec![p.to_path_buf()]);
@@ -559,5 +559,117 @@ mod tests {
     fn dev_string_matches_mountinfo_format() {
         assert_eq!(dev_string(0x803), "8:3");
         assert_eq!(dev_string(0x16), "0:22");
+    }
+
+    #[test]
+    fn hidden_stacked_bind_does_not_hide_visible_child_from_walk() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let late = root.join("late");
+        let child = late.join("child");
+        fs::create_dir_all(&child).unwrap();
+        fs::write(child.join("visible"), b"visible data").unwrap();
+        let dev = dev_string(fs::metadata(root).unwrap().dev());
+        let text = format!(
+            "1 0 {dev} / / rw - ext4 disk rw\n\
+             2 1 0:22 / /{} rw - tmpfs tmpfs rw\n\
+             4 2 {dev} /elsewhere /{} rw - ext4 disk rw\n\
+             3 2 {dev} /{} /{} rw - ext4 disk rw\n",
+            late.display(),
+            child.display(),
+            late.display(),
+            late.display(),
+        );
+        let entries = platform::parse_mountinfo_entries(text.as_bytes());
+        let raw_mounts: Vec<_> = entries.iter().map(|entry| entry.mount.clone()).collect();
+        let visible_entries = platform::visible_mount_entries(&entries);
+        let visible_mounts: Vec<_> = visible_entries
+            .iter()
+            .map(|entry| entry.mount.clone())
+            .collect();
+
+        assert!(platform::bind_mounts_below(&raw_mounts, root, &dev).contains(&child));
+        assert!(!platform::bind_mounts_below(&visible_mounts, root, &dev).contains(&child));
+
+        let mut opts = WalkOptions::new(vec![root.to_path_buf()]);
+        opts.one_file_system = true;
+        let mut tree = walk_with_mounts(&opts, &visible_mounts).unwrap();
+        assert!(
+            names_preorder(&mut tree)
+                .iter()
+                .any(|name| name == "visible")
+        );
+    }
+
+    #[test]
+    fn descendant_bind_attached_below_visible_mountpoint_does_not_hide_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let late = root.join("late");
+        let child = late.join("child");
+        fs::create_dir_all(&child).unwrap();
+        fs::write(child.join("visible"), b"visible data").unwrap();
+        let dev = dev_string(fs::metadata(root).unwrap().dev());
+        let text = format!(
+            "1 0 {dev} / / rw - ext4 disk rw\n\
+             2 1 {dev} /elsewhere /{} rw - ext4 disk rw\n\
+             3 1 {dev} /{} /{} rw - ext4 disk rw\n",
+            child.display(),
+            late.display(),
+            late.display(),
+        );
+        let entries = platform::parse_mountinfo_entries(text.as_bytes());
+        let raw_mounts: Vec<_> = entries.iter().map(|entry| entry.mount.clone()).collect();
+        let visible_entries = platform::visible_mount_entries(&entries);
+        let visible_mounts: Vec<_> = visible_entries
+            .iter()
+            .map(|entry| entry.mount.clone())
+            .collect();
+
+        assert!(platform::bind_mounts_below(&raw_mounts, root, &dev).contains(&child));
+        assert!(!platform::bind_mounts_below(&visible_mounts, root, &dev).contains(&child));
+
+        let mut opts = WalkOptions::new(vec![root.to_path_buf()]);
+        opts.one_file_system = true;
+        let mut tree = walk_with_mounts(&opts, &visible_mounts).unwrap();
+        assert!(
+            names_preorder(&mut tree)
+                .iter()
+                .any(|name| name == "visible")
+        );
+    }
+
+    #[test]
+    fn top_stacked_subtree_bind_remains_a_walk_boundary() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let late = root.join("late");
+        fs::create_dir_all(&late).unwrap();
+        fs::write(late.join("hidden_by_bind"), b"must not be walked").unwrap();
+        let dev = dev_string(fs::metadata(root).unwrap().dev());
+        let text = format!(
+            "1 0 {dev} / / rw - ext4 disk rw\n\
+             2 1 0:22 / /{} rw - tmpfs tmpfs rw\n\
+             3 2 {dev} /elsewhere /{} rw - ext4 disk rw\n",
+            late.display(),
+            late.display(),
+        );
+        let entries = platform::parse_mountinfo_entries(text.as_bytes());
+        let visible_entries = platform::visible_mount_entries(&entries);
+        let visible_mounts: Vec<_> = visible_entries
+            .iter()
+            .map(|entry| entry.mount.clone())
+            .collect();
+        assert!(visible_entries.iter().any(|entry| entry.mount_id == 3));
+        assert!(platform::bind_mounts_below(&visible_mounts, root, &dev).contains(&late));
+
+        let mut opts = WalkOptions::new(vec![root.to_path_buf()]);
+        opts.one_file_system = true;
+        let mut tree = walk_with_mounts(&opts, &visible_mounts).unwrap();
+        assert!(
+            !names_preorder(&mut tree)
+                .iter()
+                .any(|name| name == "hidden_by_bind")
+        );
     }
 }

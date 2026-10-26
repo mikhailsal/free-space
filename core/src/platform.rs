@@ -1,6 +1,7 @@
 //! Platform hooks (plan: "Платформенные крючки"): allocated size, file identity,
 //! mount boundaries, filesystem stats. v1 ships the Linux implementation only.
 
+use std::collections::HashSet;
 use std::ffi::{CString, OsStr};
 use std::io;
 use std::os::unix::ffi::OsStrExt;
@@ -108,9 +109,15 @@ pub struct MountInfo {
     pub root: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MountInfoEntry {
+    pub mount_id: u64,
+    pub parent_id: u64,
+    pub mount: MountInfo,
+}
+
 /// Decode the octal escapes (`\040` for space etc.) used by the kernel in mountinfo.
-fn unescape_mount(s: &str) -> PathBuf {
-    let b = s.as_bytes();
+fn unescape_mount(b: &[u8]) -> PathBuf {
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
@@ -130,30 +137,150 @@ fn unescape_mount(s: &str) -> PathBuf {
 }
 
 pub fn parse_mountinfo(text: &str) -> Vec<MountInfo> {
+    parse_mountinfo_bytes(text.as_bytes())
+}
+
+fn parse_mountinfo_bytes(text: &[u8]) -> Vec<MountInfo> {
+    parse_mountinfo_entries(text)
+        .into_iter()
+        .map(|entry| entry.mount)
+        .collect()
+}
+
+pub(crate) fn parse_mountinfo_entries(text: &[u8]) -> Vec<MountInfoEntry> {
     let mut v = Vec::new();
-    for line in text.lines() {
-        let fields: Vec<&str> = line.split(' ').collect();
-        let Some(sep) = fields.iter().position(|f| *f == "-") else {
+    for line in text.split(|b| *b == b'\n') {
+        let fields: Vec<&[u8]> = line.split(|b| *b == b' ').collect();
+        let Some(sep) = fields.iter().position(|f| *f == b"-") else {
             continue;
         };
         if fields.len() < 5 || fields.len() < sep + 3 {
             continue;
         }
-        v.push(MountInfo {
-            dev: fields[2].to_string(),
-            root: unescape_mount(fields[3]),
-            mount_point: unescape_mount(fields[4]),
-            fs_type: fields[sep + 1].to_string(),
-            source: fields[sep + 2].to_string(),
+        let (Ok(mount_id), Ok(parent_id)) = (
+            String::from_utf8_lossy(fields[0]).parse(),
+            String::from_utf8_lossy(fields[1]).parse(),
+        ) else {
+            continue;
+        };
+        v.push(MountInfoEntry {
+            mount_id,
+            parent_id,
+            mount: MountInfo {
+                dev: String::from_utf8_lossy(fields[2]).into_owned(),
+                root: unescape_mount(fields[3]),
+                mount_point: unescape_mount(fields[4]),
+                fs_type: String::from_utf8_lossy(fields[sep + 1]).into_owned(),
+                source: String::from_utf8_lossy(fields[sep + 2]).into_owned(),
+            },
         });
     }
     v
 }
 
 pub fn mountinfo() -> Vec<MountInfo> {
-    std::fs::read_to_string("/proc/self/mountinfo")
-        .map(|t| parse_mountinfo(&t))
+    mountinfo_entries()
+        .into_iter()
+        .map(|entry| entry.mount)
+        .collect()
+}
+
+pub(crate) fn mountinfo_entries() -> Vec<MountInfoEntry> {
+    std::fs::read("/proc/self/mountinfo")
+        .map(|text| parse_mountinfo_entries(&text))
         .unwrap_or_default()
+}
+
+pub(crate) fn visible_mountinfo_entries() -> Vec<MountInfoEntry> {
+    visible_mount_entries(&mountinfo_entries())
+}
+
+pub(crate) fn visible_mountinfo() -> Vec<MountInfo> {
+    visible_mountinfo_entries()
+        .into_iter()
+        .map(|entry| entry.mount)
+        .collect()
+}
+
+pub(crate) fn visible_mount_entries(mounts: &[MountInfoEntry]) -> Vec<MountInfoEntry> {
+    let roots: Vec<&MountInfoEntry> = mounts
+        .iter()
+        .filter(|entry| entry.mount.mount_point == Path::new("/"))
+        .collect();
+    let mut top_roots = roots.iter().copied().filter(|entry| {
+        !roots
+            .iter()
+            .any(|child| child.mount_id != entry.mount_id && child.parent_id == entry.mount_id)
+    });
+    let Some(root) = top_roots.next() else {
+        return Vec::new();
+    };
+    if top_roots.next().is_some() {
+        return Vec::new();
+    }
+
+    let mut visible = Vec::new();
+    let mut pending = vec![root.clone()];
+    let mut visited = HashSet::new();
+    while let Some(parent) = pending.pop() {
+        if !visited.insert(parent.mount_id) {
+            continue;
+        }
+        visible.push(parent.clone());
+        let mut points = Vec::new();
+        for child in mounts
+            .iter()
+            .filter(|entry| entry.parent_id == parent.mount_id && entry.mount_id != parent.mount_id)
+        {
+            if !points.contains(&child.mount.mount_point) {
+                points.push(child.mount.mount_point.clone());
+            }
+        }
+        // Process ancestor mountpoints before descendants. A mount attached to
+        // this parent below a visible mountpoint is hidden unless that visible
+        // mount is its actual parent in mountinfo's ID topology.
+        points.sort_by_key(|point| point.components().count());
+        for point in points {
+            if let Some(top) = top_mount_at(mounts, parent.mount_id, &point) {
+                let covering = visible
+                    .iter()
+                    .chain(pending.iter())
+                    .filter(|entry| {
+                        entry.mount.mount_point != point
+                            && point.starts_with(&entry.mount.mount_point)
+                    })
+                    .max_by_key(|entry| entry.mount.mount_point.components().count());
+                if covering.is_none_or(|entry| entry.mount_id == parent.mount_id) {
+                    pending.push(top);
+                }
+            }
+        }
+    }
+    visible
+}
+
+fn top_mount_at(
+    mounts: &[MountInfoEntry],
+    parent_id: u64,
+    mount_point: &Path,
+) -> Option<MountInfoEntry> {
+    let mut current = unique_mount_child(mounts, parent_id, mount_point)?;
+    while let Some(top) = unique_mount_child(mounts, current.mount_id, mount_point) {
+        current = top;
+    }
+    Some(current)
+}
+
+fn unique_mount_child(
+    mounts: &[MountInfoEntry],
+    parent_id: u64,
+    mount_point: &Path,
+) -> Option<MountInfoEntry> {
+    let mut matches = mounts
+        .iter()
+        .filter(|entry| entry.parent_id == parent_id && entry.mount.mount_point == mount_point);
+    let child = matches.next()?.clone();
+    matches.next().is_none().then_some(child)
 }
 
 /// Filesystems `install-timer` puts into the default root set.
@@ -270,6 +397,68 @@ mod tests {
         );
         // a root inside the self-bind: the same rule from that mount
         assert!(bind_mounts_below(&m, Path::new("/home/u"), "8:3").is_empty());
+    }
+
+    #[test]
+    fn descendants_attached_below_a_visible_mountpoint_are_hidden() {
+        let entries = parse_mountinfo_entries(
+            b"1 0 8:3 / / rw - ext4 disk rw\n\
+              2 1 8:3 /elsewhere /data/late/child rw - ext4 disk rw\n\
+              3 1 8:3 /data/late /data/late rw - ext4 disk rw\n",
+        );
+        let visible = visible_mount_entries(&entries);
+        let ids: Vec<_> = visible.iter().map(|entry| entry.mount_id).collect();
+        assert!(ids.contains(&3));
+        assert!(!ids.contains(&2));
+    }
+
+    #[test]
+    fn top_of_stacked_mount_remains_visible_for_bind_boundaries() {
+        let entries = parse_mountinfo_entries(
+            b"1 0 8:3 / / rw - ext4 disk rw\n\
+              2 1 0:22 / /data/late rw - tmpfs tmpfs rw\n\
+              3 2 8:3 /elsewhere /data/late rw - ext4 disk rw\n",
+        );
+        let visible = visible_mount_entries(&entries);
+        assert!(visible.iter().any(|entry| entry.mount_id == 3));
+        let mounts: Vec<_> = visible.into_iter().map(|entry| entry.mount).collect();
+        assert!(
+            bind_mounts_below(&mounts, Path::new("/"), "8:3")
+                .contains(&PathBuf::from("/data/late"))
+        );
+    }
+
+    #[test]
+    fn raw_mount_paths_preserve_the_whole_table_and_bind_boundaries() {
+        let mut text = SAMPLE.as_bytes().to_vec();
+        text.extend_from_slice(b"50 22 8:3 /other /raw/\xff rw - ext4 /dev/sda3 rw\n");
+        text.extend_from_slice(b"51 22 8:3 /raw/self /raw/self rw - ext4 /dev/sda3 rw\n");
+        text.extend_from_slice(br"52 22 8:3 /other\134name /raw/space\040tab\011line\012slash\134end rw - ext4 /dev/sda3 rw");
+        // read_to_string would discard all mounts, including unrelated valid rows.
+        assert!(std::str::from_utf8(&text).is_err());
+        let mounts = parse_mountinfo_bytes(&text);
+        assert_eq!(mounts.len(), 9);
+        assert_eq!(mounts[0].mount_point, Path::new("/"));
+        assert_eq!(mounts[6].mount_point.as_os_str().as_bytes(), b"/raw/\xff");
+        assert_eq!(mounts[8].root.as_os_str().as_bytes(), br"/other\name");
+        assert_eq!(
+            mounts[8].mount_point.as_os_str().as_bytes(),
+            b"/raw/space tab\tline\nslash\\end"
+        );
+        let raw = Path::new(OsStr::from_bytes(b"/raw/\xff"));
+        assert_eq!(
+            mount_for(&mounts, &raw.join("child")).unwrap().mount_point,
+            raw
+        );
+        assert_eq!(
+            mount_for(&mounts, Path::new(OsStr::from_bytes(b"/raw/\xffsibling")))
+                .unwrap()
+                .mount_point,
+            Path::new("/")
+        );
+        let binds = bind_mounts_below(&mounts, Path::new("/raw"), "8:3");
+        assert!(binds.contains(&raw.to_path_buf()));
+        assert!(!binds.contains(&PathBuf::from("/raw/self")));
     }
 
     #[test]
