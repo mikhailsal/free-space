@@ -74,9 +74,11 @@ Source for all: Claude adversarial review of the A1 PR. These are defects in cod
 
 Source for all: the cycle-3 review of the A1 PR (Security, Maintainability, Testing, Simplification and Red Team specialists, and the Claude and Codex adversarial passes). Each is a gap in the test-only harnesses; none changes product behavior.
 
-- [ ] **Fault points poll forever, and a SIGKILLed harness leaves the paused scan and the mount.** Context: `core/src/fault.rs:20-26` waits for the pause file to go, with no deadline. `scripts/fault-fs.sh` and `scripts/mount-fs.sh` kill, reap and unmount on TERM, HUP, INT and EXIT, but SIGKILL runs no trap, so the paused root scan and its tmpfs stay. Fix: a deadline in the debug-only pause loop, and run both harnesses under `unshare -m --propagation private`, so a mount dies with its namespace. Trigger: before A2. **Priority:** P3. Source: Claude adversarial review (F4, F5d).
 
 ## Completed
+
+- [x] **Fault points poll forever, and a SIGKILLed harness leaves the paused scan and the mount.** Context: `core/src/fault.rs:20-26` waits for the pause file to go, with no deadline. `scripts/fault-fs.sh` and `scripts/mount-fs.sh` kill, reap and unmount on TERM, HUP, INT and EXIT, but SIGKILL runs no trap, so the paused root scan and its tmpfs stay. Fix: a deadline in the debug-only pause loop, and run both harnesses under `unshare -m --propagation private`, so a mount dies with its namespace. Trigger: before A2. **Priority:** P3. Source: Claude adversarial review (F4, F5d).
+  - **Completed:** 2026-10-26. Debug pauses expire after 60 seconds and fail closed on marker errors. The mount harnesses enter a verified private namespace before creating fixtures; disposable-runner fault and mount tests are required before merge.
 
 - [x] **`diff` reports `NO_PREV` during a rotation.** Context: `core/src/queries/diff.rs:24-45` opens current, then prev. A publish between the two opens, or the window after `rotate_prev` and before the publish, gives `NO_PREV` ("wait for the next scheduled scan") instead of `ROTATED` ("retry"). Found by reading, not reproduced. Fix: retry the pair once, then map to `ROTATED`. Trigger: before A2. **Priority:** P3.
   - **Completed:** 2026-10-26. Opening a pair retries a transient publication race once, then classifies a declared missing or mismatched previous generation as `ROTATED`. A genuine first generation or an older-schema previous file remains `NO_PREV`; six deterministic rotation tests cover the boundaries.
