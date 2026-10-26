@@ -101,10 +101,11 @@ pub fn snapshot_id() -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
+/// Consume scan data so it can be released before building SQLite indexes.
 pub fn write_snapshot(
     path: &Path,
-    tree: &Tree,
-    fin: &Finalized,
+    tree: Tree,
+    fin: Finalized,
     meta: &WriteMeta,
     reserve: &Reserve,
 ) -> Result<WriteStats> {
@@ -118,8 +119,8 @@ pub fn write_snapshot(
 
 fn write_inner(
     path: &Path,
-    tree: &Tree,
-    fin: &Finalized,
+    tree: Tree,
+    fin: Finalized,
     meta: &WriteMeta,
     reserve: &Reserve,
 ) -> Result<WriteStats> {
@@ -152,14 +153,18 @@ fn write_inner(
     conn.execute_batch("BEGIN")?;
     conn.execute_batch(CREATE_TABLES).map_err(map_err)?;
     insert_metadata(&conn, fin.order.len() as u64, meta, &map_err)?;
-    insert_entries(&conn, tree, fin, &map_err)?;
+    insert_entries(&conn, &tree, &fin, &map_err)?;
     stats.rows = fin.order.len() as u64;
-    insert_hardlinks(&conn, fin, &map_err)?;
-    insert_roots(&conn, tree, fin, &map_err)?;
-    insert_mounts(&conn, tree, fin, &map_err)?;
-    insert_denied(&conn, tree, fin, &map_err)?;
+    insert_hardlinks(&conn, &fin, &map_err)?;
+    insert_roots(&conn, &tree, &fin, &map_err)?;
+    insert_mounts(&conn, &tree, &fin, &map_err)?;
+    insert_denied(&conn, &tree, &fin, &map_err)?;
     insert_refreshes(&conn, meta, &map_err)?;
     stats.insert_seconds = t0.elapsed().as_secs_f64();
+    // SQLite owns every row now. Release scan allocations before its index
+    // sort buffers and growing page cache raise the write-phase peak.
+    drop(fin);
+    drop(tree);
     crate::scan::profile::phase("index");
     let t1 = Instant::now();
     for sql in CREATE_INDEXES {

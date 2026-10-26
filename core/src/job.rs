@@ -457,7 +457,7 @@ impl ScanData {
                     .take(tree.roots.len())
                     .map(|n| n.errors as u64)
                     .sum();
-                let stats = writer::write_snapshot(path, &tree, &fin, meta, reserve)?;
+                let stats = writer::write_snapshot(path, tree, fin, meta, reserve)?;
                 Ok((stats, denied, errors))
             }
         }

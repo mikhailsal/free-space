@@ -33,3 +33,26 @@ classification. Differential and crash/retry tests pass. The constrained
 wide-directory benchmark documented in `docs/benchmarks.md` completed one million
 files under a 128 MiB/no-swap cgroup while the default engine was OOM-killed.
 Per-phase RSS attribution remains outside this implementation.
+
+## D18 allocation inventory
+
+This opt-in engine trades repeated short-lived allocations and database I/O for
+entry-count-independent retention. It does **not** eliminate per-entry allocation.
+
+| Site | Allocation/copy | Lifetime and bound |
+|---|---|---|
+| `staged/walk.rs::read_entry` | `file_name()` creates names for path construction and insertion; `job.path.join(...)` creates a full `PathBuf` for each entry. | One entry at a time. Paths/names are dropped after SQLite insertion. No whole-directory vector or sort. |
+| `staged/walk.rs::next_job` | SQLite reads one directory-path BLOB into a `Vec<u8>`/`PathBuf`. | One active directory job. Pending jobs and their paths stay in SQLite. |
+| `staged/write.rs::next_child` | Formats a small SQL string for each lookup and reads one name BLOB into `Raw.name: Vec<u8>`. | One result at a time; prepared statements are cached. There is no result `collect()`. |
+| `staged/write.rs::write_root` | Clones the child name into its parent's keyset cursor; grows the DFS frame vector and current byte-path vector when a greater depth/path length is encountered. | One cursor name per active frame. Capacity follows maximum depth/path length, not total entries or sibling count. Root path cloning occurs once per root. |
+| `staged/write.rs::enter` | Reads path/name strings for a mount row when encountered. | One mount row, immediately inserted and dropped. Ordinary entries keep scalar metadata on the stack. |
+| `denied.rs::push` | Invalid UTF-8 paths allocate a lossy string; the first five warning paths are copied. | One current path plus five retained examples. Complete reports are written to the unlinked spool. |
+| `denied.rs::serialize` | Allocates a byte vector/string for each spooled report path. | One path at a time while streaming JSON; no full report collection. |
+| SQLite staging/output | Copies bound names, paths, keys and rows into SQLite storage and caches. Hardlink paths and pending directory paths consume disk space proportional to the tree. | Two 8 MiB cache targets during output, mmap disabled, indexes maintained from empty tables and indexed single-row queries. These targets are not a hard process RSS cap. |
+
+Root preparation retains root metadata, canonical paths and mount/bind-boundary
+information. Those allocations scale with the configured roots and mount table,
+not with discovered entries. The root-only `Tree` explicitly disables the used-
+inode preallocation estimate. The optional profiler allocates a small status string
+and JSON record at phase boundaries, not per entry. Test helpers intentionally
+collect small differential fixtures; production staging does not.
