@@ -144,7 +144,9 @@ fn v2_status_text_and_json_agree_on_growth_and_generation() {
         assert_eq!(report["generation"], 2);
         assert!(String::from_utf8_lossy(&scan.stderr).contains("generation 2 published"));
         if backend == "v2" {
-            assert!(String::from_utf8_lossy(&scan.stderr).contains("walk includes finalization"));
+            assert!(
+                String::from_utf8_lossy(&scan.stderr).contains("preparation is reported as walk")
+            );
             assert_eq!(report["finalize_seconds"], 0.0);
             assert_eq!(report["publish_seconds"], 0.0);
         }

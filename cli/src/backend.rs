@@ -302,12 +302,12 @@ pub fn top_growth(reader: &Reader, start: &[u8]) -> Result<Option<(String, i64)>
     Ok(Some((String::from_utf8_lossy(&path).into_owned(), delta)))
 }
 
-/// V2 combines finalization with walking and indexes/publication with its SQL
-/// transaction. The existing numeric report assigns these combined durations to
-/// walk_seconds and insert_seconds; phases without a separate step stay zero.
+/// Preparation is timed as walk and the complete write transaction as insert.
+/// Aggregation occurs during preparation or the transaction depending on the
+/// profile; phases without separate timers stay zero.
 pub fn timing_note() {
     eprintln!(
-        "v2 timings: walk includes finalization; insert includes indexing and publication (no separate phase timings)"
+        "v2 timings: preparation is reported as walk; the write transaction as insert (no separate phase timings)"
     );
 }
 
