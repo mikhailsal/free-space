@@ -20,9 +20,9 @@ mod mounts;
 use crate::error::{Error, ErrorCode, Result};
 use crate::job::{denied_paths, denied_warning};
 use crate::platform;
-use crate::queries::common::{Paths, normalize, resolve};
+use crate::queries::common::{Paths, Row, normalize, resolve};
 use crate::scan::tree::LinkPolicy;
-use crate::scan::{self, Kind, MountRow, Tree, flags};
+use crate::scan::{self, Kind, MountRow, RootInfo, Tree, flags};
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
 use crate::snapshot::reader::Snapshot;
 use crate::snapshot::writer::{self, RefreshRow, Reserve, WriteMeta, WriteStats};
@@ -225,15 +225,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     publish::cleanup_tmp(&req.dir);
     let snap = Snapshot::open_current(&req.dir)?;
     let (x, xpath) = resolve(&snap, &path)?;
-    match x.kind() {
-        Kind::Dir => {}
-        Kind::Mount => {
-            return Err(Error::usage(format!(
-                "{label} is a mount point outside this root's filesystem; refresh is per filesystem"
-            )));
-        }
-        _ => return Err(Error::usage(format!("{label} is not a directory"))),
-    }
+    check_target(&x, label)?;
     let started = platform::now_secs();
     let seen = Arc::new(AtomicU64::new(0));
     let pw = ProgressWriter::start(
@@ -250,7 +242,83 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let load_seconds = t.elapsed().as_secs_f64();
 
     let t = Instant::now();
-    let os_path = PathBuf::from(std::ffi::OsStr::from_bytes(&xpath));
+    let sub = rescan_subtree(
+        &snap,
+        &loaded.tree.roots,
+        &x,
+        &xpath,
+        req.workers,
+        seen,
+        label,
+    )?;
+    let walk_seconds = t.elapsed().as_secs_f64();
+    let removed = sub.is_none();
+    let subtree_entries = sub.as_ref().map(|t| t.nodes.len() as u64).unwrap_or(0);
+
+    let t = Instant::now();
+    let mut paths = Paths::new(&snap.conn);
+    let policy = graft(&mut loaded, x.id, x.subtree_end, sub, &mut paths)?;
+    drop(paths);
+    let mut tree = loaded.tree;
+    update_fs_stats(&mut tree, &xpath);
+    let fin = tree.finalize_with(&policy);
+    let finalize_seconds = t.elapsed().as_secs_f64();
+    let denied = denied_paths(&tree, &fin);
+
+    pw.set_stage(progress::STAGE_WRITE);
+    precheck(&req.dir, fin.order.len() as u64)?;
+    crate::fault::point(&req.dir, "prechecked");
+    let (generation, _) = crate::job::next_generation(&req.dir);
+    let meta = refresh_meta(&snap, generation, &xpath, started)?;
+    let tmp = req.dir.tmp(generation);
+    let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
+    drop(snap);
+    crate::fault::point(&req.dir, "written");
+
+    pw.set_stage(progress::STAGE_PUBLISH);
+    let t = Instant::now();
+    publish::publish_current(&req.dir, &tmp)?;
+    let publish_seconds = t.elapsed().as_secs_f64();
+    drop(pw);
+
+    record_success(&req.dir, generation, &denied)?;
+
+    Ok(RefreshReport {
+        generation,
+        path: label.to_string(),
+        entries: fin.order.len() as u64,
+        subtree_entries,
+        removed,
+        load_seconds,
+        walk_seconds,
+        finalize_seconds,
+        write: ws,
+        publish_seconds,
+        total_seconds: t_all.elapsed().as_secs_f64(),
+        snapshot_bytes: ws.bytes,
+        denied,
+    })
+}
+
+fn check_target(x: &Row, label: &str) -> Result<()> {
+    match x.kind() {
+        Kind::Dir => {}
+        Kind::Mount => {
+            return Err(Error::usage(format!(
+                "{label} is a mount point outside this root's filesystem; refresh is per filesystem"
+            )));
+        }
+        _ => return Err(Error::usage(format!("{label} is not a directory"))),
+    }
+    Ok(())
+}
+
+fn subtree_exists(
+    os_path: &Path,
+    roots: &[RootInfo],
+    one_file_system: bool,
+    label: &str,
+) -> Result<bool> {
     // Only a missing path can remove the cached subtree. Other stat failures
     // (for example, an unsearchable ancestor) must leave the snapshot intact.
     let exists = match os_path.symlink_metadata() {
@@ -264,91 +332,83 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
         }
         Ok(m) => {
             use std::os::unix::fs::MetadataExt;
-            mounts::check(
-                &os_path,
-                Some(m.dev()),
-                &loaded.tree.roots,
-                snap.meta.one_file_system,
-                label,
-            )?;
+            mounts::check(os_path, Some(m.dev()), roots, one_file_system, label)?;
             true
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            mounts::check(
-                &os_path,
-                None,
-                &loaded.tree.roots,
-                snap.meta.one_file_system,
-                label,
-            )?;
+            mounts::check(os_path, None, roots, one_file_system, label)?;
             false
         }
         Err(e) => return Err(Error::io(format!("stat {label}"), e)),
     };
-    let sub = if exists {
-        let opts = scan::WalkOptions {
-            roots: vec![os_path.clone()],
-            one_file_system: snap.meta.one_file_system,
-            workers: req.workers,
-            seen,
-            expected: Some(x.items as u64 + 1),
-        };
-        let t =
-            scan::walk(&opts).map_err(|e| Error::generic(format!("refresh walk failed: {e}")))?;
-        if t.nodes.is_empty() || t.roots[0].path.as_os_str().as_bytes() != xpath.as_slice() {
-            return Err(Error::usage(format!(
-                "{label} resolves to {} on disk (symlink?); refresh the real path",
-                t.roots
-                    .first()
-                    .map(|r| r.path.display().to_string())
-                    .unwrap_or_default()
-            )));
-        }
-        Some(t)
-    } else {
+    Ok(exists)
+}
+
+fn rescan_subtree(
+    snap: &Snapshot,
+    roots: &[RootInfo],
+    x: &Row,
+    xpath: &[u8],
+    workers: usize,
+    seen: Arc<AtomicU64>,
+    label: &str,
+) -> Result<Option<Tree>> {
+    let os_path = PathBuf::from(std::ffi::OsStr::from_bytes(xpath));
+    if !subtree_exists(&os_path, roots, snap.meta.one_file_system, label)? {
         if x.parent_id.is_none() {
             return Err(Error::usage(format!(
                 "root {label} no longer exists; run a full scan"
             )));
         }
-        None
+        return Ok(None);
+    }
+    let opts = scan::WalkOptions {
+        roots: vec![os_path.clone()],
+        one_file_system: snap.meta.one_file_system,
+        workers,
+        seen,
+        expected: Some(x.items as u64 + 1),
     };
-    let walk_seconds = t.elapsed().as_secs_f64();
-    let removed = sub.is_none();
-    let subtree_entries = sub.as_ref().map(|t| t.nodes.len() as u64).unwrap_or(0);
+    let t = scan::walk(&opts).map_err(|e| Error::generic(format!("refresh walk failed: {e}")))?;
+    if t.nodes.is_empty() || t.roots[0].path.as_os_str().as_bytes() != xpath {
+        return Err(Error::usage(format!(
+            "{label} resolves to {} on disk (symlink?); refresh the real path",
+            t.roots
+                .first()
+                .map(|r| r.path.display().to_string())
+                .unwrap_or_default()
+        )));
+    }
+    Ok(Some(t))
+}
 
-    let t = Instant::now();
-    let mut paths = Paths::new(&snap.conn);
-    let policy = graft(&mut loaded, x.id, x.subtree_end, sub, &mut paths)?;
-    drop(paths);
-    let mut tree = loaded.tree;
+fn update_fs_stats(tree: &mut Tree, xpath: &[u8]) {
     // a refresh usually follows a cleanup: the free space shown "at scan"
     // should move with it
     if let Some(r) = tree
         .roots
         .iter_mut()
-        .filter(|r| is_under(&xpath, r.path.as_os_str().as_bytes()))
+        .filter(|r| is_under(xpath, r.path.as_os_str().as_bytes()))
         .max_by_key(|r| r.path.as_os_str().len())
         && scan::walk::statvfs_safe(&r.fs_type)
         && let Ok(st) = platform::statvfs(&r.path)
     {
         r.stats = st;
     }
-    let fin = tree.finalize_with(&policy);
-    let finalize_seconds = t.elapsed().as_secs_f64();
-    let denied = denied_paths(&tree, &fin);
+}
 
-    pw.set_stage(progress::STAGE_WRITE);
-    publish::precheck(&req.dir, Some(fin.order.len() as u64), 2).map_err(|mut e| {
+fn precheck(dir: &SnapshotDir, entries: u64) -> Result<publish::PrecheckInfo> {
+    publish::precheck(dir, Some(entries), 2).map_err(|mut e| {
         e.last_error = Some(state::LastError {
             ts: platform::now_secs(),
             op: "precheck".into(),
             message: e.message.clone(),
         });
         e
-    })?;
-    crate::fault::point(&req.dir, "prechecked");
-    let (generation, _) = crate::job::next_generation(&req.dir);
+    })
+}
+
+fn refresh_meta(snap: &Snapshot, generation: u64, xpath: &[u8], started: i64) -> Result<WriteMeta> {
     let mut meta = WriteMeta::new(generation, snap.meta.prev_generation, snap.meta.scanned_at);
     meta.one_file_system = snap.meta.one_file_system;
     meta.host = snap.meta.host.clone();
@@ -367,43 +427,22 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
             .collect::<rusqlite::Result<Vec<_>>>()?;
     }
     meta.refreshes.push(RefreshRow {
-        path: xpath.clone(),
+        path: xpath.to_vec(),
         scanned_at: started,
         generation,
     });
-    let tmp = req.dir.tmp(generation);
-    let ws = writer::write_snapshot(&tmp, &tree, &fin, &meta, &Reserve::new(req.dir.as_path()))?;
-    drop(snap);
-    crate::fault::point(&req.dir, "written");
+    Ok(meta)
+}
 
-    pw.set_stage(progress::STAGE_PUBLISH);
-    let t = Instant::now();
-    publish::publish_current(&req.dir, &tmp)?;
-    let publish_seconds = t.elapsed().as_secs_f64();
-    drop(pw);
-
-    let mut st = state::read(&req.dir).ok().flatten().unwrap_or_default();
+fn record_success(dir: &SnapshotDir, generation: u64, denied: &[String]) -> Result<()> {
+    let mut st = state::read(dir).ok().flatten().unwrap_or_default();
     st.last_error = None;
     st.last_success_ts = Some(platform::now_secs());
     st.current_generation = Some(generation);
-    st.warnings = denied_warning(&denied).into_iter().collect();
-    state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
+    st.warnings = denied_warning(denied).into_iter().collect();
+    state::write(dir, &st).map_err(|e| Error::io("write state.json", e))?;
 
-    Ok(RefreshReport {
-        generation,
-        path: label.to_string(),
-        entries: fin.order.len() as u64,
-        subtree_entries,
-        removed,
-        load_seconds,
-        walk_seconds,
-        finalize_seconds,
-        write: ws,
-        publish_seconds,
-        total_seconds: t_all.elapsed().as_secs_f64(),
-        snapshot_bytes: ws.bytes,
-        denied,
-    })
+    Ok(())
 }
 
 /// `path` is `root` or lies below it.
