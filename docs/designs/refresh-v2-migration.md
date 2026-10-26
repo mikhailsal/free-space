@@ -1,8 +1,9 @@
 # Issue #10: experimental generation-store migration
 
-Status: opt-in Rust API and explicit CLI/HTTP backend on an implementation
-branch. V1 remains the default; published v1 snapshots are unchanged. Issue #10
-is not complete until the remaining production gates below are satisfied.
+Status: opt-in CLI/HTTP backend with timer lifecycle and explicit maintenance on
+the implementation branch. V1 remains the default and keeps its existing
+snapshot files. Final measurements and publication checks are pending. See
+[the operator guide](../refresh-v2.md).
 
 ## Executable stages
 
@@ -37,9 +38,12 @@ is not complete until the remaining production gates below are satisfied.
 7. **Implemented:** disk-staged v2 seed with raw own values and exact aggregates,
    using the existing bounded-memory walker. Both seed profiles share atomic
    publication and honor `keep_previous`. Complete denied reports stream to disk.
-8. **Remaining:** integrate scan options into opt-in CLI routing, complete
-   process-crash/real ENOSPC coverage and production acceptance. Measure physical
-   I/O, constrained memory, long-run history and target-machine budgets.
+8. **Implemented:** CLI scan options, timer install/uninstall, maintenance and
+   policy recovery, complete write reports, process-kill, syscall-boundary and
+   actual private-volume ENOSPC tests. Interrupted stages are recovered under
+   lifetime locks.
+9. **Remaining:** final complete-command scaling/constrained-memory measurements
+   and publication checks.
 
 Validation commands:
 
@@ -55,7 +59,8 @@ cargo test --release -p freespace-core --test generation_store locality_benchmar
 `Store::scan_roots(roots, one_file_system, workers)` and
 `Store::refresh(existing_directory, workers)` exercise the complete
 filesystem-to-store path. `Reader::open(dedicated_path)` pins a read transaction
-and current/prev pair. No CLI switch is provided yet.
+and current/prev pair. `--backend v2` or config `backend = "v2"` selects the
+separate store; the operator guide covers seeding and ongoing maintenance.
 
 The `identities` table allocates a permanent integer key by collision-free raw
 root/path equality. `live` contains one current row per scoped path; `versions`
@@ -119,8 +124,27 @@ the other is rejected, and a fresh retry preserves both changes.
 
 WAL and FULL synchronization supply SQLite transaction durability. Injected
 publication-trigger failures after local and external-owner updates roll back
-entries, root metadata, current, prev and history together. Process termination
-and ENOSPC remain separate tests; statement rollback is not evidence for them.
+entries, root metadata, current, prev and history together. Separate subprocess
+tests stop writers at selected WAL/staging writes and inject ENOSPC at the OS
+write boundary. They verify both generation views, metadata, history, internal
+accounting and retries. `generation_volume` separately passed actual ENOSPC for
+staging, final WAL and checkpoint writes on a private 768 MiB tmpfs. Its barrier
+resumes a real write after filling that isolated volume; it never substitutes an
+errno. Published views/accounting survive and retries work after filler removal.
+The test requires Linux, a C compiler, passwordless sudo and private mount
+namespaces; it explicitly skips when namespace privileges are unavailable.
+This verifies the bounded tmpfs fixture, not every filesystem's failure modes.
+
+The lifecycle suite repeats 160 refreshes and 16 full-scan rotations with pinned
+readers, accounting checks and bounded GC. After reclamation the retained-record
+count returns to 211 in each sampled cycle. A separate 8-versus-1,024 unrelated
+entry fixture keeps 25 logical SQL changes and 1,732 VM instructions across each
+of 12 refreshes. These are workload-specific correctness/locality checks, not
+hardware latency budgets. An isolated private mount namespace also compares
+v1/v2 against live tmpfs and same-device bind mounts: one-filesystem/cross-mount,
+nested roots, both seed profiles, refresh, and late boundary changes. Namespace
+privileges are required for those mount cases; unavailable privileges are
+reported as a skip.
 
 ## Retention, reader leases and recovery
 
@@ -276,19 +300,16 @@ streams the scoped subtree below the requested depth; memory is bounded, but
 extra scoped reads remain to be benchmarked/optimized. The experimental raw
 `Reader::diff` remains separate from the public adapter.
 
-Remaining gates:
+CLI/HTTP routing, maintenance/policy recovery and timer lifecycle have integrated
+tests, including malformed/empty stores, complete denied reports, report timing
+groups, read-only access and isolated root install/uninstall. V1 remains default.
 
-- CLI/HTTP routing and operational maintenance commands with end-to-end v1
-  response parity. Production remains v1 by default.
+Remaining acceptance evidence:
+
 - Constrained-memory measurement of the implemented disk-staged full-scan seed
   through the exact integrated CLI binary. Differential tests already cover raw
   own values beyond u32 aggregate saturation, scoped hardlink ties, mount/denied
   metadata, negative timestamps, byte paths, refresh and both keep-prev modes.
-- Writer process-kill and actual ENOSPC at staging, WAL/index writes, publication
-  and maintenance. SQLite `max_page_count` FULL rollback and reader-process death
-  are tested, but do not substitute for these fault modes.
-- Wider real mount/unmount races, H/A fanout and concurrent lifecycle stress;
-  long-run upkeep throughput, capacity sizing and read-only deployment permissions.
 - Physical I/O, dirty pages, RSS, cold-cache and deep-query measurements, and
   agreed target-machine budgets. Admission limits are not physical-size claims.
 
@@ -324,11 +345,9 @@ outside the refreshed subtree while growing unrelated inode groups from 10 to
 equal SQL mutation counts and no linear increase in VM instructions. This proves
 only that fixture's unrelated-group isolation; H/A fanout measurements remain.
 
-Validation: after integrating master `abe7eff8` (including disk-backed scan),
-165 core tests passed after the first-run and secure-file follow-up. `scripts/check.sh rust size` passed workspace strict
-Clippy, formatting, suppression and file-size checks. The explicit release
-benchmark passed before that integration. The subsequent default-budget, initial-seed, first-run and secure-file follow-ups
-passed all eleven retention tests and the same strict Rust/size checks. The nine v2 store tests, seven
-hardlink parity/locality tests, eight public-query parity tests, eleven retention
-checks and four v2 unit tests cover the contracts described above. Production
-routing, bounded-RSS seeding and physical/crash gates remain open.
+This historical benchmark predates the integrated disk seed, CLI report path,
+timer/maintenance commands and expanded crash tests. It demonstrates logical
+locality for the supported fixture and is not the final complete-command timing.
+The current validation commands above rerun strict formatting, Clippy, size,
+query/retention parity and fault tests. Final CLI/cgroup evidence is recorded in
+`docs/benchmarks.md` with its exact measured source and binary hashes.
