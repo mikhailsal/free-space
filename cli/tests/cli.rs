@@ -237,7 +237,11 @@ fn scan_and_refresh_without_write_access_say_sudo() {
     assert_eq!(json(&o)["error"]["code"], "NOT_ROOT", "{}", json(&o));
     assert_eq!(
         json(&o)["error"]["fix"],
-        format!("sudo freespace scan {}", root.display())
+        format!(
+            "sudo freespace scan '{}' --workers {}",
+            root.display(),
+            freespace_core::scan::default_workers()
+        )
     );
     // nothing published there yet: refresh has nothing to refresh
     let o = run(&["refresh", s(&root), "--json"]);
@@ -251,7 +255,7 @@ fn scan_and_refresh_without_write_access_say_sudo() {
     assert_eq!(json(&o)["error"]["code"], "NOT_ROOT", "{}", json(&o));
     assert_eq!(
         json(&o)["error"]["fix"],
-        format!("sudo freespace refresh {}", root.display())
+        format!("sudo freespace refresh '{}'", root.display())
     );
 }
 
