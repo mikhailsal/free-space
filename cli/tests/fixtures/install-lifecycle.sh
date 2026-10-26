@@ -19,6 +19,10 @@ printf 'root:x:0:0:root:/root:/bin/bash\n' > /etc/passwd
 printf 'root:x:0:\nfreespace:x:4242:root\n' > /etc/group
 mkdir -p "$scratch/tools" "$scratch/root/sub" "$scratch/units"
 printf test > "$scratch/root/sub/a"
+mkdir -p "$scratch/install-link-target"
+chmod 700 "$scratch/install-link-target"
+printf keep-install-target > "$scratch/install-link-target/marker"
+ln -s "$scratch/install-link-target" "$scratch/install-link"
 export FREESPACE_CONFIG="$scratch/config.toml"
 export FREESPACE_UNIT_DIR="$scratch/units"
 export HOME=/root
@@ -49,6 +53,15 @@ TOOL
 chmod 755 "$scratch/tools/"*
 export PATH="$scratch/tools:/usr/bin:/bin"
 [ "$(command -v systemctl)" = "$scratch/tools/systemctl" ]
+# Reject a symlinked v2 base before installing the binary, writing config, or
+# changing ownership/mode on its target.
+install_target_stat=$(stat -c %u:%g:%a "$scratch/install-link-target")
+if "$binary" --backend v2 install-timer --no-start --roots "$scratch/root" --snapshot-dir "$scratch/install-link" --user root --json > "$scratch/install-link.json" 2>&1; then
+  echo 'v2 install accepted a symlinked snapshot base' >&2; exit 1
+fi
+[ "$(stat -c %u:%g:%a "$scratch/install-link-target")" = "$install_target_stat" ]
+[ "$(cat "$scratch/install-link-target/marker")" = keep-install-target ]
+[ ! -e "$scratch/config.toml" ] && [ ! -e /usr/local/bin/freespace ]
 # Explicit selection must be persisted so the unit's ordinary `scan` uses v2.
 "$binary" --backend v2 install-timer --no-start --roots "$scratch/root" --snapshot-dir "$scratch/snap" --user root --json > "$scratch/install.json"
 python3 - "$scratch" <<'PY'
@@ -129,6 +142,24 @@ if "$binary" install-timer --uninstall --user root --json > "$scratch/locked.jso
 fi
 [ -f "$scratch/config.toml" ] && [ -f "$scratch/snap/v2/generations.db" ]
 wait "$holder"
+# A symlinked configured base must abort uninstall before locks, systemd, or
+# manifest cleanup can reach the target.
+mv "$scratch/snap" "$scratch/snap-real"
+mkdir -p "$scratch/uninstall-link-target/v2"
+chmod 700 "$scratch/uninstall-link-target"
+printf keep-uninstall-target > "$scratch/uninstall-link-target/v2/generations.db"
+ln -s "$scratch/uninstall-link-target" "$scratch/snap"
+uninstall_target_stat=$(stat -c %u:%g:%a "$scratch/uninstall-link-target")
+systemctl_calls_before=$(grep -c '^systemctl ' "$scratch/tools.log" || true)
+if "$binary" install-timer --uninstall --user root --json > "$scratch/uninstall-link.json" 2>&1; then
+  echo 'v2 uninstall accepted a symlinked snapshot base' >&2; exit 1
+fi
+[ "$(stat -c %u:%g:%a "$scratch/uninstall-link-target")" = "$uninstall_target_stat" ]
+[ "$(cat "$scratch/uninstall-link-target/v2/generations.db")" = keep-uninstall-target ]
+[ -f "$scratch/config.toml" ] && [ -f "$scratch/units/freespace.service" ]
+[ "$(grep -c '^systemctl ' "$scratch/tools.log" || true)" -eq "$systemctl_calls_before" ]
+rm "$scratch/snap"
+mv "$scratch/snap-real" "$scratch/snap"
 # Cleanup removes only the v2 manifest, preserving v1 and unknown files.
 printf preserve-v1 > "$scratch/snap/snapshot.db"
 printf preserve-base > "$scratch/snap/unrelated.txt"

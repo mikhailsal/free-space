@@ -53,6 +53,46 @@ pub(super) fn prepare_backend_dirs(config: &Config) -> Result<SnapshotDir> {
     Ok(dir)
 }
 
+/// Reject symlinked components before v2 install or uninstall touches paths
+/// beneath the configured snapshot base. V1 keeps its established behavior.
+pub(super) fn validate_v2_base(config: &Config) -> Result<()> {
+    if config.backend != Backend::V2 {
+        return Ok(());
+    }
+    let mut path = PathBuf::new();
+    for component in config.snapshot_dir.components() {
+        path.push(component);
+        reject_symlink(&path)?;
+    }
+    let dir = SnapshotDir::new(config.snapshot_dir.join("v2"));
+    reject_symlink(dir.as_path())?;
+    Ok(())
+}
+
+pub(super) fn validate_v2_install_files(config: &Config) -> Result<()> {
+    validate_v2_base(config)?;
+    if config.backend != Backend::V2 {
+        return Ok(());
+    }
+    let dir = SnapshotDir::new(config.snapshot_dir.join("v2"));
+    for file in v2_files(&dir) {
+        reject_symlink(&file)?;
+    }
+    Ok(())
+}
+
+fn reject_symlink(path: &Path) -> Result<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::generic(format!(
+            "refusing symlinked v2 snapshot path {}",
+            path.display()
+        ))),
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(Error::io(format!("inspect {}", path.display()), error)),
+    }
+}
+
 fn prepare_directory(path: &Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     fsutil::ensure_dir(path).map_err(|e| Error::io(format!("create {}", path.display()), e))?;

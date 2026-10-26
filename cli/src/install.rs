@@ -80,6 +80,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
     let mut c = config::load_from(&cfg_path)?.config;
     c.backend = crate::backend::load()?.config.backend;
     apply_config_overrides(&a, &mut c);
+    lifecycle::validate_v2_install_files(&c)?;
     let text = config::render(&c);
     // the file we write must load back: catches a bad --at or a relative path
     config::parse(&text, &cfg_path)?;

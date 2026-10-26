@@ -21,6 +21,7 @@ pub(super) fn uninstall(a: &InstallArgs) -> output::Result<()> {
     if let Ok(loaded) = crate::backend::load() {
         c.backend = loaded.config.backend;
     }
+    super::lifecycle::validate_v2_base(&c)?;
     let mut removed: Vec<String> = Vec::new();
     let mut kept: Vec<String> = Vec::new();
 
