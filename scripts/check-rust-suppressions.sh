@@ -136,16 +136,29 @@ for raw in tracked.split(b"\0"):
                     break
             end += 1
         attr = re.sub(r"\s+", "", code[start:end])
-        if not re.search(r"(?<!\w)(?:allow|expect)\(", attr):
-            continue
-        hit = next((lint for lint in blocked if re.search(rf"(?<!\w){re.escape(lint)}(?!\w)", attr)), None)
-        if hit is None and re.search(r"(?:^|[,(])warnings(?:[,)])", attr):
-            hit = "warnings"
-        if hit is None:
-            continue
-        line = source.count("\n", 0, start) + 1
-        print(f"check-rust-suppressions: {path}:{line}: forbidden {hit} suppression", file=sys.stderr)
-        violations += 1
+        # Rust accepts raw identifiers in lint paths, for example
+        # clippy::r#too_many_lines. The r# prefix does not change the lint.
+        attr = re.sub(r"(?<!\w)r#(?=[A-Za-z_])", "", attr)
+        for lint_attr in re.finditer(r"(?<!\w)(?:allow|expect)\(", attr):
+            args_start = lint_attr.end()
+            pos = args_start
+            parens = 1
+            while pos < len(attr) and parens:
+                if attr[pos] == "(":
+                    parens += 1
+                elif attr[pos] == ")":
+                    parens -= 1
+                pos += 1
+            args = attr[args_start:pos - 1] if parens == 0 else attr[args_start:]
+            hit = next((lint for lint in blocked if re.search(rf"(?<!\w){re.escape(lint)}(?!\w)", args)), None)
+            if hit is None and re.search(r"(?:^|[,(])warnings(?:[,)])", args):
+                hit = "warnings"
+            if hit is None:
+                continue
+            line = source.count("\n", 0, start) + 1
+            print(f"check-rust-suppressions: {path}:{line}: forbidden {hit} suppression", file=sys.stderr)
+            violations += 1
+            break
 
 raise SystemExit(1 if violations else 0)
 PY

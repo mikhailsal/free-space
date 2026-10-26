@@ -135,8 +135,13 @@ grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines supp
 printf 'ok\n#[cfg_attr(all(), doc = "]", allow(clippy::too_many_lines))]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
 if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'string-bracket Rust suppression passed'; fi
 grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'string-bracket Rust suppression diagnostic missing'
+printf 'ok\n#[allow(clippy::r#too_many_lines)]\nfn suppressed() {}\n' > "$tmp/dispatch/ok.rs"
+if (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then fail 'raw-identifier Rust suppression passed'; fi
+grep -F 'check-rust-suppressions: ok.rs:2: forbidden clippy::too_many_lines suppression' "$tmp/rust-suppression.out" >/dev/null || fail 'raw-identifier Rust suppression diagnostic missing'
+printf 'ok\n#[cfg_attr(all(), allow(dead_code), deny(clippy::too_many_lines))]\nfn short() {}\n' > "$tmp/dispatch/ok.rs"
+if ! (cd "$tmp/dispatch" && "$dispatch" rust) >"$tmp/rust-suppression.out" 2>&1; then cat "$tmp/rust-suppression.out" >&2; fail 'unrelated allow plus deny was rejected'; fi
 printf 'ok\n' > "$tmp/dispatch/ok.rs"
-pass 'check rejects Rust lint suppressions through comments and nested attributes'
+pass 'check rejects Rust suppressions through comments, strings, and raw identifiers without false positives'
 
 mkdir -p "$tmp/dispatch/web/src"
 printf '// biome-ignore lint/complexity/noExcessiveLinesPerFunction: used suppression\n' > "$tmp/dispatch/web/src/main.ts"
