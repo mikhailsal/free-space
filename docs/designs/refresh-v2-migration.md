@@ -265,9 +265,10 @@ outside the refreshed subtree while growing unrelated inode groups from 10 to
 equal SQL mutation counts and no linear increase in VM instructions. This proves
 only that fixture's unrelated-group isolation; H/A fanout measurements remain.
 
-Validation before final integration: 150 core tests passed, strict core Clippy
-passed, and the explicit release benchmark passed. Repository Rust/size checks
-are rerun after integrating the latest master. The nine v2 store tests, seven
+Validation: after integrating master `abe7eff8` (including disk-backed scan),
+161 core tests passed. `scripts/check.sh rust size` passed workspace strict
+Clippy, formatting, suppression and file-size checks. The explicit release
+benchmark passed before that integration. The nine v2 store tests, seven
 hardlink parity/locality tests, eight public-query parity tests, seven retention
 checks and four v2 unit tests cover the contracts described above. Production
 routing, bounded-RSS seeding and physical/crash gates remain open.
