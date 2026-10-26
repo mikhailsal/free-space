@@ -44,6 +44,8 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    outputs:
+      candidate_revision: ${{ steps.provenance.outputs.candidate_revision }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,6 +63,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - name: Build both release binaries and record provenance
+        id: provenance
         shell: bash
         run: |
           set -euo pipefail
@@ -75,6 +78,7 @@ jobs:
             sha256sum "binaries/$arm" > "binaries/$arm.sha256.txt"
             "binaries/$arm" --version > "binaries/$arm.version.txt"
           done
+          echo "candidate_revision=$(cat binaries/candidate.revision.txt)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -83,8 +87,30 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      candidate_revision: ${{ steps.provenance.outputs.candidate_revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Record verified revision
+        id: provenance
+        run: echo "candidate_revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: scripts/check.sh rust
+      - run: cargo test --workspace
+
   measure:
-    needs: build
+    needs: [build, verify]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -95,6 +121,11 @@ jobs:
         with:
           name: v2-balance-binaries
           path: binaries
+      - name: Require the built and verified candidate to match
+        env:
+          BUILT_REVISION: ${{ needs.build.outputs.candidate_revision }}
+          VERIFIED_REVISION: ${{ needs.verify.outputs.candidate_revision }}
+        run: test "$BUILT_REVISION" = "$VERIFIED_REVISION"
       - name: Run all comparison arms sequentially on this runner
         env:
           # Fixed literals selected by booleans; commit text never reaches shell.
@@ -114,6 +145,14 @@ jobs:
             --baseline binaries/baseline --candidate binaries/candidate \
             --output results --steps "$BENCH_STEPS" --memory "$BENCH_MEMORY" \
             --repeats "$BENCH_REPEATS" "${extra[@]}"
+      - name: Summarize measured results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d results ]]; then
+            python3 scripts/summarize-v2-container.py results | tee results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
       # Upload raw stdout/stderr, timing, cgroup, file allocation and dbstat JSON.
       # Scratch trees and databases are never part of the results artifact.
       - uses: actions/upload-artifact@v4
