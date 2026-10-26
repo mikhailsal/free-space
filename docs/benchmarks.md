@@ -388,6 +388,50 @@ RSS, kernel I/O counters and endpoint disk occupancy. Connection-close costs are
 included in complete command time; older experimental Store-only timings in the
 migration design exclude them and must not be substituted for this result.
 
+### V2 full scan under a 128 MiB cgroup
+
+The same release source/binary above was also tested with `--low-memory`, one
+walker, `keep_previous=false`, fresh stores and a fresh **128 MiB, no-swap**
+systemd user cgroup per command. Each directory contains up to 1,000 empty files.
+Fixture creation is outside the cgroup; the Python measurement helper and file
+cache share the scanner's limit. These are separate single runs, with v1/v2 order
+at 100k and v2/v1 order at one million. Cache state is uncontrolled. Full process
+time includes writer close and checkpoint.
+
+| Files / entries | Backend | Full command | Peak process RSS | Sampled peak DB/stage/WAL allocation |
+|---:|---|---:|---:|---:|
+| 100,000 / 100,101 | v1 | 2.32 s | 26,116 KiB | 17.9 MiB |
+| 100,000 / 100,101 | v2 | 17.26 s | 26,756 KiB | 201.9 MiB |
+| 1,000,000 / 1,001,001 | v1 | 65.77 s | 26,740 KiB | 178.3 MiB |
+| 1,000,000 / 1,001,001 | v2 | 213.57 s | 29,104 KiB | 2,029.3 MiB |
+
+All four commands completed with exact entry counts, no errors, no OOM/OOM-kill
+events and swap disabled. V2 peak process RSS grew from 26.1 to 28.4 MiB across a
+tenfold fixture increase. The million-file v2 cgroup recorded 25,685 memory-limit
+pressure events and sampled current memory reached the cap with a one-page
+transient overshoot. This is completion under cache-reclaim pressure, not spare
+memory headroom or a universal process/cgroup-size guarantee.
+
+The kernel lacks `memory.peak`; cgroup current memory and allocated disk space
+were sampled every 20 ms and can miss short peaks. On the million-file fixture,
+v2 took about 3.25 times as long as v1 and used about 11.4 times the sampled peak
+disk space. Kernel input/output counters were 4,413,328 / 6,446,872 for v2 versus
+270,512 / 517,312 for v1; these are process-accounting counters, not device-byte
+measurements. The storage/time tradeoff is part of selecting v2.
+
+Reproduce each size into a new output directory on a disk-backed scratch volume:
+
+```sh
+SOURCE_REVISION=575044b6d2e9fba3aa7467489ed19afa9088e4e0 \
+  STEPS=1000000 BACKENDS="v2 v1" MEMORY_MAX=128M \
+  scripts/bench-v2-seed.py target/release/freespace ./new-seed-results
+```
+
+[Raw cgroup/CLI/time records and exact archived runners](benchmark-results/v2-seed-memory-2026-10-26.json)
+include the four runs, source/tree/binary and runner hashes, memory limits,
+pressure counters, complete reports and measurement qualifications. Generated
+fixtures/stores were removed after the run; the results remain available.
+
 ## Disk-backed full scan
 
 `scan --low-memory` (or config `low_memory = true`) streams individual entries and

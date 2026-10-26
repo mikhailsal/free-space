@@ -1,0 +1,290 @@
+{
+  "measured_source": "575044b6d2e9fba3aa7467489ed19afa9088e4e0",
+  "measured_tree": "eb0a187372596d935bf957b1caccf760300b342b",
+  "binary_sha256": "ee58e9af394599f86457b34debdd9309961f4e90573aefe8b387a39fcd295b7c",
+  "profile": "release",
+  "memory_max_bytes": 134217728,
+  "swap_max_bytes": 0,
+  "sampling_interval_ms": 20,
+  "manifests": {
+    "100k": {
+      "binary": "/tmp/freespace-v2-generation/target/release/freespace",
+      "binary_sha256": "ee58e9af394599f86457b34debdd9309961f4e90573aefe8b387a39fcd295b7c",
+      "source_revision": "575044b6d2e9fba3aa7467489ed19afa9088e4e0",
+      "platform": "Linux-5.15.0-136-generic-x86_64-with-glibc2.35",
+      "steps": [
+        100000
+      ],
+      "memory_max": "128M",
+      "cache_policy": "warm/uncontrolled; alternating backend order; helper and filesystem cache share cgroup",
+      "runner_sha256": "01f88588136c50c420ba6834568d9bc9f4752d1f332dc0bb950ac08dab0bc43b"
+    },
+    "1m": {
+      "binary": "/tmp/freespace-v2-generation/target/release/freespace",
+      "binary_sha256": "ee58e9af394599f86457b34debdd9309961f4e90573aefe8b387a39fcd295b7c",
+      "source_revision": "575044b6d2e9fba3aa7467489ed19afa9088e4e0",
+      "platform": "Linux-5.15.0-136-generic-x86_64-with-glibc2.35",
+      "steps": [
+        1000000
+      ],
+      "memory_max": "128M",
+      "backend_order": [
+        "v2",
+        "v1"
+      ],
+      "cache_policy": "warm/uncontrolled; alternating backend order; helper and filesystem cache share cgroup",
+      "runner_sha256": "bff67028da8da624242f1b3707e270daa8fc7bea886813ae17b9ce9aead72654"
+    }
+  },
+  "runners": {
+    "100k": {
+      "sha256": "01f88588136c50c420ba6834568d9bc9f4752d1f332dc0bb950ac08dab0bc43b",
+      "source": "#!/usr/bin/env python3\n\"\"\"Whole-command v1/v2 disk-seed comparison under a fresh no-swap cgroup.\nBINARY OUTPUT; STEPS='100000 1000000', MEMORY_MAX=128M, SOURCE_REVISION=<hash>.\n\"\"\"\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport platform\nimport shutil\nimport subprocess\nimport sys\nimport tempfile\nimport time\n\n\ndef dump(path, value):\n    path.write_text(json.dumps(value, indent=2) + '\\n')\n\n\ndef group_path():\n    line = next(v for v in Path('/proc/self/cgroup').read_text().splitlines() if v.startswith('0::'))\n    return Path('/sys/fs/cgroup') / line[3:].lstrip('/')\n\n\ndef disk_bytes(folder):\n    total = 0\n    for path in folder.rglob('*'):\n        try:\n            total += path.stat().st_blocks * 512\n        except FileNotFoundError:\n            pass\n    return total\n\n\ndef run(spec_file):\n    spec = json.loads(spec_file.read_text())\n    prefix = Path(spec['prefix'])\n    group = group_path()\n    peak_disk = 0\n    peak_current = 0\n    started = time.monotonic()\n    time_format = '{\"elapsed_seconds\":%e,\"peak_rss_kib\":%M,\"inputs\":%I,\"outputs\":%O,\"exit_code\":%x}'\n    cmd = ['/usr/bin/time', '-f', time_format, '-o', str(prefix.with_suffix('.time')), *spec['command']]\n    with prefix.with_suffix('.stdout').open('w') as out, prefix.with_suffix('.stderr').open('w') as err:\n        proc = subprocess.Popen(cmd, env=dict(os.environ, **spec['env']), stdout=out, stderr=err)\n        while proc.poll() is None:\n            peak_disk = max(peak_disk, disk_bytes(Path(spec['snapshot'])))\n            peak_current = max(peak_current, int((group / 'memory.current').read_text()))\n            time.sleep(0.02)\n    usage = json.loads(prefix.with_suffix('.time').read_text().splitlines()[-1])\n    cg = {name:(group/name).read_text().strip() for name in ['memory.max','memory.swap.max','memory.peak','memory.events','memory.pressure'] if (group/name).exists()}\n    result = dict(spec, usage=usage, cgroup=cg, sampled_peak_cgroup_bytes=peak_current,\n                  sampled_peak_disk_bytes=max(peak_disk,disk_bytes(Path(spec['snapshot']))),\n                  harness_elapsed_seconds=time.monotonic()-started)\n    if proc.returncode == 0:\n        report=json.loads(prefix.with_suffix('.stdout').read_text())\n        assert report['entries']==spec['expected_entries'],report\n        assert report['errors']==0 and not report['incomplete'],report\n        result['report']=report\n    dump(prefix.with_suffix('.metrics.json'),result)\n    if proc.returncode:\n        raise SystemExit(proc.returncode)\n\n\ndef main():\n    if len(sys.argv)==3 and sys.argv[1]=='--run':\n        run(Path(sys.argv[2])); return\n    binary=Path(sys.argv[1]).resolve()\n    output=Path(sys.argv[2]).resolve(); output.mkdir(parents=True,exist_ok=False)\n    steps=[int(v) for v in os.environ.get('STEPS','100000 1000000').split()]\n    limit=os.environ.get('MEMORY_MAX','128M')\n    dump(output/'manifest.json',dict(binary=str(binary),binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),\n         source_revision=os.environ.get('SOURCE_REVISION'),platform=platform.platform(),steps=steps,memory_max=limit,\n         cache_policy='warm/uncontrolled; alternating backend order; helper and filesystem cache share cgroup',\n         runner_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))\n    (output/'config.toml').write_text('keep_previous = false\\n')\n    with tempfile.TemporaryDirectory(prefix='v2bm-') as scratch:\n        tree=Path(scratch)/'r';tree.mkdir();previous=0\n        for step in steps:\n            for n in range(previous,step):\n                parent=tree/f'd{n//1000:04}'\n                parent.mkdir(exist_ok=True)\n                (parent/f'f{n:07}').touch(exist_ok=False)\n            previous=step\n            entries=1+step+(step+999)//1000\n            for backend in (['v1','v2'] if steps.index(step)%2==0 else ['v2','v1']):\n                snapshot=Path(scratch)/backend;snapshot.mkdir()\n                prefix=output/f'{step}-{backend}'\n                command=[str(binary),'--backend',backend,'scan',str(tree),'--workers','1','--low-memory','--json']\n                spec=dict(command=command,prefix=str(prefix),snapshot=str(snapshot),expected_entries=entries,\n                          env=dict(FREESPACE_CONFIG=str(output/'config.toml'),FREESPACE_SNAPSHOT_DIR=str(snapshot),LC_ALL='C'))\n                spec_file=prefix.with_suffix('.run.json');dump(spec_file,spec)\n                subprocess.run(['systemd-run','--user','--wait','--pipe','--quiet','--property=MemoryMax='+limit,\n                                '--property=MemorySwapMax=0','--property=OOMPolicy=continue',sys.executable,\n                                str(Path(__file__).resolve()),'--run',str(spec_file)],check=True)\n                row=json.loads(prefix.with_suffix('.metrics.json').read_text())\n                print(backend,step,row['usage'],row['sampled_peak_disk_bytes'],row['cgroup'],flush=True)\n                shutil.rmtree(snapshot)\n\nif __name__=='__main__': main()\n"
+    },
+    "1m": {
+      "sha256": "bff67028da8da624242f1b3707e270daa8fc7bea886813ae17b9ce9aead72654",
+      "source": "#!/usr/bin/env python3\n\"\"\"Whole-command v1/v2 disk-seed comparison under a fresh no-swap cgroup.\nBINARY OUTPUT; STEPS='100000 1000000', MEMORY_MAX=128M, SOURCE_REVISION=<hash>.\n\"\"\"\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport platform\nimport shutil\nimport subprocess\nimport sys\nimport tempfile\nimport time\n\n\ndef dump(path, value):\n    path.write_text(json.dumps(value, indent=2) + '\\n')\n\n\ndef group_path():\n    line = next(v for v in Path('/proc/self/cgroup').read_text().splitlines() if v.startswith('0::'))\n    return Path('/sys/fs/cgroup') / line[3:].lstrip('/')\n\n\ndef disk_bytes(folder):\n    total = 0\n    for path in folder.rglob('*'):\n        try:\n            total += path.stat().st_blocks * 512\n        except FileNotFoundError:\n            pass\n    return total\n\n\ndef run(spec_file):\n    spec = json.loads(spec_file.read_text())\n    prefix = Path(spec['prefix'])\n    group = group_path()\n    peak_disk = 0\n    peak_current = 0\n    started = time.monotonic()\n    time_format = '{\"elapsed_seconds\":%e,\"peak_rss_kib\":%M,\"inputs\":%I,\"outputs\":%O,\"exit_code\":%x}'\n    cmd = ['/usr/bin/time', '-f', time_format, '-o', str(prefix.with_suffix('.time')), *spec['command']]\n    with prefix.with_suffix('.stdout').open('w') as out, prefix.with_suffix('.stderr').open('w') as err:\n        proc = subprocess.Popen(cmd, env=dict(os.environ, **spec['env']), stdout=out, stderr=err)\n        while proc.poll() is None:\n            peak_disk = max(peak_disk, disk_bytes(Path(spec['snapshot'])))\n            peak_current = max(peak_current, int((group / 'memory.current').read_text()))\n            time.sleep(0.02)\n    usage = json.loads(prefix.with_suffix('.time').read_text().splitlines()[-1])\n    cg = {name:(group/name).read_text().strip() for name in ['memory.max','memory.swap.max','memory.peak','memory.events','memory.pressure'] if (group/name).exists()}\n    result = dict(spec, usage=usage, cgroup=cg, sampled_peak_cgroup_bytes=peak_current,\n                  sampled_peak_disk_bytes=max(peak_disk,disk_bytes(Path(spec['snapshot']))),\n                  harness_elapsed_seconds=time.monotonic()-started)\n    if proc.returncode == 0:\n        report=json.loads(prefix.with_suffix('.stdout').read_text())\n        assert report['entries']==spec['expected_entries'],report\n        assert report['errors']==0 and not report['incomplete'],report\n        result['report']=report\n    dump(prefix.with_suffix('.metrics.json'),result)\n    if proc.returncode:\n        raise SystemExit(proc.returncode)\n\n\ndef main():\n    if len(sys.argv)==3 and sys.argv[1]=='--run':\n        run(Path(sys.argv[2])); return\n    binary=Path(sys.argv[1]).resolve()\n    output=Path(sys.argv[2]).resolve(); output.mkdir(parents=True,exist_ok=False)\n    steps=[int(v) for v in os.environ.get('STEPS','100000 1000000').split()]\n    limit=os.environ.get('MEMORY_MAX','128M')\n    backends=os.environ.get('BACKENDS','v1 v2').split()\n    assert sorted(backends)==['v1','v2']\n    dump(output/'manifest.json',dict(binary=str(binary),binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),\n         source_revision=os.environ.get('SOURCE_REVISION'),platform=platform.platform(),steps=steps,memory_max=limit,backend_order=backends,\n         cache_policy='warm/uncontrolled; alternating backend order; helper and filesystem cache share cgroup',\n         runner_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))\n    (output/'config.toml').write_text('keep_previous = false\\n')\n    with tempfile.TemporaryDirectory(prefix='v2bm-') as scratch:\n        tree=Path(scratch)/'r';tree.mkdir();previous=0\n        for step in steps:\n            for n in range(previous,step):\n                parent=tree/f'd{n//1000:04}'\n                parent.mkdir(exist_ok=True)\n                (parent/f'f{n:07}').touch(exist_ok=False)\n            previous=step\n            entries=1+step+(step+999)//1000\n            for backend in (backends if steps.index(step)%2==0 else list(reversed(backends))):\n                snapshot=Path(scratch)/backend;snapshot.mkdir()\n                prefix=output/f'{step}-{backend}'\n                command=[str(binary),'--backend',backend,'scan',str(tree),'--workers','1','--low-memory','--json']\n                spec=dict(command=command,prefix=str(prefix),snapshot=str(snapshot),expected_entries=entries,\n                          env=dict(FREESPACE_CONFIG=str(output/'config.toml'),FREESPACE_SNAPSHOT_DIR=str(snapshot),LC_ALL='C'))\n                spec_file=prefix.with_suffix('.run.json');dump(spec_file,spec)\n                subprocess.run(['systemd-run','--user','--wait','--pipe','--quiet','--property=MemoryMax='+limit,\n                                '--property=MemorySwapMax=0','--property=OOMPolicy=continue',sys.executable,\n                                str(Path(__file__).resolve()),'--run',str(spec_file)],check=True)\n                row=json.loads(prefix.with_suffix('.metrics.json').read_text())\n                print(backend,step,row['usage'],row['sampled_peak_disk_bytes'],row['cgroup'],flush=True)\n                shutil.rmtree(snapshot)\n\nif __name__=='__main__': main()\n"
+    }
+  },
+  "records": [
+    {
+      "case": "100k",
+      "command": [
+        "/tmp/freespace-v2-generation/target/release/freespace",
+        "--backend",
+        "v1",
+        "scan",
+        "/tmp/v2bm-ehj_ustx/r",
+        "--workers",
+        "1",
+        "--low-memory",
+        "--json"
+      ],
+      "prefix": "/tmp/freespace-v2-seed-575044b6/100k/100000-v1",
+      "snapshot": "/tmp/v2bm-ehj_ustx/v1",
+      "expected_entries": 100101,
+      "env": {
+        "FREESPACE_CONFIG": "/tmp/freespace-v2-seed-575044b6/100k/config.toml",
+        "FREESPACE_SNAPSHOT_DIR": "/tmp/v2bm-ehj_ustx/v1",
+        "LC_ALL": "C"
+      },
+      "usage": {
+        "elapsed_seconds": 2.32,
+        "peak_rss_kib": 26116,
+        "inputs": 0,
+        "outputs": 36768,
+        "exit_code": 0
+      },
+      "cgroup": {
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0",
+        "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0"
+      },
+      "sampled_peak_cgroup_bytes": 46505984,
+      "sampled_peak_disk_bytes": 18804736,
+      "harness_elapsed_seconds": 2.3323809759895084,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 100101,
+        "roots": [
+          "/tmp/v2bm-ehj_ustx/r"
+        ],
+        "workers": 1,
+        "walk_seconds": 0.78112172,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 1.446637043,
+        "index_seconds": 0.018897025,
+        "publish_seconds": 0.000816273,
+        "total_seconds": 2.316250251,
+        "snapshot_bytes": 11964416,
+        "snapshot_path": "/tmp/v2bm-ehj_ustx/v1/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      }
+    },
+    {
+      "case": "100k",
+      "command": [
+        "/tmp/freespace-v2-generation/target/release/freespace",
+        "--backend",
+        "v2",
+        "scan",
+        "/tmp/v2bm-ehj_ustx/r",
+        "--workers",
+        "1",
+        "--low-memory",
+        "--json"
+      ],
+      "prefix": "/tmp/freespace-v2-seed-575044b6/100k/100000-v2",
+      "snapshot": "/tmp/v2bm-ehj_ustx/v2",
+      "expected_entries": 100101,
+      "env": {
+        "FREESPACE_CONFIG": "/tmp/freespace-v2-seed-575044b6/100k/config.toml",
+        "FREESPACE_SNAPSHOT_DIR": "/tmp/v2bm-ehj_ustx/v2",
+        "LC_ALL": "C"
+      },
+      "usage": {
+        "elapsed_seconds": 17.26,
+        "peak_rss_kib": 26756,
+        "inputs": 414080,
+        "outputs": 635728,
+        "exit_code": 0
+      },
+      "cgroup": {
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.events": "low 0\nhigh 0\nmax 1817\noom 0\noom_kill 0",
+        "memory.pressure": "some avg10=1.08 avg60=0.19 avg300=0.04 total=234327\nfull avg10=1.08 avg60=0.19 avg300=0.04 total=234327"
+      },
+      "sampled_peak_cgroup_bytes": 134217728,
+      "sampled_peak_disk_bytes": 211660800,
+      "harness_elapsed_seconds": 17.281268145001377,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 100101,
+        "roots": [
+          "/tmp/v2bm-ehj_ustx/r"
+        ],
+        "workers": 1,
+        "walk_seconds": 0.80095214,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 14.656541838,
+        "index_seconds": 0.0,
+        "publish_seconds": 0.0,
+        "total_seconds": 17.259158521,
+        "snapshot_bytes": 105426944,
+        "snapshot_path": "/tmp/v2bm-ehj_ustx/v2/v2/generations.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      }
+    },
+    {
+      "case": "1m",
+      "command": [
+        "/tmp/freespace-v2-generation/target/release/freespace",
+        "--backend",
+        "v1",
+        "scan",
+        "/tmp/v2bm-poob2gxs/r",
+        "--workers",
+        "1",
+        "--low-memory",
+        "--json"
+      ],
+      "prefix": "/tmp/freespace-v2-seed-575044b6/1m/1000000-v1",
+      "snapshot": "/tmp/v2bm-poob2gxs/v1",
+      "expected_entries": 1001001,
+      "env": {
+        "FREESPACE_CONFIG": "/tmp/freespace-v2-seed-575044b6/1m/config.toml",
+        "FREESPACE_SNAPSHOT_DIR": "/tmp/v2bm-poob2gxs/v1",
+        "LC_ALL": "C"
+      },
+      "usage": {
+        "elapsed_seconds": 65.77,
+        "peak_rss_kib": 26740,
+        "inputs": 270512,
+        "outputs": 517312,
+        "exit_code": 0
+      },
+      "cgroup": {
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.events": "low 0\nhigh 0\nmax 1299\noom 0\noom_kill 0",
+        "memory.pressure": "some avg10=0.46 avg60=0.28 avg300=0.09 total=623499\nfull avg10=0.46 avg60=0.28 avg300=0.09 total=623499"
+      },
+      "sampled_peak_cgroup_bytes": 134217728,
+      "sampled_peak_disk_bytes": 186937344,
+      "harness_elapsed_seconds": 65.79316083800222,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 1001001,
+        "roots": [
+          "/tmp/v2bm-poob2gxs/r"
+        ],
+        "workers": 1,
+        "walk_seconds": 16.890812884,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 46.05354153,
+        "index_seconds": 2.702787014,
+        "publish_seconds": 0.001643509,
+        "total_seconds": 65.76030178,
+        "snapshot_bytes": 120492032,
+        "snapshot_path": "/tmp/v2bm-poob2gxs/v1/snapshot.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      }
+    },
+    {
+      "case": "1m",
+      "command": [
+        "/tmp/freespace-v2-generation/target/release/freespace",
+        "--backend",
+        "v2",
+        "scan",
+        "/tmp/v2bm-poob2gxs/r",
+        "--workers",
+        "1",
+        "--low-memory",
+        "--json"
+      ],
+      "prefix": "/tmp/freespace-v2-seed-575044b6/1m/1000000-v2",
+      "snapshot": "/tmp/v2bm-poob2gxs/v2",
+      "expected_entries": 1001001,
+      "env": {
+        "FREESPACE_CONFIG": "/tmp/freespace-v2-seed-575044b6/1m/config.toml",
+        "FREESPACE_SNAPSHOT_DIR": "/tmp/v2bm-poob2gxs/v2",
+        "LC_ALL": "C"
+      },
+      "usage": {
+        "elapsed_seconds": 213.57,
+        "peak_rss_kib": 29104,
+        "inputs": 4413328,
+        "outputs": 6446872,
+        "exit_code": 0
+      },
+      "cgroup": {
+        "memory.max": "134217728",
+        "memory.swap.max": "0",
+        "memory.events": "low 0\nhigh 0\nmax 25685\noom 0\noom_kill 0",
+        "memory.pressure": "some avg10=6.64 avg60=3.43 avg300=1.21 total=5324299\nfull avg10=6.64 avg60=3.43 avg300=1.21 total=5324299"
+      },
+      "sampled_peak_cgroup_bytes": 134221824,
+      "sampled_peak_disk_bytes": 2127843328,
+      "harness_elapsed_seconds": 213.59310490200005,
+      "report": {
+        "generation": 1,
+        "prev_generation": null,
+        "entries": 1001001,
+        "roots": [
+          "/tmp/v2bm-poob2gxs/r"
+        ],
+        "workers": 1,
+        "walk_seconds": 17.781921701999998,
+        "finalize_seconds": 0.0,
+        "insert_seconds": 173.803766291,
+        "index_seconds": 0.0,
+        "publish_seconds": 0.0,
+        "total_seconds": 213.565737243,
+        "snapshot_bytes": 1059778560,
+        "snapshot_path": "/tmp/v2bm-poob2gxs/v2/v2/generations.db",
+        "errors": 0,
+        "incomplete": false,
+        "unknown_subtrees": []
+      }
+    }
+  ],
+  "limitations": [
+    "One run per backend/size; warm uncontrolled cache; order alternates across sizes, not repetitions.",
+    "Helper and filesystem cache share the cgroup; no memory.peak on this kernel, so current-memory and disk peaks are sampled lower bounds.",
+    "Kernel process I/O counters are not direct physical-device byte measurements.",
+    "The v2 million-file cgroup reached its cap with a one-page transient overshoot and substantial reclaim; low RSS does not mean memory headroom.",
+    "Includes final writer-close/checkpoint and report/state work; low-memory mode and keep_previous=false."
+  ]
+}

@@ -2,7 +2,7 @@
 
 Status: opt-in CLI/HTTP backend with timer lifecycle and explicit maintenance on
 the implementation branch. V1 remains the default and keeps its existing
-snapshot files. Final measurements and publication checks are pending. See
+snapshot files. Final publication checks are pending. See
 [the operator guide](../refresh-v2.md).
 
 ## Executable stages
@@ -42,8 +42,9 @@ snapshot files. Final measurements and publication checks are pending. See
    policy recovery, complete write reports, process-kill, syscall-boundary and
    actual private-volume ENOSPC tests. Interrupted stages are recovered under
    lifetime locks.
-9. **Remaining:** final complete-command scaling/constrained-memory measurements
-   and publication checks.
+9. **Measured:** complete CLI refresh scaling and constrained-memory full scans
+   from source `575044b6`; raw manifests/reports and tradeoffs are archived in
+   `docs/benchmarks.md`. Final CI and publication checks remain.
 
 Validation commands:
 
@@ -305,16 +306,21 @@ CLI/HTTP routing, maintenance/policy recovery and timer lifecycle have integrate
 tests, including malformed/empty stores, complete denied reports, report timing
 groups, read-only access and isolated root install/uninstall. V1 remains default.
 
-Remaining acceptance evidence:
+Acceptance measurements use the exact integrated CLI binary: three warm
+refresh/scan repetitions at each unrelated-tree size, plus four no-swap128MiB
+full-seed runs up to a million files. Complete command time includes close and
+checkpoint. Reported RSS and kernel process I/O counters complement the logical
+SQL tests; raw data and full-scan/storage tradeoffs are in `docs/benchmarks.md`.
+Differential tests cover raw own values beyond u32 saturation, scoped hardlink
+ties, mount/denied metadata, negative timestamps, byte paths, refresh and both
+keep-prev modes.
 
-- Constrained-memory measurement of the implemented disk-staged full-scan seed
-  through the exact integrated CLI binary. Differential tests already cover raw
-  own values beyond u32 aggregate saturation, scoped hardlink ties, mount/denied
-  metadata, negative timestamps, byte paths, refresh and both keep-prev modes.
-- Physical I/O, dirty pages, RSS, cold-cache and deep-query measurements, and
-  agreed target-machine budgets. Admission limits are not physical-size claims.
-
-Issue #10 remains open until these gates pass.
+Evidence limits remain explicit: no cold-cache or target Raspberry Pi run,
+direct device-write/dirty-page attribution, pathological H/A latency bound or
+deep-query performance guarantee is claimed. No target-machine numerical budget
+was supplied; the128MiB fixture demonstrates one working limit. Admission limits
+are not physical-size guarantees. These qualifications constrain performance
+claims; final CI/publication is required before closing issue #10.
 
 ## Measured revision-4 evidence (2026-10-26)
 
