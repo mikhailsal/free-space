@@ -5,78 +5,16 @@
 //! code, message and fix, and whether it reaches state.json.
 
 use std::fs;
-use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
 
-use freespace_core::job::{self, ScanRequest};
 use freespace_core::queries::{self, diff, params::*};
-use freespace_core::refresh::{self, RefreshReport, RefreshRequest};
-use freespace_core::snapshot::SnapshotDir;
 use freespace_core::snapshot::reader::Snapshot;
 use freespace_core::snapshot::state;
 use freespace_core::{Error, ErrorCode};
 
-struct Fx {
-    _tmp: tempfile::TempDir,
-    root: PathBuf,
-    dir: SnapshotDir,
-}
-
-fn fx() -> Fx {
-    let tmp = tempfile::tempdir().unwrap();
-    let root = tmp.path().join("r");
-    fs::create_dir(&root).unwrap();
-    let dir = SnapshotDir::new(tmp.path().join("snap"));
-    Fx {
-        _tmp: tmp,
-        root,
-        dir,
-    }
-}
+mod common;
+use common::{Fx, fx};
 
 impl Fx {
-    fn p(&self, rel: &str) -> PathBuf {
-        if rel.is_empty() {
-            self.root.clone()
-        } else {
-            self.root.join(rel)
-        }
-    }
-
-    fn s(&self, rel: &str) -> String {
-        self.p(rel).to_str().unwrap().to_owned()
-    }
-
-    fn file(&self, rel: &str, size: usize) {
-        let p = self.p(rel);
-        fs::create_dir_all(p.parent().unwrap()).unwrap();
-        fs::write(&p, vec![7u8; size]).unwrap();
-    }
-
-    fn scan_roots(&self, roots: Vec<PathBuf>) -> Result<job::ScanReport, Error> {
-        job::run_scan(ScanRequest {
-            roots,
-            one_file_system: true,
-            workers: 2,
-            dir: self.dir.clone(),
-            keep_previous: true,
-            on_progress: None,
-        })
-    }
-
-    fn scan(&self) {
-        self.scan_roots(vec![self.root.clone()]).unwrap();
-    }
-
-    fn refresh(&self, rel: &str) -> Result<RefreshReport, Error> {
-        refresh::run_refresh(RefreshRequest {
-            path: self.p(rel).as_os_str().as_bytes().to_vec(),
-            workers: 2,
-            dir: self.dir.clone(),
-            on_progress: None,
-        })
-    }
-
     fn names(&self, rel: &str) -> Vec<String> {
         let snap = Snapshot::open_current(&self.dir).unwrap();
         let r = queries::ls(
@@ -108,11 +46,11 @@ impl Fx {
 #[test]
 fn refresh_of_a_deleted_folder_drops_it() {
     let f = fx();
-    f.file("a/b/c", 8192);
-    f.file("a/d", 4096);
-    f.scan();
+    f.write_file("a/b/c", 8192);
+    f.write_file("a/d", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
     fs::remove_dir_all(f.p("a/b")).unwrap();
-    let rep = f.refresh("a/b").unwrap();
+    let rep = f.try_refresh("a/b").unwrap();
     assert!(rep.removed);
     assert_eq!(rep.subtree_entries, 0);
     assert_eq!(rep.generation, 2);
@@ -131,11 +69,11 @@ fn refresh_of_a_deleted_folder_drops_it() {
 #[test]
 fn refresh_refuses_what_it_cannot_rescan_in_place() {
     let f = fx();
-    f.file("a/sub/f", 8192);
-    f.file("k/g", 4096);
-    f.scan();
+    f.write_file("a/sub/f", 8192);
+    f.write_file("k/g", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
     let usage = |rel: &str, message: String| {
-        let e = f.refresh(rel).unwrap_err();
+        let e = f.try_refresh(rel).unwrap_err();
         assert_eq!(
             (e.code, e.message.as_str()),
             (ErrorCode::Usage, message.as_str())
@@ -172,10 +110,10 @@ fn refresh_refuses_what_it_cannot_rescan_in_place() {
 #[test]
 fn diff_of_a_path_in_neither_snapshot() {
     let f = fx();
-    f.file("a/x", 4096);
-    f.scan();
-    f.file("a/y", 4096);
-    f.scan();
+    f.write_file("a/x", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+    f.write_file("a/y", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
     let e = f.diff("nope").unwrap_err();
     assert_eq!(e.code, ErrorCode::PathNotFound);
     assert_eq!(
@@ -191,11 +129,11 @@ fn diff_of_a_path_in_neither_snapshot() {
 #[test]
 fn diff_refuses_two_rows_of_one_hash() {
     let f = fx();
-    f.file("a/x", 4096);
-    f.file("b/y", 4096);
-    f.scan();
-    f.file("b/z", 8192);
-    f.scan();
+    f.write_file("a/x", 4096);
+    f.write_file("b/y", 4096);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
+    f.write_file("b/z", 8192);
+    f.scan_roots(vec![f.root.clone()], 2, true).unwrap();
     // the previous snapshot's a/ renamed, its path hash kept: one hash, two names
     let prev = rusqlite::Connection::open(f.dir.prev()).unwrap();
     let n = prev
@@ -227,7 +165,7 @@ fn diff_refuses_two_rows_of_one_hash() {
 #[test]
 fn a_scan_of_no_roots_is_a_config_error_kept_in_state() {
     let f = fx();
-    let e = f.scan_roots(Vec::new()).unwrap_err();
+    let e = f.scan_roots(Vec::new(), 2, true).unwrap_err();
     assert_eq!(e.code, ErrorCode::Config);
     assert_eq!(e.message, "no roots to scan");
     assert_eq!(
