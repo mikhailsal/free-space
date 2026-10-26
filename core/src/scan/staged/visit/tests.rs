@@ -157,6 +157,69 @@ fn raw_visitor_preserves_scoped_alias_mount_denied_and_unsaturated_own_values() 
     );
     assert_eq!(staged.roots.roots[0].path.as_os_str().as_bytes(), b"/data");
 }
+
+#[test]
+fn leaf_rows_keep_enter_leave_callbacks_and_parent_state() {
+    type Event = (bool, Vec<u8>, Option<Vec<u8>>, Kind);
+    struct Trace(Vec<Event>);
+    impl Visitor for Trace {
+        type State = (Vec<u8>, Kind);
+
+        fn enter(&mut self, row: Row<'_>, parent: Option<&Self::State>) -> Result<Self::State> {
+            let state = (row.path.to_vec(), row.node.kind());
+            self.0
+                .push((true, state.0.clone(), parent.map(|p| p.0.clone()), state.1));
+            Ok(state)
+        }
+
+        fn leave(&mut self, state: Self::State, parent: Option<&mut Self::State>) -> Result<()> {
+            self.0
+                .push((false, state.0, parent.map(|p| p.0.clone()), state.1));
+            Ok(())
+        }
+    }
+    fn event(enter: bool, path: &[u8], parent: Option<&[u8]>, kind: Kind) -> Event {
+        (enter, path.to_vec(), parent.map(<[u8]>::to_vec), kind)
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+    let mut tree = fixture();
+    tree.nodes[5].kind = Kind::Symlink.code();
+    tree.nodes[5].nlink = 1;
+    let staged = staged(&tree, &tmp.path().join("stage.tmp"));
+    let mut trace = Trace(Vec::new());
+    staged.visit(&mut trace).unwrap();
+    assert_eq!(
+        trace.0,
+        vec![
+            event(true, b"/data", None, Kind::Dir),
+            event(true, b"/data/mount", Some(b"/data"), Kind::Mount),
+            event(false, b"/data/mount", Some(b"/data"), Kind::Mount),
+            event(true, b"/data/nested", Some(b"/data"), Kind::Dir),
+            event(true, b"/data/nested/x", Some(b"/data/nested"), Kind::File),
+            event(false, b"/data/nested/x", Some(b"/data/nested"), Kind::File),
+            event(false, b"/data/nested", Some(b"/data"), Kind::Dir),
+            event(true, b"/data/unknown-\xff", Some(b"/data"), Kind::Dir),
+            event(false, b"/data/unknown-\xff", Some(b"/data"), Kind::Dir),
+            event(false, b"/data", None, Kind::Dir),
+            event(true, b"/data/nested", None, Kind::Dir),
+            event(
+                true,
+                b"/data/nested/x",
+                Some(b"/data/nested"),
+                Kind::Symlink
+            ),
+            event(
+                false,
+                b"/data/nested/x",
+                Some(b"/data/nested"),
+                Kind::Symlink
+            ),
+            event(false, b"/data/nested", None, Kind::Dir),
+        ]
+    );
+}
+
 #[test]
 fn reserve_failure_happens_before_generation_mutation() {
     let tmp = tempfile::tempdir().unwrap();

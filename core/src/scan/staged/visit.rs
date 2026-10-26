@@ -36,6 +36,7 @@ struct Raw {
 }
 struct Frame<S> {
     raw: i64,
+    is_directory: bool,
     cursor: Option<(Vec<u8>, i64)>,
     path_len: usize,
     state: S,
@@ -91,7 +92,12 @@ impl StagedTree {
         let mut count = 1;
         while let Some(parent) = stack.last_mut() {
             guard.tick()?;
-            if let Some(raw) = self.visit_child(parent)? {
+            let child = if parent.is_directory {
+                self.visit_child(parent)?
+            } else {
+                None
+            };
+            if let Some(raw) = child {
                 parent.cursor = Some((raw.name.clone(), raw.id));
                 path.truncate(parent.path_len);
                 push_component(&mut path, &raw.name);
@@ -163,6 +169,7 @@ impl StagedTree {
         )?;
         Ok(Frame {
             raw: raw.id,
+            is_directory: raw.node.kind() == Kind::Dir,
             cursor: None,
             path_len: path.len(),
             state,
