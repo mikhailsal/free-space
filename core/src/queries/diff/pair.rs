@@ -16,7 +16,7 @@ struct PreviousRows {
     rows: Vec<Option<LevelRow>>,
     next: Vec<Option<usize>>,
     previous: Vec<Option<usize>>,
-    by_key: HashMap<RowKey, usize>,
+    by_identity: HashMap<RowKey, usize>,
     name_hasher: RandomState,
 }
 
@@ -26,7 +26,7 @@ impl PreviousRows {
         let mut prev_next = vec![None; prev_rows.len()];
         let mut prev_prev = vec![None; prev_rows.len()];
         let name_hasher = RandomState::new();
-        let mut prev_by_key: HashMap<(i64, u64, Option<i64>), usize> =
+        let mut prev_by_identity: HashMap<(i64, u64, Option<i64>), usize> =
             HashMap::with_capacity(prev_rows.len());
         for (i, row) in prev_rows.iter().enumerate() {
             let row = row.as_ref().expect("previous row is present");
@@ -35,7 +35,7 @@ impl PreviousRows {
                 name_hasher.hash_one(&row.row.name),
                 row.parent_hash,
             );
-            prev_next[i] = prev_by_key.insert(key, i);
+            prev_next[i] = prev_by_identity.insert(key, i);
             if let Some(next) = prev_next[i] {
                 prev_prev[next] = Some(i);
             }
@@ -44,7 +44,7 @@ impl PreviousRows {
             rows: prev_rows,
             next: prev_next,
             previous: prev_prev,
-            by_key: prev_by_key,
+            by_identity: prev_by_identity,
             name_hasher,
         }
     }
@@ -57,7 +57,7 @@ impl PreviousRows {
         ppaths: &mut Paths<'_>,
     ) -> Result<Option<usize>> {
         let mut candidate: Option<usize> = None;
-        let mut cursor = self.by_key.get(&key).copied();
+        let mut cursor = self.by_identity.get(&key).copied();
         while let Some(i) = cursor {
             let row = self.rows[i]
                 .as_ref()
@@ -95,9 +95,9 @@ impl PreviousRows {
             if let Some(previous) = self.previous[i] {
                 self.next[previous] = self.next[i];
             } else if let Some(next) = self.next[i] {
-                self.by_key.insert(key, next);
+                self.by_identity.insert(key, next);
             } else {
-                self.by_key.remove(&key);
+                self.by_identity.remove(&key);
             }
             if let Some(next) = self.next[i] {
                 self.previous[next] = self.previous[i];
