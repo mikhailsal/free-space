@@ -14,7 +14,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use clap::Args;
-use freespace_core::config;
 use freespace_core::error::{Error, Result};
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
@@ -71,7 +70,7 @@ fn new_token() -> Result<String> {
 
 impl Server {
     pub async fn bind(port: Option<u16>) -> Result<Server> {
-        let loaded = config::load()?;
+        let loaded = crate::backend::load()?;
         let port = port.unwrap_or(loaded.config.port);
         let listener = TcpListener::bind(("127.0.0.1", port)).await.map_err(|e| {
             let mut err = Error::io(format!("cannot listen on 127.0.0.1:{port}"), e);
@@ -82,9 +81,10 @@ impl Server {
             .local_addr()
             .map_err(|e| Error::io("cannot read the listening port", e))?
             .port();
-        let dir = loaded.snapshot_dir();
+        let dir = crate::backend::dir(&loaded);
         let state = Arc::new(api::AppState {
             port,
+            backend: loaded.config.backend,
             token: new_token()?,
             pool: pool::Pool::new(dir.clone()),
             dir,

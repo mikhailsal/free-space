@@ -5,16 +5,17 @@ use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
+use clap::Parser;
 use freespace_core::config;
 use freespace_core::platform::now_secs;
-use freespace_core::snapshot::{SnapshotDir, fsutil, state};
+use freespace_core::snapshot::{fsutil, state};
 
 /// DX file-mode table: root writes into snapshot_dir (0640), users into
 /// `$XDG_STATE_HOME/freespace/` (0600).
 fn crash_dir() -> (PathBuf, u32) {
     if fsutil::is_root() {
-        let dir = config::load()
-            .map(|l| l.config.snapshot_dir)
+        let dir = crate::backend::load()
+            .map(|l| crate::backend::dir(&l).path)
             .unwrap_or_else(|_| PathBuf::from(config::DEFAULT_SNAPSHOT_DIR));
         return (dir, 0o640);
     }
@@ -38,7 +39,7 @@ pub fn install_hook() {
             .map(|l| format!("{}:{}", l.file(), l.line()))
             .unwrap_or_default();
         let version = freespace_core::VERSION;
-        let args: Vec<String> = std::env::args().collect();
+        let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
         let (dir, mode) = crash_dir();
         let path = dir.join(format!("crash-{}.log", now_secs()));
         let written = std::fs::create_dir_all(&dir).is_ok()
@@ -69,14 +70,50 @@ pub fn install_hook() {
         );
         // a crashed scan or refresh holds the lock: record it for status/doctor
         if fsutil::is_root()
-            && let Some(op) = args.get(1).filter(|a| *a == "scan" || *a == "refresh")
-            && let Ok(l) = config::load()
+            && let Some(op) = operation(&args)
+            && let Ok(l) = crate::backend::load()
         {
-            state::record_error(
-                &SnapshotDir::new(l.config.snapshot_dir),
-                op,
-                &format!("crashed: {msg}"),
-            );
+            state::record_error(&crate::backend::dir(&l), op, &format!("crashed: {msg}"));
         }
     }));
+}
+
+/// Reuse Clap's grammar so global option values or paths named `scan` cannot
+/// be mistaken for the running command. OsString also preserves raw paths.
+fn operation(args: &[std::ffi::OsString]) -> Option<&'static str> {
+    let cli = crate::Cli::try_parse_from(args).ok()?;
+    match cli.command {
+        Some(crate::Command::Scan(_)) => Some("scan"),
+        Some(crate::Command::Refresh(_)) => Some("refresh"),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn detects_writer_commands_with_global_flags() {
+        for args in [
+            vec!["freespace", "scan"],
+            vec!["freespace", "--backend", "v2", "scan", "/tmp"],
+            vec!["freespace", "refresh", "--backend=v2", "/tmp"],
+        ] {
+            let args = args
+                .into_iter()
+                .map(std::ffi::OsString::from)
+                .collect::<Vec<_>>();
+            assert!(super::operation(&args).is_some());
+        }
+        for args in [
+            vec!["freespace", "ls", "scan"],
+            vec!["freespace", "--backend", "scan"],
+            vec!["freespace", "status"],
+        ] {
+            let args = args
+                .into_iter()
+                .map(std::ffi::OsString::from)
+                .collect::<Vec<_>>();
+            assert_eq!(super::operation(&args), None);
+        }
+    }
 }

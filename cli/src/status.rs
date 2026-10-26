@@ -3,7 +3,6 @@
 
 use clap::Args;
 use freespace_core::Result;
-use freespace_core::config;
 use freespace_core::format;
 use freespace_core::queries::{self, diff, types::StatusResponse};
 use freespace_core::snapshot::SnapshotDir;
@@ -34,6 +33,34 @@ pub fn gather(dir: &SnapshotDir) -> Result<Summary> {
                 .ok()
                 .flatten()
         }),
+        _ => None,
+    };
+    Ok(Summary { status, growth })
+}
+
+pub fn gather_loaded(loaded: &freespace_core::config::Loaded) -> Result<Summary> {
+    let dir = crate::backend::dir(loaded);
+    if loaded.config.backend == freespace_core::config::Backend::V1 {
+        return gather(&dir);
+    }
+    let reader = match crate::backend::reader(&dir) {
+        Ok(reader) => reader,
+        Err(error)
+            if error.code == freespace_core::ErrorCode::NoSnapshot
+                && freespace_core::snapshot::lock::probe(&dir).is_some() =>
+        {
+            return Ok(Summary {
+                status: queries::v2::status_page(None, &dir)?,
+                growth: None,
+            });
+        }
+        Err(error) => return Err(error),
+    };
+    let status = queries::v2::status(&reader, &dir)?;
+    let growth = match (&status.prev, status.roots.first()) {
+        (Some(_), Some(root)) => crate::backend::top_growth(&reader, root.path.as_bytes())
+            .ok()
+            .flatten(),
         _ => None,
     };
     Ok(Summary { status, growth })
@@ -78,6 +105,8 @@ pub fn sentence(s: &Summary) -> String {
 /// "Scanning / since 12:03 · 2.1 M of ~7.3 M files · 29% · 48 s" (D12/D14).
 pub fn scanning_line(sc: &Scanning, p: Option<&Progress>, capital: bool) -> String {
     let verb = match (sc.op.as_str(), capital) {
+        ("maintain", true) => "Maintaining",
+        ("maintain", false) => "maintaining",
         ("refresh", true) => "Refreshing",
         ("refresh", false) => "refreshing",
         (_, true) => "Scanning",
@@ -112,8 +141,8 @@ pub fn doctor_hint(r: &StatusResponse) -> Option<String> {
 }
 
 pub fn run(a: &StatusArgs) -> output::Result<()> {
-    let dir = config::load()?.snapshot_dir();
-    let s = gather(&dir)?;
+    let loaded = crate::backend::load()?;
+    let s = gather_loaded(&loaded)?;
     if a.json {
         output::print_json(&s.status)?;
         return Ok(());

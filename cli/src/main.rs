@@ -1,8 +1,10 @@
+mod backend;
 mod bare;
 mod completions;
 mod crash;
 mod doctor;
 mod install;
+mod maintain;
 mod output;
 mod query;
 mod refresh;
@@ -39,6 +41,7 @@ Look:
 Maintain:
   status          Snapshot age, free space, last error, running scan
   doctor          Check the timer, binary, access and space; print fixes
+  maintain        Reclaim retired v2 records and optionally checkpoint the WAL
   scan            Scan and publish a new snapshot (root)
   refresh         Rescan one folder into the current snapshot (root)
 
@@ -62,6 +65,9 @@ Every Look command takes --json. Errors under --json are JSON on stdout too.
     help_template = HELP_TEMPLATE
 )]
 struct Cli {
+    /// Snapshot backend (v2 is experimental and uses a separate database)
+    #[arg(long, global = true, value_parser = ["v1", "v2"])]
+    backend: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
     /// Print the summary as JSON (same as `status --json`)
@@ -111,6 +117,14 @@ enum Command {
         after_help = "Examples:\n  sudo freespace refresh /home/tass/.cache\n  sudo freespace refresh /var/log --json"
     )]
     Refresh(refresh::RefreshArgs),
+    /// Reclaim retired v2 records and optionally checkpoint the WAL
+    #[command(
+        after_help = "V2 only. Policy changes persist even when readers defer cleanup.
+Examples:
+  freespace --backend v2 maintain --budget 1000 --json
+  freespace --backend v2 maintain --checkpoint --max-records 1000000"
+    )]
+    Maintain(maintain::MaintainArgs),
     /// Nightly scan, read access for you, first scan now (root)
     #[command(
         name = "install-timer",
@@ -155,6 +169,7 @@ fn main() -> ExitCode {
         Ok(c) => c,
         Err(e) => return output::clap_error(e),
     };
+    backend::select(cli.backend.as_deref());
     let (res, json) = match cli.command {
         None => (bare::run(cli.json), cli.json),
         Some(Command::Status(a)) => (status::run(&a), a.json),
@@ -179,6 +194,7 @@ fn main() -> ExitCode {
             let json = a.json;
             (refresh::run(a), json)
         }
+        Some(Command::Maintain(a)) => (maintain::run(&a), a.json),
         Some(Command::InstallTimer(a)) => {
             let json = a.json;
             (install::run(a), json)

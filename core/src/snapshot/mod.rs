@@ -8,6 +8,7 @@ pub mod publish;
 pub mod reader;
 pub mod schema;
 pub mod state;
+pub mod v2;
 pub mod writer;
 
 use std::path::{Path, PathBuf};

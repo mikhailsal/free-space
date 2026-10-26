@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 use crate::platform::{self, MountInfo};
 use crate::scan::RootInfo;
 
-pub(super) fn check(
+pub(crate) fn check(
     target: &Path,
     target_dev: Option<u64>,
     roots: &[RootInfo],

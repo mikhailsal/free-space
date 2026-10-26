@@ -4,6 +4,10 @@ Where did my disk go? `freespace` keeps a snapshot of the whole filesystem tree,
 
 Linux with systemd, x86_64 and aarch64. One static binary, MIT licensed.
 
+For local refresh without rebuilding the whole snapshot, the opt-in
+[v2 generation store](docs/refresh-v2.md) supports CLI/HTTP queries, disk-backed
+full scans, and explicit maintenance of older versions.
+
 ![freespace gui: a 169 G home folder, its fifteen folders by size, .cache (46 G) selected with what is biggest inside it](docs/img/gui.png)
 
 ## How it compares
@@ -168,7 +172,7 @@ Every error names a code. The `docs` link in an error points here:
 | <a id="error-lock"></a>`LOCK` | 6 | A scan or refresh is already running. | Wait; `freespace status` shows its progress. |
 | <a id="error-hash-collision"></a>`HASH_COLLISION` | 7 | A `diff` pair failed raw path verification. | [Report it](https://github.com/mikhailsal/free-space/issues); `ls` and `top` are not affected. |
 | <a id="error-no-snapshot"></a>`NO_SNAPSHOT` | 8 | Nothing scanned yet. | Install with the one-liner above, or `sudo freespace scan`. If `freespace status` shows a scan running, wait for it. |
-| <a id="error-snapshot-access"></a>`SNAPSHOT_ACCESS` | 9 | The snapshot exists but this user cannot read it. | `sudo freespace install-timer` gives the sudo user read access (`--user NAME` for someone else). |
+| <a id="error-snapshot-access"></a>`SNAPSHOT_ACCESS` | 9 | The snapshot exists but this user cannot read it. | `sudo freespace install-timer` gives the sudo user read access (`--user NAME` for someone else). For v2, use `sudo freespace --backend v2 install-timer`. |
 | <a id="error-not-root"></a>`NOT_ROOT` | 1 | `scan`, `refresh` and `install-timer` need root. | Run it with `sudo`. |
 | <a id="error-not-supported"></a>`NOT_SUPPORTED` | 1 | Not available here, e.g. no systemd for the timer. | Run `sudo freespace scan` from cron or by hand. |
 

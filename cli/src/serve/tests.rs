@@ -41,18 +41,31 @@ fn scan(root: &Path, dir: &SnapshotDir, keep_previous: bool) {
 }
 
 fn start(with_snapshot: bool) -> Fx {
+    start_backend(with_snapshot, freespace_core::config::Backend::V1)
+}
+
+fn start_backend(with_snapshot: bool, backend: freespace_core::config::Backend) -> Fx {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path().join("r");
     std::fs::create_dir_all(root.join("sub")).unwrap();
     std::fs::write(root.join("sub/a.bin"), vec![1u8; 64 * 1024]).unwrap();
     let dir = SnapshotDir::new(tmp.path().join("snap"));
     if with_snapshot {
-        scan(&root, &dir, false);
+        if backend == freespace_core::config::Backend::V1 {
+            scan(&root, &dir, false);
+        } else {
+            std::fs::create_dir_all(dir.as_path()).unwrap();
+            freespace_core::snapshot::v2::Store::open(&crate::backend::database(&dir))
+                .unwrap()
+                .scan(&root, 2)
+                .unwrap();
+        }
     }
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     let port = listener.local_addr().unwrap().port();
     let state = Arc::new(AppState {
+        backend,
         port,
         token: TOKEN.into(),
         pool: Pool::new(dir.clone()),
@@ -431,4 +444,100 @@ fn pool_follows_the_published_snapshot() {
     let d = fx.api(&format!("/api/diff?path={}&kind=any", fx.q("sub")));
     assert_eq!(d.status, 200, "{}", d.text());
     assert_eq!(d.json()["entries"][0]["name"], "b.bin");
+}
+
+#[test]
+fn v2_api_routes_every_endpoint_to_a_fresh_pin() {
+    use freespace_core::queries::params::{DiffParams, FindParams, TopParams};
+    let f = start_backend(true, freespace_core::config::Backend::V2);
+    let mut store =
+        freespace_core::snapshot::v2::Store::open(&crate::backend::database(&f.dir)).unwrap();
+    store.scan(&f.root, 2).unwrap();
+    std::fs::write(f.root.join("sub/b"), vec![4u8; 8192]).unwrap();
+    store.refresh(&f.root.join("sub"), 2).unwrap();
+    let path = f.root.to_str().unwrap().to_owned();
+    let reader = crate::backend::reader(&f.dir).unwrap();
+    let pairs = [
+        (
+            "ls",
+            serde_json::to_value(
+                queries::v2::ls(
+                    &reader,
+                    &LsParams {
+                        path: Some(path.clone()),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        ),
+        (
+            "top",
+            serde_json::to_value(
+                queries::v2::top(
+                    &reader,
+                    &TopParams {
+                        path: Some(path.clone()),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        ),
+        (
+            "find",
+            serde_json::to_value(
+                queries::v2::find(
+                    &reader,
+                    &FindParams {
+                        path: Some(path.clone()),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        ),
+        (
+            "diff",
+            serde_json::to_value(
+                queries::v2::diff(
+                    &reader,
+                    &DiffParams {
+                        path: Some(path),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        ),
+    ];
+    for (endpoint, mut expected) in pairs {
+        let response = f.api(&format!("/api/{endpoint}?path={}", f.q("")));
+        assert_eq!(response.status, 200, "{endpoint}: {:?}", response.body);
+        let mut got = response.json();
+        // Age may cross a wall-clock second between the two reads.
+        got.as_object_mut().unwrap().remove("age_seconds");
+        expected.as_object_mut().unwrap().remove("age_seconds");
+        assert_eq!(got, expected, "{endpoint}");
+    }
+    assert_eq!(f.api("/api/status").json()["generation"], 3);
+    assert_eq!(f.api("/api/status").json()["prev_generation"], 1);
+    store.scan(&f.root, 2).unwrap();
+    assert_eq!(f.api("/api/status").json()["generation"], 4);
+}
+
+#[test]
+fn v2_api_missing_store_preserves_first_run_contract() {
+    let f = start_backend(false, freespace_core::config::Backend::V2);
+    assert_eq!(f.api("/api/status").status, 200);
+    assert_eq!(f.api("/api/status").json()["generation"], Value::Null);
+    assert_eq!(
+        f.api("/api/ls").status,
+        freespace_core::ErrorCode::NoSnapshot.http_status()
+    );
+    assert!(!crate::backend::database(&f.dir).exists());
 }

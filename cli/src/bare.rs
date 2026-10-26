@@ -1,7 +1,6 @@
 //! Bare `freespace` (D10): the status sentence and three next commands, exit 0.
 //! Piped, the next commands carry `--json` (D15); `--json` prints `status --json`.
 
-use freespace_core::config;
 use freespace_core::queries::params::hex_encode;
 use freespace_core::{ErrorCode, INSTALL_CMD};
 
@@ -9,10 +8,11 @@ use crate::output;
 use crate::status;
 
 pub fn run(json: bool) -> output::Result<()> {
-    let dir = config::load()?.snapshot_dir();
+    let loaded = crate::backend::load()?;
+    let dir = crate::backend::dir(&loaded);
     let piped = !output::stdout_is_tty();
     let j = if piped { " --json" } else { "" };
-    let s = match status::gather(&dir) {
+    let s = match status::gather_loaded(&loaded) {
         Ok(s) => s,
         Err(e) if e.code == ErrorCode::NoSnapshot && !json => {
             output::print(&format!(

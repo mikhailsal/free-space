@@ -171,6 +171,26 @@ I/O and system memory use. Keep results on a filesystem with adequate free space
 Defaults are `STEPS="100 1000"`, `WORKERS=2`, `REPEATS=1`, `SMALL_FILES=16`, and
 `FILES_PER_DIR=1000`. All are positive integers; steps must increase strictly.
 Python-style underscores in step values are accepted for readability.
+`BACKENDS` defaults to `v1`, so the default workload also accepts older binaries.
+For a binary supporting v2, compare both backends on the same tree:
+
+```sh
+BACKENDS="v1 v2" STEPS="1000 10000 100000" REPEATS=3 \
+  SOURCE_REVISION=$(git rev-parse HEAD) \
+  scripts/bench-refresh-memory.sh ./target/release/freespace ./bench-results
+```
+
+Each backend has its own snapshot directory. Their order alternates between
+repetitions; both see identical filesystem contents. The manifest retains the
+supplied source revision and binary hash. GNU time covers the entire process,
+including SQLite close and any close-time checkpoint, which can be outside the
+CLI stage timers. `time.wall_seconds_monotonic` uses the harness's monotonic clock
+and includes GNU time wrapper overhead; GNU time's `%e` has coarser resolution.
+Its input/output counters are kernel block-operation counts,
+not measured physical device bytes. Endpoint disk occupancy includes WAL and
+retained files; it is not peak temporary space. Stage timings use each backend's
+documented grouping and should not be compared as identical implementations.
+
 Steps count **unrelated files**, not total entries. Files are empty, with fixed
 names and mtimes, grouped into numbered directories with at most
 `FILES_PER_DIR` files each. The scanned root contains `small/` and `unrelated/`;
@@ -318,6 +338,99 @@ allocations. Writer insert loops and refresh graft/finalize loops are
 unchanged. The new report counters are scalars; transferring `Tree` and
 `Finalized` moves their existing buffers without copying them. Explicit drops
 release existing allocations and the old snapshot connection.
+
+## Complete CLI refresh with v2 (2026-10-26)
+
+Release binary from `575044b6d2e9fba3aa7467489ed19afa9088e4e0`, SHA-256
+`ee58e9af394599f86457b34debdd9309961f4e90573aefe8b387a39fcd295b7c`.
+Linux 5.15 x86_64/glibc, Intel Core i7-4770S, ext4, two walker workers. No other
+agent builds or benchmarks ran during this series; other host activity and
+cache state were not controlled. The small refresh target contains 18 entries;
+only the unrelated sibling grows. Three repetitions per size/backend alternate
+backend order. Each repetition scans, then refreshes unchanged data. Timings
+include process startup, writer close/checkpoint, state update and the GNU time
+wrapper. These are warm synthetic measurements, not cold-disk promises.
+
+```sh
+SOURCE_REVISION=575044b6d2e9fba3aa7467489ed19afa9088e4e0 \
+  BACKENDS="v1 v2" STEPS="1000 10000 100000" REPEATS=3 WORKERS=2 \
+  SMALL_FILES=16 scripts/bench-refresh-memory.sh target/release/freespace ./bench-results
+```
+
+| Unrelated files | V1 refresh median | V2 refresh median | V1 refresh RSS | V2 refresh RSS |
+|---:|---:|---:|---:|---:|
+| 1,000 | 115.6 ms | 29.0 ms | 8,696 KiB | 8,840 KiB |
+| 10,000 | 116.1 ms | 31.7 ms | 10,372 KiB | 8,880 KiB |
+| 100,000 | 520.3 ms | 29.4 ms | 28,272 KiB | 8,804 KiB |
+
+All 36 scan/refresh reports passed entry/error/incompleteness checks. At 100,000
+unrelated files, v2 refresh is about **17.7 times faster** with **69% lower peak
+process RSS** in this workload. Its wall-time range is 27.1–30.8 ms, versus
+519.4–617.6 ms for v1. Median kernel output-operation counts are 1,512 versus
+23,072. Those counters provide OS-level I/O evidence; they are not direct
+physical-device byte measurements. The roughly constant v2 refresh time/RSS as
+unrelated entries grow supports the locality tests' SQL evidence.
+
+The tradeoff is substantial full-scan and storage overhead. At 100,000 unrelated
+files, the ordinary memory-profile v2 scan took 14.79 s and 77,068 KiB RSS versus
+0.72 s and 27,252 KiB for v1. Endpoint snapshot-directory allocation was about
+300.8 MB for v2 versus 23.6 MB for v1 after repeated scans. V2 retains obsolete
+versions until explicit maintenance; this series reused stores across all sizes
+and repeats without running maintenance, while v1 retains only current/prev.
+These endpoint sizes therefore include different physical retention states.
+Use `--low-memory` for a bounded full-scan working set, plan additional disk
+capacity, and run maintenance to reclaim eligible records. Local-refresh gains
+do not imply faster full scans or smaller databases.
+
+[Raw reports, stage timings and manifest](benchmark-results/refresh-v2-cli-2026-10-26.json)
+include source/tree/binary hashes, all repetitions, monotonic/GNU wall times,
+RSS, kernel I/O counters and endpoint disk occupancy. Connection-close costs are
+included in complete command time; older experimental Store-only timings in the
+migration design exclude them and must not be substituted for this result.
+
+### V2 full scan under a 128 MiB cgroup
+
+The same release source/binary above was also tested with `--low-memory`, one
+walker, `keep_previous=false`, fresh stores and a fresh **128 MiB, no-swap**
+systemd user cgroup per command. Each directory contains up to 1,000 empty files.
+Fixture creation is outside the cgroup; the Python measurement helper and file
+cache share the scanner's limit. These are separate single runs, with v1/v2 order
+at 100k and v2/v1 order at one million. Cache state is uncontrolled. Full process
+time includes writer close and checkpoint.
+
+| Files / entries | Backend | Full command | Peak process RSS | Sampled peak DB/stage/WAL allocation |
+|---:|---|---:|---:|---:|
+| 100,000 / 100,101 | v1 | 2.32 s | 26,116 KiB | 17.9 MiB |
+| 100,000 / 100,101 | v2 | 17.26 s | 26,756 KiB | 201.9 MiB |
+| 1,000,000 / 1,001,001 | v1 | 65.77 s | 26,740 KiB | 178.3 MiB |
+| 1,000,000 / 1,001,001 | v2 | 213.57 s | 29,104 KiB | 2,029.3 MiB |
+
+All four commands completed with exact entry counts, no errors, no OOM/OOM-kill
+events and swap disabled. V2 peak process RSS grew from 26.1 to 28.4 MiB across a
+tenfold fixture increase. The million-file v2 cgroup recorded 25,685 memory-limit
+pressure events and sampled current memory reached the cap with a one-page
+transient overshoot. This is completion under cache-reclaim pressure, not spare
+memory headroom or a universal process/cgroup-size guarantee.
+
+The kernel lacks `memory.peak`; cgroup current memory and allocated disk space
+were sampled every 20 ms and can miss short peaks. On the million-file fixture,
+v2 took about 3.25 times as long as v1 and used about 11.4 times the sampled peak
+disk space. Kernel input/output counters were 4,413,328 / 6,446,872 for v2 versus
+270,512 / 517,312 for v1; these are process-accounting counters, not device-byte
+measurements. The storage/time tradeoff is part of selecting v2.
+
+Reproduce each size into a new output directory on a disk-backed scratch volume:
+
+```sh
+SOURCE_REVISION=575044b6d2e9fba3aa7467489ed19afa9088e4e0 \
+  STEPS=1000000 BACKENDS="v2 v1" MEMORY_MAX=128M \
+  scripts/bench-v2-seed.py target/release/freespace ./new-seed-results
+```
+
+[Raw cgroup/CLI/time records and exact archived runners](benchmark-results/v2-seed-memory-2026-10-26.json)
+include the four runs, source/tree/binary and runner hashes, memory limits,
+pressure counters, complete reports and measurement qualifications. Generated
+fixtures/stores were removed after the run; the results remain available.
 
 ## Disk-backed full scan
 

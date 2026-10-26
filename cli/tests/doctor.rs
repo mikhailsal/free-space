@@ -266,3 +266,69 @@ fn any_recorded_error_is_a_failure_and_status_points_to_doctor() {
         assert_eq!(t.lines().last(), Some("Run: freespace doctor"), "{t}");
     }
 }
+
+#[test]
+fn doctor_selects_v2_from_config_and_cli_override() {
+    let e = Env::scanned();
+    let output = e.run(&["--backend", "v2", "scan", e.root().to_str().unwrap()]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let v2_dir = SnapshotDir::new(e.snap().join("v2"));
+    state::record_error(&v2_dir, "scan", "v2-only failure");
+    for config in ["", "backend = \"v2\"\n"] {
+        fs::write(e.config(), config).unwrap();
+        let args = if config.is_empty() {
+            vec!["--backend", "v2", "doctor", "--json"]
+        } else {
+            vec!["doctor", "--json"]
+        };
+        let output = e.run(&args);
+        let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+        let checks = value["checks"].as_array().unwrap();
+        let check = |id: &str| checks.iter().find(|c| c["id"] == id).unwrap();
+        assert_eq!(check("access")["ok"], true);
+        assert!(
+            check("access")["detail"]
+                .as_str()
+                .unwrap()
+                .contains("v2/generations.db")
+        );
+        assert_eq!(check("freshness")["ok"], true);
+        assert!(
+            check("last_error")["detail"]
+                .as_str()
+                .unwrap()
+                .contains("v2-only failure")
+        );
+        assert!(
+            check("space")["detail"]
+                .as_str()
+                .unwrap()
+                .contains("WAL and retention")
+        );
+        assert!(
+            !check("space")["detail"]
+                .as_str()
+                .unwrap()
+                .contains("next scan needs")
+        );
+    }
+    // A CLI override back to v1 must diagnose its independent healthy state.
+    let output = e.run(&["--backend", "v1", "doctor", "--json"]);
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let checks = value["checks"].as_array().unwrap();
+    let access = checks.iter().find(|c| c["id"] == "access").unwrap();
+    assert!(
+        access["detail"]
+            .as_str()
+            .unwrap()
+            .contains("snap/snapshot.db")
+    );
+    assert_eq!(
+        checks.iter().find(|c| c["id"] == "last_error").unwrap()["ok"],
+        true
+    );
+}

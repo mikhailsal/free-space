@@ -5,7 +5,6 @@
 use std::io::{IsTerminal, Write};
 use std::process::ExitCode;
 
-use freespace_core::config;
 use freespace_core::queries::types::Header;
 use freespace_core::{Error, ErrorCode};
 
@@ -103,10 +102,10 @@ fn output_failure(error: &dyn std::fmt::Display) -> ExitCode {
 }
 
 fn print_error_body(e: &Error) -> Result<()> {
-    let loaded = config::load().ok();
+    let loaded = crate::backend::load().ok();
     let dir = loaded
         .as_ref()
-        .map(|l| l.config.snapshot_dir.display().to_string());
+        .map(|l| crate::backend::dir(l).path.display().to_string());
     let cfg = loaded.as_ref().map(|l| l.path.display().to_string());
     print_json(&e.body(dir.as_deref(), cfg.as_deref()))
 }

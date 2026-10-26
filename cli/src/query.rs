@@ -6,14 +6,10 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
 use clap::Args;
-use freespace_core::config;
 use freespace_core::format;
-use freespace_core::queries;
 use freespace_core::queries::params::{DiffParams, FindParams, LsParams, TopParams, hex_encode};
 use freespace_core::queries::types::{DiffEntry, DiffStatus};
 use freespace_core::scan::Kind;
-use freespace_core::snapshot::SnapshotDir;
-use freespace_core::snapshot::reader::Snapshot;
 use freespace_core::{Error, Result};
 
 use crate::output::{self, Align, Table};
@@ -122,10 +118,6 @@ pub struct DiffArgs {
     pub json: bool,
 }
 
-fn dir() -> Result<SnapshotDir> {
-    Ok(config::load()?.snapshot_dir())
-}
-
 /// `(path, path_raw)` for the params structs: relative paths are made absolute
 /// against the current directory (symlinks resolved when the path still exists),
 /// non-UTF-8 paths travel as hex.
@@ -149,17 +141,14 @@ fn path_params(o: &PathOpts) -> Result<(Option<String>, Option<String>)> {
 
 pub fn ls(a: &LsArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
-    let snap = Snapshot::open_current(&dir()?)?;
-    let r = queries::ls(
-        &snap,
-        &LsParams {
-            path,
-            path_raw,
-            sort: a.sort.clone(),
-            limit: a.limit,
-            snapshot: a.snapshot.clone(),
-        },
-    )?;
+    let snap = crate::backend::Session::open(&crate::backend::load()?)?;
+    let r = snap.ls(&LsParams {
+        path,
+        path_raw,
+        sort: a.sort.clone(),
+        limit: a.limit,
+        snapshot: a.snapshot.clone(),
+    })?;
     output::warn_incomplete(&r.header);
     if a.json {
         output::print_json(&r)?;
@@ -207,19 +196,16 @@ pub fn ls(a: &LsArgs) -> output::Result<()> {
 
 pub fn top(a: &TopArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
-    let snap = Snapshot::open_current(&dir()?)?;
-    let r = queries::top(
-        &snap,
-        &TopParams {
-            path,
-            path_raw,
-            kind: a.kind.clone(),
-            min_size: a.min_size.clone(),
-            older_than: a.older_than.clone(),
-            sort: a.sort.clone(),
-            limit: a.limit,
-        },
-    )?;
+    let snap = crate::backend::Session::open(&crate::backend::load()?)?;
+    let r = snap.top(&TopParams {
+        path,
+        path_raw,
+        kind: a.kind.clone(),
+        min_size: a.min_size.clone(),
+        older_than: a.older_than.clone(),
+        sort: a.sort.clone(),
+        limit: a.limit,
+    })?;
     output::warn_incomplete(&r.header);
     if a.json {
         output::print_json(&r)?;
@@ -286,23 +272,20 @@ pub fn top(a: &TopArgs) -> output::Result<()> {
 
 pub fn find(a: &FindArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
-    let snap = Snapshot::open_current(&dir()?)?;
-    let r = queries::find(
-        &snap,
-        &FindParams {
-            path,
-            path_raw,
-            name: a.name.clone(),
-            iname: a.iname.clone(),
-            older_than: a.older_than.clone(),
-            newer_than: a.newer_than.clone(),
-            min_size: a.min_size.clone(),
-            kind: a.kind.clone(),
-            sort: a.sort.clone(),
-            limit: a.limit,
-            snapshot: a.snapshot.clone(),
-        },
-    )?;
+    let snap = crate::backend::Session::open(&crate::backend::load()?)?;
+    let r = snap.find(&FindParams {
+        path,
+        path_raw,
+        name: a.name.clone(),
+        iname: a.iname.clone(),
+        older_than: a.older_than.clone(),
+        newer_than: a.newer_than.clone(),
+        min_size: a.min_size.clone(),
+        kind: a.kind.clone(),
+        sort: a.sort.clone(),
+        limit: a.limit,
+        snapshot: a.snapshot.clone(),
+    })?;
     output::warn_incomplete(&r.header);
     if a.json {
         output::print_json(&r)?;
@@ -354,8 +337,8 @@ pub fn find(a: &FindArgs) -> output::Result<()> {
 
 pub fn diff(a: &DiffArgs) -> output::Result<()> {
     let (path, path_raw) = path_params(&a.at)?;
-    let r = queries::diff(
-        &dir()?,
+    let r = crate::backend::diff(
+        &crate::backend::load()?,
         &DiffParams {
             path,
             path_raw,

@@ -11,6 +11,7 @@ pub mod pass;
 pub mod status;
 pub mod top;
 pub mod types;
+pub mod v2;
 
 pub use diff::diff;
 pub use find::find;
