@@ -34,6 +34,8 @@ async function stopTimers(page: Page) {
 
 /** The API calls the page made, one per line: each query in name order, and the lines sorted, as answers may race. */
 const asked = (api: MockApi) => `${api.requests.map(inOrder).sort().join("\n")}\n`;
+const inspectorCalls = (api: MockApi) =>
+  api.requests.filter((request) => new URL(request, "http://mock").searchParams.get("limit") === "4").length;
 
 function inOrder(request: string) {
   const u = new URL(request, "http://mock");
@@ -194,10 +196,17 @@ const STATES: State[] = [
   },
   {
     name: "hidden-listed",
-    go: async (p) => {
+    go: async (p, api) => {
       await open(p);
+      // Drain the initial inspector fetch so the next count increase belongs to the selection change below.
+      await expect(p.locator('.biggest [aria-busy="true"]')).toHaveCount(0);
+      const callsBeforeHide = inspectorCalls(api);
       await p.keyboard.press("h");
       await expect(p.locator(".crumbs .hid")).toBeVisible();
+      // Hiding the selected row moves selection and starts a new asynchronous inspector request. Let it
+      // finish before reload; otherwise reload can abort it before MockApi records it, depending on timing.
+      await expect.poll(() => inspectorCalls(api)).toBe(callsBeforeHide + 1);
+      await expect(p.locator('.biggest [aria-busy="true"]')).toHaveCount(0);
       // hiding lasts for the snapshot; the reload drops the toast
       await p.reload();
       await p.locator(".crumbs .hid").click();
