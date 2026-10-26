@@ -136,3 +136,98 @@ The first run of this measurement, on v0.1.0, found a bug. The unit's scan of `/
 - The warm column is not a fully cached run (see above).
 - "Cold" means the guest's caches are empty. The VMware host may still cache the virtual disk, which is how a cold query reads the 1 GB snapshot in about a second while a cold scan's metadata reads take minutes.
 - The nightly unit runs with `Nice=19` and `IOSchedulingClass=idle`, so on a busy machine it takes longer than these normal-priority rows; that is the point of idle priority.
+
+## Synthetic refresh and memory scaling harness (#10, #11)
+
+`scripts/bench-refresh-memory.sh` measures a full scan and a refresh of a fixed
+small folder while only an unrelated sibling grows. It needs Bash, Python 3,
+GNU `/usr/bin/time`, and Linux `stat`; it runs as an ordinary user and does not
+change cache settings, mounts, memory limits, swap, or system services.
+
+Build a release binary once, then run the default smoke workload:
+
+```sh
+cargo build --release -p freespace
+scripts/bench-refresh-memory.sh ./target/release/freespace ./bench-results
+```
+
+For a larger series with three scan/refresh pairs per size:
+
+```sh
+STEPS="10_000 100_000 1_000_000" WORKERS=8 REPEATS=3 SMALL_FILES=16 \
+  FILES_PER_DIR=1000 TMPDIR=/path/to/scratch \
+  scripts/bench-refresh-memory.sh ./target/release/freespace ./bench-results
+```
+
+`BINARY` may also name an executable on `PATH`. `OUTPUT_PARENT` receives a new
+unique `refresh-memory-*` directory per invocation; existing results are never
+overwritten. `TMPDIR` selects the scratch filesystem (default: the Python
+system temporary directory). The harness removes only its own newly created
+scratch directory when it exits normally or encounters a Python exception.
+Termination by SIGTERM or SIGKILL can leave that directory behind. Results persist.
+Set `TMPDIR` to the disk being studied; `/tmp` may be tmpfs, which changes both
+I/O and system memory use. Keep results on a filesystem with adequate free space.
+
+Defaults are `STEPS="100 1000"`, `WORKERS=2`, `REPEATS=1`, `SMALL_FILES=16`, and
+`FILES_PER_DIR=1000`. All are positive integers; steps must increase strictly.
+Python-style underscores in step values are accepted for readability.
+Steps count **unrelated files**, not total entries. Files are empty, with fixed
+names and mtimes, grouped into numbered directories with at most
+`FILES_PER_DIR` files each. The scanned root contains `small/` and `unrelated/`;
+only `unrelated/` grows between steps. The small subtree stays unchanged across
+all runs. Snapshot and config directories are outside the scanned tree. The
+harness supplies its own config with `keep_previous=true` and overrides inherited
+`FREESPACE_CONFIG` and `FREESPACE_SNAPSHOT_DIR`.
+
+Each repetition runs a full scan immediately followed by a refresh of `small/`,
+with identical workers. The snapshot directory is reused across steps and
+repetitions, so later scans rotate a previous generation. Every successful row
+is checked for the expected total entry count, a complete scan, and the fixed
+refresh subtree count. A failed command or invalid report stops the series with
+a nonzero exit; inspect the retained artifacts before analyzing partial results.
+
+The result directory contains:
+
+- `manifest.json`: binary path, version and SHA-256, platform, filesystem type,
+  initial `/proc/meminfo`, GNU time version, workload settings, scratch paths,
+  and cache/snapshot policy. Record the binary's source revision and build flags
+  separately; its version string and hash do not identify those automatically.
+- `results.jsonl`: one JSON object per operation with step, repetition, workers,
+  exact argument vector, exit status, validation error (normally null), GNU time
+  metrics, endpoint snapshot occupancy, and the original CLI JSON as `report`.
+- `files-<step>-r<repeat>-<scan|refresh>.json`, `.stderr`, and `.time`: raw CLI
+  report, diagnostics, and GNU time output, including failures.
+
+For example, extract the core measurements without extra dependencies:
+
+```sh
+python3 - ./bench-results/refresh-memory-EXAMPLE/results.jsonl <<'PY'
+import json, sys
+for line in open(sys.argv[1]):
+    row = json.loads(line)
+    report = row['report'] or {}
+    print(row['operation'], row['unrelated_files'], report.get('entries'),
+          report.get('subtree_entries'), report.get('total_seconds'),
+          row['time']['peak_rss_kib'])
+PY
+```
+
+The nested CLI report retains `walk_seconds`, `finalize_seconds`,
+`insert_seconds`, `index_seconds`, `publish_seconds`, `total_seconds`, and, for
+refresh, `load_seconds`. GNU time adds process wall seconds and whole-command
+peak RSS in **KiB**. It also records filesystem input/output counts (`%I`, `%O`),
+which are kernel accounting units, **not byte counts**. Endpoint
+`snapshot_file_bytes` and `snapshot_allocated_bytes` include retained generations
+and bookkeeping files; they do not measure peak temporary disk occupancy.
+
+These runs have uncontrolled caches: file creation warms metadata and refresh
+follows scan. Compare distributions across repetitions and separate invocations
+under comparable machine load; small smoke timings are dominated by overhead.
+Empty files isolate entry-count costs but do not represent realistic payloads,
+hardlinks, permission errors, deletion, or changing subtree contents. The harness
+measures phase **timings**, not phase-specific RSS; GNU time cannot attribute its
+single process peak to walk/finalize/write/index phases. RSS excludes page cache
+and other system/cgroup memory and cannot demonstrate a memory budget or OOM
+safety. A separately configured VM/cgroup and phase-aware profiling are needed
+for those acceptance checks. This infrastructure supplies measurements for #10
+and #11 and makes no speed or memory improvement claim.
