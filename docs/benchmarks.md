@@ -254,7 +254,13 @@ RSS is KiB and time is seconds. These are whole-command peaks, not stage RSS.
 | 100,120 | scan | 36,334 | 26,456 | 0.625 | 0.770 |
 | 100,120 | refresh | 45,012 | 34,900 | 0.510 | 0.610 |
 
-Median full-scan stage timings from the same runs:
+Median full-scan stage timings from the same runs. These measurements used
+an earlier candidate whose insert timer included releasing the tree and
+finalized arrays. The current writer records insert time before that release,
+preserving the baseline timer boundary; deallocation is included only in total
+time, between the insert and index timers. The historical candidate insert
+numbers below and in the follow-up therefore include that extra work. RSS and
+wall measurements cover the whole command and do not depend on timer placement.
 
 | Entries | Build | Walk | Finalize | Insert | Index | Publish | Total |
 |---|---|---|---|---|---|---|---|

@@ -160,11 +160,11 @@ fn write_inner(
     insert_mounts(&conn, &tree, &fin, &map_err)?;
     insert_denied(&conn, &tree, &fin, &map_err)?;
     insert_refreshes(&conn, meta, &map_err)?;
+    stats.insert_seconds = t0.elapsed().as_secs_f64();
     // SQLite owns every row now. Release scan allocations before its index
     // sort buffers and growing page cache raise the write-phase peak.
     drop(fin);
     drop(tree);
-    stats.insert_seconds = t0.elapsed().as_secs_f64();
     let t1 = Instant::now();
     for sql in CREATE_INDEXES {
         conn.execute_batch(sql).map_err(map_err)?;
