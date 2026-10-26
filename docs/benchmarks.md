@@ -231,3 +231,47 @@ and other system/cgroup memory and cannot demonstrate a memory budget or OOM
 safety. A separately configured VM/cgroup and phase-aware profiling are needed
 for those acceptance checks. This infrastructure supplies measurements for #10
 and #11 and makes no speed or memory improvement claim.
+
+### Releasing scan data before index creation
+
+A local glibc release build on 2026-10-26 compared baseline `5a280da` with
+ownership transferred to the snapshot writer. The writer drops `Tree` and
+`Finalized` after inserting all tables, before `CREATE INDEX`. SQLite settings,
+schema, transaction boundaries, and publication order are unchanged. Report
+entry/error counts are captured before transferring ownership.
+
+Two invocations per binary used the synthetic harness above with
+`STEPS="10000 100000" REPEATS=3` and its default 2 workers, 16 small files,
+and 1000 files per directory. Order was baseline, candidate, baseline,
+candidate. The host ran Linux 5.15, glibc 2.35, on ext4, with uncontrolled
+caches and other host activity. Each cell below is the median of six runs;
+RSS is KiB and time is seconds. These are whole-command peaks, not stage RSS.
+
+| Entries | Operation | Baseline peak RSS | Candidate peak RSS | Baseline wall | Candidate wall |
+|---|---|---|---|---|---|
+| 10,030 | scan | 11,242 | 10,294 | 0.110 | 0.110 |
+| 10,030 | refresh | 11,648 | 10,478 | 0.105 | 0.115 |
+| 100,120 | scan | 36,334 | 26,456 | 0.625 | 0.770 |
+| 100,120 | refresh | 45,012 | 34,900 | 0.510 | 0.610 |
+
+Median full-scan stage timings from the same runs:
+
+| Entries | Build | Walk | Finalize | Insert | Index | Publish | Total |
+|---|---|---|---|---|---|---|---|
+| 10,030 | baseline | 0.029340 | 0.000696 | 0.013702 | 0.023299 | 0.001059 | 0.107021 |
+| 10,030 | candidate | 0.029866 | 0.000581 | 0.011065 | 0.020194 | 0.001796 | 0.112108 |
+| 100,120 | baseline | 0.246661 | 0.006558 | 0.121165 | 0.197558 | 0.001913 | 0.618723 |
+| 100,120 | candidate | 0.276694 | 0.008566 | 0.158670 | 0.248005 | 0.002714 | 0.767135 |
+
+The 100k scan peak falls 27.2%; refresh falls 22.5%. Timings in these separate
+harness runs are slower for the candidate. A follow-up used one unchanged
+100,101-entry tree (100 numbered directories, 1000 empty numbered files each),
+2 workers, and alternating baseline/candidate/candidate/baseline order three
+times, with separate snapshot directories. It confirmed the RSS reduction:
+median 34,300 to 24,528 KiB (28.5%). Both binaries' wall times ranged from 0.61
+to 0.71 s; medians were 0.61 and 0.66 s. Median insert time was 0.116979 vs
+0.132916 s, index time 0.210195 vs 0.209731 s, and total time 0.608336 vs
+0.657334 s. This is a memory improvement, with no speed improvement claim.
+The results do not establish a memory budget or predict the musl/mimalloc
+release build's peak; larger realistic trees and controlled hosts need their
+own measurements.

@@ -265,7 +265,14 @@ fn scan_locked(mut req: ScanRequest, label: &str) -> Result<ScanReport> {
     } = walk_scan(&mut req, label)?;
     fault::point(&req.dir, "walked");
 
-    let published = publish_scan(&req, &tree, &fin, pw, walk_seconds)?;
+    let entries = tree.nodes.len() as u64;
+    let errors = tree
+        .roots
+        .iter()
+        .enumerate()
+        .map(|(i, _)| tree.nodes[i].errors as u64)
+        .sum();
+    let published = publish_scan(&req, tree, fin, pw, walk_seconds)?;
     let mut st = state::read(&req.dir).ok().flatten().unwrap_or_default();
     st.last_error = None;
     st.last_success_ts = Some(platform::now_secs());
@@ -275,16 +282,10 @@ fn scan_locked(mut req: ScanRequest, label: &str) -> Result<ScanReport> {
     st.last_scan_seconds = Some(t_all.elapsed().as_secs_f64());
     state::write(&req.dir, &st).map_err(|e| Error::io("write state.json", e))?;
 
-    let errors = tree
-        .roots
-        .iter()
-        .enumerate()
-        .map(|(i, _)| tree.nodes[i].errors as u64)
-        .sum();
     Ok(ScanReport {
         generation: published.generation,
         prev_generation: published.prev_generation,
-        entries: tree.nodes.len() as u64,
+        entries,
         walk_seconds,
         finalize_seconds,
         write: published.write,
@@ -305,8 +306,8 @@ struct PublishedScan {
 
 fn publish_scan(
     req: &ScanRequest,
-    tree: &Tree,
-    fin: &Finalized,
+    tree: Tree,
+    fin: Finalized,
     pw: ProgressWriter,
     walk_seconds: f64,
 ) -> Result<PublishedScan> {
