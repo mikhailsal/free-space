@@ -245,20 +245,24 @@ fn a_failed_run_with_no_recorded_success_sends_status_to_doctor() {
     assert_eq!(t.lines().last(), Some("Run: freespace doctor"), "{t}");
 }
 
-/// Pins the history rule: an error older than the last success is not flagged.
-/// TODOS.md (P2) calls that a defect, because a success clears `last_error`;
-/// the fix PR flips this test on purpose.
+/// A present error remains a failure regardless of timestamp ordering; every
+/// successful scan clears `last_error`.
 #[test]
-fn an_error_older_than_the_last_success_is_history() {
+fn any_recorded_error_is_a_failure_and_status_points_to_doctor() {
     let e = Env::scanned();
-    e.failed_at(-60, "write", "disk full");
-    assert_eq!(
-        e.check("last_error"),
-        (true, "none since the last successful scan".into(), None)
-    );
-    let o = e.cmd(&["status"]).output().unwrap();
-    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
-    let t = String::from_utf8_lossy(&o.stdout);
-    assert!(t.contains(" write: disk full"), "{t}"); // still listed, just not flagged
-    assert!(!t.contains("Run: freespace doctor"), "{t}");
+    for offset in [-60, 0, 60] {
+        e.failed_at(offset, "write", "disk \u{1b}[31mfull");
+        let (ok, detail, fix) = e.check("last_error");
+        assert!(!ok, "offset {offset}: {detail}");
+        assert!(detail.ends_with(" write: disk \u{1b}[31mfull"), "{detail}");
+        assert_eq!(fix.as_deref(), Some(JOURNAL));
+        let (_, code) = e.doctor();
+        assert_eq!(code, 1, "offset {offset}");
+        let o = e.cmd(&["status"]).output().unwrap();
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        let t = String::from_utf8_lossy(&o.stdout);
+        assert!(t.contains(" write: disk \\u{1b}[31mfull"), "{t}");
+        assert!(!t.contains('\u{1b}'), "{t:?}");
+        assert_eq!(t.lines().last(), Some("Run: freespace doctor"), "{t}");
+    }
 }

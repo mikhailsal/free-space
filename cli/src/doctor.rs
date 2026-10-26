@@ -317,7 +317,7 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) ->
 
     match state::read(dir) {
         Ok(Some(st)) => match &st.last_error {
-            Some(le) if st.last_success_ts.is_none_or(|ok| le.ts > ok) => {
+            Some(le) => {
                 let fix = match le.op.as_str() {
                     "precheck" | "reserve" => format!(
                         "free space, or set keep_previous = false / move snapshot_dir in {}, then sudo freespace install-timer",
@@ -331,7 +331,7 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) ->
                     fix,
                 ));
             }
-            _ => v.push(pass("last_error", "none since the last successful scan")),
+            None => v.push(pass("last_error", "none since the last successful scan")),
         },
         Ok(None) => v.push(pass("last_error", "no state.json yet")),
         Err(e) => v.push(fail(

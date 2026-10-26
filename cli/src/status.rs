@@ -107,11 +107,7 @@ pub fn doctor_hint(r: &StatusResponse) -> Option<String> {
     let stale = r
         .age_seconds
         .is_some_and(|a| a > crate::doctor::STALE_SECONDS);
-    let failed = match (&r.last_error, r.last_success_ts) {
-        (Some(e), Some(ok)) => e.ts > ok,
-        (Some(_), None) => true,
-        _ => false,
-    };
+    let failed = r.last_error.is_some();
     (stale || failed).then(|| "Run: freespace doctor".to_owned())
 }
 
