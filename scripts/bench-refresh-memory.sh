@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 
 FIXED_MTIME = 1_700_000_000
@@ -123,6 +124,7 @@ def main():
             "environment": {key: env[key] for key in ("LC_ALL", "FREESPACE_CONFIG")},
             "measurement_notes": [
                 "GNU time covers the complete command, including connection close and any close-time checkpoint.",
+                "wall_seconds_monotonic also includes the GNU time wrapper startup/exit; it has finer resolution than GNU time %e.",
                 "peak_rss_kib is the command process high-water RSS, not cgroup memory.",
                 "fs_inputs/fs_outputs are kernel rusage block-operation counters, not measured physical device bytes.",
                 "CLI phase timings use each backend's documented grouping and need not sum to command wall time.",
@@ -157,10 +159,13 @@ def main():
                     command.extend([operation, str(target), "--workers", str(workers), "--json"])
                     time_format = '{"wall_seconds":%e,"peak_rss_kib":%M,"fs_inputs":%I,"fs_outputs":%O,"exit_code":%x}'
                     with report_path.open("w") as stdout, stderr_path.open("w") as stderr:
+                        wall_start = time.perf_counter()
                         result = subprocess.run(["/usr/bin/time", "-f", time_format, "-o", str(time_path), *command],
                                                 env=run_env, stdout=stdout, stderr=stderr)
+                        wall_seconds = time.perf_counter() - wall_start
                     # GNU time may prepend a failure message; its formatted row is last.
                     metrics = json.loads(time_path.read_text().splitlines()[-1])
+                    metrics["wall_seconds_monotonic"] = wall_seconds
                     report = None
                     validation_error = None
                     try:

@@ -184,7 +184,9 @@ Each backend has its own snapshot directory. Their order alternates between
 repetitions; both see identical filesystem contents. The manifest retains the
 supplied source revision and binary hash. GNU time covers the entire process,
 including SQLite close and any close-time checkpoint, which can be outside the
-CLI stage timers. Its input/output counters are kernel block-operation counts,
+CLI stage timers. `time.wall_seconds_monotonic` uses the harness's monotonic clock
+and includes GNU time wrapper overhead; GNU time's `%e` has coarser resolution.
+Its input/output counters are kernel block-operation counts,
 not measured physical device bytes. Endpoint disk occupancy includes WAL and
 retained files; it is not peak temporary space. Stage timings use each backend's
 documented grouping and should not be compared as identical implementations.
