@@ -136,7 +136,18 @@ enum Command {
 
 fn main() -> ExitCode {
     crash::install_hook();
-    let matches = match Cli::command().try_get_matches() {
+    let mut command = Cli::command();
+    // Clap copies argv[0] into styled usage/help before the error contexts
+    // can be escaped. Preserve the normal basename, escaping dynamic data first.
+    if let Some(arg0) = std::env::args_os().next()
+        && let Some(name) = std::path::Path::new(&arg0)
+            .file_name()
+            .map(std::ffi::OsStr::to_string_lossy)
+        && name.chars().any(char::is_control)
+    {
+        command = command.bin_name(output::escape(&name));
+    }
+    let matches = match command.try_get_matches() {
         Ok(m) => m,
         Err(e) => return output::clap_error(e),
     };

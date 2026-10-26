@@ -71,7 +71,7 @@ pub fn run(a: RefreshArgs) -> output::Result<()> {
     let tty = output::stderr_is_tty();
     eprintln!(
         "freespace refresh {}: started, {workers} workers",
-        path.display()
+        output::escape(&path.display().to_string())
     );
     let rep = refresh::run_refresh(RefreshRequest {
         path: path.as_os_str().as_bytes().to_vec(),
@@ -90,13 +90,13 @@ pub fn run(a: RefreshArgs) -> output::Result<()> {
     };
     eprintln!(
         "freespace refresh {}: generation {} published, {what}, {} in {:.1} s",
-        rep.path,
+        output::escape(&rep.path),
         rep.generation,
         format::size(rep.snapshot_bytes),
         rep.total_seconds
     );
     if let Some(w) = job::denied_warning(&rep.denied) {
-        eprintln!("warning: {w}");
+        eprintln!("warning: {}", output::escape(&w));
     }
     if a.json {
         output::print_json(&Report {

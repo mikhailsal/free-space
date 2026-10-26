@@ -105,9 +105,13 @@ pub fn run(a: &DoctorArgs) -> output::Result<bool> {
     let mut out = String::new();
     for c in &checks {
         let mark = if c.ok { "ok  " } else { "FAIL" };
-        out.push_str(&format!("{mark}  {:<w$}  {}\n", c.id, c.detail));
+        out.push_str(&format!(
+            "{mark}  {:<w$}  {}\n",
+            c.id,
+            output::escape(&c.detail)
+        ));
         if let Some(f) = &c.fix {
-            out.push_str(&format!("      {:<w$}  fix: {f}\n", ""));
+            out.push_str(&format!("      {:<w$}  fix: {}\n", "", output::escape(f)));
         }
     }
     let failed = checks.iter().filter(|c| !c.ok).count();

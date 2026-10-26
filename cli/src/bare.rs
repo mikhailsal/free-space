@@ -2,6 +2,7 @@
 //! Piped, the next commands carry `--json` (D15); `--json` prints `status --json`.
 
 use freespace_core::config;
+use freespace_core::queries::params::hex_encode;
 use freespace_core::{ErrorCode, INSTALL_CMD};
 
 use crate::output;
@@ -16,7 +17,7 @@ pub fn run(json: bool) -> output::Result<()> {
         Err(e) if e.code == ErrorCode::NoSnapshot && !json => {
             output::print(&format!(
                 "No snapshot yet in {}.\nNext:\n{}",
-                dir.path.display(),
+                output::escape(&dir.path.display().to_string()),
                 next(&[
                     (
                         INSTALL_CMD.to_owned(),
@@ -35,7 +36,14 @@ pub fn run(json: bool) -> output::Result<()> {
         return Ok(());
     }
     let r = &s.status;
-    let at = shell_word(r.roots.first().map_or("/", |x| x.path.as_str()));
+    let path = r.roots.first().map_or("/", |x| x.path.as_str());
+    let at = if path.chars().any(char::is_control) {
+        // Display escapes inside shell quotes select a different filename.
+        // The raw selector stays terminal-safe and round-trips in any shell.
+        format!("--path-raw {}", hex_encode(path.as_bytes()))
+    } else {
+        shell_word(path)
+    };
     let lines = if r.generation.is_none() {
         vec![
             (

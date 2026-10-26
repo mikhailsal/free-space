@@ -71,12 +71,12 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
     let tty = output::stderr_is_tty();
     let label = roots
         .iter()
-        .map(|r| r.display().to_string())
+        .map(|r| output::escape(&r.display().to_string()))
         .collect::<Vec<_>>()
         .join(" ");
     eprintln!(
         "freespace scan {label}: started, {workers} workers, snapshot dir {}",
-        dir.path.display()
+        output::escape(&dir.path.display().to_string())
     );
     let on_progress = progress_line(tty);
     let rep = job::run_scan(ScanRequest {
@@ -101,7 +101,7 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
         rep.write.insert_seconds + rep.write.index_seconds
     );
     if let Some(w) = job::denied_warning(&rep.denied) {
-        eprintln!("warning: {w}");
+        eprintln!("warning: {}", output::escape(&w));
     }
     if a.json {
         output::print_json(&Report {
