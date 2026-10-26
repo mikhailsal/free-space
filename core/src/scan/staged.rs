@@ -29,11 +29,14 @@ pub struct StagedTree {
     count: u64,
     one_file_system: bool,
     reserve: Reserve,
+    cleanup: bool,
 }
 
 impl Drop for StagedTree {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        if self.cleanup {
+            let _ = std::fs::remove_file(&self.path);
+        }
     }
 }
 
@@ -172,6 +175,7 @@ impl StagedTree {
             count,
             one_file_system: opts.one_file_system,
             reserve: reserve.clone(),
+            cleanup: create,
         };
         for (id, path) in paths.iter().enumerate() {
             let node = tree.roots.nodes[id];

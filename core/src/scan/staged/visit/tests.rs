@@ -80,6 +80,7 @@ fn staged(tree: &Tree, path: &Path) -> StagedTree {
             min_free: 0,
             check_every: 1024,
         },
+        cleanup: true,
     };
     for (id, node) in tree.nodes.iter().enumerate() {
         staged

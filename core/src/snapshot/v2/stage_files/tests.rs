@@ -68,6 +68,34 @@ fn guard_never_removes_a_replacement_name() {
 }
 
 #[test]
+fn precreated_tree_defers_unlink_to_guard_and_preserves_replacement_name() {
+    use crate::{
+        scan::{WalkOptions, staged::StagedTree},
+        snapshot::writer::Reserve,
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("root");
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("file"), b"contents").unwrap();
+    let stage = StageFile::create(tmp.path()).unwrap();
+    let path = stage.path().to_owned();
+    let staged = StagedTree::walk_precreated(
+        &WalkOptions::new(vec![root]),
+        &path,
+        &Reserve::new(tmp.path()),
+    )
+    .unwrap();
+    let moved = tmp.path().join("moved-stage");
+    fs::rename(&path, &moved).unwrap();
+    fs::write(&path, b"replacement").unwrap();
+    drop(staged);
+    assert_eq!(fs::read(&path).unwrap(), b"replacement");
+    drop(stage);
+    assert_eq!(fs::read(&path).unwrap(), b"replacement");
+    assert!(moved.exists());
+}
+
+#[test]
 fn killed_stage_owner_releases_lock_and_next_scan_reclaims_file() {
     let tmp = tempfile::tempdir().unwrap();
     let mut child = Command::new(std::env::current_exe().unwrap())
