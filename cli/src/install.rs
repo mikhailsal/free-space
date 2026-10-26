@@ -65,6 +65,14 @@ pub struct InstallArgs {
 }
 
 pub fn run(a: InstallArgs) -> output::Result<()> {
+    // Installation/uninstallation manages the v1 file manifest and grants.
+    // Refuse before any mutation until the v2 lifecycle is implemented.
+    if crate::backend::load()?.config.backend == config::Backend::V2
+        || config::load_from(&config::config_path())?.config.backend == config::Backend::V2
+    {
+        return Err(Error::new(ErrorCode::NotSupported,
+            "install-timer and --uninstall do not yet support the v2 backend; v2 data was left untouched").into());
+    }
     if !fsutil::is_root() {
         return Err(Error::new(ErrorCode::NotRoot, "install-timer needs root")
             .with_fix("sudo freespace install-timer")

@@ -170,3 +170,63 @@ fn v2_status_text_and_json_agree_on_growth_and_generation() {
     assert_eq!(status["generation"], 2);
     assert_eq!(status["prev_generation"], 1);
 }
+
+#[test]
+fn v2_install_lifecycle_refuses_before_mutating_files() {
+    use std::os::unix::fs::PermissionsExt;
+    let e = Env::new();
+    let units = e.tmp.path().join("units");
+    let bin = e.tmp.path().join("bin");
+    let called = e.tmp.path().join("systemctl-called");
+    std::fs::create_dir(&units).unwrap();
+    std::fs::create_dir(&bin).unwrap();
+    let unit = units.join("freespace.service");
+    std::fs::write(&unit, "preserve existing service").unwrap();
+    let systemctl = bin.join("systemctl");
+    std::fs::write(
+        &systemctl,
+        "#!/bin/sh\nprintf called > \"$FREESPACE_TEST_SYSTEMCTL\"\nexit 0\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&systemctl, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let run = |args: &[&str]| {
+        e.cmd(args)
+            .env("FREESPACE_UNIT_DIR", &units)
+            .env("FREESPACE_TEST_SYSTEMCTL", &called)
+            .env("PATH", &bin)
+            .output()
+            .unwrap()
+    };
+    std::fs::create_dir_all(e.snap().join("v2")).unwrap();
+    let data = e.snap().join("v2/generations.db");
+    std::fs::write(&data, b"preserve v2 data").unwrap();
+    for config in ["", "backend = \"v2\"\n"] {
+        std::fs::write(e.config(), config).unwrap();
+        for uninstall in [false, true] {
+            let mut args = vec!["--backend", "v2", "install-timer", "--json"];
+            if uninstall {
+                args.push("--uninstall");
+            }
+            let output = run(&args);
+            assert!(!output.status.success());
+            assert!(
+                String::from_utf8_lossy(&output.stdout)
+                    .contains("do not yet support the v2 backend")
+            );
+            assert_eq!(std::fs::read_to_string(e.config()).unwrap(), config);
+            assert_eq!(std::fs::read(&data).unwrap(), b"preserve v2 data");
+        }
+    }
+    // Overriding the current invocation cannot silently rewrite a persisted
+    // v2 configuration through the v1 installer lifecycle either.
+    let output = run(&["--backend", "v1", "install-timer", "--uninstall", "--json"]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("do not yet support the v2 backend"));
+    assert_eq!(std::fs::read(&data).unwrap(), b"preserve v2 data");
+    assert_eq!(
+        std::fs::read_to_string(&unit).unwrap(),
+        "preserve existing service"
+    );
+    assert_eq!(std::fs::read_dir(&units).unwrap().count(), 1);
+    assert!(!called.exists(), "refusal must not invoke systemctl");
+}

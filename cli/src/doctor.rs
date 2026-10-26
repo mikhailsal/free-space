@@ -53,7 +53,7 @@ fn fail(id: &str, detail: impl Into<String>, fix: impl Into<String>) -> Check {
 /// Returns whether every check passed.
 pub fn run(a: &DoctorArgs) -> output::Result<bool> {
     let mut checks = Vec::new();
-    let loaded = match config::load() {
+    let loaded = match crate::backend::load() {
         Ok(l) => {
             let what = if l.exists {
                 ""
@@ -78,7 +78,9 @@ pub fn run(a: &DoctorArgs) -> output::Result<bool> {
         .as_ref()
         .map(|l| l.config.clone())
         .unwrap_or_default();
-    let dir = SnapshotDir::new(&cfg.snapshot_dir);
+    let dir = loaded
+        .as_ref()
+        .map_or_else(|| SnapshotDir::new(&cfg.snapshot_dir), crate::backend::dir);
 
     checks.push(timer());
     checks.push(binary());
@@ -89,7 +91,11 @@ pub fn run(a: &DoctorArgs) -> output::Result<bool> {
     } else {
         cfg.roots.clone()
     };
-    checks.extend(snapshot_checks(&dir, cfg.keep_previous, &roots));
+    if cfg.backend == config::Backend::V2 {
+        checks.extend(v2_snapshot_checks(&dir));
+    } else {
+        checks.extend(snapshot_checks(&dir, cfg.keep_previous, &roots));
+    }
     checks.push(skill_version());
 
     let ok = checks.iter().all(|c| c.ok);
@@ -328,6 +334,72 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) ->
         v.push(check);
     }
     v
+}
+
+/// V2 publishes into one transactional database. V1's replacement-file space
+/// estimate does not describe its WAL or retention admission policy.
+fn v2_snapshot_checks(dir: &SnapshotDir) -> Vec<Check> {
+    let mut checks = Vec::new();
+    match crate::backend::reader(dir).and_then(|reader| reader.meta(false)) {
+        Ok(meta) => {
+            checks.push(pass(
+                "access",
+                format!(
+                    "{} is readable as {}",
+                    crate::backend::database(dir).display(),
+                    whoami()
+                ),
+            ));
+            let age = now_secs() - meta.scanned_at;
+            checks.push(if age > STALE_SECONDS {
+                fail(
+                    "freshness",
+                    format!(
+                        "snapshot is {} old (generation {})",
+                        format::age(age),
+                        meta.generation
+                    ),
+                    "sudo freespace --backend v2 scan",
+                )
+            } else {
+                pass(
+                    "freshness",
+                    format!("generation {} · {} old", meta.generation, format::age(age)),
+                )
+            });
+        }
+        Err(error) if error.code == ErrorCode::NoSnapshot && lock::probe(dir).is_some() => {
+            checks.push(pass("access", "no snapshot yet: the first scan is running"));
+        }
+        Err(error) => checks.push(fail(
+            "access",
+            error.message.clone(),
+            "inspect the v2 store; then sudo freespace --backend v2 scan",
+        )),
+    }
+    let mut recorded = recorded_error_check(dir);
+    if !recorded.ok {
+        recorded.fix =
+            Some("inspect the v2 state and store; rerun sudo freespace --backend v2 scan".into());
+    }
+    checks.push(recorded);
+    if dir.as_path().is_dir() {
+        checks.push(match platform::statvfs(dir.as_path()) {
+            Ok(stats) => pass(
+                "space",
+                format!(
+                    "{} available; v2 checks WAL and retention admission during publication",
+                    format::size(stats.avail)
+                ),
+            ),
+            Err(error) => fail(
+                "space",
+                error.to_string(),
+                "check access to the v2 snapshot directory",
+            ),
+        });
+    }
+    checks
 }
 
 fn recorded_error_check(dir: &SnapshotDir) -> Check {
