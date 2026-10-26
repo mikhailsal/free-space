@@ -166,7 +166,7 @@ Every error names a code. The `docs` link in an error points here:
 | <a id="error-rotated"></a>`ROTATED` | 4 | A new snapshot was published in the middle of the query. | Run the same command again. |
 | <a id="error-schema"></a>`SCHEMA` | 5 | The snapshot was written by a freespace with another format. | Rescan: `sudo systemctl start freespace.service` or `sudo freespace scan`. |
 | <a id="error-lock"></a>`LOCK` | 6 | A scan or refresh is already running. | Wait; `freespace status` shows its progress. |
-| <a id="error-hash-collision"></a>`HASH_COLLISION` | 7 | Two paths share a hash inside one `diff` answer. | [Report it](https://github.com/mikhailsal/free-space/issues); `ls` and `top` are not affected. |
+| <a id="error-hash-collision"></a>`HASH_COLLISION` | 7 | A `diff` pair failed raw path verification. | [Report it](https://github.com/mikhailsal/free-space/issues); `ls` and `top` are not affected. |
 | <a id="error-no-snapshot"></a>`NO_SNAPSHOT` | 8 | Nothing scanned yet. | Install with the one-liner above, or `sudo freespace scan`. If `freespace status` shows a scan running, wait for it. |
 | <a id="error-snapshot-access"></a>`SNAPSHOT_ACCESS` | 9 | The snapshot exists but this user cannot read it. | `sudo freespace install-timer` gives the sudo user read access (`--user NAME` for someone else). |
 | <a id="error-not-root"></a>`NOT_ROOT` | 1 | `scan`, `refresh` and `install-timer` need root. | Run it with `sudo`. |
