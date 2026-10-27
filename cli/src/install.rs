@@ -22,6 +22,7 @@ use freespace_core::{Error, ErrorCode, Result};
 use crate::output;
 
 mod lifecycle;
+mod memory_profile;
 mod report;
 use lifecycle::{grant_backend_access, prepare_backend_dirs};
 mod uninstall;
@@ -50,6 +51,9 @@ pub struct InstallArgs {
     /// Keep the previous snapshot for `diff` (needs 3x snapshot size free)
     #[arg(long, value_name = "BOOL", num_args = 0..=1, default_missing_value = "true")]
     pub keep_previous: Option<bool>,
+    /// Full-scan disk staging: auto estimates memory, true/false choose explicitly
+    #[arg(long, value_enum, value_name = "auto|true|false", num_args = 0..=1, default_missing_value = "true")]
+    pub low_memory: Option<memory_profile::Choice>,
     /// Where snapshots live (default /var/lib/freespace)
     #[arg(long, value_hint = clap::ValueHint::DirPath)]
     pub snapshot_dir: Option<PathBuf>,
@@ -77,13 +81,7 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         return uninstall(&a);
     }
     let cfg_path = config::config_path();
-    let mut c = config::load_from(&cfg_path)?.config;
-    c.backend = crate::backend::load()?.config.backend;
-    apply_config_overrides(&a, &mut c);
-    lifecycle::validate_v2_install_files(&c)?;
-    let text = config::render(&c);
-    // the file we write must load back: catches a bad --at or a relative path
-    config::parse(&text, &cfg_path)?;
+    let (c, text, memory) = installation_config(&a, &cfg_path)?;
 
     let copied_from = self_install()?;
     if let Some(from) = &copied_from {
@@ -132,6 +130,8 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         interval: c.interval.clone(),
         at: c.at.clone(),
         keep_previous: c.keep_previous,
+        low_memory: c.low_memory,
+        low_memory_reason: memory.reason,
         snapshot_dir: dir.path.display().to_string(),
         user: user.as_ref().map(|u| u.name.clone()),
         access: access.into(),
@@ -141,6 +141,25 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
         scan_reason: scan_reason.clone(),
     };
     report::print(&report, a.json)
+}
+
+fn installation_config(
+    a: &InstallArgs,
+    cfg_path: &Path,
+) -> Result<(Config, String, memory_profile::Decision)> {
+    let loaded = config::load_from(cfg_path)?;
+    let configured_low_memory = loaded.configured_low_memory;
+    let mut c = loaded.config;
+    c.backend = crate::backend::load()?.config.backend;
+    apply_config_overrides(a, &mut c);
+    let memory = memory_profile::resolve(a.low_memory, configured_low_memory, &c);
+    c.low_memory = memory.low_memory;
+    lifecycle::validate_v2_install_files(&c)?;
+    let text = config::render(&c);
+    // the file we write must load back: catches a bad --at or a relative path
+    config::parse(&text, cfg_path)?;
+
+    Ok((c, text, memory))
 }
 
 fn install_units(c: &Config, cfg_path: &Path) -> Result<Option<String>> {

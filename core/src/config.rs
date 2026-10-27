@@ -65,6 +65,8 @@ pub struct Loaded {
     pub config: Config,
     pub path: PathBuf,
     pub exists: bool,
+    /// A saved choice, distinct from a missing key that uses Config's default.
+    pub configured_low_memory: Option<bool>,
 }
 
 impl Loaded {
@@ -74,15 +76,34 @@ impl Loaded {
 }
 
 pub fn parse(text: &str, path: &Path) -> Result<Config> {
-    let c: Config = toml::from_str(text).map_err(|e| {
+    parse_document(text, path).map(|(config, _)| config)
+}
+
+fn parse_document(text: &str, path: &Path) -> Result<(Config, Option<bool>)> {
+    let error = |e: toml::de::Error| {
         Error::new(
             ErrorCode::Config,
             format!("{}: {}", path.display(), e.message()),
         )
         .with_fix(format!("fix or remove the key in {}", path.display()))
-    })?;
-    validate(&c, path)?;
-    Ok(c)
+    };
+    // Inspect presence in the same text, without another filesystem read.
+    let document: toml::Value = toml::from_str(text).map_err(error)?;
+    let configured_low_memory = document
+        .get("low_memory")
+        .map(|value| {
+            value.as_bool().ok_or_else(|| {
+                Error::new(
+                    ErrorCode::Config,
+                    format!("{}: low_memory must be true or false", path.display()),
+                )
+                .with_fix(format!("fix low_memory in {}", path.display()))
+            })
+        })
+        .transpose()?;
+    let config: Config = toml::from_str(text).map_err(error)?;
+    validate(&config, path)?;
+    Ok((config, configured_low_memory))
 }
 
 fn validate(c: &Config, path: &Path) -> Result<()> {
@@ -123,9 +144,12 @@ pub fn load() -> Result<Loaded> {
 }
 
 pub fn load_from(path: &Path) -> Result<Loaded> {
-    let (mut config, exists) = match std::fs::read_to_string(path) {
-        Ok(t) => (parse(&t, path)?, true),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Config::default(), false),
+    let (mut config, exists, configured_low_memory) = match std::fs::read_to_string(path) {
+        Ok(t) => {
+            let (config, configured_low_memory) = parse_document(&t, path)?;
+            (config, true, configured_low_memory)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Config::default(), false, None),
         Err(e) => {
             return Err(Error::new(
                 ErrorCode::Config,
@@ -140,6 +164,7 @@ pub fn load_from(path: &Path) -> Result<Loaded> {
         config,
         path: path.to_path_buf(),
         exists,
+        configured_low_memory,
     })
 }
 
@@ -163,9 +188,7 @@ pub fn render(c: &Config) -> String {
     if let Some(w) = c.workers {
         s.push_str(&format!("workers = {w}\n"));
     }
-    if c.low_memory {
-        s.push_str("low_memory = true\n");
-    }
+    s.push_str(&format!("low_memory = {}\n", c.low_memory));
     s.push_str(&format!("port = {}\n", c.port));
     s.push_str(&format!("interval = {:?}\n", c.interval));
     s.push_str(&format!("at = {:?}\n", c.at));
@@ -202,5 +225,34 @@ mod tests {
         assert!(e.message.contains("at"));
         let e = parse("roots = [\"relative\"]", p).unwrap_err();
         assert!(e.message.contains("roots"));
+        let e = parse("low_memory = \"auto\"", p).unwrap_err();
+        assert!(e.message.contains("low_memory"));
+    }
+
+    #[test]
+    fn loaded_presence_distinguishes_missing_false_and_true() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        let missing = load_from(&path).unwrap();
+        assert!(!missing.exists);
+        assert_eq!(missing.configured_low_memory, None);
+        for (text, expected) in [
+            ("", None),
+            ("low_memory = false", Some(false)),
+            ("low_memory = true", Some(true)),
+        ] {
+            std::fs::write(&path, text).unwrap();
+            let loaded = load_from(&path).unwrap();
+            assert!(loaded.exists);
+            assert_eq!(loaded.configured_low_memory, expected);
+            assert_eq!(loaded.config.low_memory, expected.unwrap_or(false));
+            let rendered = render(&loaded.config);
+            assert!(rendered.contains(&format!("low_memory = {}\n", loaded.config.low_memory)));
+            std::fs::write(&path, rendered).unwrap();
+            assert_eq!(
+                load_from(&path).unwrap().configured_low_memory,
+                Some(loaded.config.low_memory)
+            );
+        }
     }
 }

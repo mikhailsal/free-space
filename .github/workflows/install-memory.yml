@@ -1,0 +1,42 @@
+name: install memory correctness
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/install-auto-low-memory]
+
+permissions:
+  contents: read
+
+jobs:
+  install-memory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: Swatinem/rust-cache@v2
+      - name: workspace correctness and debug GNU binary
+        run: |
+          cargo test --workspace --locked
+          cargo build --workspace --locked
+      - name: source limits and shell checks
+        run: |
+          scripts/check.sh size
+          shellcheck scripts/check-install-memory.sh
+      - name: isolated installer selection in real no-swap cgroups
+        run: bash scripts/check-install-memory.sh target/debug/freespace "$RUNNER_TEMP/install-memory"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: install-memory-correctness
+          path: ${{ runner.temp }}/install-memory
+          if-no-files-found: warn
+          retention-days: 7

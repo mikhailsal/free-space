@@ -80,6 +80,23 @@ assert f'setfacl -R -m u:root:rX {p}/snap/v2\n' in log
 assert f'setfacl -d -m u:root:rX {p}/snap/v2\n' in log
 assert 'systemctl start' not in log
 PY
+# An explicit false is persisted and survives an ordinary reinstall; a bare
+# flag forces disk staging, and auto can be requested again without scanning.
+"$binary" install-timer --no-start --user root --low-memory false --json > "$scratch/memory-false.json"
+"$binary" install-timer --no-start --user root --json > "$scratch/memory-preserved.json"
+"$binary" install-timer --no-start --user root --low-memory --json > "$scratch/memory-true.json"
+"$binary" install-timer --no-start --user root --low-memory auto --json > "$scratch/memory-auto.json"
+python3 - "$scratch" <<'PYMEM'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1])
+for name, expected in [('false', False), ('preserved', False), ('true', True)]:
+    report = json.loads((p / f'memory-{name}.json').read_text())
+    assert report['low_memory'] is expected, report
+    assert report['low_memory_reason']
+auto = json.loads((p / 'memory-auto.json').read_text())
+assert isinstance(auto['low_memory'], bool) and auto['low_memory_reason']
+assert f"low_memory = {str(auto['low_memory']).lower()}" in (p / 'config.toml').read_text()
+PYMEM
 # A manual scan before first publication must be found through the v2 lock.
 flock -x "$scratch/snap/v2/.lock" -c 'sleep 2' &
 holder=$!

@@ -204,13 +204,31 @@ roots = ["/", "/home"]
 snapshot_dir = "/var/lib/freespace"
 keep_previous = true            # previous snapshot for diff; needs room for both
 # workers = 4                   # walker threads; default min(CPUs, 8)
-# low_memory = true             # full scans use disk staging and one walker
+low_memory = false             # installer chooses automatically; true uses disk staging
 port = 0                        # gui/serve port; 0 picks a free one
 interval = "daily"              # hourly, daily or weekly
 at = "02:00"
 ```
 
 Change it with `sudo freespace install-timer --roots / /home --interval daily --at 03:30` rather than by hand: that also rewrites the timer.
+
+On first installation, `install-timer` chooses `low_memory` from the estimated
+scan size and available RAM, including visible container memory limits. It saves
+the result and preserves it on subsequent installations, including an explicit
+`false`. Installation reports the selected mode and its reason.
+
+To recalculate after changing roots or the machine's memory budget:
+
+<!-- no-run -->
+```sh
+sudo freespace install-timer --low-memory auto
+```
+
+Use `--low-memory true` (or bare `--low-memory`) to force disk staging, or
+`--low-memory false` to force the ordinary mode. These flags also work through
+`install.sh` after its `--` separator. Automatic selection is an installation-time
+heuristic, described in [the memory policy](docs/install-memory.md); it does not
+change modes during a scan.
 
 ## <a id="from-source"></a>Build from source
 

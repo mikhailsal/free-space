@@ -7,6 +7,8 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
+pub mod memory;
+
 /// statvfs numbers for one filesystem.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FsStats {
