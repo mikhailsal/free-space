@@ -739,3 +739,81 @@ versions await explicit bounded maintenance. This experiment does not measure
 maintenance steady state or promise a fixed-size cache. Revision 4 and 5 stores
 are incompatible; seed a new state directory following the
 [upgrade guide](refresh-v2.md#upgrade-an-earlier-experimental-store).
+
+## Ordinary-memory current-backend comparison (2026-10-27)
+
+[Run 40474178463](https://github.com/mikhailsal/free-space/actions/runs/40474178463)
+answers how the candidate behaves when the memory ceiling no longer constrains
+this fixture. Both backends use the **same current candidate binary**, SHA-256
+`ef5d5e9b773ff1e427c59a8a79e1d052ff23e2f89db7251b9e5171d7b06608b7`, built
+from source `e370279a161c235a0381c00f92b9d5f97f4502ab`. Scanner implementation
+and build inputs are unchanged from the prior candidate; this revision adds
+benchmark controls. The historical v1 binary is not used as the comparator.
+
+Each arm gets a fresh Docker cgroup with a **4 GiB memory limit, no swap,
+2-CPU quota and one scan worker**. The fixture contains one million unrelated
+files, a fixed 18-entry refresh target, and 1,001,020 total entries.
+`keep_previous=true`. Two paired repeats alternate backend order. Default
+in-memory staging and `--low-memory` disk staging are measured separately,
+sequentially on the same GitHub-hosted VM: eight arm containers and 24 commands.
+
+All 24 commands validate, all eight Docker states report no OOM, all eight
+sync/cache-drop receipts succeed, and all 24 observer hash inventories match.
+Every recorded cgroup `memory.events` counter remains zero, including `max` and
+`oom`; the largest arm peak is 2,978,213,888 bytes (2,840.25 MiB), below the
+4,096 MiB limit. Thus these timings are not measurements at the memory ceiling.
+All complete [records are archived as compressed JSON](benchmark-results/v2-normal-memory-2026-10-27.json.gz).
+
+The initial scan follows the requested clean OS cache drop for each arm;
+subsequent commands retain cache. SHA-256 integrity reads and immutable SQLite
+observations run outside timed spans but can warm cache. Active pages and
+hardware caches are not reset. Complete CLI wall time includes process start,
+publication and close/checkpoint. These are GNU/glibc release builds with
+Rust/Cargo 1.99.1 and Bun 1.4.2; they are not timings of the distributed musl
+binary or a prediction of another machine's filesystem. Two repeats provide
+observed ranges, not tight statistical confidence intervals.
+
+### Default in-memory staging
+
+Seconds except the refresh row; values are median [minimum–maximum].
+
+| Complete command | Current v1 | Current v2 |
+| --- | ---: | ---: |
+| Initial full scan, s | 12.186 [12.061–12.312] | 51.831 [51.091–52.571] |
+| Repeat full scan, s | 5.363 [5.352–5.374] | 31.922 [31.534–32.310] |
+| 18-entry refresh, ms | 2,543.57 [2,505.81–2,581.32] | 8.254 [8.135–8.372] |
+
+At these medians, v2 takes **4.25 times** as long for the initial full scan and
+**5.95 times** for the repeat, while its small refresh is **308 times faster**.
+Median scan RSS is approximately 184 MiB for v1 and 535 MiB for v2; refresh RSS
+is approximately 199 MiB and 8 MiB, respectively. RSS excludes filesystem cache
+and the helper. The largest cgroup peaks across the arm lifecycle are about
+2,057 MiB for v1 and 2,840 MiB for v2, including cache and observations.
+
+The report groups filesystem preparation/aggregation in `walk_seconds` and
+publication work in the other stages. Initial walk medians are about 9.90 s for
+v1 and 10.96 s for v2; repeat walks are about 3.05 s and 3.35 s. V2's publication
+transaction (`insert_seconds`) takes about 38.29 s initially and 27.09 s on
+repeat. This identifies the expensive reported phase; it is not a causal
+CPU-versus-device-I/O breakdown. Additional RAM does not eliminate the measured
+versioned-publication cost.
+
+### Disk staging with the same 4 GiB budget
+
+| Complete command | Current v1 | Current v2 |
+| --- | ---: | ---: |
+| Initial full scan, s | 25.720 [25.671–25.768] | 57.703 [57.295–58.111] |
+| Repeat full scan, s | 18.345 [18.242–18.447] | 39.847 [39.761–39.934] |
+| 18-entry refresh, ms | 2,617.36 [2,516.99–2,717.74] | 8.523 [8.399–8.647] |
+
+V2's scan RSS is about 26–27 MiB in this mode, compared with about 535 MiB for
+its default in-memory scan. Its observed full scans take about 58/40 s instead
+of 52/32 s; this is an explicit time/process-RSS tradeoff. The whole cgroup
+still peaks around 2,508 MiB because filesystem cache remains charged to it.
+V1's disk-scan RSS is about 25 MiB, and refresh still uses its in-memory engine.
+
+The harness exposes `--current-backends`, `--scan-profile memory|disk|both`,
+`--keep-previous true|false|both`, and `--memory 4096` for this comparison. These
+flags select a benchmark profile; they do not alter application defaults or
+reserve 4 GiB on the user's computer. Existing 128 MiB records remain a separate
+constrained-memory experiment, with their original failure qualifications.

@@ -99,6 +99,8 @@ for access paths and remaining costs. The [container measurements](benchmarks.md
 quantify these costs. The million-file candidate completed its CLI commands at
 128 MiB without OOM; the overall comparison run remains failed because of
 comparator failures and the observer guard described in that report.
+The separate [4 GiB comparison](benchmarks.md#ordinary-memory-current-backend-comparison-2026-10-27)
+measures current v1/v2 default and disk staging without hitting the memory limit.
 
 ## Generations and refresh
 

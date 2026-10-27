@@ -271,6 +271,10 @@ Revision-5 [GitHub container records](../benchmarks.md#github-container-storage-
 include an accepted paired 100k pilot and qualified million-file command evidence.
 The latter candidate completed all six CLI commands without OOM at 128 MiB; its
 full comparison workflow failed on observer allocation guards and v1 failures.
+The separate [4 GiB current-backend comparison](../benchmarks.md#ordinary-memory-current-backend-comparison-2026-10-27)
+passed all 24 commands without memory-limit hits or OOM, measuring default and
+disk staging as separate profiles. Its numerical timings do not come from the
+128 MiB experiment.
 The revision-4 evidence below describes its recorded source, not this candidate.
 
 `walk` includes filesystem preparation and raw in-memory staging; full scans
