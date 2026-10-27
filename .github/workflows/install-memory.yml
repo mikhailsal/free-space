@@ -4,6 +4,17 @@ on:
   workflow_dispatch:
   push:
     branches: [feat/install-auto-low-memory]
+  pull_request:
+    paths:
+      - .github/workflows/install-memory.yml
+      - scripts/check-install-memory.sh
+      - core/src/platform/**
+      - core/src/platform.rs
+      - core/src/config.rs
+      - cli/src/install/**
+      - cli/src/install.rs
+      - cli/tests/install_lifecycle.rs
+      - cli/tests/fixtures/install-lifecycle.sh
 
 permissions:
   contents: read
