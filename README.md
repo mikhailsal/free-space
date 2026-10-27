@@ -12,6 +12,12 @@ full scans, and explicit maintenance of older versions.
 
 ## How it compares
 
+For **v1 vs v2-low_memory vs v2-normal**, see the
+[backend comparison table](docs/benchmarks.md#backend-comparison-at-a-glance):
+initial creation, whole-tree update, directory refresh, database size and peak
+RAM, measured in matched GitHub containers. Separate local results cover the
+7.18-million-entry filesystem. The tool comparison below is historical v1/0.1.1.
+
 `du`, `ncdu`, `gdu` and `dust` walk the disk when you ask, and the walk is the slow part. freespace walks it at night, at idle priority, and answers from the saved snapshot. One machine, a VMware disk with 408 G in 7.8 million entries, every tool run cold as root, du and duc once, the others twice ([method and all runs](docs/benchmarks.md#current-releases)):
 
 | Tool | Answer to "what is using my disk?" | Full walk of `/` | Peak memory of the walk |

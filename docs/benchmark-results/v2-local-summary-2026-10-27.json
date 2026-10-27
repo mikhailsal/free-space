@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-27",
+  "environment": "Local live filesystem; separate one-off runs, not GitHub containers or a controlled A/B experiment",
+  "low_memory": {
+    "version": "0.2.0",
+    "backend": "v2",
+    "low_memory": true,
+    "install_seconds": 5.344261655001901,
+    "failed_seed_seconds": 1057.0749248010106,
+    "failed_seed_exit_code": 1,
+    "successful_seed_seconds": 2272.01644704098,
+    "seed_entries": 7183289,
+    "refresh_path": "/var/log",
+    "refresh_entries": 451,
+    "refresh_wall_seconds": 0.16493935699691065,
+    "refresh_cli_seconds": 0.121253513,
+    "database_bytes": 5514113024,
+    "doctor_ok": true,
+    "generation": 2,
+    "local_service_override": "/etc/systemd/system/freespace.service.d/sqlite-temp.conf",
+    "sqlite_tmpdir": "/var/lib/freespace/sqlite-tmp",
+    "v1_retained": true,
+    "binary_sha256": "32d948fb2981b4829edbcc30304e382cb79f202cfe64fb7524ffe54fa271277a",
+    "peak_process_rss_kib": null,
+    "workers": 1,
+    "peak_rss_note": "Not captured; an early walk sample cannot establish a whole-command peak."
+  },
+  "normal": {
+    "normal_seconds": 1065.6376662209805,
+    "low_memory_seconds": 2272.01644704098,
+    "observed_time_ratio": 2.1320722033954773,
+    "normal_max_rss_kib": 4993744,
+    "normal_max_rss_gib": 4.7624053955078125,
+    "entries": 7184480,
+    "database_bytes": 5470306304,
+    "workers": 8,
+    "cgroup_memory_limit_bytes": 8589934592,
+    "cgroup_events": {
+      "low": 0,
+      "high": 0,
+      "max": 61336,
+      "oom": 0,
+      "oom_kill": 0
+    },
+    "cgroup_sampled_peak_bytes": 8589934592,
+    "main_config_unchanged": true,
+    "comparison_limits": [
+      "separate one-off live filesystem runs",
+      "previous scan may warm filesystem metadata",
+      "8GiB cgroup limit touched, including file-cache pressure; no OOM or swap"
+    ]
+  }
+}
