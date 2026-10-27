@@ -1,5 +1,85 @@
 # Benchmarks
 
+## Backend comparison at a glance
+
+### Matched GitHub containers: 1,001,020 entries
+
+The three modes below use the same current binary and synthetic filesystem on
+one GitHub-hosted VM: 4 GiB RAM per container, no swap, 2 CPUs, one scan worker,
+`keep_previous=true`, two repeats per mode. **v1 means the v1 backend in the
+current binary**, rather than the historical 0.1.1 executable. Normal means
+in-memory scan staging; `low_memory` means disk staging.
+
+| Metric | v1 (normal) | v2-low_memory | v2-normal |
+| --- | ---: | ---: | ---: |
+| Initial database creation | 12.186 s | 57.703 s | 51.831 s |
+| Whole-tree update: second full scan | 5.363 s | 39.847 s | 31.922 s |
+| One-directory update: 18-entry `refresh` | 2.544 s | 8.523 ms | 8.254 ms |
+| Database files after creation | 110.93 MiB | 431.09 MiB | 427.30 MiB |
+| Database files after second full scan | 221.86 MiB | 532.45 MiB | 528.71 MiB |
+| Highest process RSS across scans and refreshes | 199.59 MiB | 27.29 MiB | 535.82 MiB |
+| Highest container RAM across the full arm lifecycle, including cache | 2,057.08 MiB | 2,507.94 MiB | 2,840.25 MiB |
+
+Times are medians of complete CLI wall times, including publication and close.
+The initial scan follows an OS cache drop; the second scan and refresh retain
+cache, including effects of integrity checks outside timing. Whole-tree update
+means rescanning the entire fixture; it is distinct from refreshing one small
+directory. `low_memory` changes full-scan staging; directory refresh uses the
+same v2 engine in both modes.
+
+Database sizes are the sum of logical `.db` file lengths at command completion,
+including the previous v1 snapshot after the second scan. They exclude WAL,
+staging and other temporary files, so **installation needs more free disk space
+than the database row**. V2 history can grow on further scans until maintenance;
+the second-scan size is not a steady-state bound. The small size difference
+between v2 modes reflects physical layout, not a different retention policy.
+
+RAM rows are the **largest observed peaks**, not medians or guaranteed minimum
+machine requirements. Process RSS excludes filesystem cache; container RAM also
+includes cache, kernel charges and benchmark helpers/observers. All three modes
+completed below the 4 GiB container ceiling without memory-limit events. These
+numbers do not establish the smallest RAM budget that would work.
+
+On this fixture, v1 builds and rescans faster with a smaller database; v2 makes
+the small directory refresh much faster. V2-normal uses more process RAM than
+v1, while v2-low_memory trades scan time for lower process RAM.
+
+[Method, timing ranges and build details](#ordinary-memory-current-backend-comparison-2026-10-27)
+· [Raw records](benchmark-results/v2-normal-memory-2026-10-27.json.gz)
+· [GitHub run](https://github.com/mikhailsal/free-space/actions/runs/40474178463)
+
+### Local filesystem: approximately 7.18 million entries
+
+These are separate one-off v0.2.0 musl release runs on a live filesystem,
+recorded on 2026-10-27. They are useful operational observations, **not a matched
+comparison**: cache state, background load, worker count and memory limits differ.
+
+| Metric | v1 | v2-low_memory | v2-normal |
+| --- | ---: | ---: | ---: |
+| Initial database creation | Not measured in this comparison | 37 min 52 s | 17 min 46 s |
+| Whole-disk update: repeat full scan | Not measured | Not measured | Not measured |
+| One-directory update: `/var/log`, 451 entries | Not measured | 0.165 s | Not measured separately |
+| Database file | Not measured | 5.14 GiB after creation and refresh | 5.09 GiB after creation |
+| Peak process RSS | Not measured | Not captured | 4.76 GiB |
+
+The low-memory scan used one worker under the installed nightly service; normal
+used eight workers in a separate fresh store, with an 8 GiB container limit and
+no swap. That limit was reached (cache included), with no OOM; normal timing is
+therefore not an unconstrained-RAM result. Entry counts were 7,183,289 and
+7,184,480, respectively. The observed 2.13× creation-time difference cannot be
+attributed to staging mode alone. The low-memory walk's approximately 20 MiB
+RSS sample was **not a whole-command peak** and is not used as one here.
+The successful low-memory run required a writable SQLite temporary directory
+under the service sandbox; an earlier failed attempt is excluded from creation
+time. [Recorded local summaries](benchmark-results/v2-local-summary-2026-10-27.json)
+retain the timings and limits; these local runs were not executed on GitHub.
+
+The README's **1.52 GB** peak and **288/399 s** scans refer to the historical
+v1/0.1.1 experiment below, on a different approximately 7.8-million-entry tree.
+They are not v2 measurements and cannot fill the missing local v1 cells.
+
+## Historical v1 measurements (2026-10-23)
+
 Measured on the machine freespace was built for (the design's primary target), 2026-10-23. Raw rows come from `scripts/bench-baseline.sh` (scans) and `scripts/bench-queries.sh` (queries); both print TSV.
 
 ## Machine
