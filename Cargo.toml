@@ -6,7 +6,7 @@ members = ["core", "cli"]
 too_many_lines = "warn"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
@@ -15,7 +15,7 @@ homepage = "https://github.com/mikhailsal/free-space"
 authors = ["Mikhail Salnikov"]
 
 [workspace.dependencies]
-freespace-core = { path = "core", version = "0.1.1" }
+freespace-core = { path = "core", version = "0.2.0" }
 libc = "0.2"
 regex = "1.11"
 rusqlite = { version = "0.40", features = ["bundled", "functions", "hooks"] }

@@ -8,8 +8,8 @@ a Boolean so later installations preserve the selection. Explicit `true` and
 The installer reads Linux `MemAvailable`, bounded by total RAM and the remaining
 capacity of visible cgroup memory limits. It considers both cgroup v2 and the v1
 memory controller, including visible parent limits and their current usage.
-It reserves at most one quarter of that available capacity for the estimated
-ordinary scan working set.
+It compares the estimated ordinary scan working set against one quarter of
+that available capacity; it does not reserve memory.
 
 The working-set estimate is 64 MiB plus 384 bytes per entry for v1, or 1,024 bytes
 per entry for v2. These are conservative policy constants, not measured peak
