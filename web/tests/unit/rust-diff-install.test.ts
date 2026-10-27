@@ -145,7 +145,7 @@ test("text normalization preserves foreign headers, unknown times, shape and eve
 test("actual text and JSON reports must prove ACL, scheduled time, expected copy behavior and no scan", () => {
   const file = join(tmp, "no-scan-report");
   const text =
-    "freespace 1.2.3 timer installed\n  config     /etc/freespace/config.toml (roots /scratch, daily at 23:12, keep_previous true)\n  snapshots  /scratch/snap (read access for human (ACL))\n  timer      freespace.timer, next run Mon 2026-10-26 23:12:00 UTC\n";
+    "freespace 1.2.3 timer installed\n  config     /etc/freespace/config.toml (roots /scratch, daily at 23:12, keep_previous true)\n  low_memory false (auto: estimate fits budget)\n  snapshots  /scratch/snap (read access for human (ACL))\n  timer      freespace.timer, next run Mon 2026-10-26 23:12:00 UTC\n";
   for (const [report, accepted] of [
     [text, true],
     [text.replace("1.2.3 timer", "9.9.9 timer"), false],
@@ -156,6 +156,8 @@ test("actual text and JSON reports must prove ACL, scheduled time, expected copy
     [text.replace("daily at 23:12", "daily at 01:23"), false],
     [text.replace("keep_previous true", "keep_previous false"), false],
     [text.replace("(ACL)", "via group freespace"), false],
+    [text.replace("low_memory false", "low_memory unknown"), false],
+    [text.replace(" (auto: estimate fits budget)", ""), false],
     [text.replace("Mon 2026-10-26 23:12:00 UTC", "unknown"), false],
     [`${text}First scan started (no snapshot)\n`, false],
     [text.replace("human", "foreign"), false],

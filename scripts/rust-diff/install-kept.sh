@@ -40,11 +40,12 @@ install_text_report() { # <raw-text> <own-version>
 
 install_text_check() { # <raw> <own-version> <config> <roots> <interval> <at> <keep-previous> <snapshot> <user>
   local raw=$1 version=$2 config=$3 roots=$4 interval=$5 at=$6 keep=$7 snap=$8 user=$9 first_line
-  [ "$(wc -l <"$raw")" = 4 ] || fail 'text install report must have exactly four no-scan lines'
+  [ "$(wc -l <"$raw")" = 5 ] || fail 'text install report must have exactly five no-scan lines'
   IFS= read -r first_line <"$raw"
   [ "$first_line" = "freespace $version timer installed" ] || fail 'text install report must show the exact own-version header'
   grep -Fx "  config     $config (roots $roots, $interval at $at, keep_previous $keep)" "$raw" >/dev/null || fail 'text install report must show the expected configuration'
   grep -Fx "  snapshots  $snap (read access for $user (ACL))" "$raw" >/dev/null || fail 'text install report must show ACL access'
+  grep -Ex '  low_memory (true|false) [(].+[)]' "$raw" >/dev/null || fail 'text install report must show memory selection and reason'
   grep -Ex '  timer      freespace[.]timer, next run (Mon|Tue|Wed|Thu|Fri|Sat|Sun) [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} UTC' "$raw" >/dev/null || fail 'text install report must show a scheduled next_run'
 }
 

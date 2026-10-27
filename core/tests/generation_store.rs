@@ -267,8 +267,8 @@ fn unrelated_width_does_not_expand_mutations_or_vm_work() {
         measurements.push((report.sql_changes, count.load(Ordering::Relaxed)));
         let c = Connection::open(&f.db).unwrap();
         for sql in [
-            "SELECT min_scanned_at FROM live WHERE parent=1 ORDER BY min_scanned_at LIMIT 1",
-            "SELECT newest_mtime FROM live WHERE parent=1 AND newest_mtime IS NOT NULL ORDER BY newest_mtime DESC LIMIT 1",
+            "SELECT min_scanned_at FROM live_rows WHERE parent=1 ORDER BY min_scanned_at LIMIT 1",
+            "SELECT newest_mtime FROM live_rows WHERE parent=1 AND newest_mtime IS NOT NULL ORDER BY newest_mtime DESC LIMIT 1",
         ] {
             let mut q = c.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
             let plan = q
@@ -339,19 +339,19 @@ fn deleting_oldest_branch_recomputes_minimum_from_live_index() {
     f.scan();
     // Distinct deterministic scan stamps model a snapshot after earlier refreshes.
     let c = Connection::open(&f.db).unwrap();
-    c.execute_batch("UPDATE live SET scanned_at=500,min_scanned_at=500")
+    c.execute_batch("UPDATE live_rows SET scanned_at=500,min_scanned_at=500")
         .unwrap();
     c.execute(
-        "UPDATE live SET scanned_at=100,min_scanned_at=100 WHERE path=?1",
+        "UPDATE live_rows SET scanned_at=100,min_scanned_at=100 WHERE id IN (SELECT id FROM identities WHERE path=?1)",
         [bytes(&f.root.join("local"))],
     )
     .unwrap();
     c.execute(
-        "UPDATE live SET scanned_at=1000,min_scanned_at=100 WHERE path=?1",
+        "UPDATE live_rows SET scanned_at=1000,min_scanned_at=100 WHERE id IN (SELECT id FROM identities WHERE path=?1)",
         [bytes(&f.root)],
     )
     .unwrap();
-    c.execute_batch("UPDATE versions SET scanned_at=(SELECT scanned_at FROM live WHERE live.id=versions.id),min_scanned_at=(SELECT min_scanned_at FROM live WHERE live.id=versions.id)").unwrap();
+    c.execute_batch("UPDATE version_rows SET scanned_at=(SELECT scanned_at FROM live_rows WHERE live_rows.id=version_rows.id),min_scanned_at=(SELECT min_scanned_at FROM live_rows WHERE live_rows.id=version_rows.id)").unwrap();
     assert_eq!(f.get("").min_scanned_at, 100);
     fs::remove_dir_all(f.root.join("local")).unwrap();
     f.store.refresh(&f.root.join("local"), 1).unwrap();

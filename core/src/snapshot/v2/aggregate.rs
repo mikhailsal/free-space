@@ -65,12 +65,12 @@ pub(super) fn update(
         e.errors = apply(e.errors, d.errors)?;
         let min: Option<i64> = c
             .query_row(
-                "SELECT min_scanned_at FROM live WHERE parent=?1 ORDER BY min_scanned_at LIMIT 1",
+                "SELECT min_scanned_at FROM live_rows WHERE parent=?1 ORDER BY min_scanned_at LIMIT 1",
                 [e.id],
                 |r| r.get(0),
             )
             .optional()?;
-        let newest:Option<i64>=c.query_row("SELECT newest_mtime FROM live WHERE parent=?1 AND newest_mtime IS NOT NULL ORDER BY newest_mtime DESC LIMIT 1",[e.id],|r|r.get(0)).optional()?;
+        let newest:Option<i64>=c.query_row("SELECT newest_mtime FROM live_rows WHERE parent=?1 AND newest_mtime IS NOT NULL ORDER BY newest_mtime DESC LIMIT 1",[e.id],|r|r.get(0)).optional()?;
         e.min_scanned_at = e.scanned_at.min(min.unwrap_or(e.scanned_at));
         e.newest_mtime = newest;
         if let Some(p) = e.parent {

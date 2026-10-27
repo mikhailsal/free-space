@@ -4,8 +4,26 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-27
+
+### Added
+
+- Opt-in v2 snapshots make local refresh update the selected subtree, its ancestors and affected hardlinks while preserving atomic generations and pinned readers. Select v2 explicitly; v1 remains the default.
+- `scan --low-memory` uses disk staging and one walker for a smaller process working set. The installer now selects this mode from the scan-size estimate and available RAM, including visible container limits. Saved choices are preserved; `install-timer --low-memory auto|true|false` recalculates or overrides the choice.
+- `maintain` performs bounded v2 history cleanup and store maintenance, with crash recovery and retention controls.
+
+### Changed
+
+- V2 revision 5 stores immutable paths once and reduces database size and sampled disk peaks in the published GitHub container comparisons. Full scans remain slower than v1; see the benchmark guide for measured tradeoffs.
+- Earlier experimental v2 stores require a new snapshot directory and a full scan. They are not migrated in place; retain the old binary, configuration and state for rollback. Existing v1 snapshots remain supported.
+- Full scans and v1 refresh release completed tree data before index construction to reduce overlapping memory allocations.
+- Shared Rust, shell, TypeScript, formatting and source-size checks run before pushes and in CI; reproducible benchmark records include container limits and cache conditions.
+
 ### Fixed
 
+- Snapshot rotation, corruption and concurrent-reader edge cases now preserve usable generations or return explicit errors. Local refresh preserves mount boundaries, hardlink ownership and ancestor aggregates through deletion and failure recovery.
+- Query output escapes terminal control characters, reports output-write failures and distinguishes truncated diffs. Recovery commands quote paths safely, and schema and access errors retain actionable diagnostics.
+- Installation and cleanup reject unsafe snapshot paths and nonregular lock/diagnostic files, preserve active readers and writers, and recover abandoned staging files.
 - In the GUI, `/` or the Find tab sometimes opened Find without the cursor in the name field: the field was focused from a timer that could run before the form was drawn. It is now focused right after the form is drawn.
 
 ## [0.1.1] - 2026-10-23
@@ -32,6 +50,7 @@ First public release.
 - Error contract: every error has a stable code, exit number, `fix`, `recovery` hint and a `docs` link into the README.
 - `install.sh`: one-line install, upgrade and rollback (`--version X`) from GitHub Releases with sha256 checks; static musl builds for x86_64 and aarch64.
 
-[Unreleased]: https://github.com/mikhailsal/free-space/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mikhailsal/free-space/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mikhailsal/free-space/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mikhailsal/free-space/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mikhailsal/free-space/releases/tag/v0.1.0

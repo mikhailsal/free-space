@@ -1,0 +1,256 @@
+name: v2 storage balance
+
+on:
+  push:
+    branches: [perf/v2-storage-balance]
+    paths:
+      - .github/workflows/v2-balance.yml
+      - .cargo/**
+      - Cargo.toml
+      - Cargo.lock
+      - VERSION
+      - rust-toolchain*
+      - core/**
+      - cli/**
+      - web/**
+      - scripts/bench-v2-container.py
+      - scripts/bench_v2_config.py
+      - scripts/bench-v2-container/**
+      - scripts/summarize-v2-container.py
+      - scripts/check-v2-observer.py
+      - scripts/check.sh
+      - scripts/check-rust-suppressions.sh
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Baseline revision (v1 and v2 comparator)
+        default: 036fd2b7cb223a212dc3c68d78d4400d74ab793a
+        type: string
+      candidate_ref:
+        description: Candidate revision
+        default: master
+        type: string
+      steps:
+        description: Pilot 100000; confirmation 1000000; or both
+        default: '100000'
+        type: choice
+        options: ['100000', '1000000', '100000,1000000']
+      memory_mib:
+        description: Container RAM MiB (no swap)
+        default: '256'
+        type: choice
+        options: ['128', '256', '512', '4096']
+      repeats:
+        description: Paired repeats, alternating order
+        default: '2'
+        type: choice
+        options: ['1', '2', '3']
+      scans:
+        description: Complete scans per arm before refresh
+        default: '3'
+        type: choice
+        options: ['2', '3']
+      include_v1:
+        description: Include baseline v1 comparator
+        default: true
+        type: boolean
+      current_backends:
+        description: Compare candidate v1 and v2 instead of historical baseline
+        default: false
+        type: boolean
+      scan_profile:
+        description: Full-scan staging profile
+        default: disk
+        type: choice
+        options: [disk, memory, both]
+      keep_previous:
+        description: Retain previous generation during full scans
+        default: both
+        type: choice
+        options: ['both', 'true', 'false']
+      observer_check:
+        description: Run observer diagnostics instead of performance measurements
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-balance-${{ github.ref }}-${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '1000000') || '100000' }}-${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-4g]') && '4096') || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}-${{ inputs.scan_profile || (contains(github.event.head_commit.message, '[bench-profiles]') && 'both') || (contains(github.event.head_commit.message, '[bench-memory]') && 'memory') || 'disk' }}-${{ (inputs.current_backends == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[bench-current]'))) && 'current' || 'historical' }}-${{ inputs.keep_previous || (contains(github.event.head_commit.message, '[bench-keep-prev]') && 'true') || 'both' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      candidate_revision: ${{ steps.provenance.outputs.candidate_revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.baseline_ref || '036fd2b7cb223a212dc3c68d78d4400d74ab793a' }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref || github.sha }}
+          path: candidate
+          persist-credentials: false
+      # A single installed toolchain compiles both checkouts sequentially.
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Build both release binaries and record provenance
+        id: provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir binaries
+          rustc -Vv > binaries/compiler.txt
+          cargo -V >> binaries/compiler.txt
+          bun --version >> binaries/compiler.txt
+          for arm in baseline candidate; do
+            git -C "$arm" rev-parse HEAD > "binaries/$arm.revision.txt"
+            (cd "$arm" && timeout 1200 cargo build --release --locked -p freespace) > "binaries/$arm.build.log" 2>&1
+            cp "$arm/target/release/freespace" "binaries/$arm"
+            sha256sum "binaries/$arm" > "binaries/$arm.sha256.txt"
+            "binaries/$arm" --version > "binaries/$arm.version.txt"
+          done
+          echo "candidate_revision=$(cat binaries/candidate.revision.txt)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-balance-binaries
+          path: binaries/
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      candidate_revision: ${{ steps.provenance.outputs.candidate_revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Record verified revision
+        id: provenance
+        run: echo "candidate_revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: scripts/check.sh rust
+      - run: cargo test --workspace
+
+  measure:
+    if: ${{ !(inputs.observer_check == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[observer-check]'))) }}
+    needs: [build, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: v2-balance-binaries
+          path: binaries
+      - name: Require the built and verified candidate to match
+        env:
+          BUILT_REVISION: ${{ needs.build.outputs.candidate_revision }}
+          VERIFIED_REVISION: ${{ needs.verify.outputs.candidate_revision }}
+        run: test "$BUILT_REVISION" = "$VERIFIED_REVISION"
+      - name: Run all comparison arms sequentially on this runner
+        env:
+          # Fixed literals selected by booleans; commit text never reaches shell.
+          # Push markers let a branch-only workflow run confirmation before it
+          # exists on the default branch and can accept workflow_dispatch.
+          BENCH_STEPS: ${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '1000000') || '100000' }}
+          BENCH_MEMORY: ${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-4g]') && '4096') || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}
+          BENCH_REPEATS: ${{ inputs.repeats || (contains(github.event.head_commit.message, '[bench-once]') && '1') || '2' }}
+          BENCH_SCANS: ${{ inputs.scans || (contains(github.event.head_commit.message, '[bench-two-scans]') && '2') || '3' }}
+          BENCH_PROFILE: ${{ inputs.scan_profile || (contains(github.event.head_commit.message, '[bench-profiles]') && 'both') || (contains(github.event.head_commit.message, '[bench-memory]') && 'memory') || 'disk' }}
+          BENCH_CURRENT: ${{ inputs.current_backends == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[bench-current]')) }}
+          BENCH_KEEP_PREVIOUS: ${{ inputs.keep_previous || (contains(github.event.head_commit.message, '[bench-keep-prev]') && 'true') || 'both' }}
+          BENCH_V1: ${{ (github.event_name == 'push' && !contains(github.event.head_commit.message, '[bench-v2-only]')) || (github.event_name == 'workflow_dispatch' && inputs.include_v1) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x binaries/baseline binaries/candidate
+          extra=()
+          if [[ "$BENCH_CURRENT" == true ]]; then
+            extra+=(--current-backends)
+          elif [[ "$BENCH_V1" == true ]]; then
+            extra+=(--include-v1)
+          fi
+          python3 scripts/bench-v2-container.py \
+            --baseline binaries/baseline --candidate binaries/candidate \
+            --output results --steps "$BENCH_STEPS" --memory "$BENCH_MEMORY" \
+            --repeats "$BENCH_REPEATS" --scans "$BENCH_SCANS" \
+            --scan-profile "$BENCH_PROFILE" --keep-previous "$BENCH_KEEP_PREVIOUS" "${extra[@]}"
+      - name: Summarize measured results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d results ]]; then
+            python3 scripts/summarize-v2-container.py results | tee results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # Upload raw stdout/stderr, timing, cgroup, file allocation and dbstat JSON.
+      # Scratch trees and databases are never part of the results artifact.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-balance-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            results/
+            binaries/*.txt
+            binaries/*.log
+          if-no-files-found: error
+          retention-days: 14
+
+  # Diagnostic profile only: no timings from this job are accepted measurements.
+  observer-check:
+    if: ${{ inputs.observer_check == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[observer-check]')) }}
+    needs: [build, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: v2-balance-binaries
+          path: binaries
+      - name: Require the built and verified candidate to match
+        env:
+          BUILT_REVISION: ${{ needs.build.outputs.candidate_revision }}
+          VERIFIED_REVISION: ${{ needs.verify.outputs.candidate_revision }}
+        run: test "$BUILT_REVISION" = "$VERIFIED_REVISION"
+      - name: Check observer behavior without collecting performance results
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x binaries/baseline binaries/candidate
+          python3 scripts/check-v2-observer.py \
+            --baseline binaries/baseline --candidate binaries/candidate \
+            --output observer-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-observer-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            observer-results/
+            binaries/*.txt
+            binaries/*.log
+          if-no-files-found: error
+          retention-days: 14

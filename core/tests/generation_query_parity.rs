@@ -413,12 +413,12 @@ fn denied_previous_descendants_are_unknown_and_headers_global() {
     drop(c);
     let c = rusqlite::Connection::open(&path).unwrap();
     c.execute(
-        "UPDATE live SET flags=flags|1 WHERE path=?1",
+        "UPDATE live_rows SET flags=flags|1 WHERE id IN (SELECT id FROM identities WHERE path=?1)",
         [f.p("denied").as_os_str().as_bytes()],
     )
     .unwrap();
     c.execute(
-        "UPDATE versions SET flags=flags|1 WHERE path=?1 AND dead IS NULL",
+        "UPDATE version_rows SET flags=flags|1 WHERE id IN (SELECT id FROM identities WHERE path=?1) AND dead IS NULL",
         [f.p("denied").as_os_str().as_bytes()],
     )
     .unwrap();
@@ -482,14 +482,15 @@ fn mount_placeholder_and_nested_root_with_identical_paths_stay_distinct() {
     let id: i64 = c
         .query_row("SELECT id FROM live WHERE path=?1", [raw], |r| r.get(0))
         .unwrap();
-    c.execute("UPDATE versions SET kind=4 WHERE id=?1", [id])
+    c.execute("UPDATE version_rows SET kind=4 WHERE id=?1", [id])
         .unwrap();
     c.execute(
         "INSERT INTO mount_versions VALUES(?1,?2,'testfs',123,456,1,NULL)",
         rusqlite::params![id, raw],
     )
     .unwrap();
-    c.execute("INSERT INTO versions SELECT ?1,NULL,path,sort_key,1,0,own_allocated,own_apparent,own_errors,mtime,scanned_at,999,999,0,0,min_scanned_at,newest_mtime,path,nlink,dev,ino,born,dead FROM versions WHERE id=?2", rusqlite::params![id+10000, id]).unwrap();
+    c.execute("INSERT INTO identities(id,scope,path,sort_key) SELECT ?1,path,path,sort_key FROM identities WHERE id=?2", rusqlite::params![id+10000, id]).unwrap();
+    c.execute("INSERT INTO version_rows SELECT ?1,NULL,1,0,own_allocated,own_apparent,own_errors,mtime,scanned_at,999,999,0,0,min_scanned_at,newest_mtime,nlink,dev,ino,born,dead,basename FROM version_rows WHERE id=?2", rusqlite::params![id+10000, id]).unwrap();
     c.execute("INSERT INTO root_versions SELECT ?1,?2,dev,'testfs',456,333,333,123,inodes_total,inodes_free,1,born,dead FROM root_versions", rusqlite::params![id+10000, raw]).unwrap();
     drop(c);
     let reader = Reader::open(&path).unwrap();
@@ -614,7 +615,7 @@ fn global_denied_paths_follow_configured_root_order() {
         .unwrap();
     drop(c);
     let c = rusqlite::Connection::open(&path).unwrap();
-    c.execute("UPDATE versions SET flags=flags|1 WHERE kind=1", [])
+    c.execute("UPDATE version_rows SET flags=flags|1 WHERE kind=1", [])
         .unwrap();
     drop(c);
     let reader = Reader::open(&path).unwrap();

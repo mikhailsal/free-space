@@ -15,6 +15,8 @@ pub(super) struct Report {
     pub(super) interval: String,
     pub(super) at: String,
     pub(super) keep_previous: bool,
+    pub(super) low_memory: bool,
+    pub(super) low_memory_reason: String,
     pub(super) snapshot_dir: String,
     pub(super) user: Option<String>,
     /// "acl", "group" (re-login needed) or "none".
@@ -39,6 +41,11 @@ pub(super) fn print(report: &Report, json: bool) -> output::Result<()> {
         output::escape(&report.interval),
         output::escape(&report.at),
         report.keep_previous
+    ));
+    out.push_str(&format!(
+        "  low_memory {} ({})\n",
+        report.low_memory,
+        output::escape(&report.low_memory_reason)
     ));
     let who = match (&report.user, report.access.as_str()) {
         (Some(u), "acl") => format!("read access for {} (ACL)", output::escape(u)),

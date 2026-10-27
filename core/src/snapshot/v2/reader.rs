@@ -5,6 +5,18 @@ use schema::COLUMNS;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+// Start with the sparse denied index; root/identity joins must not scan all entries.
+pub(super) const DENIED_QUERY: &str = "SELECT i.path FROM version_rows v INDEXED BY versions_denied CROSS JOIN identities i ON i.id=v.id WHERE i.scope=?1 AND (v.flags & 1)!=0 AND v.born<=?2 AND (v.dead IS NULL OR v.dead>?2) ORDER BY i.sort_key,v.born";
+
+// Start with the sparse denied index; root/identity joins must not scan all entries.
+pub(super) const UNKNOWN_SUBTREES_QUERY: &str = "SELECT i.scope,i.sort_key,i.path FROM version_rows v INDEXED BY versions_denied CROSS JOIN identities i ON i.id=v.id CROSS JOIN root_versions r ON r.path=i.scope AND r.born<=?1 AND (r.dead IS NULL OR r.dead>?1) WHERE (v.flags & 1)!=0 AND v.born<=?1 AND (v.dead IS NULL OR v.dead>?1) ORDER BY r.ordinal,i.sort_key";
+
+pub(super) fn children_sql() -> String {
+    format!(
+        "SELECT {COLUMNS} FROM child_versions WHERE parent=?1 AND born<=?2 AND (dead IS NULL OR dead>?2) ORDER BY basename"
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GenerationPair {
     pub current: i64,
@@ -133,7 +145,7 @@ impl Reader {
             return Ok(Vec::new());
         };
         let g = self.generation(previous)?;
-        let mut q=self.conn.prepare(&format!("SELECT {COLUMNS} FROM versions WHERE parent=?1 AND born<=?2 AND (dead IS NULL OR dead>?2) ORDER BY sort_key"))?;
+        let mut q = self.conn.prepare(&children_sql())?;
         Ok(q.query_map(params![parent.id, g], Entry::row)?
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
@@ -185,7 +197,7 @@ impl Reader {
     /// Stream every denied entry in configured-root/preorder order, including
     /// nested denied entries. The caller chooses its report representation.
     pub fn visit_denied(&self, mut visit: impl FnMut(&[u8]) -> Result<()>) -> Result<()> {
-        let mut q = self.conn.prepare("SELECT path FROM versions WHERE scope=?1 AND (flags & 1)!=0 AND born<=?2 AND (dead IS NULL OR dead>?2) ORDER BY sort_key,born")?;
+        let mut q = self.conn.prepare(DENIED_QUERY)?;
         for root in self.roots(false)? {
             let mut rows = q.query(params![root.path, self.generations.current])?;
             while let Some(row) = rows.next()? {
@@ -204,7 +216,7 @@ impl Reader {
     /// Global incompleteness and capped non-nested denied paths, from the pin.
     pub fn unknown_subtrees(&self, previous: bool, cap: usize) -> Result<(bool, Vec<Vec<u8>>)> {
         let g = self.generation(previous)?;
-        let mut q=self.conn.prepare("SELECT e.scope,e.sort_key,e.path FROM versions e JOIN root_versions r ON r.path=e.scope AND r.born<=?1 AND (r.dead IS NULL OR r.dead>?1) WHERE (e.flags & 1)!=0 AND e.born<=?1 AND (e.dead IS NULL OR e.dead>?1) ORDER BY r.ordinal,e.sort_key")?;
+        let mut q = self.conn.prepare(UNKNOWN_SUBTREES_QUERY)?;
         let mut rows = q.query([g])?;
         let mut paths = Vec::new();
         let mut enclosing: Option<(Vec<u8>, Vec<u8>)> = None;
