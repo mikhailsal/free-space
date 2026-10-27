@@ -7,7 +7,8 @@ Full scans support `--low-memory`, using disk staging and a depth stack.
 Earlier revision-4 runs traded slower full scans and larger retained storage
 for local updates; see the [historical CLI comparison](benchmarks.md#complete-cli-refresh-with-v2-2026-10-26).
 The current revision-5 layout normalizes immutable paths and uses compact keys;
-its storage and performance results are pending container verification. Enable
+its [GitHub container evidence](benchmarks.md#github-container-storage-balance-2026-10-27)
+records substantial storage savings and the limits of the comparison. Enable
 disk staging on machines with limited RAM and budget for database/WAL space as
 well as the temporary staging file.
 
@@ -94,8 +95,10 @@ Historical metadata and child names still consume space. Queries join identity
 data to metadata; current refresh sorts its selected subtree, and historical
 queries can inspect obsolete retained records. Maintenance remains explicit.
 See the [storage design](designs/refresh-v2-migration.md#storage-and-api-contract)
-for access paths and remaining costs. Revision-5 measurements are pending;
-no size, speed or peak-memory improvement is claimed yet.
+for access paths and remaining costs. The [container measurements](benchmarks.md#github-container-storage-balance-2026-10-27)
+quantify these costs. The million-file candidate completed its CLI commands at
+128 MiB without OOM; the overall comparison run remains failed because of
+comparator failures and the observer guard described in that report.
 
 ## Generations and refresh
 

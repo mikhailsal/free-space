@@ -591,7 +591,8 @@ compares baseline `036fd2b7cb223a212dc3c68d78d4400d74ab793a` against
 1.99.1, Bun 1.4.2 and `cargo build --release --locked -p freespace`.
 The candidate binary SHA-256 is
 `ef5d5e9b773ff1e427c59a8a79e1d052ff23e2f89db7251b9e5171d7b06608b7`;
-full provenance is in the [raw pilot records](benchmark-results/v2-storage-pilot-2026-10-27.json).
+full provenance is in the [raw pilot records](benchmark-results/v2-storage-pilot-2026-10-27.json.gz).
+The archived records are gzip-compressed JSON; decompress with `gzip -dc FILE.json.gz`.
 These are GNU/glibc builds, not measurements of the distributed static musl binary.
 
 All comparison arms run sequentially on the same GitHub-hosted VM, each in a
@@ -610,7 +611,9 @@ fixture creation, scans and immutable SQLite observations. It makes no cold-cach
 claim. GNU time reports each CLI's peak RSS; cgroup peak includes preparation and
 all earlier activity in that arm. Complete wall time includes process start and
 last-writer close/checkpoint, while observations run outside timed spans. Disk
-peaks sampled every 20 ms are lower bounds. Class maxima must not be added to
+peaks sampled every 20 ms are lower bounds for named files under `snapshot_dir`;
+temporary files elsewhere and already-unlinked files are outside this metric.
+It is not a hard bound on all process disk use. Class maxima must not be added to
 reconstruct a simultaneous total; the reported total is sampled concurrently.
 Short refresh WAL activity can be missed entirely by this sampler.
 
@@ -655,19 +658,80 @@ method evidence, not the optimized candidate's timing baseline. The candidate
 pilot builds its own paired baseline with Rust 1.99.1. Its disk reductions are
 consistent across both repeats/settings, and measured timing ranges improve
 substantially, but two repeats do not establish tight confidence intervals or
-predict another machine's latency. [Raw control records](benchmark-results/v2-storage-control-2026-10-27.json)
+predict another machine's latency. [Raw control records](benchmark-results/v2-storage-control-2026-10-27.json.gz)
 preserve the unchanged-arm evidence.
 
-### Million-file confirmation
+### Million-file command evidence
 
-Confirmation with the same scanner binaries and a 128 MiB no-swap container is
-pending. Initial attempts exhausted memory while creating fixtures, before any
-freespace command; they provide no scanner performance or memory-limit result.
-The repaired protocol prepares fixtures on the dedicated GitHub-hosted VM,
-syncs closed files, and requests an OS page/dentry/inode cache drop before each
-arm. CLI/helper/observer memory remains constrained; setup memory is excluded.
-Active pages and hardware caches are not reset. This protocol differs from the
-warm 256 MiB pilot and its timings must not be pooled with that pilot.
+[Run 40418037469](https://github.com/mikhailsal/free-space/actions/runs/40418037469)
+uses source `770730769b9a66986b25fff63236730e7a20d22d`, whose scanner binaries
+have the same hashes as the accepted pilot. Each arm uses a fresh 2-CPU,
+128 MiB no-swap container, one repeat per `keep_previous` setting, two low-memory
+full scans and an 18-entry refresh. Each report covers 1,001,020 entries,
+including one million unrelated files. Fixtures are prepared outside the
+measured container on the dedicated GitHub-hosted VM; all six sync/cache-drop
+receipts succeeded. Cache then remains in the arm cgroup across commands and
+immutable observations. Active pages and hardware caches are not reset.
+The cgroup peak here excludes host fixture preparation, while including the
+CLI, helper and observations. This differs from the warm 256 MiB pilot;
+latencies must not be pooled across these protocols.
+
+**The overall comparison run failed.** It contains 15 of 18 expected command
+records: 13 valid CLI results, two failed v1 refreshes and three old-v2 commands
+not reached after observer failures. All six candidate-v2 CLI commands completed
+with valid counts, zero errors/incompleteness and zero OOM events. The two v1
+refreshes were killed with OOM; one also reached the watchdog timeout. Their
+elapsed times are failure diagnostics, never completed latency samples.
+
+Four post-command observer guards rejected a decrease in allocated SHM blocks
+from 36,864 to 32,768 bytes. In each case the only changed occupancy field was
+`generations.db-shm` allocation; its logical size stayed 32,768, and every other
+file name, logical size and allocation stayed the same. This is evidence of an
+overstrict allocation-equality guard, not retrospective proof of byte identity:
+this protocol captured no pre/post content hashes. The failed status is retained
+in the [complete records](benchmark-results/v2-storage-confirmation-2026-10-27.json.gz).
+The following values come only from independently validated CLI records,
+collected before their subsequent observation; they do not assert an all-green
+comparison workflow.
+
+| Million-file command | Baseline v2 logical DB | Revision-5 logical DB | Baseline sampled directory peak | Revision-5 sampled directory peak |
+| --- | ---: | ---: | ---: | ---: |
+| First full scan, `keep_previous=true` | 1,116.29 MB | 452.03 MB | 2,241.26 MB | 907.55 MB |
+| Second full scan, `keep_previous=true` | 1,658.00 MB | 558.32 MB | 3,186.63 MB | 852.41 MB |
+
+The logical DB is **59.5% smaller** after seeding and **66.3% smaller** after the
+second scan. These values preserve the same current/history cardinalities.
+Observed directory peaks fall about 59.5% and 73.3%, respectively; they remain
+sampled lower bounds for named snapshot-directory files. No hard process disk
+cap or maintenance steady state was established.
+
+| Complete command, `keep_previous=true` | Baseline v1 | Baseline v2 | Revision-5 v2 |
+| --- | ---: | ---: | ---: |
+| First low-memory scan | 42.20 s | 169.65 s | 122.95 s |
+| Second low-memory scan | 40.99 s | 250.21 s | 96.83 s |
+| 18-entry refresh | Failed: OOM plus timeout | Not reached after observer guard | 30.82 ms |
+
+With `keep_previous=false`, candidate scans complete in 101.75 and 96.13 seconds,
+and refresh in 23.36 ms. Candidate scan RSS spans 22.18–25.63 MiB, refresh
+8.00–8.33 MiB; the configured cgroup limit remains 128 MiB and its peak reaches
+that limit. Completion under this budget does not imply spare memory or another
+machine's latency. A single repeat per setting establishes no tight latency
+confidence interval. V1's valid scans remain faster and its DB remains smaller;
+no finite million-file v1 refresh speedup is derived from its failed executions.
+
+Earlier 128 MiB attempts failed during fixture generation before any freespace
+command; they provide no scanner performance or memory-limit result. The host
+fixture/cold-cache protocol above separates that preparation cost from the CLI.
+The observer repair now checks names, logical sizes and bounded SHA-256 content
+inventories, recording allocation drift independently. Integrity reads occur
+outside CLI timing but affect subsequent cache state, so the repaired protocol
+is separately versioned. [Diagnostic run 40426917945](https://github.com/mikhailsal/free-space/actions/runs/40426917945)
+passed both baseline/candidate observers on OS-enforced read-only mounts, with
+identical pre/post SHA-256 inventories and EROFS write/create probes. Four
+regressions verify allocation-only drift acceptance and rejection of same-size
+byte, name and logical-size mutations. [Diagnostic records](benchmark-results/v2-observer-check-2026-10-27.json.gz)
+are correctness evidence, not another million-file performance sample. This does
+not retroactively supply hashes or a passing status for the earlier comparison.
 
 History still grows on repeated full scans, including `keep_previous=false`:
 that option removes the public comparison generation, while obsolete physical

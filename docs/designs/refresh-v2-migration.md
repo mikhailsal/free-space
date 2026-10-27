@@ -45,10 +45,12 @@ snapshot files. Final publication checks are pending. See
 9. **Measured earlier layout:** complete CLI refresh scaling and constrained-memory full scans
    from source `575044b6`; raw manifests/reports and tradeoffs are archived in
    `docs/benchmarks.md`. These results do not measure the revision-5 layout.
-10. **Implemented candidate, measurements pending:** normalize immutable entry
+10. **Implemented and measured candidate:** normalize immutable entry
     data, compact component keys, retain indexed child ordering through raw
     basenames, traverse only current parent links during refresh, and skip staged
-    child probes for non-directory rows. Final CI and publication checks remain.
+    child probes for non-directory rows. GitHub command evidence is recorded in
+    `docs/benchmarks.md`; the failed full comparison is qualified there. Final
+    publication checks remain.
 
 Validation commands:
 
@@ -265,9 +267,11 @@ only the backend flag cannot make a revision-5 binary read revision 4. The
 sequence. No v1 file or earlier published inode is mutated or silently migrated,
 and no whole-snapshot rewrite fallback is introduced.
 
-Revision-5 performance and storage results are pending container verification.
-The revision-4 evidence below and earlier integrated CLI comparisons describe
-their recorded sources, not this candidate.
+Revision-5 [GitHub container records](../benchmarks.md#github-container-storage-balance-2026-10-27)
+include an accepted paired 100k pilot and qualified million-file command evidence.
+The latter candidate completed all six CLI commands without OOM at 128 MiB; its
+full comparison workflow failed on observer allocation guards and v1 failures.
+The revision-4 evidence below describes its recorded source, not this candidate.
 
 `walk` includes filesystem preparation and raw in-memory staging; full scans
 also fold and attribute their seed there. Refresh attribution/folding and
@@ -305,8 +309,8 @@ and lifetimes are:
 The staged visitor queries children only for directory rows. Files, symlinks,
 mount placeholders and other non-directory leaves still receive enter/leave
 callbacks and contribute to their parent, but do not issue empty child probes.
-This removes SQL work structurally; its effect on full-scan throughput has not
-yet been measured for revision 5.
+The GitHub comparison measures this together with normalization, not its
+isolated contribution to throughput.
 
 SQLite cache values are targets, not process RSS caps. Ancestor path/key storage
 can grow quadratically with extreme depth, but not with unrelated entry count.
