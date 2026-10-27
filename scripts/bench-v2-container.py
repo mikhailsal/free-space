@@ -2,7 +2,9 @@
 """GitHub-runner Docker benchmark. Never use the loaded development host.
 
 Host: --baseline BIN --candidate BIN --output DIR [--steps 100000,1000000]
-      [--memory 128|256|512] [--repeats 2] [--include-v1]
+      [--memory 128|256|512|4096] [--repeats 2] [--include-v1]
+      [--current-backends] [--scan-profile disk|memory|both]
+      [--keep-previous both|true|false]
 Each comparison arm receives a fresh 2-CPU, no-swap cgroup; bind-mounted fixtures
 and snapshots bypass overlayfs. On a dedicated ephemeral GitHub-hosted VM,
 host fixture setup is synced and caches dropped before each arm container.
@@ -10,7 +12,6 @@ Peaks sampled at 20ms are lower bounds; cgroup memory.peak is arm-cumulative
 for CLI/helper/observations, excluding host setup. RSS covers each CLI process.
 """
 
-import argparse
 from contextlib import closing
 import hashlib
 import json
@@ -26,6 +27,8 @@ import tempfile
 import threading
 import time
 import uuid
+
+from bench_v2_config import parse_arguments, profile_arguments
 
 
 def dump(path, value):
@@ -129,7 +132,7 @@ def measured_command(spec):
     dump(output / "cgroup-start.json", dict(path=str(group), metrics=before))
     command = ["/binary", "--backend", spec["backend"], spec["operation"], spec["target"],
                "--workers", "1", "--json"]
-    if spec["operation"] == "scan":
+    if spec["operation"] == "scan" and spec.get("scan_profile", "disk") == "disk":
         command.append("--low-memory")
     env = dict(os.environ, LC_ALL="C", FREESPACE_CONFIG="/scratch/config.toml",
                FREESPACE_SNAPSHOT_DIR="/scratch/snapshot")
@@ -369,15 +372,20 @@ def host(args):
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     harness = Path(__file__).resolve()
-    binaries = {"baseline-v2": (Path(args.baseline).resolve(), "v2"),
-                "candidate-v2": (Path(args.candidate).resolve(), "v2")}
-    if args.include_v1:
-        binaries["baseline-v1"] = (Path(args.baseline).resolve(), "v1")
+    if args.current_backends:
+        binaries = {"candidate-v1": (Path(args.candidate).resolve(), "v1"),
+                    "candidate-v2": (Path(args.candidate).resolve(), "v2")}
+    else:
+        binaries = {"baseline-v2": (Path(args.baseline).resolve(), "v2"),
+                    "candidate-v2": (Path(args.candidate).resolve(), "v2")}
+        if args.include_v1:
+            binaries["baseline-v1"] = (Path(args.baseline).resolve(), "v1")
     image = "freespace-balance:" + uuid.uuid4().hex
     subprocess.run(["docker", "build", "-t", image, str(harness.parent / "bench-v2-container")], check=True, timeout=600)
     failures = []
     completed = False
     manifest = dict(schema_version=1, arguments=vars(args), kernel=platform.release(),
+        scan_profile=args.scan_profile,
         measurement_protocol="host-setup-cold-arm-integrity-v3", cache_flush_receipts=[],
         started_unix_seconds=time.time(),
         cpu=Path("/proc/cpuinfo").read_text(), docker=capture(["docker", "version"]),
@@ -385,7 +393,8 @@ def host(args):
         resource_policy="dedicated ephemeral GitHub-hosted VM; host setup excluded; each arm has 2 CPU quota, selected RAM MiB, memory-swap=memory, no OOM override",
         cache_policy="host-generated deterministic fixture, os.sync every 10000 files and at completion; os.sync then sudo -n tee /proc/sys/vm/drop_caches with input 3 before each arm on this job's ephemeral VM only; failure aborts, never warm fallback; clean OS input caches requested dropped (active pages and hardware caches not reset), then cache retained across CLI processes, full-file SHA256 reads before/after immutable post-command dbstat; integrity reads outside CLI timing warm/evict cache; alternating paired arm order",
         measurement_policy="complete CLI incl close/checkpoint; helper shares cgroup; memory.peak arm-cumulative CLI/helper/observations excluding host fixture generation; per-command sampled current lower bound and GNU time RSS; disk peaks sampled lower bounds",
-        provenance={arm: dict(sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
+        provenance={arm: dict(scan_profile=args.scan_profile,
+                     sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                      source_revision=binary.with_name(binary.name + ".revision.txt").read_text().strip(),
                      version=capture([str(binary), "--version"])) for arm, (binary, _) in binaries.items()},
         github={key: os.environ.get(key) for key in ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_OS", "RUNNER_ENVIRONMENT")})
@@ -396,7 +405,8 @@ def host(args):
             manifest["filesystem"] = capture(["findmnt", "-T", str(scratch), "-J", "-o", "TARGET,SOURCE,FSTYPE,OPTIONS"])
             dump(output / "manifest.json", manifest)
             ordinal = 0
-            for keep in (False, True):
+            keeps = (False, True) if args.keep_previous == "both" else (args.keep_previous == "true",)
+            for keep in keeps:
                 for repeat in range(args.repeats):
                     for step_index, count in enumerate(steps):
                         arms = list(binaries)
@@ -414,7 +424,7 @@ def host(args):
                                 ident = f"{ordinal:04}-{arm}-{count}-keep{int(keep)}-r{repeat + 1}"
                                 binary, backend = binaries[arm]
                                 operations = ["scan"] * args.scans + ["refresh"]
-                                spec = dict(id=ident, arm=arm, backend=backend,
+                                spec = dict(id=ident, arm=arm, backend=backend, scan_profile=args.scan_profile,
                                     expected_entries=count + (count + 999) // 1000 + 20,
                                     operations=operations, memory_mib=args.memory,
                                     keep_previous=keep, repeat=repeat + 1, files=count,
@@ -470,17 +480,17 @@ def host(args):
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--inside":
         return inside(Path(sys.argv[2]))
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline", required=True)
-    parser.add_argument("--candidate", required=True)
-    parser.add_argument("--output", required=True)
-    parser.add_argument("--steps", default="100000")
-    parser.add_argument("--memory", type=int, choices=(128, 256, 512), default=256)
-    parser.add_argument("--repeats", type=int, default=2)
-    parser.add_argument("--scans", type=int, default=3)
-    parser.add_argument("--timeout-seconds", type=int, default=900)
-    parser.add_argument("--include-v1", action="store_true")
-    return host(parser.parse_args())
+    args = parse_arguments(__doc__)
+    if args.scan_profile != "both":
+        return host(args)
+    output = Path(args.output).resolve()
+    if output.exists():
+        raise FileExistsError(f"output already exists: {output}")
+    results = {}
+    for profile in ("memory", "disk"):
+        results[profile] = host(profile_arguments(args, profile, output))
+    dump(output / "status.json", dict(success=not any(results.values()), profiles=results))
+    return 1 if any(results.values()) else 0
 
 
 if __name__ == "__main__":

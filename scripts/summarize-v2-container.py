@@ -43,7 +43,7 @@ def main():
         row = json.loads(path.read_text())
         match = re.search(r"-(\d+)-(scan|refresh)$", row.get("id", ""))
         ordinal = int(match[1]) + 1 if match else 0
-        key = (row["arm"], row["keep_previous"], row["files"], ordinal, row["operation"])
+        key = (row.get("scan_profile", "disk"), row["arm"], row["keep_previous"], row["files"], ordinal, row["operation"])
         groups[key].append(row)
     for path in sorted(args.directory.rglob("*.spec.json")):
         spec = json.loads(path.read_text())
@@ -59,10 +59,10 @@ def main():
     scopes = sorted({row.get("memory_peak_scope", "unspecified in artifact")
                      for rows in groups.values() for row in rows})
     print("Cgroup peak scope from raw artifacts: " + "; ".join(scopes) + ". RSS is per CLI.")
-    print("\n| arm | keep | files | command | valid/rows | elapsed | RSS | cgroup peak | sampled current peak |")
-    print("|---|---|---:|---|---:|---|---|---|---|")
+    print("\n| scan profile | arm | keep | files | command | valid/rows | elapsed | RSS | cgroup peak | sampled current peak |")
+    print("|---|---|---|---:|---|---:|---|---|---|---|")
     for key, rows in sorted(groups.items()):
-        arm, keep, files, ordinal, operation = key
+        profile, arm, keep, files, ordinal, operation = key
         accepted = [row for row in rows if valid(row)]
         count = len(accepted)
         if count != len(rows):
@@ -70,13 +70,13 @@ def main():
         rss = [row["time"]["peak_rss_kib"] for row in accepted if "peak_rss_kib" in row.get("time", {})]
         cg = [int(row["cgroup_after"]["memory.peak"]) for row in accepted if "memory.peak" in row.get("cgroup_after", {})]
         current = [row["sampled_memory_peak"] for row in accepted if "sampled_memory_peak" in row]
-        print(f"| {arm} | {str(keep).lower()} | {files} | {ordinal}:{operation} | {count}/{len(rows)} | "
+        print(f"| {profile} | {arm} | {str(keep).lower()} | {files} | {ordinal}:{operation} | {count}/{len(rows)} | "
               f'{span([row["elapsed_seconds"] for row in accepted])} | {span(rss, 1024)} | '
               f"{span(cg, 1048576)} | {span(current, 1048576)} |")
     for key, rows in sorted(groups.items()):
-        arm, keep, files, ordinal, operation = key
+        profile, arm, keep, files, ordinal, operation = key
         accepted = [row for row in rows if valid(row)]
-        print(f"\n{arm}, keep_previous={str(keep).lower()}, files={files}, command={ordinal}:{operation}")
+        print(f"\nscan_profile={profile}, {arm}, keep_previous={str(keep).lower()}, files={files}, command={ordinal}:{operation}")
         print("\n| component | peak logical | peak allocated | end logical | end allocated |")
         print("|---|---|---|---|---|")
         for component in ("total", "db", "wal", "stage", "shm", "other"):
