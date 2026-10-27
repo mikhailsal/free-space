@@ -68,6 +68,38 @@ def file_occupancy(snapshot):
     return result
 
 
+def snapshot_integrity(snapshot):
+    """Hash named regular files in bounded chunks, outside command timing."""
+    result = {}
+    for file in sorted(snapshot.rglob("*")):
+        if not file.is_file():
+            continue
+        before = file.stat()
+        digest = hashlib.sha256()
+        with file.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        after = file.stat()
+        if before.st_size != after.st_size:
+            raise RuntimeError(f"file size changed while hashing {file}")
+        result[str(file.relative_to(snapshot))] = dict(logical_bytes=after.st_size,
+                                                       sha256=digest.hexdigest())
+    return result
+
+
+def observer_comparison(before_integrity, after_integrity, before_allocation, after_allocation):
+    # st_blocks can settle asynchronously after a writer exits. It remains a
+    # measurement, not a substitute for logical/content mutation detection.
+    return dict(integrity_before=before_integrity, integrity_after=after_integrity,
+                files_before=before_allocation, files_after=after_allocation,
+                logical_content_unchanged=before_integrity == after_integrity,
+                files_unchanged=before_allocation == after_allocation,
+                allocation_drift={name: dict(before=before_allocation.get(name),
+                                             after=after_allocation.get(name))
+                                  for name in sorted(before_allocation.keys() | after_allocation.keys())
+                                  if before_allocation.get(name) != after_allocation.get(name)})
+
+
 def cgroup():
     relative = next(line[3:] for line in Path("/proc/self/cgroup").read_text().splitlines()
                     if line.startswith("0::"))
@@ -305,18 +337,19 @@ def inside(spec_path):
         code = measured_command(command_spec)
         # SQLite uses a read-only connection and no checkpoint PRAGMA. This
         # observation can warm/evict cache; record it rather than reset cache.
-        before_files = file_occupancy(Path("/scratch/snapshot"))
-        observation = dict(cache_policy="immutable post-command observation only with absent/zero WAL; cache retained in arm cgroup",
-                           files_before=before_files,
+        snapshot = Path("/scratch/snapshot")
+        before_integrity = snapshot_integrity(snapshot)
+        before_files = file_occupancy(snapshot)
+        observation = dict(cache_policy="bounded full-file integrity reads then immutable observer then integrity reads; outside CLI timing, cache retained in arm cgroup",
                            cgroup_before=cg_read(group),
-                           databases=db_breakdown(Path("/scratch/snapshot")),
+                           databases=db_breakdown(snapshot),
                            cgroup_after=cg_read(group))
-        after_files = file_occupancy(Path("/scratch/snapshot"))
-        observation["files_after"] = after_files
-        observation["files_unchanged"] = before_files == after_files
+        after_integrity = snapshot_integrity(snapshot)
+        after_files = file_occupancy(snapshot)
+        observation.update(observer_comparison(before_integrity, after_integrity, before_files, after_files))
         dump(Path("/results") / command_spec["id"] / "dbstat.json", observation)
-        if before_files != after_files:
-            raise RuntimeError("SQLite observation changed snapshot file occupancy")
+        if not observation["logical_content_unchanged"]:
+            raise RuntimeError("SQLite observation changed snapshot names, logical sizes or bytes")
         if code:
             return code
     final = cg_read(group)
@@ -345,12 +378,12 @@ def host(args):
     failures = []
     completed = False
     manifest = dict(schema_version=1, arguments=vars(args), kernel=platform.release(),
-        measurement_protocol="host-setup-cold-arm-v2", cache_flush_receipts=[],
+        measurement_protocol="host-setup-cold-arm-integrity-v3", cache_flush_receipts=[],
         started_unix_seconds=time.time(),
         cpu=Path("/proc/cpuinfo").read_text(), docker=capture(["docker", "version"]),
         image=capture(["docker", "image", "inspect", image]),
         resource_policy="dedicated ephemeral GitHub-hosted VM; host setup excluded; each arm has 2 CPU quota, selected RAM MiB, memory-swap=memory, no OOM override",
-        cache_policy="host-generated deterministic fixture, os.sync every 10000 files and at completion; os.sync then sudo -n tee /proc/sys/vm/drop_caches with input 3 before each arm on this job's ephemeral VM only; failure aborts, never warm fallback; clean OS input caches requested dropped (active pages and hardware caches not reset), then cache retained across CLI processes and immutable post-command dbstat; alternating paired arm order",
+        cache_policy="host-generated deterministic fixture, os.sync every 10000 files and at completion; os.sync then sudo -n tee /proc/sys/vm/drop_caches with input 3 before each arm on this job's ephemeral VM only; failure aborts, never warm fallback; clean OS input caches requested dropped (active pages and hardware caches not reset), then cache retained across CLI processes, full-file SHA256 reads before/after immutable post-command dbstat; integrity reads outside CLI timing warm/evict cache; alternating paired arm order",
         measurement_policy="complete CLI incl close/checkpoint; helper shares cgroup; memory.peak arm-cumulative CLI/helper/observations excluding host fixture generation; per-command sampled current lower bound and GNU time RSS; disk peaks sampled lower bounds",
         provenance={arm: dict(sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                      source_revision=binary.with_name(binary.name + ".revision.txt").read_text().strip(),

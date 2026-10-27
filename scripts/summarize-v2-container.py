@@ -63,17 +63,19 @@ def main():
     print("|---|---|---:|---|---:|---|---|---|---|")
     for key, rows in sorted(groups.items()):
         arm, keep, files, ordinal, operation = key
-        count = sum(valid(row) for row in rows)
+        accepted = [row for row in rows if valid(row)]
+        count = len(accepted)
         if count != len(rows):
             issues.append(f"invalid command rows: {key}: {len(rows) - count}")
-        rss = [row["time"]["peak_rss_kib"] for row in rows if "peak_rss_kib" in row.get("time", {})]
-        cg = [int(row["cgroup_after"]["memory.peak"]) for row in rows if "memory.peak" in row.get("cgroup_after", {})]
-        current = [row["sampled_memory_peak"] for row in rows if "sampled_memory_peak" in row]
+        rss = [row["time"]["peak_rss_kib"] for row in accepted if "peak_rss_kib" in row.get("time", {})]
+        cg = [int(row["cgroup_after"]["memory.peak"]) for row in accepted if "memory.peak" in row.get("cgroup_after", {})]
+        current = [row["sampled_memory_peak"] for row in accepted if "sampled_memory_peak" in row]
         print(f"| {arm} | {str(keep).lower()} | {files} | {ordinal}:{operation} | {count}/{len(rows)} | "
-              f'{span([row["elapsed_seconds"] for row in rows])} | {span(rss, 1024)} | '
+              f'{span([row["elapsed_seconds"] for row in accepted])} | {span(rss, 1024)} | '
               f"{span(cg, 1048576)} | {span(current, 1048576)} |")
     for key, rows in sorted(groups.items()):
         arm, keep, files, ordinal, operation = key
+        accepted = [row for row in rows if valid(row)]
         print(f"\n{arm}, keep_previous={str(keep).lower()}, files={files}, command={ordinal}:{operation}")
         print("\n| component | peak logical | peak allocated | end logical | end allocated |")
         print("|---|---|---|---|---|")
@@ -83,7 +85,7 @@ def main():
                                      ("sampled_disk_peak", "allocated_bytes"),
                                      ("endpoint_disk", "logical_bytes"),
                                      ("endpoint_disk", "allocated_bytes")):
-                values.append(span([row[metric][component][quantity] for row in rows
+                values.append(span([row[metric][component][quantity] for row in accepted
                                     if quantity in row.get(metric, {}).get(component, {})], 1048576))
             print(f'| {component} | {" | ".join(values)} |')
         print()
