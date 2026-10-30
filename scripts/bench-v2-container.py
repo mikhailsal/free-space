@@ -455,16 +455,20 @@ def host(args):
                     "candidate-v2": (Path(args.candidate).resolve(), "v2")}
         if args.include_v1:
             binaries["baseline-v1"] = (Path(args.baseline).resolve(), "v1")
+    benchmark_label = "freespace.benchmark=" + (os.environ.get("FREESPACE_BENCHMARK_RUN_TOKEN")
+        or os.environ.get("GITHUB_RUN_ID") or uuid.uuid4().hex)
     image = "freespace-balance:" + uuid.uuid4().hex
     subprocess.run(["docker", "build", "-t", image, str(harness.parent / "bench-v2-container")], check=True, timeout=600)
     failures = []
     completed = False
     manifest = dict(schema_version=1, arguments=vars(args), kernel=platform.release(),
+        benchmark_label=benchmark_label,
         scan_profile=args.scan_profile,
         measurement_protocol="host-shared-fixture-cold-arm-integrity-v4", cache_flush_receipts=[],
         io_device=str(io_device) if io_device else None, io_device_number=io_device_number, io_limits=io_limits,
         started_unix_seconds=time.time(),
-        cpu=Path("/proc/cpuinfo").read_text(), docker=capture(["docker", "version"]),
+        cpu=Path("/proc/cpuinfo").read_text(), host_meminfo=Path("/proc/meminfo").read_text(),
+        docker=capture(["docker", "version"]),
         image=capture(["docker", "image", "inspect", image]),
         resource_policy=f"dedicated ephemeral GitHub-hosted VM; host setup excluded; each arm has {args.cpus} CPU quota, selected RAM MiB, memory-swap=memory, no OOM override; requested I/O limits verified in cgroup io.max",
         cache_policy="host-generated deterministic fixture, os.sync every 10000 files and at completion; os.sync then sudo -n tee /proc/sys/vm/drop_caches with input 3 before each arm on this job's ephemeral VM only; failure aborts, never warm fallback; clean OS input caches requested dropped (active pages and hardware caches not reset), then cache retained across CLI processes, full-file SHA256 reads before/after immutable post-command dbstat; integrity reads outside CLI timing warm/evict cache; alternating paired arm order",
@@ -528,7 +532,8 @@ def host(args):
                                         dump(output / "manifest.json", manifest)
                                 name = "fs-balance-" + uuid.uuid4().hex
                                 print(f"running {ident}: memory={args.memory}MiB CPUs={args.cpus} workers={args.workers} swap=0", flush=True)
-                                command = ["docker", "run", "--name", name, "--network", "none", "--cpus", str(args.cpus),
+                                command = ["docker", "run", "--name", name, "--label", benchmark_label,
+                                    "--network", "none", "--cpus", str(args.cpus),
                                     "--memory", f"{args.memory}m", "--memory-swap", f"{args.memory}m",
                                     "--cgroupns", "private", "--pids-limit", "128", "--user", f"{os.getuid()}:{os.getgid()}",
                                     "--mount", f"type=bind,src={case},dst=/scratch",

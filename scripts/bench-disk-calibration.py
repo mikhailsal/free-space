@@ -24,7 +24,9 @@ def run(args):
     device_number = f"{os.major(device_stat.st_rdev)}:{os.minor(device_stat.st_rdev)}"
     limits = dict(rbps=33554432, wbps=16777216, riops=1000, wiops=500) if args.profile == "limited" else {}
     name = "freespace-calibration-" + uuid.uuid4().hex
-    command = ["docker", "run", "-d", "--name", name, "--network", "none",
+    benchmark_label = "freespace.benchmark=" + (os.environ.get("FREESPACE_BENCHMARK_RUN_TOKEN")
+        or os.environ.get("GITHUB_RUN_ID") or uuid.uuid4().hex)
+    command = ["docker", "run", "-d", "--name", name, "--label", benchmark_label, "--network", "none",
                "--cpus", "2", "--memory", "4096m", "--memory-swap", "4096m",
                "--cgroupns", "private", "--mount", f"type=bind,src={args.directory},dst=/disk",
                "--entrypoint", "sleep"]
@@ -33,6 +35,7 @@ def run(args):
             command += ["--device-" + flag, f"{args.device}:{limits[key]}"]
     command += [args.image, "infinity"]
     report = dict(profile=args.profile, device=device_number, requested_limits=limits,
+                  benchmark_label=benchmark_label,
                   scope="runner-only direct I/O; synthetic envelope, not local calibration", jobs=[], success=False)
     try:
         capture(command)
