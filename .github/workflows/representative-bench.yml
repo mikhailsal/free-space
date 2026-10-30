@@ -1,0 +1,102 @@
+name: Representative scanner benchmark
+
+on:
+  push:
+    branches: [perf/representative-gh-bench]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: representative-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Check harness and build the measured binary
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/tests -p 'test_bench*.py'
+          mkdir binaries
+          git rev-parse HEAD > binaries/candidate.revision.txt
+          rustc -Vv > binaries/compiler.txt
+          cargo build --release --locked -p freespace
+          cp target/release/freespace binaries/candidate
+          sha256sum binaries/candidate > binaries/candidate.sha256.txt
+          cargo test --workspace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: representative-binary
+          path: binaries/
+          retention-days: 7
+
+  pilot:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        io: [native, limited]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: representative-binary
+          path: binaries
+      - name: Verify disk model and run a paired pilot
+        env:
+          BENCH_IO: ${{ matrix.io }}
+          BENCH_FILES: '100000'
+          BENCH_SCANS: '3'
+          BENCH_REPEATS: '2'
+        run: bash scripts/bench-representative.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: representative-pilot-${{ matrix.io }}
+          path: representative-results/
+          retention-days: 14
+
+  local-scale:
+    needs: [build, pilot]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        io: [native, limited]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: representative-binary
+          path: binaries
+      - name: Measure 7202464 entries and five retained generations
+        env:
+          BENCH_IO: ${{ matrix.io }}
+          BENCH_FILES: '7195248'
+          BENCH_SCANS: '5'
+          BENCH_REPEATS: '1'
+        run: bash scripts/bench-representative.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: representative-local-scale-${{ matrix.io }}
+          path: representative-results/
+          retention-days: 14

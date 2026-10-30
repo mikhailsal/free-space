@@ -4,8 +4,9 @@
 Host: --baseline BIN --candidate BIN --output DIR [--steps 100000,1000000]
       [--memory 128|256|512|4096] [--repeats 2] [--include-v1]
       [--current-backends] [--scan-profile disk|memory|both]
-      [--keep-previous both|true|false]
-Each comparison arm receives a fresh 2-CPU, no-swap cgroup; bind-mounted fixtures
+      [--keep-previous both|true|false] [--cpus 2] [--workers 1] [--refreshes 1]
+      [--io-device /dev/DEVICE --read-bps N --write-bps N --read-iops N --write-iops N]
+Each comparison arm receives a fresh configurable CPU, no-swap cgroup; bind-mounted fixtures
 and snapshots bypass overlayfs. On a dedicated ephemeral GitHub-hosted VM,
 host fixture setup is synced and caches dropped before each arm container.
 Peaks sampled at 20ms are lower bounds; cgroup memory.peak is arm-cumulative
@@ -21,6 +22,7 @@ import platform
 import shutil
 import signal
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -56,6 +58,12 @@ def occupancy(snapshot):
             result[key]["logical_bytes"] += stat.st_size
             result[key]["allocated_bytes"] += stat.st_blocks * 512
     return result
+
+
+def filesystem_used(path):
+    """Allocated bytes across the filesystem, including open unlinked files."""
+    usage = os.statvfs(path)
+    return (usage.f_blocks - usage.f_bfree) * usage.f_frsize
 
 
 def file_occupancy(snapshot):
@@ -115,7 +123,23 @@ def cg_read(folder):
     return {name: (folder / name).read_text().strip() for name in (
         "memory.current", "memory.peak", "memory.max", "memory.events",
         "memory.swap.current", "memory.swap.peak", "memory.swap.max", "memory.pressure",
-        "cpu.max", "cpu.stat") if (folder / name).exists()}
+        "cpu.max", "cpu.stat", "io.max", "io.stat", "io.pressure") if (folder / name).exists()}
+
+
+def verify_io(metrics, spec):
+    """Abort before timing if Docker did not install every requested limit."""
+    limits = spec.get("io_limits", {})
+    if not limits:
+        return
+    if "io.max" not in metrics or "io.stat" not in metrics:
+        raise RuntimeError("requested I/O limits require readable cgroup v2 io.max and io.stat")
+    devices = {}
+    for line in metrics["io.max"].splitlines():
+        device, *fields = line.split()
+        devices[device] = dict(field.split("=", 1) for field in fields)
+    actual = devices.get(spec["io_device_number"], {})
+    if any(actual.get(key) != str(value) for key, value in limits.items()):
+        raise RuntimeError(f"requested I/O limits were not installed: {limits}; io.max={metrics['io.max']}")
 
 
 def measured_command(spec):
@@ -127,26 +151,31 @@ def measured_command(spec):
     if before.get("memory.max") != expected_max or before.get("memory.swap.max") != "0":
         raise RuntimeError(f"container is not in the requested no-swap cgroup: {before}")
     quota, period = before.get("cpu.max", "max 1").split()
-    if quota == "max" or int(quota) != 2 * int(period):
-        raise RuntimeError("CPU quota must be exactly 2 CPUs")
+    if quota == "max" or int(quota) != spec.get("cpus", 2) * int(period):
+        raise RuntimeError("CPU quota does not match requested CPUs")
     dump(output / "cgroup-start.json", dict(path=str(group), metrics=before))
+    verify_io(before, spec)
     command = ["/binary", "--backend", spec["backend"], spec["operation"], spec["target"],
-               "--workers", "1", "--json"]
+               "--workers", str(spec.get("workers", 1)), "--json"]
     if spec["operation"] == "scan" and spec.get("scan_profile", "disk") == "disk":
         command.append("--low-memory")
     env = dict(os.environ, LC_ALL="C", FREESPACE_CONFIG="/scratch/config.toml",
-               FREESPACE_SNAPSHOT_DIR="/scratch/snapshot")
+               FREESPACE_SNAPSHOT_DIR="/scratch/snapshot",
+               SQLITE_TMPDIR="/scratch/snapshot/tmp")
     peaks = occupancy(Path("/scratch/snapshot"))
     file_peaks = {}
     sampled_memory = 0
+    filesystem_used_start = filesystem_used("/scratch/snapshot")
+    filesystem_used_peak = filesystem_used_start
     stopped = threading.Event()
     timed_out = threading.Event()
     sampler_errors = []
 
     def sample():
-        nonlocal sampled_memory
+        nonlocal sampled_memory, filesystem_used_peak
         try:
             while not stopped.is_set():
+                filesystem_used_peak = max(filesystem_used_peak, filesystem_used("/scratch/snapshot"))
                 current = occupancy(Path("/scratch/snapshot"))
                 for name, values in file_occupancy(Path("/scratch/snapshot")).items():
                     prior = file_peaks.setdefault(name, dict(logical_bytes=0, allocated_bytes=0))
@@ -192,9 +221,13 @@ def measured_command(spec):
     finally:
         stopped.set()
         sampler.join()
+    filesystem_used_end = filesystem_used("/scratch/snapshot")
+    filesystem_used_peak = max(filesystem_used_peak, filesystem_used_end)
     elapsed = finished - started
     print(f'command end {spec["id"]}: exit={proc.returncode} elapsed={elapsed:.6f}s', flush=True)
     after = cg_read(group)
+    dump(output / "cgroup-end.json", dict(path=str(group), metrics=after))
+    verify_io(after, spec)
     endpoint = occupancy(Path("/scratch/snapshot"))
     for kind in peaks:
         for key in peaks[kind]:
@@ -207,6 +240,16 @@ def measured_command(spec):
                sampler_errors=sampler_errors, elapsed_seconds=elapsed, cgroup_path=str(group),
                cgroup_before=before, cgroup_after=after, sampled_memory_peak=sampled_memory,
                sampled_disk_peak=peaks, endpoint_disk=endpoint, sample_interval_seconds=0.02)
+    row["filesystem_used_start"] = filesystem_used_start
+    row["filesystem_used_end"] = filesystem_used_end
+    row["filesystem_used_peak"] = filesystem_used_peak
+    row["filesystem_used_incremental_peak"] = filesystem_used_peak - filesystem_used_start
+    row["filesystem_used_scope"] = (
+        "bytes from (statvfs.f_blocks - statvfs.f_bfree) * statvfs.f_frsize; "
+        "entire filesystem containing /scratch/snapshot, including fixture, metadata, "
+        "and open unlinked allocated temporary files; includes unrelated activity if "
+        "filesystem is not exclusive; sampled peak is a lower bound; incremental "
+        "peak is relative to command start, not total snapshot size")
     row["memory_peak_scope"] = "arm cumulative CLI, helper and prior observations; excludes host fixture generation"
     row["sampled_memory_peak_scope"] = "current command sampled memory.current; lower bound"
     row["sampled_file_peaks"] = file_peaks
@@ -289,7 +332,7 @@ def generate(root, start, stop, checkpoint):
 
 
 def prepare_fixture(case, output, ident, files):
-    """Prepare outside the measured cgroup, then cold-start the entire arm."""
+    """Prepare once per file count, outside every measured cgroup."""
     def checkpoint(subtree, created, phase):
         row = dict(subtree=subtree, created_files=created, phase=phase,
                    unix_seconds=time.time(), scope="host setup outside measured container")
@@ -308,6 +351,10 @@ def prepare_fixture(case, output, ident, files):
     checkpoint("tree", files + 16, "before_final_sync")
     os.sync()
     checkpoint("tree", files + 16, "complete")
+
+
+def flush_caches(output, ident):
+    """Cold-start each arm, including arms sharing the immutable fixture."""
     command = ["sudo", "-n", "tee", "/proc/sys/vm/drop_caches"]
     receipt = dict(arm=ident, policy="sync then drop_caches=3 on this dedicated ephemeral GitHub-hosted VM only",
                    runner_environment=os.environ["RUNNER_ENVIRONMENT"],
@@ -365,10 +412,21 @@ def host(args):
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
         raise RuntimeError("Setup, cache flushing and measurements require an ephemeral GitHub-hosted Actions VM")
     steps = [int(value) for value in args.steps.split(",")]
-    if any(value not in (100000, 1000000) for value in steps) or sorted(set(steps)) != steps:
-        raise ValueError("steps must be 100000 and/or 1000000 in increasing order")
+    if any(not 1 <= value <= 8000000 for value in steps) or sorted(set(steps)) != steps:
+        raise ValueError("steps must be unique counts from 1 through 8000000 in increasing order")
     if args.repeats < 1 or args.scans < 2:
         raise ValueError("repeats >= 1 and scans >= 2 required")
+    io_limits = {key: getattr(args, option) for key, option in (
+        ("rbps", "read_bps"), ("wbps", "write_bps"), ("riops", "read_iops"), ("wiops", "write_iops"))
+        if getattr(args, option) is not None}
+    io_device = None
+    io_device_number = None
+    if args.io_device:
+        io_device = Path(args.io_device).resolve(strict=True)
+        device_stat = io_device.stat()
+        if not stat.S_ISBLK(device_stat.st_mode):
+            raise ValueError("--io-device must name a block device")
+        io_device_number = f"{os.major(device_stat.st_rdev)}:{os.minor(device_stat.st_rdev)}"
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     harness = Path(__file__).resolve()
@@ -386,13 +444,14 @@ def host(args):
     completed = False
     manifest = dict(schema_version=1, arguments=vars(args), kernel=platform.release(),
         scan_profile=args.scan_profile,
-        measurement_protocol="host-setup-cold-arm-integrity-v3", cache_flush_receipts=[],
+        measurement_protocol="host-shared-fixture-cold-arm-integrity-v4", cache_flush_receipts=[],
+        io_device=str(io_device) if io_device else None, io_device_number=io_device_number, io_limits=io_limits,
         started_unix_seconds=time.time(),
         cpu=Path("/proc/cpuinfo").read_text(), docker=capture(["docker", "version"]),
         image=capture(["docker", "image", "inspect", image]),
-        resource_policy="dedicated ephemeral GitHub-hosted VM; host setup excluded; each arm has 2 CPU quota, selected RAM MiB, memory-swap=memory, no OOM override",
+        resource_policy=f"dedicated ephemeral GitHub-hosted VM; host setup excluded; each arm has {args.cpus} CPU quota, selected RAM MiB, memory-swap=memory, no OOM override; requested I/O limits verified in cgroup io.max",
         cache_policy="host-generated deterministic fixture, os.sync every 10000 files and at completion; os.sync then sudo -n tee /proc/sys/vm/drop_caches with input 3 before each arm on this job's ephemeral VM only; failure aborts, never warm fallback; clean OS input caches requested dropped (active pages and hardware caches not reset), then cache retained across CLI processes, full-file SHA256 reads before/after immutable post-command dbstat; integrity reads outside CLI timing warm/evict cache; alternating paired arm order",
-        measurement_policy="complete CLI incl close/checkpoint; helper shares cgroup; memory.peak arm-cumulative CLI/helper/observations excluding host fixture generation; per-command sampled current lower bound and GNU time RSS; disk peaks sampled lower bounds",
+        measurement_policy="SQLITE_TMPDIR is snapshot/tmp on the same measured device; pathname disk sampling omits unlinked files; filesystem statvfs sampling includes their allocated blocks and all other filesystem usage; complete CLI incl close/checkpoint; helper shares cgroup; memory.peak arm-cumulative CLI/helper/observations excluding host fixture generation; per-command sampled current lower bound and GNU time RSS; disk peaks sampled lower bounds",
         provenance={arm: dict(scan_profile=args.scan_profile,
                      sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                      source_revision=binary.with_name(binary.name + ".revision.txt").read_text().strip(),
@@ -404,11 +463,21 @@ def host(args):
             scratch = Path(temporary)
             manifest["filesystem"] = capture(["findmnt", "-T", str(scratch), "-J", "-o", "TARGET,SOURCE,FSTYPE,OPTIONS"])
             dump(output / "manifest.json", manifest)
+            if io_device:
+                backing = scratch.stat().st_dev
+                backing_number = f"{os.major(backing)}:{os.minor(backing)}"
+                manifest["scratch_device_number"] = backing_number
+                dump(output / "manifest.json", manifest)
+                if backing_number != io_device_number:
+                    raise RuntimeError(f"I/O device {io_device_number} does not directly back scratch filesystem {backing_number}; layered devices are unsupported")
             ordinal = 0
             keeps = (False, True) if args.keep_previous == "both" else (args.keep_previous == "true",)
-            for keep in keeps:
-                for repeat in range(args.repeats):
-                    for step_index, count in enumerate(steps):
+            for step_index, count in enumerate(steps):
+                fixture = scratch / "fixture"
+                fixture.mkdir()
+                prepare_fixture(fixture, output, f"fixture-{count}", count)
+                for keep in keeps:
+                    for repeat in range(args.repeats):
                         arms = list(binaries)
                         if (repeat + step_index + int(keep)) % 2:
                             arms.reverse()
@@ -418,36 +487,43 @@ def host(args):
                             case = scratch / "case"
                             case.mkdir()
                             try:
-                                (case / "snapshot").mkdir()
+                                (case / "snapshot" / "tmp").mkdir(parents=True)
+                                (case / "tree").mkdir()
                                 (case / "config.toml").write_text(f"keep_previous = {str(keep).lower()}\n")
                                 ordinal += 1
                                 ident = f"{ordinal:04}-{arm}-{count}-keep{int(keep)}-r{repeat + 1}"
                                 binary, backend = binaries[arm]
-                                operations = ["scan"] * args.scans + ["refresh"]
+                                operations = ["scan"] * args.scans + ["refresh"] * args.refreshes
                                 spec = dict(id=ident, arm=arm, backend=backend, scan_profile=args.scan_profile,
                                     expected_entries=count + (count + 999) // 1000 + 20,
-                                    operations=operations, memory_mib=args.memory,
+                                    operations=operations, memory_mib=args.memory, workers=args.workers, cpus=args.cpus,
+                                    io_device=str(io_device) if io_device else None, io_device_number=io_device_number, io_limits=io_limits,
                                     keep_previous=keep, repeat=repeat + 1, files=count,
                                     timeout_seconds=args.timeout_seconds, order=ordinal)
                                 spec_path = output / (ident + ".spec.json")
                                 dump(spec_path, spec)
                                 try:
-                                    prepare_fixture(case, output, ident, count)
+                                    flush_caches(output, ident)
                                 finally:
                                     receipt_path = output / (ident + ".cache-flush.json")
                                     if receipt_path.exists():
                                         manifest["cache_flush_receipts"].append(json.loads(receipt_path.read_text()))
                                         dump(output / "manifest.json", manifest)
                                 name = "fs-balance-" + uuid.uuid4().hex
-                                print(f"running {ident}: memory={args.memory}MiB CPUs=2 swap=0", flush=True)
-                                command = ["docker", "run", "--name", name, "--network", "none", "--cpus", "2",
+                                print(f"running {ident}: memory={args.memory}MiB CPUs={args.cpus} workers={args.workers} swap=0", flush=True)
+                                command = ["docker", "run", "--name", name, "--network", "none", "--cpus", str(args.cpus),
                                     "--memory", f"{args.memory}m", "--memory-swap", f"{args.memory}m",
                                     "--cgroupns", "private", "--pids-limit", "128", "--user", f"{os.getuid()}:{os.getgid()}",
                                     "--mount", f"type=bind,src={case},dst=/scratch",
+                                    "--mount", f"type=bind,src={fixture / 'tree'},dst=/scratch/tree,readonly",
                                     "--mount", f"type=bind,src={output},dst=/results",
                                     "--mount", f"type=bind,src={harness.parent},dst=/harness,readonly",
                                     "--mount", f"type=bind,src={binary},dst=/binary,readonly",
                                     image, "/results/" + spec_path.name]
+                                for option in ("read-bps", "write-bps", "read-iops", "write-iops"):
+                                    value = getattr(args, option.replace("-", "_"))
+                                    if value is not None:
+                                        command[2:2] = ["--device-" + option, f"{io_device}:{value}"]
                                 try:
                                     with (output / (ident + ".docker.log")).open("w") as log:
                                         run = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
@@ -468,6 +544,7 @@ def host(args):
                                         stderr=subprocess.DEVNULL, timeout=30, check=False)
                             finally:
                                 shutil.rmtree(case)
+                shutil.rmtree(fixture)
             completed = True
     finally:
         dump(output / "status.json", {"failures": failures, "completed": completed,
