@@ -57,9 +57,9 @@ must not be described as statistically precise. The fixture contains empty
 files in shallow directories: it matches entry count, not the local path-depth,
 name-length, hardlink, permission or directory-fanout distribution.
 
-A dedicated sparse 48 GiB ext4 image supplies 8.5 million inodes. The host must
-have at least 32 GiB free before setup; sparse virtual capacity is not reserved
-physical capacity. Loop direct I/O limits double caching. Fixtures are generated
+A dedicated preallocated 30 GiB ext4 image supplies 8.5 million inodes. The host must
+have at least 32 GiB free before setup; backing blocks are reserved with fallocate
+and formatting disables discard. Loop direct I/O limits double caching. Fixtures are generated
 once per count outside measured cgroups, then mounted read-only into each arm.
 Each arm starts with a verified host cache flush. Later commands retain cache,
 including observer reads. No local cache is flushed.
@@ -93,6 +93,11 @@ require additional trustworthy local I/O evidence.
 - Retain raw reports, exit status, OOM counters, device configuration, SHA-256
   provenance, table counts and index sizes. Failed or incomplete commands are
   diagnostics, never successful timing samples.
+
+The observer has a separate bounded SQL budget and missing table/index evidence
+invalidates the command. Large jobs have a 280-minute measurement deadline within
+a 300-minute job budget, leaving time to upload partial diagnostics. A deadline
+failure is an incomplete experiment, not a completed latency measurement.
 
 No product optimization is accepted before these measurements identify the
 cost and a counterfactual experiment verifies the proposed cause.

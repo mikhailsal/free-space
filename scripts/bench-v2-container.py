@@ -270,9 +270,10 @@ def measured_command(spec):
     return 0 if row["validated"] else 1
 
 
-def db_breakdown(snapshot):
+def db_breakdown(snapshot, timeout_seconds=120):
     """Read-only observation after CLI exit, outside timed span; cache is retained."""
     result = {}
+    deadline = time.monotonic() + timeout_seconds
     for path in sorted(snapshot.rglob("*.db")):
         key = str(path.relative_to(snapshot))
         wal = path.with_name(path.name + "-wal")
@@ -284,7 +285,6 @@ def db_breakdown(snapshot):
             continue
         try:
             with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True, timeout=10)) as db:
-                deadline = time.monotonic() + 120
                 db.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
                 schema = db.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").fetchall()
                 tables = [row[1] for row in schema if row[0] == "table"]
@@ -392,14 +392,31 @@ def inside(spec_path):
         before_files = file_occupancy(snapshot)
         observation = dict(cache_policy="bounded full-file integrity reads then immutable observer then integrity reads; outside CLI timing, cache retained in arm cgroup",
                            cgroup_before=cg_read(group),
-                           databases=db_breakdown(snapshot),
+                           timeout_seconds=spec["timeout_seconds"],
+                           databases=db_breakdown(snapshot, timeout_seconds=spec["timeout_seconds"]),
                            cgroup_after=cg_read(group))
         after_integrity = snapshot_integrity(snapshot)
         after_files = file_occupancy(snapshot)
         observation.update(observer_comparison(before_integrity, after_integrity, before_files, after_files))
-        dump(Path("/results") / command_spec["id"] / "dbstat.json", observation)
+        observation["errors"] = {
+            name: {key: details[key] for key in ("error", "unavailable", "dbstat_error") if key in details}
+            for name, details in observation["databases"].items()
+            if any(key in details for key in ("error", "unavailable", "dbstat_error"))}
         if not observation["logical_content_unchanged"]:
-            raise RuntimeError("SQLite observation changed snapshot names, logical sizes or bytes")
+            observation["errors"]["integrity"] = "SQLite observation changed snapshot names, logical sizes or bytes"
+        observation["validated"] = not observation["errors"]
+        command_output = Path("/results") / command_spec["id"]
+        dump(command_output / "dbstat.json", observation)
+        metrics_path = command_output / "metrics.json"
+        metrics = json.loads(metrics_path.read_text())
+        metrics["cli_validated"] = metrics["validated"]
+        metrics["observer_validated"] = observation["validated"]
+        metrics["validated"] = metrics["cli_validated"] and metrics["observer_validated"]
+        if observation["errors"]:
+            metrics["observer_errors"] = observation["errors"]
+        dump(metrics_path, metrics)
+        if not observation["validated"] and not code:
+            raise RuntimeError(f"SQLite observation failed: {observation['errors']}")
         if code:
             return code
     final = cg_read(group)
@@ -527,7 +544,7 @@ def host(args):
                                 try:
                                     with (output / (ident + ".docker.log")).open("w") as log:
                                         run = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
-                                            timeout=300 + len(operations) * (args.timeout_seconds + 180))
+                                            timeout=300 + len(operations) * (2 * args.timeout_seconds + 180))
                                     inspection = json.loads(capture(["docker", "inspect", name]))[0]
                                     dump(output / (ident + ".docker-state.json"), inspection["State"])
                                     valid = True

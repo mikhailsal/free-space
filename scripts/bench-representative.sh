@@ -26,15 +26,15 @@ trap 'exit 143' TERM
 df -h > "$output/host-disk.txt"
 lsblk -o NAME,MAJ:MIN,SIZE,TYPE,ROTA,MODEL >> "$output/host-disk.txt"
 # No host cache or device is changed outside this ephemeral runner.
-# Sparse capacity is a ceiling, not a claim that the host has 48 GiB free.
+# Reserve actual backing blocks; inner statvfs must not promise absent storage.
 available=$(df -B1 --output=avail "$volume" | tail -1)
 if (( available < 32 * 1024 * 1024 * 1024 )); then
   echo 'Need at least 32 GiB free on the runner for the dedicated filesystem.' >&2
   exit 1
 fi
-truncate -s 48G "$volume/disk.img"
+fallocate -l 30G "$volume/disk.img"
 loop_device=$(sudo losetup --find --show --direct-io=on "$volume/disk.img")
-sudo mkfs.ext4 -q -F -N 8500000 -m 0 -E lazy_itable_init=0,lazy_journal_init=0 "$loop_device"
+sudo mkfs.ext4 -q -F -N 8500000 -m 0 -E nodiscard,lazy_itable_init=0,lazy_journal_init=0 "$loop_device"
 mkdir "$mount_dir"
 sudo mount "$loop_device" "$mount_dir"
 sudo chown "$(id -u):$(id -g)" "$mount_dir"

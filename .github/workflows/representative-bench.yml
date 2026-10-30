@@ -88,6 +88,7 @@ jobs:
           name: representative-binary
           path: binaries
       - name: Measure 7202464 entries and five retained generations
+        timeout-minutes: 280
         env:
           BENCH_IO: ${{ matrix.io }}
           BENCH_FILES: '7195248'
