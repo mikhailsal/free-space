@@ -3,8 +3,12 @@
 Status: [source review](../benchmark-results/v1-refresh-exact-capacity-source-reviews-2026-10-31.json)
 completed with the requested Opus model and `NO_FINDINGS`; normal hooks pass.
 Published candidate `f04a109124c3747d937547e4fc1f6d37ad59392a` starts from
-frozen release-target baseline `e8265778`. No candidate tests or measurements
-have run yet.
+frozen release-target baseline `e8265778`. GitHub passed 310 Rust tests (one ignored) and 82 Python tests. The
+[1m screen](../benchmark-results/v1-refresh-capacity-screen-2026-10-31.md) and
+[7.3m exploratory pair](../benchmark-results/v1-refresh-capacity-full-2026-10-31.md)
+are complete; this candidate remains unpromoted. Full-scale process RSS fell
+31.84% (about 562 MiB) in one pair, while refresh wall time rose 0.53%; H2 remains
+inconclusive and no minimum tested-memory requirement has been established.
 
 The [musl control](../benchmark-results/v1-refresh-musl-screen-2026-10-31.md)
 shows a repeatable approximately 88 MiB RSS step while appending 99 nodes to a
@@ -23,7 +27,7 @@ as a bound on a possibly enlarged folder.
 Real filesystem/snapshot preparation tests cover an empty folder growing to
 128 files, 128 files shrinking to one, and folder removal. They inspect actual
 preparation, graft pointer stability and finalized content counts; capacity
-overflow has a separate check. Tests are prepared, not reported as passing.
+overflow has a separate check. All three tests passed on GitHub; no Rust tests were run locally.
 `Vec` promises at least the requested capacity, so the tests do not impose an
 allocator-specific exact capacity or an arbitrary rounding limit. The checked
 requested-size arithmetic is tested separately.

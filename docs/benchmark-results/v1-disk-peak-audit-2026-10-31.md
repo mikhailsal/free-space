@@ -1,0 +1,13 @@
+# SQL scan disk peak: receipt audit
+
+The measured `app_disk_peak_bytes` increases by 4,096 bytes in all three SQL scan pairs. This is a positive median under the existing H2 rule; nothing here changes that outcome. The raw receipts do not establish a specific application-file growth or the exact true peak.
+
+The metric is the 20 ms sampled whole-filesystem statvfs used-byte peak minus the start value, plus initial snapshot allocated bytes. It includes filesystem metadata and open unlinked files. `sampled_disk_peak.total` comes from a separate directory traversal; its maximum and the statvfs peak need not match. Per-file maxima are each independently sampled and cannot be summed as simultaneous occupancy. The samples can miss brief peaks.
+
+All three baseline values are 459,644,928 bytes; all candidate values are 459,649,024. In the first two pairs the absolute filesystem peak is identical, while the baseline start is 4,096 bytes higher. In the third pair starts match and candidate sampled absolute peak is 4,096 bytes higher. All six output temp files have the same recorded maximum logical and allocated size (128,008,192 bytes); all six stage maxima are 75,603,968 logical and 75,608,064 allocated bytes. Endpoint allocated totals match. These do not prove identical intermediate or true peak allocation.
+
+Both arms record a 4,096-byte `progress.json.tmp` per-file maximum, but no synchronized trace establishes whether it existed at either statvfs peak. The first two baseline runs also record a 4,096-byte excess over logical size in the prior snapshot's individual allocated maximum; statvfs, allocation and traversal timings are insufficient to attribute the difference. Both runs use ext4; `st_blocks` is reported in 512-byte units, which does not itself establish the filesystem block size.
+
+The separate musl identical-binary control recorded scan deltas 0, +4,096, 0 bytes, maximum absolute 4,096. It is an empirical same-job noise reference, not a paired causal comparison with the SQL VM; seed and filesystem state differ. A prospective attribution experiment could timestamp bounded statvfs and inode-deduplicated named/open-deleted allocations together, preserve phase and block-size metadata, and quantify sampler overhead and missed peaks. It must keep the existing gate and immutable seeds.
+
+Source: `scripts/bench-v2-container.py` occupancy/statvfs helpers and `measured_command`; raw receipts in `/tmp/freespace-combined-sql-screen/scan/measurements` and `/tmp/freespace-refresh-musl-screen/scan/measurements`. Machine-readable values: `/tmp/freespace-disk-peak-audit.json`.

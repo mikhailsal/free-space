@@ -1,0 +1,89 @@
+{
+  "verdict": "The recorded metric rises by 4096 bytes in all three SQL scan pairs; the traces do not establish that a specific application file or its true peak grew by 4096 bytes. H2 median rule remains unchanged.",
+  "metric": "app_disk_peak_bytes = max sampled (statvfs.f_blocks - f_bfree) * f_frsize, including endpoint, minus filesystem_used_start plus initial_snapshot_allocated_bytes; sample interval 20 ms; whole filesystem, including metadata and unlinked open files",
+  "sql_scan": {
+    "baseline_app": [
+      459644928,
+      459644928,
+      459644928
+    ],
+    "candidate_app": [
+      459649024,
+      459649024,
+      459649024
+    ],
+    "deltas": [
+      4096,
+      4096,
+      4096
+    ],
+    "baseline_start": [
+      604274688,
+      604274688,
+      604270592
+    ],
+    "candidate_start": [
+      604270592,
+      604270592,
+      604270592
+    ],
+    "baseline_peak": [
+      807899136,
+      807899136,
+      807895040
+    ],
+    "candidate_peak": [
+      807899136,
+      807899136,
+      807899136
+    ],
+    "initial_snapshot_allocated_bytes": 256020480,
+    "sampled_directory_total_allocated_baseline": [
+      459649024,
+      459649024,
+      459644928
+    ],
+    "sampled_directory_total_allocated_candidate": [
+      459649024,
+      459649024,
+      459649024
+    ],
+    "all_output_snapshot_tmp_logical_and_allocated_bytes": 128008192,
+    "all_stage_logical_bytes": 75603968,
+    "all_stage_allocated_bytes": 75608064,
+    "seed_sha256": "bed0c8d962b875a8c49e8ccaceb2ac27ea34d3588785a3170679360519fec9a9"
+  },
+  "musl_identical_binary_control_scan": {
+    "baseline_app": [
+      461291520,
+      461291520,
+      461291520
+    ],
+    "candidate_app": [
+      461291520,
+      461295616,
+      461291520
+    ],
+    "deltas": [
+      0,
+      4096,
+      0
+    ],
+    "maximum_absolute_delta": 4096,
+    "seed_sha256": "7b1d794e5b6dee5df64f13f15bc751923308a1f35c7970cee77a100d7779a184",
+    "cross_vm_comparison": "Not a paired comparison to SQL screen; different seed and fixture allocation values."
+  },
+  "evidence_limits": [
+    "Each per-file peak is independently maximized, not a simultaneous inventory. Named total is separately sampled; recursive traversal/statfs are not atomic and scan samples can miss short peaks. st_blocks uses 512-byte units, but actual allocating filesystem blocks and allocation timing are separate observations.",
+    "The SQL per-file maxima record a 4096-byte progress.json.tmp in both arms, but do not show when it overlaps the peak; this supports a possible transient auxiliary-block explanation, not attribution. Two baseline seed snapshot.prev.db per-file peaks show 4096 extra allocated bytes versus logical size, and filesystem starting occupancy is 4096 higher in the first two baseline pairs; causation is unresolved.",
+    "All six output temporary files have equal recorded peak logical and allocated bytes; endpoints have equal allocated totals. Identical peaks or endpoints do not establish identical intermediate allocation, simultaneity, or true peak. Filesystem ext4 and metadata/unlinked-file accounting can affect statvfs."
+  ],
+  "suggested_prospective_instrumentation": "If a new admitted experiment needs attribution, collect timestamped paired statvfs, inode-deduplicated logical/allocated inventories including link counts and deleted-open/temp accounting at a higher bounded sampling rate and phase boundaries, retaining start/end, filesystem block-size metadata, observer overhead, control arms and immutable seeds. Quantify missed peaks and sampling overhead; do not alter historical metric or loosen gates.",
+  "sources": [
+    "/tmp/free-space-v1-qualification-harness/scripts/bench-v2-container.py:44",
+    "/tmp/free-space-v1-qualification-harness/scripts/bench-v2-container.py:168",
+    "/tmp/free-space-v1-qualification-harness/scripts/bench-v2-container.py:249",
+    "/tmp/freespace-combined-sql-screen/scan/measurements",
+    "/tmp/freespace-refresh-musl-screen/scan/measurements"
+  ]
+}

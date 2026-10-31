@@ -23,7 +23,8 @@
     41223904260,
     41227692011,
     41227699497,
-    41230966330
+    41230966330,
+    41231314351
   ],
   "runs": [
     {
@@ -483,14 +484,45 @@
       "run_id": 41230966330,
       "created_at": "2026-10-31T18:45:36Z",
       "head_sha_verified": true,
-      "purpose": "combined-sql-full-exploratory"
+      "purpose": "combined-sql-full-exploratory",
+      "conclusion": "",
+      "completed_job_seconds": 162.0
+    },
+    {
+      "id": "qualification-smoke-default",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
+      "pairs_per_operation": 1,
+      "operations": [
+        "scan"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
+      "status": "completed",
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "qualification-smoke-default",
+      "run_id": 41231314351,
+      "created_at": "2026-10-31T18:50:04Z",
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "completed_job_seconds": 315,
+      "job_seconds": 315
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T18:49:10.770026+00:00",
-  "completed_job_seconds": 19727.0,
-  "maximum_committed_seconds": 37727,
-  "remaining_unreserved_seconds": 178273,
+  "updated_at": "2026-10-31T18:58:01.728422+00:00",
+  "completed_job_seconds": 20042,
+  "maximum_committed_seconds": 35042,
+  "remaining_unreserved_seconds": 180958,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -529,7 +561,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 9000,
+  "planned_reserved_seconds": 6000,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Exact node capacity after actual subtree walk",
@@ -605,29 +637,6 @@
   ],
   "planned_next_dispatches": [
     {
-      "id": "qualification-smoke-default",
-      "branch": "perf/v1-qualification-harness",
-      "revision": "8aa634532097154447b13850331fd577fdf5d029",
-      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-      "comparison": "candidate",
-      "stage": "smoke",
-      "files": 100000,
-      "pairs_per_operation": 1,
-      "operations": [
-        "scan"
-      ],
-      "target": "x86_64-unknown-linux-musl",
-      "io": "local",
-      "subtree_entries": 100,
-      "scenario": "unchanged",
-      "memory_mib": 4096,
-      "timeout_minutes": 20,
-      "maximum_job_seconds": 3000,
-      "status": "admitted_not_dispatched",
-      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
-      "purpose": "Protocol and determinism verification only, no product-performance qualification"
-    },
-    {
       "id": "qualification-smoke-changed",
       "branch": "perf/v1-qualification-harness",
       "revision": "8aa634532097154447b13850331fd577fdf5d029",
@@ -646,7 +655,7 @@
       "memory_mib": 1024,
       "timeout_minutes": 20,
       "maximum_job_seconds": 3000,
-      "status": "conditional_default_smoke",
+      "status": "admitted_not_dispatched",
       "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
       "purpose": "Protocol and determinism verification only, no product-performance qualification"
     },
@@ -669,7 +678,7 @@
       "memory_mib": 512,
       "timeout_minutes": 20,
       "maximum_job_seconds": 3000,
-      "status": "conditional_default_smoke",
+      "status": "admitted_not_dispatched",
       "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
       "purpose": "Protocol and determinism verification only, no product-performance qualification"
     }

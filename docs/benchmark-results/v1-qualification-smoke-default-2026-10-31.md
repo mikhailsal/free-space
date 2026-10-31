@@ -1,0 +1,7 @@
+# Qualification harness default smoke — 2026-10-31
+
+[Run 41231314351](https://github.com/mikhailsal/free-space/actions/runs/41231314351) passed the full repository gates and strict protocol-v4 receipts on a 100,000-file scan with musl, local I/O, a 4 GiB no-swap worker and an independent 4 GiB observer. GitHub passed 307 Rust tests (one ignored) and 90 Python tests. The build and measured jobs used 226 and 89 seconds.
+
+The separately compiled unchanged-application arms (`e8265778` and harness `8aa6345`) produced the same actual SHA-256: `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`. Both recorded `SOURCE_DATE_EPOCH=1793464183`. This verifies binary identity for this build, including the previously varying mimalloc build-time string. The target+epoch restore key excluded the older namespace; the first build found no matching cache and saved the new one. Restoration and repeated-build identity remain checks for subsequent cases.
+
+The [receipt](v1-qualification-smoke-default-2026-10-31.json) records case bindings and all validation. This smoke checks the protocol, not a performance improvement, a full-scale noise band or a minimum RAM requirement. The [archive](v1-qualification-smoke-default-2026-10-31.tar.gz) preserves all original outputs and supporting validation/logs with an embedded verified `SHA256SUMS`; the [index](v1-qualification-smoke-default-2026-10-31.sha256) hashes the archive.

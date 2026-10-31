@@ -1,0 +1,460 @@
+{
+  "run_id": 41231314351,
+  "revision": "8aa634532097154447b13850331fd577fdf5d029",
+  "status": "completed",
+  "conclusion": "success",
+  "purpose": "Protocol/determinism verification; not product qualification",
+  "strict_summary": {
+    "valid": true,
+    "issues": [],
+    "pairs": [
+      {
+        "pair": 1,
+        "elapsed_seconds": {
+          "baseline": 4.45440454700001,
+          "candidate": 4.527145403999995,
+          "delta": 0.07274085699998523
+        },
+        "peak_rss_kib": {
+          "baseline": 37900,
+          "candidate": 37844,
+          "delta": -56
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 45338624,
+          "candidate": 45338624,
+          "delta": 0
+        }
+      }
+    ],
+    "summary": {
+      "elapsed_seconds": {
+        "median_delta": 0.07274085699998523,
+        "max_abs_delta": 0.07274085699998523
+      },
+      "peak_rss_kib": {
+        "median_delta": -56,
+        "max_abs_delta": 56
+      },
+      "app_disk_peak_bytes": {
+        "median_delta": 0,
+        "max_abs_delta": 0
+      }
+    },
+    "identical_binaries": true,
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "case": {
+      "case_policy": "qualification-v1",
+      "scenario": "unchanged",
+      "subtree_entries": 100,
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": null
+    }
+  },
+  "manifest": {
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "pairs": 1,
+    "files": 100000,
+    "operation": "scan",
+    "scenario": "unchanged",
+    "fixture_receipt": {
+      "files": 100000,
+      "expected_entries": 100449,
+      "expected_subtree_entries": 100,
+      "directories": 449,
+      "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+      "fixed_mtime": 1700000000,
+      "payload_block_fraction": 0.01,
+      "distribution": {
+        "small_files": 99,
+        "outer_files": 99901,
+        "payload_files": 1000,
+        "sparse_files": 24,
+        "hardlink_files": 99,
+        "longname_files": 3223
+      },
+      "setup_seconds": 3.7308934810000096
+    },
+    "case_policy": "qualification-v1",
+    "subtree_entries": 100,
+    "memory_mib": 4096,
+    "setup_memory_mib": 4096,
+    "observer_memory_mib": 4096,
+    "mutation_receipt": null,
+    "expected_arms": [
+      "p1-baseline-v1",
+      "p1-candidate-v1"
+    ],
+    "provenance": {
+      "baseline-v1": {
+        "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+        "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+        "build": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+          "compiler_host": "x86_64-unknown-linux-gnu",
+          "target": "x86_64-unknown-linux-musl",
+          "profile": "release --locked",
+          "flags": {
+            "RUSTFLAGS": "",
+            "CARGO_ENCODED_RUSTFLAGS": "",
+            "SOURCE_DATE_EPOCH": "1793464183"
+          },
+          "release_profile": {
+            "lto": "thin",
+            "codegen-units": 4,
+            "strip": "debuginfo"
+          },
+          "cargo_config": {},
+          "bun": "1.4.2"
+        }
+      },
+      "candidate-v1": {
+        "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+        "source_revision": "8aa634532097154447b13850331fd577fdf5d029",
+        "build": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "8aa634532097154447b13850331fd577fdf5d029",
+          "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+          "compiler_host": "x86_64-unknown-linux-gnu",
+          "target": "x86_64-unknown-linux-musl",
+          "profile": "release --locked",
+          "flags": {
+            "RUSTFLAGS": "",
+            "CARGO_ENCODED_RUSTFLAGS": "",
+            "SOURCE_DATE_EPOCH": "1793464183"
+          },
+          "release_profile": {
+            "lto": "thin",
+            "codegen-units": 4,
+            "strip": "debuginfo"
+          },
+          "cargo_config": {},
+          "bun": "1.4.2"
+        }
+      }
+    },
+    "seed_sha256": "3365d8a2e38f266b71c1d1c8a2acbf62c31cffa9d30a2c892cb27630adac80ce",
+    "sample_interval_seconds": 0.02,
+    "cache_policy": "cold after seed copy, before single CLI",
+    "observer_policy": "separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+    "diagnostic_policy": {
+      "profile_policy": "profile-v2",
+      "allocation_diagnostics": false,
+      "scope": "measured refresh CLI only; seeds and observers disabled"
+    },
+    "environment": {
+      "kernel": "7.0.0-1017-azure",
+      "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4294.441\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.23\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4290.288\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.23\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2596.118\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.23\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4298.256\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.23\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+      "memory": "MemTotal:       16367524 kB\nMemFree:        14177040 kB\nMemAvailable:   15276200 kB\nBuffers:          109672 kB\nCached:          1197852 kB\nSwapCached:            0 kB\nActive:           833016 kB\nInactive:         757708 kB\nActive(anon):     338068 kB\nInactive(anon):        0 kB\nActive(file):     494948 kB\nInactive(file):   757708 kB\nUnevictable:       46728 kB\nMlocked:           43656 kB\nSwapTotal:       3145724 kB\nSwapFree:        3145724 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              1024 kB\nWriteback:             0 kB\nAnonPages:        329928 kB\nMapped:           336160 kB\nShmem:             46136 kB\nKReclaimable:     192432 kB\nSlab:             289256 kB\nSReclaimable:     192432 kB\nSUnreclaim:        96824 kB\nKernelStack:        4224 kB\nPageTables:         6476 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    11329484 kB\nCommitted_AS:    2152148 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       38996 kB\nVmallocChunk:          0 kB\nPercpu:             2384 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:         1474560 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:             0 kB\nGPUReclaim:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      132224 kB\nDirectMap2M:     4057088 kB\nDirectMap1G:    14680064 kB\n",
+      "image": [
+        {
+          "Id": "sha256:e543a49f6ea25750c376252fab0a73128cff10136c58e753342eae0c1f4a4487",
+          "RepoTags": [
+            "freespace-pairs:803649a92c874e2a91f59b0410c0f9c9",
+            "representative-calibration:41231314351-paired-local"
+          ],
+          "RepoDigests": [],
+          "Parent": "",
+          "Comment": "buildkit.dockerfile.v0",
+          "Created": "2026-10-31T18:54:13.816068037Z",
+          "DockerVersion": "",
+          "Author": "",
+          "Config": {
+            "Hostname": "",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+              "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            ],
+            "Cmd": null,
+            "Image": "",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": [
+              "python3",
+              "/harness/bench-v2-container.py",
+              "--inside"
+            ],
+            "OnBuild": null,
+            "Labels": {
+              "org.opencontainers.image.version": "24.04"
+            }
+          },
+          "Architecture": "amd64",
+          "Os": "linux",
+          "Size": 202779257,
+          "GraphDriver": {
+            "Data": {
+              "LowerDir": "/var/lib/docker/overlay2/8c2d79a42d421fa6e7d4588be9c555a31938d9304b409586c8d5bb1ae280f68c/diff",
+              "MergedDir": "/var/lib/docker/overlay2/9uc9eera7mvc789mz4a680bcn/merged",
+              "UpperDir": "/var/lib/docker/overlay2/9uc9eera7mvc789mz4a680bcn/diff",
+              "WorkDir": "/var/lib/docker/overlay2/9uc9eera7mvc789mz4a680bcn/work"
+            },
+            "Name": "overlay2"
+          },
+          "RootFS": {
+            "Type": "layers",
+            "Layers": [
+              "sha256:bec87777bc2fb2edcdf9af11df1531469e7df911309c1413082b18fcb8610278",
+              "sha256:9504f97a3f5895d6887b26084fd07faa425bd201ffcbe3e6e9f6ecc186345f8e"
+            ]
+          },
+          "Metadata": {
+            "LastTagTime": "2026-10-31T18:54:56.228089605Z"
+          }
+        }
+      ]
+    },
+    "filesystem": {
+      "filesystems": [
+        {
+          "target": "/home/runner/work/_temp/representative-volume.5m9mqp/mount",
+          "source": "/dev/loop0",
+          "fstype": "ext4",
+          "options": "rw,relatime"
+        }
+      ]
+    },
+    "github": {
+      "GITHUB_SHA": "8aa634532097154447b13850331fd577fdf5d029",
+      "GITHUB_RUN_ID": "41231314351",
+      "GITHUB_RUN_ATTEMPT": "1"
+    }
+  },
+  "github": {
+    "attempt": 1,
+    "conclusion": "success",
+    "createdAt": "2026-10-31T18:50:04Z",
+    "event": "workflow_dispatch",
+    "headSha": "8aa634532097154447b13850331fd577fdf5d029",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T18:53:53Z",
+        "conclusion": "success",
+        "databaseId": 124625949161,
+        "name": "build",
+        "startedAt": "2026-10-31T18:50:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T18:50:10Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T18:50:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:50:11Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-31T18:50:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:50:11Z",
+            "conclusion": "success",
+            "name": "Validate per-stage time envelope",
+            "number": 3,
+            "startedAt": "2026-10-31T18:50:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:50:21Z",
+            "conclusion": "success",
+            "name": "Run dtolnay/rust-toolchain@1.99.1",
+            "number": 4,
+            "startedAt": "2026-10-31T18:50:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:50:30Z",
+            "conclusion": "success",
+            "name": "Install musl tools",
+            "number": 5,
+            "startedAt": "2026-10-31T18:50:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:50:32Z",
+            "conclusion": "success",
+            "name": "Run oven-sh/setup-bun@v2",
+            "number": 6,
+            "startedAt": "2026-10-31T18:50:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:50:32Z",
+            "conclusion": "success",
+            "name": "Run Swatinem/rust-cache@v2",
+            "number": 7,
+            "startedAt": "2026-10-31T18:50:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:52:16Z",
+            "conclusion": "success",
+            "name": "Check benchmark contracts and repository gates",
+            "number": 8,
+            "startedAt": "2026-10-31T18:50:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:43Z",
+            "conclusion": "success",
+            "name": "Build both arms with one recorded toolchain",
+            "number": 9,
+            "startedAt": "2026-10-31T18:52:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:45Z",
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 10,
+            "startedAt": "2026-10-31T18:53:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:50Z",
+            "conclusion": "success",
+            "name": "Post Run Swatinem/rust-cache@v2",
+            "number": 18,
+            "startedAt": "2026-10-31T18:53:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:50Z",
+            "conclusion": "success",
+            "name": "Post Run oven-sh/setup-bun@v2",
+            "number": 19,
+            "startedAt": "2026-10-31T18:53:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:51Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 20,
+            "startedAt": "2026-10-31T18:53:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:51Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-10-31T18:53:51Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/mikhailsal/free-space/actions/runs/41231314351/job/124625949161"
+      },
+      {
+        "completedAt": "2026-10-31T18:55:24Z",
+        "conclusion": "success",
+        "databaseId": 124626826221,
+        "name": "paired",
+        "startedAt": "2026-10-31T18:53:55Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T18:53:57Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T18:53:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:58Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-31T18:53:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:59Z",
+            "conclusion": "success",
+            "name": "Run actions/download-artifact@v4",
+            "number": 3,
+            "startedAt": "2026-10-31T18:53:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:53:59Z",
+            "conclusion": "skipped",
+            "name": "Check time admission before local-scale allocation",
+            "number": 4,
+            "startedAt": "2026-10-31T18:53:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:55:21Z",
+            "conclusion": "success",
+            "name": "Paired v1 commands with isolated observers",
+            "number": 5,
+            "startedAt": "2026-10-31T18:53:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:55:22Z",
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 6,
+            "startedAt": "2026-10-31T18:55:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:55:22Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 12,
+            "startedAt": "2026-10-31T18:55:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:55:22Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 13,
+            "startedAt": "2026-10-31T18:55:22Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/mikhailsal/free-space/actions/runs/41231314351/job/124626826221"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/mikhailsal/free-space/actions/runs/41231314351"
+  },
+  "archive": {
+    "path": "v1-qualification-smoke-default-2026-10-31.tar.gz",
+    "sha256": "55bc5ac7955fad4953dce55f4671e49c54e70fb0c9fde79b002274e20a208f25",
+    "verified_payloads": 68
+  },
+  "checks": {
+    "actual_independent_build_binary_identity": true,
+    "baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "source_date_epoch": "1793464183",
+    "rust_passed": 307,
+    "rust_ignored": 1,
+    "python_passed": 90,
+    "build_seconds": 226,
+    "paired_seconds": 89,
+    "rust_cache": "new target+epoch namespace; no cache found, then saved; real cross-run restoration not yet tested"
+  }
+}

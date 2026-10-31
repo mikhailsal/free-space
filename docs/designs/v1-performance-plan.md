@@ -479,9 +479,11 @@ controls address this mismatch before any capacity counterfactual. The current
 ledger records exact reservations within the 216,000-second campaign cap.
 The [musl screen](../benchmark-results/v1-refresh-musl-screen-2026-10-31.md) and
 full-size control pass ordinary receipts and the new declared trace structure,
-while retaining every raw HWM anomaly. They support a preallocation experiment;
-[candidate f04a109](v1-refresh-exact-capacity.md) is published, reviewed and running
-paired screening after its GitHub workspace tests. Folder observation occurs
+while retaining every raw HWM anomaly. The reviewed
+[candidate f04a109](v1-refresh-exact-capacity.md) passed GitHub workspace tests
+and completed screening and one exploratory full pair. On 7.3m entries process
+RSS fell 31.84% (about 562 MiB), refresh time rose 0.53%; H2 remains inconclusive,
+with no promotion or minimum-memory claim. Folder observation occurs
 earlier relative to publication; progress stays under the existing 99% clamp.
 This does not cancel D7's staged-refresh research or accept a capacity fix without
 measured cause/benefit. The scope/budget instruction was received before dispatch.
