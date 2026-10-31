@@ -22,6 +22,11 @@ on:
         type: choice
         options: [auto, scan, refresh]
         default: auto
+      target:
+        description: Compilation target for both benchmark arms
+        type: choice
+        options: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
+        default: x86_64-unknown-linux-gnu
       io:
         description: Runner I/O sensitivity, not an exact local-disk replica
         type: choice
@@ -61,6 +66,7 @@ jobs:
       paired_step_minutes: ${{ steps.policy.outputs.step_minutes }}
       maximum_runner_minutes: ${{ steps.policy.outputs.maximum_runner_minutes }}
       operations: ${{ steps.policy.outputs.operations }}
+      target: ${{ steps.policy.outputs.target }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,13 +78,15 @@ jobs:
           STAGE: ${{ inputs.stage || 'smoke' }}
           REQUESTED_MINUTES: ${{ inputs.timeout_minutes }}
           OPERATION: ${{ inputs.operation || 'auto' }}
+          TARGET: ${{ inputs.target || 'x86_64-unknown-linux-gnu' }}
         run: |
           python3 - <<'PY'
           import os,sys
           sys.path.insert(0,'scripts')
-          from bench_v1_admission import stage_operations,stage_timeouts
+          from bench_v1_admission import benchmark_target,stage_operations,stage_timeouts
           policy=stage_timeouts(os.environ['STAGE'],os.environ.get('REQUESTED_MINUTES'))
           policy['operations']=' '.join(stage_operations(os.environ['STAGE'],os.environ['OPERATION']))
+          policy['target']=benchmark_target(os.environ['TARGET'])
           with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
               stream.write(''.join(f'{key}={value}\n' for key,value in policy.items()))
           print(policy)
@@ -86,28 +94,40 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt, clippy
+          targets: ${{ steps.policy.outputs.target }}
+      - name: Install musl tools
+        if: steps.policy.outputs.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo timeout 180 apt-get update -q
+          sudo env DEBIAN_FRONTEND=noninteractive timeout 180 apt-get install -yq --no-install-recommends musl-tools
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ steps.policy.outputs.target }}
       - name: Check benchmark contracts and repository gates
+        env:
+          BENCH_TARGET: ${{ steps.policy.outputs.target }}
+          RUSTUP_TOOLCHAIN: 1.99.1
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_bench*.py'
           python3 -m compileall -q scripts/bench_v1*.py
           cd web && bun install --frozen-lockfile
           cd .. && scripts/check.sh
-          cargo test --workspace --locked
+          cargo test --workspace --locked --target "$BENCH_TARGET"
       - name: Build both arms with one recorded toolchain
         env:
           BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
           COMPARISON: ${{ inputs.comparison || 'control' }}
           RUSTUP_TOOLCHAIN: 1.99.1
+          BENCH_TARGET: ${{ steps.policy.outputs.target }}
         run: |
           set -euo pipefail
           mkdir binaries
           git rev-parse HEAD > binaries/candidate.revision.txt
-          cargo build --release --locked -p freespace
-          cp target/release/freespace binaries/candidate
+          cargo build --release --locked -p freespace --target "$BENCH_TARGET"
+          cp "target/$BENCH_TARGET/release/freespace" binaries/candidate
           if [[ $COMPARISON == control ]]; then
             cp binaries/candidate binaries/baseline
             cp binaries/candidate.revision.txt binaries/baseline.revision.txt
@@ -115,13 +135,14 @@ jobs:
             git worktree add --detach "$RUNNER_TEMP/baseline-source" "$BASE_REF"
             git -C "$RUNNER_TEMP/baseline-source" rev-parse HEAD > binaries/baseline.revision.txt
             (cd "$RUNNER_TEMP/baseline-source" && CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target" \
-              cargo build --release --locked -p freespace)
-            cp target/release/freespace binaries/baseline
+              cargo build --release --locked -p freespace --target "$BENCH_TARGET")
+            cp "target/$BENCH_TARGET/release/freespace" binaries/baseline
           fi
           python3 - <<'PY'
           import hashlib,json,os,pathlib,subprocess,tomllib
           compiler=subprocess.check_output(['rustc','-Vv'],text=True)
-          target=next(x.split(': ',1)[1] for x in compiler.splitlines() if x.startswith('host: '))
+          host=next(x.split(': ',1)[1] for x in compiler.splitlines() if x.startswith('host: '))
+          target=os.environ['BENCH_TARGET']
           for arm in ('baseline','candidate'):
               p=pathlib.Path('binaries')/arm
               root=(pathlib.Path(os.environ['RUNNER_TEMP'])/'baseline-source'
@@ -131,7 +152,7 @@ jobs:
                       (root/'.cargo/config',root/'.cargo/config.toml') if path.is_file()}
               record={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
                       'source_revision':p.with_name(arm+'.revision.txt').read_text().strip(),
-                      'compiler':compiler,'target':target,'profile':'release --locked',
+                      'compiler':compiler,'compiler_host':host,'target':target,'profile':'release --locked',
                       'flags':{k:os.environ.get(k,'') for k in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')},
                       'release_profile':release,'cargo_config':config,
                       'bun':subprocess.check_output(['bun','--version'],text=True).strip()}
@@ -178,6 +199,7 @@ jobs:
           BENCH_IO: ${{ inputs.io || 'native' }}
           STAGE: ${{ inputs.stage || 'smoke' }}
           OPERATIONS: ${{ needs.build.outputs.operations }}
+          BENCH_TARGET: ${{ needs.build.outputs.target }}
         run: |
           set -euo pipefail
           case "$OPERATIONS" in
@@ -196,6 +218,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: representative-v1-${{ inputs.stage || 'smoke' }}-${{ inputs.io || 'native' }}
+          name: representative-v1-${{ inputs.stage || 'smoke' }}-${{ inputs.io || 'native' }}-${{ needs.build.outputs.target }}
           path: representative-results/
           retention-days: 14

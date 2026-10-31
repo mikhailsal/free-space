@@ -48,6 +48,14 @@ class CapacityTests(unittest.TestCase):
 
 
 class TimeTests(unittest.TestCase):
+    def test_benchmark_target(self):
+        for target in ("x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"):
+            with self.subTest(target=target):
+                self.assertEqual(ADMISSION.benchmark_target(target), target)
+        for target in (None, "", "x86_64-unknown-linux-gnu extra", "aarch64-unknown-linux-musl"):
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                ADMISSION.benchmark_target(target)
+
     def test_stage_operations(self):
         for stage, expected in (("smoke", ["scan"]), ("screen", ["scan", "refresh"]),
                                 ("local-scale", ["scan"])):

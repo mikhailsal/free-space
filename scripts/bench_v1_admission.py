@@ -93,6 +93,14 @@ def admit_time(remaining_seconds, estimated_seconds, margin=0.3) -> dict:
     return receipt
 
 
+def benchmark_target(requested) -> str:
+    """Validate the explicit compilation target for both benchmark arms."""
+    if not isinstance(requested, str) or requested not in (
+            "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"):
+        raise ValueError("unknown benchmark target")
+    return requested
+
+
 def stage_operations(stage, requested='auto') -> list:
     """Return the validated, ordered operations for a campaign stage."""
     defaults = {"smoke": ["scan"], "screen": ["scan", "refresh"], "local-scale": ["scan"]}
