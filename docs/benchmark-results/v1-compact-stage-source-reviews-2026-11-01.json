@@ -1,0 +1,553 @@
+{
+  "created_at": "2026-10-31T23:07:30.405981+00:00",
+  "requested_model": "claude-opus-5-5",
+  "scope": "Compact temporary indexes, default 8 MiB cache, separately controlled 4 MiB arm and changed-full proof",
+  "sources": {
+    "control": {
+      "head": "5e1a563d871a80a3221999c360d1621a84adcf58",
+      "remote": "5e1a563d871a80a3221999c360d1621a84adcf58",
+      "branch": "perf/v1-memory-candidate-control",
+      "tracked_hashes_verified": 336
+    },
+    "8m_primary": {
+      "head": "601ce381ac229923d2c791fd8e7c510f7b3f1dfc",
+      "remote": "601ce381ac229923d2c791fd8e7c510f7b3f1dfc",
+      "branch": "perf/v1-memory-candidate-default-cache",
+      "tracked_hashes_verified": 340
+    }
+  },
+  "source_freeze": "freespace-integrated-final-all-source-hashes.json in archive",
+  "external_review_status": "Completed exact-model reviews with findings and documented dispositions; no blanket external NO_FINDINGS claim",
+  "validation": "All eight completed results revalidated with validateOutsideReview(result, structured): completed=true, gate=pass; actual modelUsage is claude-opus-5-5 and exit_code=0. A structured pass is transport/format validity, not a finding-free verdict.",
+  "reviews": [
+    {
+      "file": "freespace-memory-candidate-core-adapted-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P2] core/src/scan/staged.rs:23 \u2014 Halving `CACHE_KIB` lowers the cache on both connections. During `write_inner` (core/src/scan/staged/write.rs:68-73), the output connection keeps five secondary B-trees current row by row. One of them, `entries_path_hash`, receives inserts in random key order (core/src/snapshot/schema.rs:113). During the walk, `raw_children` is maintained under LIFO job order (core/src/scan/staged/walk.rs:22-36). At about 4 MiB per connection, both workloads can spill dirty pages and re-read evicted ones. Neither the diff nor the packet measures cache misses, I/O bytes, `insert_seconds`, walk seconds or elapsed time. Run a matched 8 MiB vs 4 MiB comparison on the same runner, fixture and harness (the default-cache arm) at representative scale. It should report walk, insert and total seconds, read/write bytes and peak RSS. Do not admit the 4 MiB arm until that comparison shows no elapsed or I/O regression beyond the qualification tolerance.\n\n[P3] core/src/scan/staged/visit/tests.rs:115-145, core/src/scan/staged/write/batch/tests.rs:74-92 \u2014 The new tests check only result order. SQLite guarantees that order for `ORDER BY path,root,id` and `ORDER BY name,id` whether or not an index exists. So they would still pass if the compact indexes stopped serving the production queries. Ordering is preserved by the implicit `XN_ROWID` key (sqlite3.c:130695-130697). What is untested is whether the planner still uses `raw_children` for the row-value seek `(name,id)>(?2,?3) ORDER BY name,id` (batch.rs, visit.rs). It is equally untested for the `links_owner` owner subquery. A planner fallback would mean a full scan or a temp B-tree sort on every child or link lookup. Add an `EXPLAIN QUERY PLAN` assertion against the production DDL for the batched, single, visit and owner queries. Each plan should use the named index with no `USE TEMP B-TREE`. Then run the staged Rust unit tests and `core/tests/staged.rs`; no Rust tests have executed on this candidate.",
+        "session_id": "4067a41e-9453-4ed3-9bbe-50c237a020b5",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 64795,
+          "output_tokens": 3038,
+          "output_tokens_details": {
+            "thinking_tokens": 2266
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 3038,
+              "cache_read_input_tokens": 64795,
+              "cache_creation_input_tokens": 0,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 0
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 3038,
+            "cacheReadInputTokens": 64795,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.073727,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2266,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-memory-candidate-core-planner-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] core/src/scan/staged.rs:25 and core/src/scan/staged/visit/tests.rs:61-63: `STAGE_SCHEMA` begins with `BEGIN;`, so every test factory that reuses it leaves a transaction open. In production, `walk_inner` runs `COMMIT` before the tree reaches `visit` or `write`. The `staged()` fixture never commits, so `raw_visitor_preserves_\u2026`, `leaf_rows_\u2026` and `reserve_failure_\u2026` run `seed_disk` and `visit` in a connection state production never has. A `seed_disk` path that issues `BEGIN` on the stage connection, or that reads the stage file through a second connection, would behave differently in these tests than in production. `Store::seed_disk` is not in the packet, so I could not rule either out.\n\nFix: make `STAGE_SCHEMA` pure DDL and call `conn.execute_batch(\"BEGIN\")?` separately in `walk_inner`. The executed statements and the transaction boundary stay the same. If you keep the current constant instead, append `COMMIT` at the end of `staged()`.\n\n[P3] core/src/scan/staged/visit/tests.rs:131-136: `compact_link_index_preserves_owner_order_for_tied_blob_paths` builds its own copy of `links` and `links_owner` instead of using `STAGE_SCHEMA`. That copy has untyped `dev`/`ino` and no `NOT NULL` constraints. The test name claims it covers the compact production index, but it would keep passing if the production `links_owner` DDL changed or drifted. Build the table from `STAGE_SCHEMA` so the tied-BLOB owner-order check runs against the real DDL. The data and expected order `[7, 9, 4, 2]` / owner `7` can stay as they are.\n\nChecked and clean:\n- The factored SQL strings match the originals byte for byte, so the `prepare_cached` keys are unchanged. This covers the cursor and initial child queries with `LIMIT 32` and `LIMIT 1`, and both link queries, including the continuation whitespace in `WRITE_LINK_SQL`.\n- `(parent,name)` and `(dev,ino,path,root)` with the implicit rowid suffix give the same ordering and row-value seek as the old explicit `id` column.\n- The EXPLAIN helper reads the `detail` column (index 3). It requires `SEARCH` plus the named index and rejects `USE TEMP B-TREE`. The helper is called for:\n  - the visit child queries, initial and cursor;\n  - the batch child queries at `LIMIT 1` and `LIMIT 32`, initial and cursor;\n  - both owner subqueries.\n- The test helpers can reach every private item they need through the existing `use super::*` chain.\n- The tied-name pagination test should give ids `1..=75` across 4 selects (32, 32, 11, then the empty select).\n\nNone of this has been executed. The GitHub staged unit tests and the full `core/tests/staged.rs` run are still required before measurement. The cache-size P2 stays a separate measurement condition, as you stated.",
+        "session_id": "db29eb69-f1cc-424d-9636-fccfa55f0231",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 52693,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 5902,
+          "output_tokens_details": {
+            "thinking_tokens": 4853
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 52693,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 5902,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 52693,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 52693
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 5902,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 52693,
+            "webSearchRequests": 0,
+            "costUSD": 0.5398908,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 4853,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 52693,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-memory-candidate-visitor-fixture-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "94973ec0-eb07-4f02-8916-de34d697be78",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 20008,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 462,
+          "output_tokens_details": {
+            "thinking_tokens": 451
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 20008,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 462,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 20008,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 20008
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 462,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 20008,
+            "webSearchRequests": 0,
+            "costUSD": 0.1696108,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 451,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 20008,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-memory-candidate-harness-adapted-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P2] The changed-full proof rests on an unverified product schema. `scripts/bench_v1_runtime.py:45-57` assumes `roots.path` and `entries.name` are BLOBs (a TEXT name never equals a BLOB in SQLite). It also assumes the columns `flags`, `allocated`, `apparent`, `mtime` (seconds) and `nlink`, a `hardlinks(entry_id, dev, ino, allocated, apparent)` table, and that flag bit 2 marks a zeroed alias. Neither suite checks any of this against the real schema. `scripts/tests/test_bench_v1_runtime.py:28` builds its own hand-written schema, and `scripts/tests/test_bench_v1_summary.py:91-97` uses hand-built rows. Any mismatch fails closed only on GitHub, which wastes the changed-full run. Before relying on the case, check the column names and types, the flag encoding, the `mtime` unit and the `dev` encoding against the e826 / ed2 `core` schema.\n\n[P2] The seed and refresh expectations assume a fixed choice of which hardlink owns the bytes, but nothing checks that the scanner makes that choice deterministically. `scripts/bench_v1_runtime.py:66-72` and `scripts/bench_v1_summary.py:84-91` require `small/nested/owner` to own the bytes in the seed and `unrelated/old-link` to be the zeroed alias. That only holds if the scanner charges the first path it reaches and visits `small` before `unrelated`. If traversal follows readdir order, ext4's hash order can flip this between runs. The refresh expectations at `scripts/bench_v1_runtime.py:73-77` then require the out-of-subtree alias to be promoted to owner and `new-link` to be zeroed.\n\n[P2] The seed scans run only the baseline binary (`scripts/bench_v1_pair.py:136`). In `comparison=candidate` mode the baseline defaults to `afce6fd` (`.github/workflows/representative-bench.yml:63`). If that revision lacks cross-boundary owner promotion, every baseline arm fails the `current` evidence check. Confirm on GitHub which baseline revision is valid for changed-full before treating its runs as qualification evidence.\n\n[P3] The check on the observer's previous facts compares against the wrong seed snapshot, and the comparison cannot prove rotation anyway. After a refresh, `snapshot.prev.db` should hold the pre-refresh `snapshot.db`. `scripts/bench_v1_summary.py:278` instead compares it with `seed_link_facts['snapshot.prev.db']`. Both seed snapshots come from identical scans of the same tree, so either key matches even if rotation never happened. Bind to `snapshot.db`, or add a value that actually differs, such as the seed `scanned_at`.\n\n[P3] The mutation's inode-overlap guard can never fail. `scripts/bench_v1_fixture.py:118-120` compares the new inodes with the deleted ones, but the new files are created before the deletions at lines 121-124, so the kernel cannot reuse a deleted inode. The repeated check in `full_mutation_ok` (`scripts/bench_v1_summary.py:58`) adds no coverage either. Inode reuse across delete-then-add is never exercised.\n\n[P3] `full_link_facts` is described as bounded but has no time limit. `scripts/bench_v1_runtime.py:43-57` sets no progress handler or deadline, unlike `observe_database`. If `(parent_id, name)` has no index, each path component scans all of `entries`. At local-scale size (about 7.3M entries) that is roughly 22 scans per observer and more in the host seed step. The host call at `scripts/bench_v1_pair.py:142-143` runs outside any container timeout.\n\n[P3] The end-to-end wiring of the new scenario is untested. No test runs `host()` with changed-full, so nothing checks that the scenario reaches `prepare`, that `seed_link_facts` reaches the manifest, or that `mutation_plan` reaches the specs (`scripts/bench_v1_pair.py:106,142,189-190`). No test runs the observer path in `inside()` either (`scripts/bench_v1_runtime.py:199-202`). The new tests only exercise the helper functions on their own.\n\n[P3] The unchanged and changed scenarios do not reject leftover full-scenario fields. `scripts/bench_v1_summary.py:145-158` accepts a non-null `seed_link_facts`, a fixture `mutation_plan`, or a spec `mutation_plan` when the scenario is not changed-full, so stale full-scenario evidence passes silently.",
+        "session_id": "35d0f2b8-16b7-492e-a113-4561e9b86b95",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 112656,
+          "output_tokens": 10196,
+          "output_tokens_details": {
+            "thinking_tokens": 8609
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 10196,
+              "cache_read_input_tokens": 112656,
+              "cache_creation_input_tokens": 0,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 0
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 10196,
+            "cacheReadInputTokens": 112656,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.2264592,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 8609,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-harness-finding-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**Findings**\n\n**[P2] e826 baseline provenance is only a default; nothing enforces it for changed-full qualification**\n`.github/workflows/representative-bench.yml:58` changes the dispatch default to `e8265778\u2026`, but three gaps remain:\n\n- The policy step still falls back to `BASE_REF: ${{ inputs.baseline || 'afce6fd' }}`.\n  - Push-triggered runs therefore resolve `baseline_revision` and `SOURCE_DATE_EPOCH` from afce6fd.\n  - Push runs are control/unchanged, so this is not a wrong-binary bug.\n  - It does mean the epoch recorded in both arms' build provenance differs between push and dispatch runs.\n- A dispatch with `scenario=changed-full comparison=candidate baseline=afce6fd` (or a short SHA) is still accepted end to end.\n- `summarize()` never checks `provenance['baseline-v1']['source_revision']` against the canonical baseline.\n\nH3's \"Next\" asks to require the explicit full e826 SHA and verify it in the admitted manifest. Currently that depends entirely on the operator.\n\nFix:\n1. Make the fallback match the input default.\n2. In the policy step, fail when `SCENARIO=changed-full` and `COMPARISON=candidate` unless the resolved `baseline_revision` is exactly `e8265778ef78ec4acd9da1375eedb0be37a123f5`.\n3. Optionally, record the required revision in the manifest and validate it in the summary, with one negative test.\n\n**[P3] The runtime now imports the summary and admission modules inside every container run**\n`scripts/bench_v1_runtime.py:12` (`from bench_v1_summary import sqlite_i64`) runs at module load. That happens for worker and observer containers in every scenario, not only changed-full.\n\n- It pulls `bench_v1_summary` \u2192 `bench_v1_admission` into the image's Python under `/harness`.\n- Local tests import these on the host interpreter only, so a container-side import incompatibility would not show up until GitHub.\n- The import would break unchanged and changed runs as well as changed-full.\n- It also adds a small, arm-symmetric amount of memory to the worker cgroup, which is part of the \"single CLI and sampler\" measured scope.\n\nFix: move `sqlite_i64` into a stdlib-only helper (or define it in the runtime and have the summary import it from there). Alternatively, explicitly confirm that the GitHub smoke exercises an unchanged worker and observer as well.\n\n**Checked and found sound**\n\n- **Baseline semantics (e826 `tree.rs`, `refresh.rs`, staged `visit.rs`/`write.rs`):**\n  - The seed owner is `small/nested/owner` (lexicographically smaller than `unrelated/\u2026`), and `old-link` is an ALIAS with zeroed sizes.\n  - `outside-owner` has nlink=1, so it has no hardlinks row.\n  - On refresh, the removed owner gives `forced_path`, which misses, so the fallback picks `old-link` as owner.\n  - The new group's known count is 1 against nlink 2, so it is `zeroed` and `new-link` is a zeroed ALIAS whose hardlinks row keeps the pre-zero sizes.\n  - The harness does not assert the stale nlink of loaded outside rows. All of this matches the expectations encoded in `full_link_facts` and `full_link_evidence_ok`.\n- **Signed u64:** `sqlite_i64` matches the Rust `as i64` cast. Boundary coverage includes 2^63 and 2^64\u22121, and rejects bool, negative and 2^64 inputs.\n- **Previous snapshot and stale fields:**\n  - The previous snapshot is checked by comparing the byte digest and the facts against seed `snapshot.prev.db`, and the negative digest test covers identical facts with different bytes.\n  - Non-full runs reject the manifest, fixture, spec and observer changed-full fields.\n- **Fixture accounting:** subtree entries n\u2192n, files n\u22122\u2192n\u22122, total files equal `files`, and `expected_entries` includes `nested`.\n- **Mocked coverage:** the mocked host and observer tests cover wiring, both seed DBs, both arm specs and observer failure propagation.\n- **Deadline handling** matches the stated design.\n\n**Missing context (not evaluable from the supplied material)**\n\n- **`scripts/bench_v1_admission.py`:** shown as modified in git status but absent from the diff. I could not confirm that `qualification_case` and `forecast_case_id` accept `changed-full`.\n- **`scripts/bench-representative.sh` and `bench-v2-container.py`:** I could not confirm that they pass `BENCH_SCENARIO=changed-full` through without their own allowlist.\n- **e826 `core/src/refresh/load.rs`:** I could not confirm that a loaded alias's own `allocated`/`apparent` (and therefore the promoted `old-link`'s entry and hardlinks-row sizes) are restored from `hardlinks`. If they are not, the refresh-phase check fails in both arms, and that failure would be ambiguous between a product defect and a harness expectation.\n- **The legacy helper's `snapshot_integrity` shape:** the tests mock `{'snapshot.prev.db': {'sha256': \u2026}}`, and I could not confirm the real helper returns that shape.\n\nThe real GitHub changed-full smoke remains required before qualification.",
+        "session_id": "90dc9872-7b3a-473c-8f02-7891504da4d0",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 121346,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 11179,
+          "output_tokens_details": {
+            "thinking_tokens": 9325
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 121346,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 11179,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 121346,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 121346
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 11179,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 121346,
+            "webSearchRequests": 0,
+            "costUSD": 1.1946548,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 9325,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 121346,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-harness-canonical-import-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**Findings**\n\n**[P3] The summary's non-canonical-baseline negative test does not isolate the new check**\n\nThe test is in `scripts/tests/test_bench_v1_summary.py`, `test_changed_full_manifest_and_observer_reject_mismatches`, in the block right after the first `assertTrue(...valid)`.\n\n- It changes only `manifest['provenance']['baseline-v1']['source_revision']` to `'afce6fd'`.\n- The arm `one` spec and metrics still carry `CANONICAL_BASELINE`.\n- Because of that, `summarize()` already fails in the `valid_spec` check (`spec.get('source_revision') == p.get('source_revision')`) and reports `one: invalid spec or provenance`.\n- The new `manifest: changed-full baseline is not canonical` check at `scripts/bench_v1_summary.py` (the block after `if not isinstance(provenance, dict)`) could be deleted and the test would still pass.\n\nFix, either of:\n- Set the manifest provenance, the `one/spec.json` `source_revision` and the `one/metrics.json` `source_revision` all to `'afce6fd'` consistently, then assert the result is invalid.\n- Or, more simply, assert `'manifest: changed-full baseline is not canonical' in result['issues']`.\n\n**Closure assessment (no further findings)**\n\nThe P2 finding (no enforcement of the e826 baseline for changed-full qualification) is closed:\n\n- **Workflow fallback:** `BASE_REF` now falls back to the full e826 SHA, matching the dispatch default. Push-run `SOURCE_DATE_EPOCH` is now consistent with dispatch runs.\n- **Workflow validation before build:** the policy step calls `validate_changed_full_baseline(SCENARIO, COMPARISON, resolved baseline_revision)`. That step runs before the toolchain, test and build steps.\n  - A short ref that resolves to e826 is accepted, which is correct because the check uses the resolved revision.\n  - `changed-full` with `control`, or with any other resolved baseline, is rejected.\n- **Ordinary comparisons:** `unchanged` and `changed` still accept arbitrary baselines in either comparison mode, so cache experiments are unaffected. The unit test covers this.\n- **Host check before allocation:** `bench_v1_pair.host` validates `sources['baseline-v1']['source_revision']` before the Docker build, the capacity check, `prepare` and the seed scans.\n  - That value comes from `revision.txt`, which `provenance()` cross-checks against `build.json` and the binary's sha256.\n  - The test asserts that `prepare` and `subprocess.run` are never called.\n  - Passing a hard-coded `'candidate'` is sound: a control run's baseline revision is the candidate HEAD, so it fails unless HEAD is e826. The workflow rejects that case first.\n- **Summary fails closed:** under v4, `changed-full` requires `provenance['baseline-v1'].source_revision == CANONICAL_BASELINE`. Arm specs and metrics are already bound to provenance.\n\nThe P3 finding (runtime importing the summary and admission modules in every container run) is closed:\n\n- `bench_v1_runtime.py` now has only stdlib imports at module level, defines `sqlite_i64` locally and loads the legacy helper lazily via `legacy()`.\n- Summary \u2192 runtime is a one-way import, so there is no cycle. `bench_v1_pair` imports runtime and then summary without issue.\n- The subprocess test confirms that importing runtime loads neither `bench_v1_summary` nor `bench_v1_admission`.\n- Existing tests that import `sqlite_i64` from `bench_v1_summary` still work through the re-export.\n\nStill required, as stated in the brief: the real GitHub changed-full smoke run before qualification. These conclusions are based only on the supplied diff and files; I did not run anything.",
+        "session_id": "69457609-21e5-4a17-8869-8672859209dc",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 110608,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 3667,
+          "output_tokens_details": {
+            "thinking_tokens": 2340
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 110608,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 3667,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 110608,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 110608
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 3667,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 110608,
+            "webSearchRequests": 0,
+            "costUSD": 0.9585108,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2340,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 110608,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-cleanup-published-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] scripts/tests/test_bench_cleanup.py:89-91 \u2014 the sync assertions check only the `timeout --kill-after=2s 15s sync -f -- ` and `sync -f -- ` prefixes, plus agreement between the two lines. They never check the target path. If cleanup synced the wrong filesystem (for example `$mount_dir`, `/`, or an empty argument), the test would still pass. The mock's `[[ ! -e $volume/disk.img ]]` check reads the test's own `$volume`, not the argument it received. Assert `calls[6] == f\"sync -f -- {directory}/volume\"`, which requires returning or exposing the temporary directory from `run_cleanup`. Add the same exact-path check to the sync-failure test at lines 117-118.",
+        "session_id": "c26979c4-b303-43e3-bd0e-d100307615f1",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 10750,
+          "cache_read_input_tokens": 658,
+          "output_tokens": 1598,
+          "output_tokens_details": {
+            "thinking_tokens": 1336
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 10750,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 1598,
+              "cache_read_input_tokens": 658,
+              "cache_creation_input_tokens": 10750,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 10750
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1598,
+            "cacheReadInputTokens": 658,
+            "cacheCreationInputTokens": 10750,
+            "webSearchRequests": 0,
+            "costUSD": 0.1180996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1336,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 10750,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-cleanup-target-assertions-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "9c5a9a5c-699f-47bb-9d70-ea626e855321",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 8694,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 563,
+          "output_tokens_details": {
+            "thinking_tokens": 552
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 8694,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 563,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 8694,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 8694
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 563,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 8694,
+            "webSearchRequests": 0,
+            "costUSD": 0.0811188,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 552,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 8694,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "dispositions": {
+    "prior_review": "/tmp/freespace-harness-canonical-import-closure-review.json",
+    "closure_diff": "In scripts/tests/test_bench_v1_summary.py the existing noncanonical negative test now asserts result issues contain manifest: changed-full baseline is not canonical; removal of canonical gate fails assertion.",
+    "test_log": "/tmp/freespace-harness-canonical-final-tests.log",
+    "dispositions": {
+      "H1": "schema confirmed; signed SQLite dev/ino conversion and boundary coverage; GH product smoke required",
+      "H2": "baseline owner deterministic; no semantic change, GH smoke required",
+      "H3": "canonical e826 enforced in workflow, host and summary for changed-full only",
+      "H4": "previous preserved and bound using reused seed and observer hashes",
+      "H5": "create-before-delete guard retained and purpose clarified; not inode reuse coverage",
+      "H6": "10-second SQLite deadline capped by caller remaining time; OS I/O outer cap",
+      "H7": "mocked host and observer wiring/failure coverage",
+      "H8": "stale non-full evidence rejected",
+      "last_P2": "canonical changed-full enforcement externally reviewed as closed",
+      "last_P3_import": "runtime no longer imports summary/admission; externally reviewed as closed",
+      "new_P3": "Parent inspected the exact issue assertion in test_bench_v1_summary.py:127 and verified all three frozen source maps. The test now fails when the canonical gate is removed. Closed as prescribed test-only correction; no new external NO_FINDINGS claimed."
+    },
+    "qualification": "8MiB primary; 4MiB only controlled cache experiment; actual changed-full GH smoke and full staged Rust tests required before performance qualification",
+    "parent_review": "2026-10-31T23:04Z; tracked source hashes match all three trees; control production equals e826; 8/4 MiB production differs only CACHE_KIB."
+  },
+  "core_dispositions": {
+    "cache_4m": "Unresolved performance condition, not a confirmed code defect. Retain 8 MiB primary; admit 4 MiB only for matched 8/4 representative-scale wall/phase/I/O/RSS experiment.",
+    "planner": "Production DDL and child/owner SQL reused in SEARCH/no-temp-sort assertions; actual bundled-SQLite tests required on GH.",
+    "fixture": "Commit production schema test transaction and reuse actual links DDL. Focused final Opus review NO_FINDINGS covers these closures only."
+  },
+  "cleanup_disposition": "Exact sync filesystem target assertions added and focused closure externally returned NO_FINDINGS. New integrated branches contain this test-only fix; frozen 55d6/0adc/2b9 measurement sources are unchanged.",
+  "invalid_review_attempts": "Two core/harness attempts omitted the explicit JSON adapter and returned invalid-response. Preserved raw error results; no valid coverage is attributed to them. Corrected invocations use the explicit adapter. Earlier provider quota error remains in the original cleanup review record.",
+  "local_validation": "52 focused mocked Python tests and nine cleanup tests passed; normal bounded Git hooks passed. No local Rust tests or application execution. Full Rust tests and real changed-full smoke remain GH prerequisites.",
+  "mechanism_probe": "Tiny 1,500-row Python SQLite 3.37.2 probe: explicit terminal id and implicit rowid both appeared in index_xinfo; removal reduced raw index pages 7 to 6 and owner pages 13 to 12. Not a bundled-SQLite or application-scale performance/RAM result.",
+  "archive": "v1-compact-stage-source-reviews-2026-11-01.tar.gz",
+  "archive_sha256": "fdf29540e31098abe4f83a9851dd8698b153718e9d834ea6e120be5dedfe5b54",
+  "indexed_payload_count": 36,
+  "product_acceptance": false
+}

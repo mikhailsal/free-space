@@ -1,5 +1,5 @@
 {
-  "status": "1GiB repaired control valid; matched joint at1GiB next,512MiB conditional",
+  "status": "Complete: all six active 1m A/A and joint rungs valid through 512 MiB; floor-censored, not a minimum or code capacity gain. Full 7.3m scale below 4 GiB remains untested.",
   "candidate_revision": "0adc796a99fd33abec85ab250ad9b2529507b49a",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
   "control_harness_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
@@ -409,7 +409,7 @@
       "allocation_diagnostics": false,
       "artifact_prefix": "/tmp/freespace-fullscan-memory-repaired-1024-aa",
       "source_repair": "test-only mock isolation; production and measurement source unchanged",
-      "external_review": "Opus5.5 pending provider quota; parent-reviewed test-only infrastructure repair, no product acceptance",
+      "external_review": "At admission Opus 5.5 was pending quota; later review identified an exact-target cleanup P3, corrected with focused NO_FINDINGS in integrated future worktrees only. This measured source remains unchanged.",
       "admitted_at": "2026-10-31T21:35:48.473653+00:00",
       "dispatch_receipt": "/tmp/freespace-fullscan-memory-repaired-1024-aa-dispatch.json",
       "run_id": 41244336962,
@@ -448,7 +448,7 @@
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
       "forecast_with_margin_seconds": 2533.7000000000003,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Valid new-source 100k protocol smoke first; all earlier active rungs valid; AA before joint. Fixed cap and forecast admission, stop on any worker failure. Old failed1GiB build is not capacity evidence.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-repaired-1024-joint",
@@ -460,14 +460,21 @@
       "allocation_diagnostics": false,
       "artifact_prefix": "/tmp/freespace-fullscan-memory-repaired-1024-joint",
       "source_repair": "test-only mock isolation; production and measurement source unchanged",
-      "external_review": "Opus5.5 pending provider quota; parent-reviewed test-only infrastructure repair, no product acceptance",
+      "external_review": "At admission Opus 5.5 was pending quota; later review identified an exact-target cleanup P3, corrected with focused NO_FINDINGS in integrated future worktrees only. This measured source remains unchanged.",
       "admitted_at": "2026-10-31T21:54:31.938459+00:00",
       "dispatch_receipt": "/tmp/freespace-fullscan-memory-repaired-1024-joint-dispatch.json",
       "run_id": 41245753697,
       "created_at": "2026-10-31T21:54:33Z",
-      "conclusion": "",
+      "conclusion": "success",
       "head_sha_verified": true,
-      "completed_job_seconds": 0
+      "completed_job_seconds": 1047.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T22:15:26.643606+00:00",
+      "job_seconds": 1047.0,
+      "receipt": "v1-fullscan-memory-repaired-1024-joint-2026-10-31.json",
+      "receipt_validation": "strict_valid_6of6_semantic_pass",
+      "h2": "inconclusive: sampled disk positive pairedmedian+12288B even within descriptive matchedAA16384B spread; no promotion",
+      "memory_outcome": "All6at1GiB memorypeak=cap, no recordedOOM, memoryPSI0.427-0.447s; baseline andjoint lowesttestedbudget1GiB at1m, exactminimumunknown. No source totalRAMsaving shown."
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -492,8 +499,8 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
-      "forecast_with_margin_seconds": 2534,
-      "status": "conditional_higher_rung_and_control",
+      "forecast_with_margin_seconds": 2533.7000000000003,
+      "status": "completed",
       "depends_on": "Valid new-source 100k protocol smoke first; all earlier active rungs valid; AA before joint. Fixed cap and forecast admission, stop on any worker failure. Old failed1GiB build is not capacity evidence.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-repaired-512-aa",
@@ -505,7 +512,20 @@
       "allocation_diagnostics": false,
       "artifact_prefix": "/tmp/freespace-fullscan-memory-repaired-512-aa",
       "source_repair": "test-only mock isolation; production and measurement source unchanged",
-      "external_review": "Opus5.5 pending provider quota; parent-reviewed test-only infrastructure repair, no product acceptance"
+      "external_review": "At admission Opus 5.5 was pending quota; later review identified an exact-target cleanup P3, corrected with focused NO_FINDINGS in integrated future worktrees only. This measured source remains unchanged.",
+      "admitted_at": "2026-10-31T22:24:40.072806+00:00",
+      "dispatch_receipt": "/tmp/freespace-fullscan-memory-repaired-512-aa-dispatch.json",
+      "run_id": 41248061322,
+      "created_at": "2026-10-31T22:24:41Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 1084.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T22:44:28.476129+00:00",
+      "job_seconds": 1084.0,
+      "receipt": "v1-fullscan-memory-repaired-512-aa-2026-10-31.json",
+      "receipt_validation": "strict_valid_6of6_semantic_pass",
+      "memory_outcome": "All6baseline1m scans pass at512MiB memorypeak=cap; maxevents2100-2511,PSI0.695-0.848s,noOOM. Lowesttestedfloor512MiB,not exactminimum/sourcegain."
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -530,8 +550,8 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
-      "forecast_with_margin_seconds": 2534,
-      "status": "conditional_higher_rung_and_control",
+      "forecast_with_margin_seconds": 2533.7000000000003,
+      "status": "completed",
       "depends_on": "Valid new-source 100k protocol smoke first; all earlier active rungs valid; AA before joint. Fixed cap and forecast admission, stop on any worker failure. Old failed1GiB build is not capacity evidence.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-repaired-512-joint",
@@ -543,7 +563,19 @@
       "allocation_diagnostics": false,
       "artifact_prefix": "/tmp/freespace-fullscan-memory-repaired-512-joint",
       "source_repair": "test-only mock isolation; production and measurement source unchanged",
-      "external_review": "Opus5.5 pending provider quota; parent-reviewed test-only infrastructure repair, no product acceptance"
+      "external_review": "Opus 5.5 reviewed; exact-target cleanup P3 corrected and focused review returned NO_FINDINGS in integrated future worktrees only. Frozen measured source unchanged.",
+      "admitted_at": "2026-10-31T22:45:38.270254+00:00",
+      "dispatch_receipt": "/tmp/freespace-fullscan-memory-repaired-512-joint-dispatch.json",
+      "run_id": 41249609974,
+      "created_at": "2026-10-31T22:45:39Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 991,
+      "job_seconds": 991,
+      "receipt": "v1-fullscan-memory-repaired-512-joint-2026-10-31.json",
+      "receipt_validation": "strict_valid_6of6_semantic_pass",
+      "h2": "inconclusive: positive paired median RSS +192 KiB and app disk +28672 bytes; no promotion",
+      "memory_outcome": "All six succeeded at 512 MiB with peak at cap, hierarchical max events and PSI, no swap or hierarchical OOM; memory.events.local not collected."
     }
   ],
   "scan_mode_scope": {
@@ -553,7 +585,7 @@
     "ordinary_in_memory_mode": "Not covered by these measurements",
     "basis": "Explicit existing worker arguments at frozen source, documented without changing any running case"
   },
-  "updated_at": "2026-10-31T21:56:09.306520+00:00",
+  "updated_at": "2026-10-31T22:47:14.900121+00:00",
   "active_ladder": [
     "fullscan-memory-2048-aa",
     "fullscan-memory-2048-joint",
@@ -578,7 +610,7 @@
         ],
         "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
         "production_and_measurement_source_changed": false,
-        "opus_review": "pending; provider quota failure"
+        "opus_review": "Opus 5.5 review completed; exact-target cleanup P3 corrected and focused NO_FINDINGS in integrated future worktrees only; measured frozen source unchanged."
       },
       "control": {
         "head": "55d6e3460f34710e2520b77da66e659d410f6c25",
@@ -588,7 +620,7 @@
         ],
         "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
         "production_and_measurement_source_changed": false,
-        "opus_review": "pending; provider quota failure"
+        "opus_review": "Opus 5.5 review completed; exact-target cleanup P3 corrected and focused NO_FINDINGS in integrated future worktrees only; measured frozen source unchanged."
       },
       "joint": {
         "head": "0adc796a99fd33abec85ab250ad9b2529507b49a",
@@ -598,7 +630,7 @@
         ],
         "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
         "production_and_measurement_source_changed": false,
-        "opus_review": "pending; provider quota failure"
+        "opus_review": "Opus 5.5 review completed; exact-target cleanup P3 corrected and focused NO_FINDINGS in integrated future worktrees only; measured frozen source unchanged."
       }
     },
     "failed_run": 41242956623,
@@ -624,9 +656,10 @@
     "note": "Two successful2GiB jobs1799s plus failed1GiB build41s and remaining24900s fit within original32400s ladder allowance; campaign60h unchanged."
   },
   "minimum_tested_success_1m": {
-    "baseline_mib": 1024,
-    "joint_mib": 2048,
+    "baseline_mib": 512,
+    "joint_mib": 512,
     "exact_minimum_known": false,
     "code_memory_saving_demonstrated": false
-  }
+  },
+  "completion_note": "The original failed 1 GiB build remains invalid. 512 MiB is the lowest tested success for both arms on this fixture and is floor-censored; it does not prove a minimum or a code capacity gain. No extrapolation to 7.3m files."
 }

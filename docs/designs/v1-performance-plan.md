@@ -88,17 +88,9 @@ uses fresh matched controls and the joint source at 4 GiB, then conditionally
 experiment; a genuine memory optimization needs matched source and capacity
 evidence. No minimum requirement or full-scan RAM improvement is claimed yet.
 
-The [repaired 1 GiB control](../benchmark-results/v1-fullscan-memory-repaired-1024-aa-2026-10-31.md)
-passed all six baseline scans and semantic observers on one million files. Every
-worker reached the cap with recorded pressure, without OOM; this is the lowest
-tested successful baseline budget at that scale, not an exact minimum. The
-matching joint case is running and 512 MiB remains conditional. An earlier
-attempt failed in the build's cleanup unit test before workers; it is not RAM
-evidence. A test-only isolation repair passed nine focused tests and a separate
-100k protocol smoke with actual unchanged binary identity before the new attempt.
-Production app and measurement source are unchanged by that repair. The parent
-inspected it for research publication; requested Opus review remains pending
-provider quota, with no clean outside-review or product-acceptance claim.
+The complete [1m memory ladder](../benchmark-results/v1-fullscan-memory-grid-manifest-2026-10-31.json) now has valid A/A and joint runs at 2 GiB, 1 GiB and 512 MiB. At 512 MiB both arms completed all six scans and semantic observers with pressure and no hierarchical OOM. This lowest tested success is floor-censored, not an exact minimum or candidate capacity gain. The joint 512 MiB median RSS and disk changes were positive (+192 KiB and +28,672 bytes), leaving H2 inconclusive. No result below 4 GiB is inferred for the 7.3m fixture. The earlier 1 GiB build failure remains invalid capacity evidence.
+
+Exact Opus 5.5 source reviews completed after quota recovery. An exact-target cleanup P3 was corrected and received focused NO_FINDINGS in integrated future worktrees only; frozen measured 55d6e346 and 0adc796a sources remain unchanged. This is not a broad clean-review claim.
 
 The bounded [staged-refresh smoke](../benchmark-results/v1-staged-refresh-isolated-smoke-2026-10-31.md)
 passed correctness, including refresh history. Its one 100k pair saved 39.49%
@@ -108,10 +100,16 @@ and sampled disk peak by 47.90%. The prototype is rejected and its conditional
 authorized by that result.
 
 Planning and earlier source reviews used the requested `claude-opus-5-5`.
-Compact temporary indexes, optional 4/8 MiB staged-cache arms and comprehensive
-mutation integration are prepared for new reviews, with no measured benefit yet.
+The published [8 MiB default research source](../benchmark-results/v1-compact-stage-source-reviews-2026-11-01.md)
+has compact temporary indexes and comprehensive mutation integration. It is
+source-reviewed with dispositions but unmeasured; 4 MiB is a controlled experiment
+only. The [preregistered next cases](../benchmark-results/v1-compact-stage-manifest-2026-11-01.json)
+require a real GitHub changed-full smoke and new Rust tests before matched screens.
 The [progress report](../benchmark-results/v1-optimization-progress-2026-10-31.md)
 separates these states and source variants.
+Completed usage is 33,113 runner seconds (9h 11m 53s) of 60 hours. The local
+`freespace.timer` is temporarily stopped for GitHub-only research; `Persistent=yes`
+can trigger catch-up when restored. Installed backend and configuration remain unchanged.
 D16 permits test-host backend switching without certifying a production release
 or unlimited local load. Continue the accepted investigation and conditional
 qualification with immutable preregistered workloads, bounded jobs and recorded
