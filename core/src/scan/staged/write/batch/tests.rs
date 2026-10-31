@@ -71,9 +71,7 @@ fn wide_raw_names_keep_cursor_order_and_reduce_selects() {
     assert_eq!((budget.slots, budget.bytes), (0, 0));
 }
 
-#[test]
-fn shared_budget_falls_back_and_releases_drained_capacity() {
-    let conn = db();
+fn populate_nested_wide(conn: &Connection) -> Vec<u64> {
     // Each first child is the next directory: buffers remain pending at
     // every ancestor while a deep, wide traversal descends.
     let mut parents = vec![1000];
@@ -81,7 +79,7 @@ fn shared_budget_falls_back_and_releases_drained_capacity() {
         let parent = parents[depth as usize];
         for i in 0..40u64 {
             insert(
-                &conn,
+                conn,
                 depth * 100 + i + 1,
                 parent,
                 format!("{i:03}").as_bytes(),
@@ -89,6 +87,13 @@ fn shared_budget_falls_back_and_releases_drained_capacity() {
         }
         parents.push(depth * 100 + 1);
     }
+    parents
+}
+
+#[test]
+fn shared_budget_falls_back_and_releases_drained_capacity() {
+    let conn = db();
+    let parents = populate_nested_wide(&conn);
     let mut budget = Budget {
         max_slots: usize::MAX,
         max_bytes: usize::MAX,
@@ -260,6 +265,68 @@ fn eviction_prefers_shallow_ancestor_and_resumes_cursor() {
     evict_for_directory(&mut stack, &mut budget);
     assert!(stack[0].pending.is_empty());
     assert!(!stack[1].pending.is_empty());
+    let root = &mut stack[0];
+    let row = take(
+        &conn,
+        root.raw,
+        &mut root.cursor,
+        &mut root.pending,
+        &mut budget,
+    )
+    .unwrap();
+    assert_eq!(row.id, 2);
+}
+
+#[test]
+fn byte_headroom_evicts_shallow_ancestor_and_resumes_cursor() {
+    use super::super::{Frame, evict_for_directory};
+    fn frame(raw: u64) -> Frame {
+        Frame {
+            raw,
+            id: raw,
+            kind: Kind::Dir,
+            cursor: None,
+            path_len: 0,
+            agg: SubtreeAgg::of(&Node::default()),
+            pending: Pending::default(),
+        }
+    }
+    let conn = db();
+    for parent in 0..2u64 {
+        for i in 0..4u64 {
+            insert(
+                &conn,
+                parent * 100 + i + 1,
+                parent,
+                format!("{i:03}").as_bytes(),
+            );
+        }
+    }
+    let mut budget = Budget {
+        max_slots: usize::MAX,
+        max_bytes: usize::MAX,
+        ..Budget::default()
+    };
+    let mut stack = vec![frame(0), frame(1), frame(2)];
+    for frame in &mut stack[..2] {
+        take(
+            &conn,
+            frame.raw,
+            &mut frame.cursor,
+            &mut frame.pending,
+            &mut budget,
+        )
+        .unwrap();
+    }
+    let reserve =
+        BATCH * size_of::<Raw>() + ALLOC_OVERHEAD + BATCH * (NAME_HEADROOM + ALLOC_OVERHEAD);
+    budget.max_bytes = budget.bytes + reserve - 1;
+    assert!(budget.can_buffer());
+    assert!(!budget.can_prefetch_full_batch());
+    evict_for_directory(&mut stack, &mut budget);
+    assert!(stack[0].pending.is_empty());
+    assert!(!stack[1].pending.is_empty());
+    assert!(budget.can_prefetch_full_batch());
     let root = &mut stack[0];
     let row = take(
         &conn,

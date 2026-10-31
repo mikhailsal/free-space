@@ -278,7 +278,7 @@ fn evict_for_directory(stack: &mut [Frame], budget: &mut batch::Budget) {
         return;
     }
     for ancestor in ancestors {
-        if budget.can_buffer() {
+        if budget.can_prefetch_full_batch() {
             break;
         }
         if !ancestor.pending.is_empty() {

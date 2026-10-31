@@ -7,6 +7,8 @@ const ROW_LIMIT: usize = 256;
 const BYTE_LIMIT: usize = 64 * 1024;
 // Bookkeeping allowance per allocation; this is not an allocator-resident bound.
 const ALLOC_OVERHEAD: usize = 64;
+// Planning headroom per name, not a filename limit or allocator guarantee.
+const NAME_HEADROOM: usize = 256;
 
 #[derive(Default)]
 pub(super) struct Pending {
@@ -38,6 +40,15 @@ impl Default for Budget {
 }
 
 impl Budget {
+    pub(super) fn can_prefetch_full_batch(&self) -> bool {
+        self.can_buffer()
+            && self.bytes.saturating_add(
+                BATCH * size_of::<Raw>()
+                    + ALLOC_OVERHEAD
+                    + BATCH * (NAME_HEADROOM + ALLOC_OVERHEAD),
+            ) <= self.max_bytes
+    }
+
     pub(super) fn can_buffer(&self) -> bool {
         self.slots.saturating_add(BATCH) <= self.max_slots
             && self
