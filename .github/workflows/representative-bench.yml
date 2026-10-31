@@ -35,7 +35,7 @@ on:
       scenario:
         description: Changed requires refresh-only operation
         type: choice
-        options: [unchanged, changed]
+        options: [unchanged, changed, changed-full]
         default: unchanged
       memory_mib:
         description: Ordinary successful-operation memory limit (MiB)
@@ -55,7 +55,7 @@ on:
       baseline:
         description: Immutable product baseline revision
         type: string
-        default: afce6fd
+        default: e8265778ef78ec4acd9da1375eedb0be37a123f5
       timeout_minutes:
         description: Optional lower measured-step cap within the stage maximum
         type: string
@@ -105,12 +105,13 @@ jobs:
           SUBTREE: ${{ inputs.subtree_entries || '100' }}
           SCENARIO: ${{ inputs.scenario || 'unchanged' }}
           MEMORY: ${{ inputs.memory_mib || '4096' }}
-          BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
+          BASE_REF: ${{ inputs.baseline || 'e8265778ef78ec4acd9da1375eedb0be37a123f5' }}
+          COMPARISON: ${{ inputs.comparison || 'control' }}
         run: |
           python3 - <<'PY'
           import os,sys
           sys.path.insert(0,'scripts')
-          from bench_v1_admission import baseline_epoch,benchmark_target,qualification_case,stage_files,stage_operations,stage_timeouts
+          from bench_v1_admission import baseline_epoch,benchmark_target,qualification_case,stage_files,stage_operations,stage_timeouts,validate_changed_full_baseline
           policy=stage_timeouts(os.environ['STAGE'],os.environ.get('REQUESTED_MINUTES'))
           operations=stage_operations(os.environ['STAGE'],os.environ['OPERATION'])
           files=stage_files(os.environ['STAGE'])
@@ -119,6 +120,7 @@ jobs:
           policy['operations']=' '.join(operations)
           policy['target']=benchmark_target(os.environ['TARGET'])
           policy['baseline_revision'],policy['source_date_epoch']=baseline_epoch(os.environ['BASE_REF'])
+          validate_changed_full_baseline(os.environ['SCENARIO'],os.environ['COMPARISON'],policy['baseline_revision'])
           with open(os.environ['GITHUB_ENV'],'a') as stream:
               stream.write(f"SOURCE_DATE_EPOCH={policy['source_date_epoch']}\n")
           with open(os.environ['GITHUB_OUTPUT'],'a') as stream:

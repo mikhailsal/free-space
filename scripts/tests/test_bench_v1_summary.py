@@ -78,6 +78,119 @@ class SummaryTest(unittest.TestCase):
         put(self.root / 'manifest.json', manifest)
         self.assertFalse(MODULE.summarize(self.root)['valid'])
 
+    def test_changed_full_manifest_and_observer_reject_mismatches(self):
+        from unittest.mock import patch
+        sys.path.insert(0, str(PATH.parent))
+        from bench_v1_fixture import prepare, mutate_full
+        with tempfile.TemporaryDirectory() as temp, patch('bench_v1_fixture.os.sync'):
+            tree = Path(temp) / 'tree'
+            actual = prepare(tree, 100, 100, 'changed-full')
+            mutation = mutate_full(tree)
+        plan = actual['mutation_plan']
+        actual['expected_entries'] = 12  # The synthetic observer fixture has 12 entries.
+        def link(prefix, flags, allocated, size, nlink):
+            return [flags, allocated, size, 1700000000, nlink, plan[prefix + '_dev'], plan[prefix + '_inode'], plan[prefix + '_allocated'], plan[prefix + '_size']]
+        old = link('old_owner', 0, plan['old_owner_allocated'], plan['old_owner_size'], 2)
+        alias = link('old_owner', 2, 0, 0, 2)
+        owner = [0, plan['outside_owner_allocated'], plan['outside_owner_size'], 1700000000, 1, None, None, None, None]
+        seed = {plan['old_owner_path']: old, plan['old_outside_path']: alias, plan['new_owner_path']: owner}
+        current = {plan['old_outside_path']: old, plan['new_owner_path']: owner,
+                   plan['new_link_path']: link('outside_owner', 2, 0, 0, 2)}
+        manifest = json.loads((self.root / 'manifest.json').read_text())
+        manifest.update(measurement_protocol=MODULE.PROTOCOL, case_policy='qualification-v1', scenario='changed-full',
+                        subtree_entries=100, memory_mib=512, setup_memory_mib=4096, observer_memory_mib=4096,
+                        fixture_receipt=actual, mutation_receipt=mutation,
+                        seed_link_facts={'snapshot.db': seed, 'snapshot.prev.db': seed}, seed_previous_sha256='b'*64)
+        manifest['provenance']['baseline-v1']['source_revision'] = MODULE.CANONICAL_BASELINE
+        put(self.root / 'manifest.json', manifest)
+        for arm in ('one', 'two'):
+            spec = json.loads((self.root / arm / 'spec.json').read_text())
+            spec.update(expected_subtree_entries=100, memory_mib=512, observer_memory_mib=4096, scenario='changed-full', mutation_plan=plan)
+            if arm == 'one':
+                spec['source_revision'] = MODULE.CANONICAL_BASELINE
+            put(self.root / arm / 'spec.json', spec)
+            metric = json.loads((self.root / arm / 'metrics.json').read_text())
+            metric['source_revision'] = spec['source_revision']
+            metric['memory_mib'] = 512; metric['report']['subtree_entries'] = 100
+            metric['cgroup_after']['memory.max'] = str(512 * 1024 * 1024)
+            put(self.root / arm / 'metrics.json', metric)
+            observer = json.loads((self.root / arm / 'observer.json').read_text())
+            observer['resources']['cgroup']['memory.max'] = str(4096 * 1024 * 1024)
+            observer['full_link_facts'] = {'previous': seed, 'current': current}
+            observer['previous_sha256'] = 'b'*64
+            put(self.root / arm / 'observer.json', observer)
+        self.assertTrue(MODULE.summarize(self.root)['valid'])
+        manifest['provenance']['baseline-v1']['source_revision'] = 'afce6fd'
+        put(self.root / 'manifest.json', manifest)
+        result = MODULE.summarize(self.root)
+        self.assertFalse(result['valid'])
+        self.assertIn('manifest: changed-full baseline is not canonical', result['issues'])
+        manifest['provenance']['baseline-v1']['source_revision'] = MODULE.CANONICAL_BASELINE
+        put(self.root / 'manifest.json', manifest)
+        # Current and previous can have identical link facts but different bytes.
+        self.change('one/observer.json', 'previous_sha256', 'c'*64)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        self.change('one/observer.json', 'previous_sha256', 'b'*64)
+        for path, key, value in [('manifest.json', 'mutation_receipt', {'recipe': 'rename-size-mtime'}),
+                                 ('manifest.json', 'fixture_receipt', {'expected_entries': 12, 'expected_subtree_entries': 100})]:
+            original = json.loads((self.root / path).read_text())
+            self.change(path, key, value)
+            self.assertFalse(MODULE.summarize(self.root)['valid'])
+            put(self.root / path, original)
+        def missing_seed(obj):
+            del obj['seed_link_facts']
+        def missing_previous(obj):
+            del obj['seed_link_facts']['snapshot.prev.db']
+        def extra_seed_snapshot(obj):
+            obj['seed_link_facts']['snapshot.extra.db'] = obj['seed_link_facts']['snapshot.db']
+        def wrong_seed_alias(obj):
+            obj['seed_link_facts']['snapshot.db'][plan['old_outside_path']][0] = 0
+        def wrong_previous(obj):
+            obj['full_link_facts']['previous'][plan['old_outside_path']][0] = 0
+        def wrong_plan(obj):
+            obj['mutation_plan']['old_owner_inode'] += 1
+        def wrong_current(index, value):
+            def change(obj):
+                obj['full_link_facts']['current'][plan['new_link_path']][index] = value
+            return change
+        for path, mutate in [('manifest.json', missing_seed), ('manifest.json', missing_previous),
+                             ('manifest.json', extra_seed_snapshot),
+                             ('manifest.json', wrong_seed_alias), ('one/observer.json', wrong_previous),
+                             ('one/spec.json', wrong_plan),
+                             ('one/observer.json', wrong_current(1, 1)),
+                             ('one/observer.json', wrong_current(2, 1)),
+                             ('one/observer.json', wrong_current(4, 1)),
+                             ('one/observer.json', wrong_current(5, plan['old_owner_dev'] + 1)),
+                             ('one/observer.json', wrong_current(6, plan['old_owner_inode'])),
+                             ('one/observer.json', wrong_current(8, plan['old_owner_size']))]:
+            with self.subTest(path=path, mutation=mutate):
+                file = self.root / path
+                original = json.loads(file.read_text())
+                changed = json.loads(file.read_text())
+                mutate(changed)
+                put(file, changed)
+                self.assertFalse(MODULE.summarize(self.root)['valid'])
+                put(file, original)
+        with self.subTest(mutation='both arms and current evidence agree on a different plan'):
+            originals = {}
+            for arm in ('one', 'two'):
+                spec_path = self.root / arm / 'spec.json'
+                observer_path = self.root / arm / 'observer.json'
+                for file in (spec_path, observer_path):
+                    originals[file] = json.loads(file.read_text())
+                spec = json.loads(spec_path.read_text())
+                observer = json.loads(observer_path.read_text())
+                spec['mutation_plan']['old_owner_inode'] += 2 ** 40
+                observer['full_link_facts']['current'][plan['old_outside_path']][6] = spec['mutation_plan']['old_owner_inode']
+                self.assertTrue(MODULE.full_link_evidence_ok(observer['full_link_facts']['current'], spec['mutation_plan'], 'refresh'))
+                put(spec_path, spec)
+                put(observer_path, observer)
+            self.assertFalse(MODULE.summarize(self.root)['valid'])
+            for file, original in originals.items():
+                put(file, original)
+        self.change('one/observer.json', 'full_link_facts', {'previous': seed, 'current': {}})
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+
     def test_qualification_case_rejects_missing_and_mismatched_bindings(self):
         self.change('manifest.json', 'measurement_protocol', MODULE.PROTOCOL)
         self.change('manifest.json', 'case_policy', 'qualification-v1')
@@ -108,6 +221,22 @@ class SummaryTest(unittest.TestCase):
             put(self.root / arm / 'metrics.json', metric)
         self.assertTrue(MODULE.summarize(self.root)['valid'])
         self.assertEqual(MODULE.summarize(self.root)['measurement_protocol'], MODULE.PROTOCOL)
+        for path, key, value in [('manifest.json', 'seed_link_facts', {}),
+                                 ('manifest.json', 'seed_previous_sha256', 'a'*64),
+                                 ('one/spec.json', 'mutation_plan', {}),
+                                 ('one/observer.json', 'full_link_facts', {}),
+                                 ('one/observer.json', 'previous_sha256', 'a'*64)]:
+            file = self.root / path
+            original = json.loads(file.read_text())
+            self.change(path, key, value)
+            self.assertFalse(MODULE.summarize(self.root)['valid'])
+            put(file, original)
+        manifest = json.loads((self.root / 'manifest.json').read_text())
+        manifest['fixture_receipt']['mutation_plan'] = {}
+        put(self.root / 'manifest.json', manifest)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        del manifest['fixture_receipt']['mutation_plan']
+        put(self.root / 'manifest.json', manifest)
         observer = json.loads((self.root / 'one' / 'observer.json').read_text())
         observer['resources']['cgroup']['memory.max'] = str(512 * 1024 * 1024)
         put(self.root / 'one' / 'observer.json', observer)
