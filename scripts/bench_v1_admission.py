@@ -11,6 +11,45 @@ import re
 import subprocess
 
 GIB = 1024 ** 3
+V1_VOLUME_GIB = 40
+V1_HARD_FLOOR_GIB = 42
+V1_PREP_HEADROOM_GIB = 2
+RUNNER_PREPARATION_POLICY = 'sdk-space-v1'
+
+
+def valid_runner_preparation(context):
+    try:
+        return (isinstance(context, dict) and context.get('success') is True
+                and type(context.get('acted')) is bool and type(context.get('freed_bytes')) is int
+                and isinstance(context.get('duration_seconds'), (int, float))
+                and not isinstance(context.get('duration_seconds'), bool)
+                and math.isfinite(context['duration_seconds']) and context['duration_seconds'] >= 0
+                and type(context.get('floor_bytes')) is int and context['floor_bytes'] == V1_HARD_FLOOR_GIB * GIB
+                and type(context.get('target_bytes')) is int
+                and context['target_bytes'] == (V1_HARD_FLOOR_GIB + V1_PREP_HEADROOM_GIB) * GIB)
+    except (KeyError, OverflowError):
+        return False
+
+
+def runner_preparation_context(receipt):
+    if not isinstance(receipt, dict) or receipt.get('success') is not True or not isinstance(receipt.get('actions'), list):
+        raise ValueError('runner preparation did not succeed')
+    try:
+        before, after = receipt['before']['available_bytes'], receipt['after']['available_bytes']
+        if type(before) is not int or type(after) is not int or min(before, after) < 0 or after < (V1_HARD_FLOOR_GIB + V1_PREP_HEADROOM_GIB) * GIB:
+            raise ValueError('invalid preparation disk counters')
+        if any(not isinstance(action, dict) or action.get('status') not in ('removed', 'skipped-unsafe-or-absent') for action in receipt['actions']):
+            raise ValueError('invalid preparation actions')
+        # On successful runs, acted means a removal completed. Failure-step
+        # summaries use possibly_modified to include partial or interrupted work.
+        context = dict(success=True, acted=any(action['status'] == 'removed' for action in receipt['actions']),
+                       freed_bytes=after - before, duration_seconds=receipt['duration_seconds'],
+                       floor_bytes=receipt['floor_bytes'], target_bytes=receipt['target_bytes'])
+    except (KeyError, TypeError) as error:
+        raise ValueError('invalid preparation receipt') from error
+    if not valid_runner_preparation(context):
+        raise ValueError('invalid preparation context')
+    return context
 
 
 def baseline_epoch(ref):
@@ -170,5 +209,5 @@ def stage_timeouts(stage, requested_minutes=None) -> dict:
         raise ValueError("requested minutes must be an integer within the stage cap")
     if not 1 <= minutes <= caps[stage]:
         raise ValueError("requested minutes must be an integer within the stage cap")
-    return dict(step_minutes=minutes, job_minutes=minutes + 5, build_minutes=25,
-                maximum_runner_minutes=minutes + 30)
+    return dict(step_minutes=minutes, job_minutes=minutes + 10, build_minutes=25,
+                maximum_runner_minutes=minutes + 35)
