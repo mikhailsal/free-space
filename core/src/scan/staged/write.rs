@@ -159,20 +159,22 @@ impl StagedTree {
                 continue;
             }
             let frame = stack.pop().unwrap();
-            conn.prepare_cached(
-                "UPDATE entries SET allocated=?2,apparent=?3,items=?4,errors=?5,
+            if frame.kind == Kind::Dir {
+                conn.prepare_cached(
+                    "UPDATE entries SET allocated=?2,apparent=?3,items=?4,errors=?5,
                     min_scanned_at=?6,newest_mtime=?7,subtree_end=?8 WHERE id=?1",
-            )?
-            .execute(params![
-                frame.id as i64,
-                frame.agg.allocated as i64,
-                frame.agg.apparent as i64,
-                frame.agg.items as i64,
-                frame.agg.errors as i64,
-                frame.agg.min_scanned_at,
-                frame.agg.stored_newest_mtime(),
-                (frame.id + frame.agg.items) as i64
-            ])?;
+                )?
+                .execute(params![
+                    frame.id as i64,
+                    frame.agg.allocated as i64,
+                    frame.agg.apparent as i64,
+                    frame.agg.items as i64,
+                    frame.agg.errors as i64,
+                    frame.agg.min_scanned_at,
+                    frame.agg.stored_newest_mtime(),
+                    (frame.id + frame.agg.items) as i64
+                ])?;
+            }
             if let Some(parent) = stack.last_mut() {
                 parent.agg.merge(&frame.agg);
                 // Match Tree's per-merge u32 saturation.
