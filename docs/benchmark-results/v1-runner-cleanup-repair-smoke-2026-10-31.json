@@ -1,0 +1,219 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41243669897",
+  "source_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "source_diff_from_e066": [
+    "scripts/tests/test_bench_cleanup.py"
+  ],
+  "strict_validation": {
+    "valid": true,
+    "issues": [],
+    "pairs": [
+      {
+        "pair": 1,
+        "elapsed_seconds": {
+          "baseline": 4.42842890899999,
+          "candidate": 4.429150103000012,
+          "delta": 0.0007211940000217965
+        },
+        "peak_rss_kib": {
+          "baseline": 37912,
+          "candidate": 37904,
+          "delta": -8
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 45309952,
+          "candidate": 45309952,
+          "delta": 0
+        }
+      }
+    ],
+    "summary": {
+      "elapsed_seconds": {
+        "median_delta": 0.0007211940000217965,
+        "max_abs_delta": 0.0007211940000217965
+      },
+      "peak_rss_kib": {
+        "median_delta": -8,
+        "max_abs_delta": 8
+      },
+      "app_disk_peak_bytes": {
+        "median_delta": 0,
+        "max_abs_delta": 0
+      }
+    },
+    "identical_binaries": true,
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "case": {
+      "case_policy": "qualification-v1",
+      "scenario": "unchanged",
+      "subtree_entries": 100,
+      "memory_mib": 1024,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": null
+    }
+  },
+  "description": [
+    {
+      "operation": "scan",
+      "protocol": "v1-single-operation-pairs-v4",
+      "github": {
+        "GITHUB_SHA": "55d6e3460f34710e2520b77da66e659d410f6c25",
+        "GITHUB_RUN_ID": "41243669897",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 100000,
+        "expected_entries": 100449,
+        "expected_subtree_entries": 100,
+        "directories": 449,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 99901,
+          "payload_files": 1000,
+          "sparse_files": 24,
+          "hardlink_files": 99,
+          "longname_files": 3223
+        },
+        "setup_seconds": 3.6207789150000167
+      },
+      "identical_binaries": true,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 4.42842890899999,
+          "candidate_median": 4.429150103000012,
+          "paired_deltas": [
+            0.0007211940000217965
+          ],
+          "paired_percent_changes": [
+            0.01628554990589226
+          ],
+          "median_paired_percent_change": 0.01628554990589226,
+          "max_abs_percent_change": 0.01628554990589226,
+          "max_abs_delta": 0.0007211940000217965
+        },
+        "peak_rss_kib": {
+          "baseline_median": 37912,
+          "candidate_median": 37904,
+          "paired_deltas": [
+            -8
+          ],
+          "paired_percent_changes": [
+            -0.0211014982063773
+          ],
+          "median_paired_percent_change": -0.0211014982063773,
+          "max_abs_percent_change": 0.0211014982063773,
+          "max_abs_delta": 8
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 45309952,
+          "candidate_median": 45309952,
+          "paired_deltas": [
+            0
+          ],
+          "paired_percent_changes": [
+            0.0
+          ],
+          "median_paired_percent_change": 0.0,
+          "max_abs_percent_change": 0.0,
+          "max_abs_delta": 0
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 4.42842890899999,
+          "rss_kib": 37912,
+          "app_disk_peak_bytes": 45309952,
+          "cgroup_peak_bytes": 254427136,
+          "cgroup_cap_bytes": 1073741824,
+          "memory_endpoint": {
+            "anon": 8560640,
+            "file": 67604480,
+            "kernel": 137048064,
+            "slab_reclaimable": 136511440
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 3.413983982,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 0.708001295,
+            "index_seconds": 0.211157457,
+            "publish_seconds": 0.000639308,
+            "total_seconds": 4.410614169
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 4.429150103000012,
+          "rss_kib": 37904,
+          "app_disk_peak_bytes": 45309952,
+          "cgroup_peak_bytes": 254427136,
+          "cgroup_cap_bytes": 1073741824,
+          "memory_endpoint": {
+            "anon": 8556544,
+            "file": 67641344,
+            "kernel": 137039872,
+            "slab_reclaimable": 136512728
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 3.413008599,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 0.685645637,
+            "index_seconds": 0.229164799,
+            "publish_seconds": 0.000641912,
+            "total_seconds": 4.409847774
+          }
+        }
+      ]
+    }
+  ],
+  "profile_v2": "not applicable: refresh-only and scan diagnostics disabled",
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 66305,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020421120,
+      "available_bytes": 91856990208
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020421120,
+      "available_bytes": 91856990208
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.00012684200000023793
+  },
+  "runner_seconds": 298,
+  "job_seconds": {
+    "build": 210,
+    "paired": 88
+  },
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 111
+  },
+  "archive": "v1-runner-cleanup-repair-smoke-2026-10-31.tar.gz",
+  "archive_sha256": "277f2423d3e1ad3b776f849766c36332df5b4325dbca9e52b4cd07ebd40e1bab",
+  "index_sha256": "0b75d7468e26ad0fb9eb5bb7b70673ecff7255944db0c6a622f4f73a325b4929",
+  "original_artifact_files": 66
+}

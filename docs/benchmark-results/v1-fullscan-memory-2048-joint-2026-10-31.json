@@ -1,0 +1,481 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41241552473",
+  "source_revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "baseline_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "candidate_binary_sha256": "f0c25acd428e150a0ad5e1139f5ef7b14cf6404dacd1cd55e0d03cec166a6e74",
+  "strict_validation": {
+    "valid": true,
+    "issues": [],
+    "pairs": [
+      {
+        "pair": 1,
+        "elapsed_seconds": {
+          "baseline": 57.721248263000035,
+          "candidate": 46.312425668,
+          "delta": -11.408822595000032
+        },
+        "peak_rss_kib": {
+          "baseline": 37640,
+          "candidate": 37880,
+          "delta": 240
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 459857920,
+          "candidate": 459821056,
+          "delta": -36864
+        }
+      },
+      {
+        "pair": 2,
+        "elapsed_seconds": {
+          "baseline": 57.698665532999996,
+          "candidate": 45.89892454599999,
+          "delta": -11.799740987000007
+        },
+        "peak_rss_kib": {
+          "baseline": 37732,
+          "candidate": 37696,
+          "delta": -36
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 459833344,
+          "candidate": 459821056,
+          "delta": -12288
+        }
+      },
+      {
+        "pair": 3,
+        "elapsed_seconds": {
+          "baseline": 57.108797288999995,
+          "candidate": 46.07539490299996,
+          "delta": -11.033402386000034
+        },
+        "peak_rss_kib": {
+          "baseline": 37572,
+          "candidate": 37728,
+          "delta": 156
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 459837440,
+          "candidate": 459821056,
+          "delta": -16384
+        }
+      }
+    ],
+    "summary": {
+      "elapsed_seconds": {
+        "median_delta": -11.408822595000032,
+        "max_abs_delta": 11.799740987000007
+      },
+      "peak_rss_kib": {
+        "median_delta": 156,
+        "max_abs_delta": 240
+      },
+      "app_disk_peak_bytes": {
+        "median_delta": -16384,
+        "max_abs_delta": 36864
+      }
+    },
+    "identical_binaries": false,
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "case": {
+      "case_policy": "qualification-v1",
+      "scenario": "unchanged",
+      "subtree_entries": 100,
+      "memory_mib": 2048,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": null
+    }
+  },
+  "description": [
+    {
+      "operation": "scan",
+      "protocol": "v1-single-operation-pairs-v4",
+      "github": {
+        "GITHUB_SHA": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+        "GITHUB_RUN_ID": "41241552473",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 999901,
+          "payload_files": 10000,
+          "sparse_files": 235,
+          "hardlink_files": 999,
+          "longname_files": 32255
+        },
+        "setup_seconds": 30.833041727999984
+      },
+      "identical_binaries": false,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 57.698665532999996,
+          "candidate_median": 46.07539490299996,
+          "paired_deltas": [
+            -11.408822595000032,
+            -11.799740987000007,
+            -11.033402386000034
+          ],
+          "paired_percent_changes": [
+            -19.76537746206922,
+            -20.45063066536833,
+            -19.319969794085
+          ],
+          "median_paired_percent_change": -19.76537746206922,
+          "max_abs_percent_change": 20.45063066536833,
+          "max_abs_delta": 11.799740987000007
+        },
+        "peak_rss_kib": {
+          "baseline_median": 37640,
+          "candidate_median": 37728,
+          "paired_deltas": [
+            240,
+            -36,
+            156
+          ],
+          "paired_percent_changes": [
+            0.6376195536663021,
+            -0.09540973179263945,
+            0.41520281060363207
+          ],
+          "median_paired_percent_change": 0.41520281060363207,
+          "max_abs_percent_change": 0.6376195536663021,
+          "max_abs_delta": 240
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 459837440,
+          "candidate_median": 459821056,
+          "paired_deltas": [
+            -36864,
+            -12288,
+            -16384
+          ],
+          "paired_percent_changes": [
+            -0.00801638906208213,
+            -0.0026722725005368098,
+            -0.0035629982630402957
+          ],
+          "median_paired_percent_change": -0.0035629982630402957,
+          "max_abs_percent_change": 0.00801638906208213,
+          "max_abs_delta": 36864
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 57.721248263000035,
+          "rss_kib": 37640,
+          "app_disk_peak_bytes": 459857920,
+          "cgroup_peak_bytes": 1944719360,
+          "cgroup_cap_bytes": 2147483648,
+          "memory_endpoint": {
+            "anon": 8564736,
+            "file": 463384576,
+            "kernel": 1359470592,
+            "slab_reclaimable": 1358916400
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.239393526,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 21.10700241,
+            "index_seconds": 2.249315843,
+            "publish_seconds": 0.001250614,
+            "total_seconds": 57.6996437
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+          "binary_sha256": "f0c25acd428e150a0ad5e1139f5ef7b14cf6404dacd1cd55e0d03cec166a6e74",
+          "elapsed_seconds": 46.312425668,
+          "rss_kib": 37880,
+          "app_disk_peak_bytes": 459821056,
+          "cgroup_peak_bytes": 1943080960,
+          "cgroup_cap_bytes": 2147483648,
+          "memory_endpoint": {
+            "anon": 8560640,
+            "file": 463261696,
+            "kernel": 1359486976,
+            "slab_reclaimable": 1358917888
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.171294076,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 8.170233439,
+            "index_seconds": 3.840989726,
+            "publish_seconds": 0.001577736,
+            "total_seconds": 46.290340835
+          }
+        },
+        {
+          "id": "p2-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 57.698665532999996,
+          "rss_kib": 37732,
+          "app_disk_peak_bytes": 459833344,
+          "cgroup_peak_bytes": 1943822336,
+          "cgroup_cap_bytes": 2147483648,
+          "memory_endpoint": {
+            "anon": 8560640,
+            "file": 463429632,
+            "kernel": 1359511552,
+            "slab_reclaimable": 1358916112
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.172270364,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 21.043729214,
+            "index_seconds": 2.356818765,
+            "publish_seconds": 0.001215253,
+            "total_seconds": 57.677983814
+          }
+        },
+        {
+          "id": "p2-candidate-v1",
+          "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+          "binary_sha256": "f0c25acd428e150a0ad5e1139f5ef7b14cf6404dacd1cd55e0d03cec166a6e74",
+          "elapsed_seconds": 45.89892454599999,
+          "rss_kib": 37696,
+          "app_disk_peak_bytes": 459821056,
+          "cgroup_peak_bytes": 1942896640,
+          "cgroup_cap_bytes": 2147483648,
+          "memory_endpoint": {
+            "anon": 8556544,
+            "file": 463228928,
+            "kernel": 1359466496,
+            "slab_reclaimable": 1358918520
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.170998267,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 8.13320201,
+            "index_seconds": 3.465873178,
+            "publish_seconds": 0.001402153,
+            "total_seconds": 45.874245422
+          }
+        },
+        {
+          "id": "p3-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 57.108797288999995,
+          "rss_kib": 37572,
+          "app_disk_peak_bytes": 459837440,
+          "cgroup_peak_bytes": 1943965696,
+          "cgroup_cap_bytes": 2147483648,
+          "memory_endpoint": {
+            "anon": 8564736,
+            "file": 463425536,
+            "kernel": 1359458304,
+            "slab_reclaimable": 1358915440
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.169878636,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 20.777296996,
+            "index_seconds": 2.035091679,
+            "publish_seconds": 0.001269762,
+            "total_seconds": 57.086501058
+          }
+        },
+        {
+          "id": "p3-candidate-v1",
+          "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+          "binary_sha256": "f0c25acd428e150a0ad5e1139f5ef7b14cf6404dacd1cd55e0d03cec166a6e74",
+          "elapsed_seconds": 46.07539490299996,
+          "rss_kib": 37728,
+          "app_disk_peak_bytes": 459821056,
+          "cgroup_peak_bytes": 1943048192,
+          "cgroup_cap_bytes": 2147483648,
+          "memory_endpoint": {
+            "anon": 8568832,
+            "file": 463249408,
+            "kernel": 1359454208,
+            "slab_reclaimable": 1358918952
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.168465055,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 7.955917636,
+            "index_seconds": 3.8210383180000003,
+            "publish_seconds": 0.001427183,
+            "total_seconds": 46.051294647
+          }
+        }
+      ]
+    }
+  ],
+  "profile_v2": "not applicable: refresh-only; allocation diagnostics disabled for scan",
+  "arms": [
+    {
+      "id": "p1-baseline-v1",
+      "memory_peak_bytes": 1944719360,
+      "memory_max": "2147483648",
+      "swap_max": "0",
+      "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory_events_local": null,
+      "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "endpoint_bytes": {
+        "anon": 8564736,
+        "file": 463384576,
+        "kernel": 1359470592,
+        "slab_reclaimable": 1358916400
+      },
+      "observer_memory_max": "4294967296",
+      "observer_swap_max": "0",
+      "current_entries": 1004499,
+      "previous_entries": 1004499
+    },
+    {
+      "id": "p1-candidate-v1",
+      "memory_peak_bytes": 1943080960,
+      "memory_max": "2147483648",
+      "swap_max": "0",
+      "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory_events_local": null,
+      "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "endpoint_bytes": {
+        "anon": 8560640,
+        "file": 463261696,
+        "kernel": 1359486976,
+        "slab_reclaimable": 1358917888
+      },
+      "observer_memory_max": "4294967296",
+      "observer_swap_max": "0",
+      "current_entries": 1004499,
+      "previous_entries": 1004499
+    },
+    {
+      "id": "p2-baseline-v1",
+      "memory_peak_bytes": 1943822336,
+      "memory_max": "2147483648",
+      "swap_max": "0",
+      "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory_events_local": null,
+      "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "endpoint_bytes": {
+        "anon": 8560640,
+        "file": 463429632,
+        "kernel": 1359511552,
+        "slab_reclaimable": 1358916112
+      },
+      "observer_memory_max": "4294967296",
+      "observer_swap_max": "0",
+      "current_entries": 1004499,
+      "previous_entries": 1004499
+    },
+    {
+      "id": "p2-candidate-v1",
+      "memory_peak_bytes": 1942896640,
+      "memory_max": "2147483648",
+      "swap_max": "0",
+      "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory_events_local": null,
+      "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "endpoint_bytes": {
+        "anon": 8556544,
+        "file": 463228928,
+        "kernel": 1359466496,
+        "slab_reclaimable": 1358918520
+      },
+      "observer_memory_max": "4294967296",
+      "observer_swap_max": "0",
+      "current_entries": 1004499,
+      "previous_entries": 1004499
+    },
+    {
+      "id": "p3-baseline-v1",
+      "memory_peak_bytes": 1943965696,
+      "memory_max": "2147483648",
+      "swap_max": "0",
+      "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory_events_local": null,
+      "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "endpoint_bytes": {
+        "anon": 8564736,
+        "file": 463425536,
+        "kernel": 1359458304,
+        "slab_reclaimable": 1358915440
+      },
+      "observer_memory_max": "4294967296",
+      "observer_swap_max": "0",
+      "current_entries": 1004499,
+      "previous_entries": 1004499
+    },
+    {
+      "id": "p3-candidate-v1",
+      "memory_peak_bytes": 1943048192,
+      "memory_max": "2147483648",
+      "swap_max": "0",
+      "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory_events_local": null,
+      "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "endpoint_bytes": {
+        "anon": 8568832,
+        "file": 463249408,
+        "kernel": 1359454208,
+        "slab_reclaimable": 1358918952
+      },
+      "observer_memory_max": "4294967296",
+      "observer_swap_max": "0",
+      "current_entries": 1004499,
+      "previous_entries": 1004499
+    }
+  ],
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 2049,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020412928,
+      "available_bytes": 91856998400
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020412928,
+      "available_bytes": 91856998400
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.00020084599999847796
+  },
+  "runner_seconds": 823,
+  "job_seconds": {
+    "build": 167,
+    "paired": 656
+  },
+  "tests": {
+    "rust_passed": 320,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 110
+  },
+  "archive": "v1-fullscan-memory-2048-joint-2026-10-31.tar.gz",
+  "archive_sha256": "1bca3bf5f7bbe854763174de18a06d339653756c287291a4b6c7caa94e3dc547",
+  "index_sha256": "39150e7b47a8c0beee70529d3df73508964dfc8c44df33155ce1268f54569989",
+  "original_artifact_files": 126
+}

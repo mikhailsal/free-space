@@ -1,0 +1,169 @@
+{
+  "run_id": 41244708164,
+  "run_url": "https://github.com/mikhailsal/free-space/actions/runs/41244708164",
+  "candidate_revision": "2b9e3fa2a594a940fc8e77af994b442330838745",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "measurement": "one paired 100k-file unchanged 100-entry subtree refresh, 4GiB, musl/local",
+  "validation": {
+    "strict_summary_valid": true,
+    "strict_summary_equal_archived": true,
+    "profile_policy": {
+      "profile_policy": "none",
+      "allocation_diagnostics": false,
+      "scope": "complete-command measurements only; no vector allocation trace"
+    },
+    "rust_test_passed": 327,
+    "rust_test_ignored": 1,
+    "python_tests": 113,
+    "cli_history_test_passed": true,
+    "public_history_test_passed": true,
+    "differential_history_fixture_tests_passed": true,
+    "jobs": [
+      {
+        "name": "build",
+        "seconds": 278.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "paired",
+        "seconds": 82.0,
+        "conclusion": "success"
+      }
+    ]
+  },
+  "binary_sha256": {
+    "baseline": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "candidate": "5ed741badb99a54d80fb43d7251ff6781aa85040b00c51dd99c09f64957accfd"
+  },
+  "metrics": {
+    "wall_s": {
+      "baseline": 1.0350502050000046,
+      "candidate": 2.382853276999981,
+      "delta": 1.3478030719999765,
+      "percent": 130.2162026043916
+    },
+    "rss_kib": {
+      "baseline": 62328,
+      "candidate": 37716,
+      "delta": -24612,
+      "percent": -39.487870619946094
+    },
+    "cgroup_peak_bytes": {
+      "baseline": 106356736,
+      "candidate": 110542848,
+      "delta": 4186112,
+      "percent": 3.9359161981052146
+    },
+    "disk_peak_bytes": {
+      "baseline": 37015552,
+      "candidate": 54747136,
+      "delta": 17731584,
+      "percent": 47.903065176496625
+    }
+  },
+  "observers": {
+    "baseline": {
+      "validated": true,
+      "errors": {},
+      "seed_sha256": "8e628bfe8335be7eadc6e7c45a51de06ad6c8aa727683c47e7e812e224f2998f",
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "4f8120d8be9d5a60b0fd9b74b1464796a8db315df376c49d7f796a54927104b4",
+      "logical_content_unchanged": true
+    },
+    "candidate": {
+      "validated": true,
+      "errors": {},
+      "seed_sha256": "8e628bfe8335be7eadc6e7c45a51de06ad6c8aa727683c47e7e812e224f2998f",
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "4f8120d8be9d5a60b0fd9b74b1464796a8db315df376c49d7f796a54927104b4",
+      "logical_content_unchanged": true
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "acted": false,
+    "freed_bytes": 0,
+    "duration_seconds": 0.0001289200000087476,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256
+  },
+  "cleanup": {
+    "success": true,
+    "exit_code": 0
+  },
+  "interpretation": "One smoke pair, not promotion or a no-regression qualification. Wall time and app disk increased substantially; total cgroup peak increased despite lower process RSS. Any further scale requires a separate root gate and forecast. Opus review of the test-only cleanup isolation fix remains pending.",
+  "raw_archive_files_sha256": {
+    "context/freespace-w5-isolated-smoke-description.json": "84df0737fa3bf01749785ea4a0c67c723e53853ac8d6b5fb264725b0d2b1e5b2",
+    "context/freespace-w5-isolated-smoke-gh.log": "15e0c84d01602323d6f864f8ca488b4a6e910ecd234d9191b09819cfc0315452",
+    "context/freespace-w5-isolated-smoke-github.json": "cd6c242acad2751fc745d951743a3d394c227f2971bd0e2f14acd3ce40e585c5",
+    "context/freespace-w5-isolated-smoke-validation.json": "38f6466cfcb99017881fe940cccaa89ed3fd0dc0e9d6d8752f5ee8f20df4533f",
+    "refresh/cleanup.log": "8aa609f0333fd1b5b3e2e7107378e1ef067231c051a7002d0cf4a16cde38922f",
+    "refresh/disk-calibration.json": "f7069584461fbbd12089c5fe96154ce0d4b00669fecd0c5d8d6b468a7f5a45d4",
+    "refresh/filesystem.json": "7870e07c8baf388e93280e05abd8e6dbf05991ed38b510425e7cae3757018d97",
+    "refresh/final-summary.md": "50e0150311f27c3994649dc8557199ba3eb845672fb645a31c0555d818f05b63",
+    "refresh/fio-randread.json": "4de8ae3c535077e9e730c49319cbe6c509c8fa408977f01d96fbe761cfde37d1",
+    "refresh/fio-randwrite.json": "8ee34bc0fdb7229595d43cbda76d86f077750942d40d7621dfb7475c565efd1c",
+    "refresh/fio-read.json": "4a329160dfe70abe269c9aa1b6d2a0a3d7068a9f74d0a117345018ab288ecb36",
+    "refresh/fio-write.json": "59b17b1ec15dcdb6e169620e16ac72a056ffb983603f1d070380f31ef4ac1805",
+    "refresh/host-disk.txt": "31ec025532ef89534b67eb8f441072891dc11559f3bbd0e5dc57b862789ffc7c",
+    "refresh/inodes.txt": "7a7e248a4510f31620fedb575fc5ac901b80d6cdf91a47d66f269b66d6b2d365",
+    "refresh/loop-devices.json": "da0fed6c7471c74d264a85d7c05a75e5826381af775ff0a1f485235f9811ce43",
+    "refresh/measurements-setup/seed-1.json": "af2a87aee05ad91b9ab9a70d589d38575e1e82ed6a42a0cc7e196dc5df2e5436",
+    "refresh/measurements-setup/seed-1/cgroup-end.json": "fb413a22b7bc50eccbf6a1a68e6402f2ebd5050f486fb7100731d436f8e3c078",
+    "refresh/measurements-setup/seed-1/cgroup-start.json": "295fa78da7905151f43684dd42f7880d2f9718be50f76f804ff079628732e0d9",
+    "refresh/measurements-setup/seed-1/metrics.json": "3910d3a24b8a375987b7514be4877fabad5ea129a0bb501be56df17c82f5c808",
+    "refresh/measurements-setup/seed-1/stderr.log": "b6915a494bf0446c4097be355a5ade3c22cbc2788f9f1d6548db148cf0f4d1a3",
+    "refresh/measurements-setup/seed-1/stdout.json": "75c3b8a38ca39b6398e141c08fdbbc7053617a32c1f8bbbe32d7ca92098227ac",
+    "refresh/measurements-setup/seed-1/time.log": "90aae259010c9f677465de7c8ab1b95b57095812d53cb987da58c5497efed3f9",
+    "refresh/measurements-setup/seed-1/worker.log": "f137333341650a0e7c40f5b1918bbd01c84ce758d469f232ba0630df8c57fc3d",
+    "refresh/measurements-setup/seed-1/writer-state.json": "a8364b7d09408cf325518fbcbb79930bb768abc3306083e7911e085e6d7a34ee",
+    "refresh/measurements-setup/seed-2.json": "e5bcfe79135799d92f369fa0119771a650694750dceeda6bf4430f94f045159b",
+    "refresh/measurements-setup/seed-2/cgroup-end.json": "f7404b2a28d97905a7690d9319416667a30fbd998884f0d0cdcc5ead1fe50c09",
+    "refresh/measurements-setup/seed-2/cgroup-start.json": "05088ae1dabd5ac7d4014fea7073e10b8dfd647fb063674123b632acaec24739",
+    "refresh/measurements-setup/seed-2/metrics.json": "c72d5b33c675f245eb3d9f7edd85ba1f0de0244f7312d0d13534bf9fdd00cc88",
+    "refresh/measurements-setup/seed-2/stderr.log": "7e26ae53435581a8c7017e3841da261589ace032cdde73c8af3519263921c4d1",
+    "refresh/measurements-setup/seed-2/stdout.json": "4b3e1759facb7e3e0b7b36b93d7bf03ab6233e711f28744571f112263a726919",
+    "refresh/measurements-setup/seed-2/time.log": "8e17680fe4368abbd1f9209e0c041a1db2bf08d5c67147655b17f26213e17ed1",
+    "refresh/measurements-setup/seed-2/worker.log": "165a64cfe36e36006088facb70b3ebf10427fb22d48e7f4dce28a851d6ff474d",
+    "refresh/measurements-setup/seed-2/writer-state.json": "413a060ce53975dfa248fc0624319605600e906db8c3973335d044ca3cfd8453",
+    "refresh/measurements/capacity-admission.json": "47406d1482e5164bc81e55e37b7bccc1849d7c61baa0af0349e1ae3b3e79272b",
+    "refresh/measurements/manifest.json": "7d3e1315555d927db88063a0cefc28aaea768df220014f67b47e4a1311ed9997",
+    "refresh/measurements/p1-baseline-v1.json": "89bc962ceca4ccaa136264af4742acaccc55973be67e2bfe2502b829a24b9a97",
+    "refresh/measurements/p1-baseline-v1/cache-flush.json": "8b0f8651d8a9a0087d50302a82706834a6e4fdc89ee140caa5ecb59ab88521c8",
+    "refresh/measurements/p1-baseline-v1/cgroup-end.json": "cde6e56c0010cfbec109ed640f5d5f425853f62d26806569f80bfa311bdf950e",
+    "refresh/measurements/p1-baseline-v1/cgroup-start.json": "6a48916255a9912042f7d0a09b19603efd79d55bb9eb018e73ed0739679b912a",
+    "refresh/measurements/p1-baseline-v1/metrics.json": "6a6ba7efba15cfba8adb2717fe9a28fa7aea16232a0926a1738da88896a843dc",
+    "refresh/measurements/p1-baseline-v1/observer-state.json": "317ae7343a2aef65dd0d9faa9bfad4709d56f8b4b6535f97fd2fcda83eb12633",
+    "refresh/measurements/p1-baseline-v1/observer.json": "128636e6703f3391084ad1963a58c5acccc848943bf292fbf2a6c8e4df698db7",
+    "refresh/measurements/p1-baseline-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "refresh/measurements/p1-baseline-v1/setup.json": "5c6451486092963de56e44620fed98564c5f848c3f0fcafed03a979c07dfb4ea",
+    "refresh/measurements/p1-baseline-v1/spec.json": "89bc962ceca4ccaa136264af4742acaccc55973be67e2bfe2502b829a24b9a97",
+    "refresh/measurements/p1-baseline-v1/stderr.log": "becfbbb94711036201d889afd14ba73d263a6084bc58f53047dbef7a2a883ba3",
+    "refresh/measurements/p1-baseline-v1/stdout.json": "4a267c19053c6206303350e2233fb7c59961c7f517146ec02bdce2499bb41a79",
+    "refresh/measurements/p1-baseline-v1/time.log": "8c49e8b63cbc8d362cf589bc173f55eb783256c24d2108ae61533cc3f7f4d320",
+    "refresh/measurements/p1-baseline-v1/worker.log": "b8006e399fb985a045410cd1d1e38c55c1908a73eeae719f580a26a0476580f0",
+    "refresh/measurements/p1-baseline-v1/writer-state.json": "086c50ddc435d4dc073b34aa72cfabcf8c9686994012d7cade46399abac75733",
+    "refresh/measurements/p1-candidate-v1.json": "05cc4681193a06a40fbd973f1dc7e77b80c1331cad52cce737dca533355590f9",
+    "refresh/measurements/p1-candidate-v1/cache-flush.json": "0e97753449e3cb180d02f44a975532eecf27366d9222d3353c15e55729f043d0",
+    "refresh/measurements/p1-candidate-v1/cgroup-end.json": "644aadc4dfdbf87ef8ff1ce28287e80d893dc844c94786b9eda1843dd684bf9f",
+    "refresh/measurements/p1-candidate-v1/cgroup-start.json": "e6e2ab7fd25e2ed1eea6ede2685e88985c635eff4b044c216a83a88f42963c02",
+    "refresh/measurements/p1-candidate-v1/metrics.json": "9fc5058626395abc0ccd7c4e3e4018e1699c0d8877eea436841871130c17d623",
+    "refresh/measurements/p1-candidate-v1/observer-state.json": "c4a2342b94c50510bf4b6047f8afde30869a7a7eba7bd577b05e45da0fd2f401",
+    "refresh/measurements/p1-candidate-v1/observer.json": "715fd8478a04f694c95108d85724709fa73510006c8d1beca084542a6badb6e2",
+    "refresh/measurements/p1-candidate-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "refresh/measurements/p1-candidate-v1/setup.json": "2660f775743a7a2f46be116191b2f32a8faf0d9619cf5a39bb9fbab0f0687c2d",
+    "refresh/measurements/p1-candidate-v1/spec.json": "05cc4681193a06a40fbd973f1dc7e77b80c1331cad52cce737dca533355590f9",
+    "refresh/measurements/p1-candidate-v1/stderr.log": "9a7273519ca3fd3bb9fa7dd89dfeed0207dc5c34fdf2fad85f3b390cdc513570",
+    "refresh/measurements/p1-candidate-v1/stdout.json": "b8e142a318a202dce9fed7c69bd9d86309c71f523baaeec4ad961195a49488fc",
+    "refresh/measurements/p1-candidate-v1/time.log": "63de0d8bc64280bb3116f56fd220aa7e03b2fdf3257b11263bd3eef452d816ee",
+    "refresh/measurements/p1-candidate-v1/worker.log": "66227c67d7ce8369059892802110ad26de2331221c2420447d474926eb34dd4c",
+    "refresh/measurements/p1-candidate-v1/writer-state.json": "66a1fde6ead6e72295a3e2f92fb0622145758fcb9aec154c4827f663d32beb6e",
+    "refresh/measurements/runner-cleanup.json": "9ce3df27ea2cd331bcf5b94150246e78fe397ab131f7c60a94b1391956a78081",
+    "refresh/measurements/status.json": "4939bcda3c3b998c4307dee647ec43869406f4db72ec2b8372ebf1613f0d55b6",
+    "refresh/measurements/summary.json": "b7ba226fadd25d46d9da86908be06b58011f1022edfe11fe1a28279eb6cde7e5",
+    "refresh/measurements/summary.md": "50e0150311f27c3994649dc8557199ba3eb845672fb645a31c0555d818f05b63",
+    "runner-preparation/receipt.json": "38433239207d7d52f35a9673af0986123c6bdffc9ed4646aa953bfde3d8cfad9"
+  }
+}

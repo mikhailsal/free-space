@@ -1,6 +1,6 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: no candidate promoted; release-musl controls complete, narrow RAM and SQL effects measured, joint configuration and staged refresh under investigation within the owner-extended 60-runner-hour cap.
+Date: 2026-10-31. Status: no candidate promoted; joint effects and full-scan memory budgets under investigation, staged-refresh prototype rejected after its smoke tradeoff, within the owner-extended 60-runner-hour cap.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
 Original source baseline: master `afce6fd`; initial investigation HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
@@ -62,7 +62,13 @@ qualification. No benefit percentages are added together.
 The [joint configuration](../benchmark-results/v1-joint-manifest-2026-10-31.json)
 combines these mechanisms and removes eager ancestor-batch eviction after source
 review found repeated-read risk on deep trees. Its final requested Opus review
-and normal hooks pass; new GitHub tests and measurements remain necessary.
+and normal hooks pass. The [joint screen](../benchmark-results/v1-joint-screen-2026-10-31.md)
+passed runtime semantics and reduced 1m scan time by 31.14%; total scan RAM was
+essentially unchanged and sampled disk H2 remained inconclusive. The matched
+2 GiB case passed, with a 19.77% paired speed gain and small positive process-RSS
+median, so no-regression is still unestablished. These are separate paired
+experiments on separate runners, not proof that changing the cap caused their
+timing differences. No full-scale joint qualification is claimed.
 Two protocol smokes verify actual binary identity across builds with a fixed
 source epoch. The original third case stopped before fixture allocation on a
 different runner image with only 14 GiB free against the unchanged 42 GiB floor;
@@ -82,7 +88,30 @@ uses fresh matched controls and the joint source at 4 GiB, then conditionally
 experiment; a genuine memory optimization needs matched source and capacity
 evidence. No minimum requirement or full-scan RAM improvement is claimed yet.
 
-Local calibration and the requested `claude-opus-5-5` outside reviews are complete.
+The [repaired 1 GiB control](../benchmark-results/v1-fullscan-memory-repaired-1024-aa-2026-10-31.md)
+passed all six baseline scans and semantic observers on one million files. Every
+worker reached the cap with recorded pressure, without OOM; this is the lowest
+tested successful baseline budget at that scale, not an exact minimum. The
+matching joint case is running and 512 MiB remains conditional. An earlier
+attempt failed in the build's cleanup unit test before workers; it is not RAM
+evidence. A test-only isolation repair passed nine focused tests and a separate
+100k protocol smoke with actual unchanged binary identity before the new attempt.
+Production app and measurement source are unchanged by that repair. The parent
+inspected it for research publication; requested Opus review remains pending
+provider quota, with no clean outside-review or product-acceptance claim.
+
+The bounded [staged-refresh smoke](../benchmark-results/v1-staged-refresh-isolated-smoke-2026-10-31.md)
+passed correctness, including refresh history. Its one 100k pair saved 39.49%
+process RSS but increased total cgroup peak by 3.94%, refresh time by 130.22%
+and sampled disk peak by 47.90%. The prototype is rejected and its conditional
+1m screen cancelled. No full-scale extrapolation or new storage design is
+authorized by that result.
+
+Planning and earlier source reviews used the requested `claude-opus-5-5`.
+Compact temporary indexes, optional 4/8 MiB staged-cache arms and comprehensive
+mutation integration are prepared for new reviews, with no measured benefit yet.
+The [progress report](../benchmark-results/v1-optimization-progress-2026-10-31.md)
+separates these states and source variants.
 D16 permits test-host backend switching without certifying a production release
 or unlimited local load. Continue the accepted investigation and conditional
 qualification with immutable preregistered workloads, bounded jobs and recorded

@@ -1,0 +1,25 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41242956623",
+  "source_revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+  "status": "failure",
+  "failure": "Build Python benchmark contract test test_bench_cleanup.CleanupTests.test_interruption_status_retained raised subprocess.TimeoutExpired after 5 seconds.",
+  "paired_status": "skipped",
+  "measurement_result": "invalid: no measured worker or observer ran",
+  "oom_or_capacity_conclusion": "none",
+  "artifact_count": 0,
+  "strict_summary": "not available",
+  "profile_v2": "not applicable: scan-only and no paired run",
+  "runner_seconds": 41,
+  "job_seconds": {
+    "build": 41,
+    "paired": 0
+  },
+  "python_tests": {
+    "run": 110,
+    "errors": 1
+  },
+  "rust_tests": "not run: Python gate failed first",
+  "archive": "v1-fullscan-memory-1024-aa-2026-10-31.tar.gz",
+  "archive_sha256": "982c73135e14f4f365b6d5a3860cd30449b3c073f2ed0a8f0df31a1fffb717e0",
+  "index_sha256": "012a2ec2fb20f3cb92ce34f430692003de089e62713c699f46e900a8470a02df"
+}

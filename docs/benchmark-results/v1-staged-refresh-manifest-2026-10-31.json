@@ -1,11 +1,11 @@
 {
-  "status": "Both recorded attempts failed before measurement; fixture correction awaits requested outside review",
+  "status": "Experiment rejected after valid smoke tradeoff; zero further dispatches",
   "purpose": "compile/runtime/semantic and bounded staged-refresh prototype smoke; no qualification or promotion",
   "priority": "separate W5 branch/job; user full-scan total-RAM lane remains primary and must not be blocked",
   "authority": "D7 authorizes staged experiment; proposal is not a dispatch",
   "source": {
     "candidate_branch": "perf/v1-staged-refresh-experiment",
-    "candidate_revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+    "candidate_revision": "2b9e3fa2a594a940fc8e77af994b442330838745",
     "candidate_engine_commit": "a5e7ba700532ac2f53a9a5e0bbce0dc86172968e",
     "product_baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
     "runner_preparation_source_commit": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
@@ -56,7 +56,18 @@
     },
     "binary_hashes": "not yet built; record both immutable build provenance and hashes before measurement",
     "history_fix_commit": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
-    "source_hashes_scope": "28 reviewed engine and integrated harness paths"
+    "source_hashes_scope": "28 reviewed engine and integrated harness paths",
+    "previous_candidate_revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+    "test_isolation_source": {
+      "head": "2b9e3fa2a594a940fc8e77af994b442330838745",
+      "base": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+      "changed_paths": [
+        "scripts/tests/test_bench_cleanup.py"
+      ],
+      "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
+      "production_and_measurement_source_changed": false,
+      "opus_review": "pending; provider quota failure"
+    }
   },
   "reviews": {
     "initial": "/tmp/freespace-w5-staged-review.json",
@@ -72,7 +83,8 @@
     "runner_prep_note": "reviewed SDK source and P3 mechanical closure merged; review artifacts retained",
     "history_initial": "/tmp/freespace-w5-staged-history-review.json",
     "history_closure": "/tmp/freespace-w5-staged-history-closure-review.json",
-    "history_closure_status": "completed exit0, exact claude-opus-5-5, validated exact NO_FINDINGS"
+    "history_closure_status": "completed exit0, exact claude-opus-5-5, validated exact NO_FINDINGS",
+    "test_isolation_repair": "v1-cleanup-fixture-repair-source-review-2026-10-31.json"
   },
   "validation_before_dispatch": {
     "normal_pre_push_gates": "rust clippy all-target metadata, size, shell, tsc and biome passed; no hook bypass",
@@ -119,7 +131,7 @@
     ]
   },
   "conditional_screen": {
-    "status": "not_admitted_conditional_only",
+    "status": "stopped_after_valid_smoke_no_dispatch",
     "maximum_dispatches": 1,
     "stage": "screen",
     "operation": "refresh",
@@ -158,7 +170,7 @@
     "complete-command RSS does not capture all cgroup RAM; measure cgroup current/peak/events and pressure",
     "no full-scale W5 stage planned"
   ],
-  "next_action": "Continue primary full-scan RAM ladder on frozen reviewed source. Keep W5 uncommitted fixture fix pending exact Opus5.5 review and new admission.",
+  "next_action": "Retain evidence and reviewed source; continue accepted v1 joint optimization and full-scan memory priority. New architecture requires separate review.",
   "created_at": "2026-10-31T20:29:53.907078+00:00",
   "campaign_cap_seconds": 216000,
   "source_review": "v1-staged-refresh-source-reviews-2026-10-31.json",
@@ -206,7 +218,7 @@
     },
     {
       "branch": "perf/v1-staged-refresh-experiment",
-      "revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+      "revision": "2b9e3fa2a594a940fc8e77af994b442330838745",
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
       "comparison": "candidate",
       "operations": [
@@ -233,10 +245,11 @@
       "pairs_per_operation": 3,
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
-      "status": "conditional_corrected_fixture_review_and_smoke",
-      "depends_on": "Fix isolated test real sync passthrough, obtain exact requested Opus5.5 source review after provider quota reset, publish and separately admit valid new smoke; then no confirmed regression and matching forecast required",
+      "status": "stopped_after_smoke_tradeoff",
+      "depends_on": "New-source protocol smoke valid with unchanged binary identity; separate corrected W5 smoke valid and no confirmed resource/time regression; fresh whole-step forecast and budget admission before conditional screen",
       "purpose": "Single conditional screening job, no full-scale expansion or promotion",
-      "previous_unmeasured_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877"
+      "previous_unmeasured_revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+      "stop_reason": "One100k pair: wall+130.216%, disk+47.903%, totalcgroup+3.936%, processRSS-39.488%; fails screening for joint objectives, no qualification/extrapolation"
     },
     {
       "branch": "perf/v1-staged-refresh-experiment",
@@ -284,6 +297,61 @@
       "receipt": "v1-staged-refresh-history-smoke-2026-10-31.json",
       "measurement_status": "invalid_before_measurement",
       "failure": "Python isolated-cleanup fixture timeout; Rust and paired measurements not reached"
+    },
+    {
+      "branch": "perf/v1-staged-refresh-experiment",
+      "revision": "2b9e3fa2a594a940fc8e77af994b442330838745",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "runner_preparation_policy": "sdk-space-v1",
+      "profile_policy": "none",
+      "allocation_diagnostics": false,
+      "stage_admission_policy": "w5-case-space-v1",
+      "id": "w5-staged-refresh-isolated-smoke",
+      "stage": "smoke",
+      "files": 100000,
+      "expected_entries": 100449,
+      "pairs_per_operation": 1,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3300,
+      "status": "completed",
+      "depends_on": "Corrected app engine has exact Opus5.5 NO_FINDINGS; only unit fixture changed after that. Parent inspected test isolation and9 mocked tests, normal hooks passed; new protocol smoke valid with actual unchanged baseline. Full GH W5 workspace tests precede measurement.",
+      "purpose": "Bounded compatibility/prototype measurement, no product qualification",
+      "admitted_at": "2026-10-31T21:40:46.655242+00:00",
+      "forecast_seconds": 525,
+      "forecast_with_margin_seconds": 683,
+      "forecast_basis": "Planning allowance: fixture8s, two seeds10s, workers125s, observers10s, copies2s, calibration and cleanup120s, unmeasured prototype uncertainty250s; no performance transfer or measured prototype latency claimed",
+      "artifact_prefix": "/tmp/freespace-w5-isolated-smoke",
+      "replaces_invalid_runs": [
+        41239317973,
+        41240352711
+      ],
+      "outside_review_scope": "App engine reviewed at a4ffffb; test-only mock fix externalOpuspending due quota, parent inspected. No product acceptance.",
+      "run_id": 41244708164,
+      "created_at": "2026-10-31T21:40:48Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 360.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T21:49:58.782355+00:00",
+      "job_seconds": 360.0,
+      "receipt": "v1-staged-refresh-isolated-smoke-2026-10-31.json",
+      "receipt_validation": "strict_valid_semantics_and_history_pass",
+      "screen_disposition": "rejected_no_further_dispatch",
+      "observed_tradeoff": "One100k pair: wall+130.216%, disk+47.903%, totalcgroup+3.936%, processRSS-39.488%; fails screening for joint objectives, no qualification/extrapolation"
     }
   ],
   "first_smoke_disposition": "No paired job, worker measurements or GitHub artifacts; no performance conclusion.",
@@ -329,7 +397,7 @@
     },
     "binary_hashes": "not yet built; record both immutable build provenance and hashes before measurement"
   },
-  "updated_at": "2026-10-31T20:46:27.455246+00:00",
+  "updated_at": "2026-10-31T21:52:47.613542+00:00",
   "pending_test_isolation_fix": {
     "source_revision_parent": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
     "file": "scripts/tests/test_bench_cleanup.py",
@@ -403,7 +471,14 @@
       "exit_code": 1
     },
     "reset_message": "resets 1:10am (Europe/Moscow)",
-    "publication_status": "Uncommitted, no new workflow dispatch or admission"
+    "publication_status": "Published for research after parent inspection and9 mocked tests; exactOpus5.5 review remains pending before product acceptance"
   },
-  "latest_smoke_receipt": "v1-staged-refresh-history-smoke-2026-10-31.json"
+  "latest_smoke_receipt": "v1-staged-refresh-history-smoke-2026-10-31.json",
+  "disposition": {
+    "decision": "not_promoted",
+    "receipt": "v1-staged-refresh-isolated-smoke-2026-10-31.json",
+    "further_dispatches": 0,
+    "qualification": false,
+    "scope": "One100k pair; gross tradeoff rejects this bounded prototype, not a general claim about all disk-backed designs"
+  }
 }

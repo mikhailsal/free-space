@@ -1,0 +1,81 @@
+{
+  "created_at": "2026-10-31T21:27:24.350099+00:00",
+  "sources": {
+    "w5": {
+      "head": "2b9e3fa2a594a940fc8e77af994b442330838745",
+      "base": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+      "changed_paths": [
+        "scripts/tests/test_bench_cleanup.py"
+      ],
+      "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
+      "production_and_measurement_source_changed": false,
+      "opus_review": "pending; provider quota failure"
+    },
+    "control": {
+      "head": "55d6e3460f34710e2520b77da66e659d410f6c25",
+      "base": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+      "changed_paths": [
+        "scripts/tests/test_bench_cleanup.py"
+      ],
+      "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
+      "production_and_measurement_source_changed": false,
+      "opus_review": "pending; provider quota failure"
+    },
+    "joint": {
+      "head": "0adc796a99fd33abec85ab250ad9b2529507b49a",
+      "base": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+      "changed_paths": [
+        "scripts/tests/test_bench_cleanup.py"
+      ],
+      "test_sha256": "e4c0788d507b451d04198a8ef7c22e2d5e9cebf210232bc1521fc897de48e975",
+      "production_and_measurement_source_changed": false,
+      "opus_review": "pending; provider quota failure"
+    }
+  },
+  "finding": "Cleanup fixture mocked timeout by invoking its child directly, but omitted sync; a unit test could call real syncfs on the host. GH traceback establishes a5s fixture timeout, not the exact blocked instruction.",
+  "correction": "Fake sync, retained timeout wrapper flags, cleanup ordering and simulated sync-failure assertions; production cleanup unchanged.",
+  "parent_inspection": "Exact diff inspected; function dispatch reaches mock, removal precedes sync, failure exits nonzero; nine isolated tests passed on each published source.",
+  "requested_external_review": {
+    "status": "error",
+    "provider": "claude-code",
+    "result": "",
+    "error": {
+      "code": "exit",
+      "message": "Claude Code exited with code 1. You've hit your 5-hour limit \u00b7 resets 1:10am (Europe/Moscow)"
+    },
+    "session_id": "a32a0562-4241-440e-8165-7f6d27d85bef",
+    "usage": {
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 0,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "modelUsage": {},
+    "exit_code": 1
+  },
+  "requested_external_review_status": "Unavailable provider quota; not completed, no clean-review claim",
+  "research_publication_decision": "Parent-reviewed reversible test-only repair authorized to unblock measurements. External Opus5.5 remains pending before product acceptance; no metric/correctness gate waived.",
+  "raw_review_prompt": "/tmp/freespace-w5-cleanup-fixture-review-prompt.txt",
+  "push_logs": [
+    "/tmp/freespace-cleanup-w5-push.log",
+    "/tmp/freespace-cleanup-control-push.log",
+    "/tmp/freespace-cleanup-joint-push.log"
+  ],
+  "local_rust_or_app_execution": false
+}
