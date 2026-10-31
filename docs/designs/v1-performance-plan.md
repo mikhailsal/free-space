@@ -53,8 +53,11 @@ rose 0.53%; H2 is inconclusive. Cgroup peak changed from 2.44 to 2.26 GiB, and
 minimum required RAM remains unknown. The
 [SQL composition screen](../benchmark-results/v1-combined-sql-screen-2026-10-31.md)
 reduced scan time by a paired median 31.33%, while its disk and refresh guards
-remain inconclusive. Its full-scale scan is still running. No benefit percentages
-are added together.
+remain inconclusive. Its [full-scale scan](../benchmark-results/v1-combined-sql-full-2026-10-31.md)
+completed one exploratory pair: 639.79 → 477.14 seconds (25.42% faster). Both
+commands reached the 4 GiB cgroup ceiling with reclaim pressure and no OOM;
+process RSS was about 34 MiB. This establishes neither minimum RAM nor repeated
+qualification. No benefit percentages are added together.
 
 The [joint configuration](../benchmark-results/v1-joint-manifest-2026-10-31.json)
 combines these mechanisms and removes eager ancestor-batch eviction after source

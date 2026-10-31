@@ -1,0 +1,370 @@
+{
+  "created_at": "2026-10-31T19:53:54.215687+00:00",
+  "source_revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+  "base_harness_revision": "8aa634532097154447b13850331fd577fdf5d029",
+  "scope": "Ephemeral runner disk preparation and its receipts only; unchanged application source",
+  "source_hashes": {
+    "base": "8aa634532097154447b13850331fd577fdf5d029",
+    "files": {
+      ".github/workflows/representative-bench.yml": {
+        "sha256": "a22259f1adfbb0e4f72e3c7e2d56eb7396e3d772d3add44ddadb8e97fca7044d",
+        "bytes": 16738
+      },
+      "scripts/bench-representative.sh": {
+        "sha256": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+        "bytes": 8789
+      },
+      "scripts/bench_v1_admission.py": {
+        "sha256": "a9841c7ec8f15e75dd5fe454a2837fb6bd385f42e2ad38833d66d83be4de0d64",
+        "bytes": 11102
+      },
+      "scripts/bench_v1_pair.py": {
+        "sha256": "a350488a8b52a6548aa5e147456f8654891097245398d01a84b06ef0e8f02bcb",
+        "bytes": 14030
+      },
+      "scripts/bench_v1_runner_prepare.py": {
+        "sha256": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+        "bytes": 7286
+      },
+      "scripts/bench_v1_summary.py": {
+        "sha256": "2ad0a6de273ee28d89df9364db35a3481f0a4878783667f21add8ddb7c70e153",
+        "bytes": 17215
+      },
+      "scripts/tests/test_bench_v1_admission.py": {
+        "sha256": "bc0c3668ab997cd259ac352d2b5859d1426b51ffa4c2b65ccdaed0d926ba9be2",
+        "bytes": 12591
+      },
+      "scripts/tests/test_bench_v1_runner_prepare.py": {
+        "sha256": "6edc0654184977c7072b0a37934d3cbfa5035f2de9e66fef86fd99fe2aab2759",
+        "bytes": 13263
+      },
+      "scripts/tests/test_bench_v1_runtime.py": {
+        "sha256": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
+        "bytes": 14770
+      },
+      "scripts/tests/test_bench_v1_summary.py": {
+        "sha256": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838",
+        "bytes": 11231
+      }
+    }
+  },
+  "requested_model": "claude-opus-5-5",
+  "reviews": [
+    {
+      "file": "freespace-runner-disk-prep-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P2] `scripts/bench_v1_runner_prepare.py` (`disk()`): free space is measured on `/`, but the floor that matters is measured somewhere else.\n- `bench-representative.sh` enforces the 42 GiB floor with `df --output=avail \"$volume\"`, where `$volume` is under `$RUNNER_TEMP`.\n- Preparation can therefore report success, or stop early at the floor, based on a filesystem that is not the one `fallocate` uses.\n- Nothing checks that each allowlisted path is on the same device as `$RUNNER_TEMP`. A deletion on another filesystem frees nothing useful. And if an allowlisted path is itself a mount point, `--one-file-system` does not stop `rm` from clearing that mount's contents.\n- Fix: measure `statvfs(os.environ['RUNNER_TEMP'])`, which should be validated as absolute and existing. Also require `os.lstat(path).st_dev == os.stat(RUNNER_TEMP).st_dev` in `safe_directory`. Mirror the same filesystem in the workflow fallback, which also uses `os.statvfs('/')`.\n\n[P2] `scripts/bench_v1_runner_prepare.py` (`COMMAND_SECONDS = 20`, `ALLOWLIST` order): the per-path limit is probably too short for the largest item.\n- The first entry, `/usr/local/lib/android`, is very large with a high file count. Removing it on hosted runners commonly takes longer than 20 s. This timing is not verified here.\n- A `TimeoutExpired` raises and fails the whole step after a partial delete. That fails closed, but it reproduces the run 41232507959 outcome in exactly the case this change targets.\n- Going from about 14 GiB to 42 GiB needs about 28 GiB freed, which is close to the whole allowlist's combined size. Hitting one timeout or exhausting the budget means the run fails.\n- Before relying on this, collect per-path durations and freed bytes from one instrumented hosted run. Then set the per-command and total budgets, and possibly the order, from that evidence.\n\n[P3] Workflow step \"Prepare ephemeral runner disk when needed\": the outer `timeout 120` equals the inner `TOTAL_SECONDS = 120`.\n- Interpreter startup, the final `read_disk`, and receipt writes all happen inside the outer limit. When the inner deadline is reached, the outer timeout kills Python first, so the script's own timeout receipt is never written.\n- Fix: give the inner budget clear headroom below the outer one, for example 100 s inner and 120 s outer.\n\n[P3] Workflow fallback receipt: it does not record why the step failed.\n- It runs after any nonzero exit, including the script's normal \"insufficient free space\" failure. In every case it appends the same message, \"failed or exceeded its 120-second limit\".\n- It does not record the exit status, so a timeout (124) cannot be told apart from a clean failure (1).\n- Fix: capture `status=$?` and store it as `exit_code` plus `timed_out: status == 124`.\n- A fallback built from scratch also lacks `floor_bytes`.\n\n[P3] `prepare()` subprocess handling: deletions can outlive their timeouts.\n- When `subprocess.run` times out, it SIGKILLs `sudo`. When the outer `timeout` fires, it TERMs Python. Neither one reliably stops the root `rm` child, which can keep deleting after its receipt entry says `error` or `interrupted`.\n- Impact is limited, because the step then fails and later measurement steps are skipped.\n- Fix: run `rm` in its own session or process group and kill the group with sudo, or wrap the command as `sudo -n timeout -k 2 <secs> rm ...` so the time limit is enforced as root.\n\n[P3] `scripts/tests/test_bench_v1_runner_prepare.py` (`test_delete_error_timeout_and_disk_error_fail_closed`, last assertion): the test runs the real deletion path.\n- It calls `prepare(ENV, read_disk=...)` with the default `safe=safe_directory` and `run=subprocess.run`. It avoids a real `sudo -n rm -rf /usr/local/lib/android` only because `read_disk` raises first.\n- If a refactor reordered that logic, the test could delete SDKs on a developer machine with passwordless sudo.\n- Fix: always pass `run=Mock()` and `safe=Mock()`.\n\n[P3] `scripts/tests/test_bench_v1_runner_prepare.py`: several paths have no tests.\n- No positive `safe_directory` case and no absent-path case.\n- No assertion that `run`'s timeout is clamped to the remaining budget.\n- No test of `main()`'s atomic receipt writes, or that a `started` action is persisted before `run`.\n- No test of the deadline check between `safe()` and the delete.\n- The workflow fallback script has no tests.\n\n[P3] Workflow `paired` job: preparation results never reach the measurement summary.\n- Preparation runs only when space is short, so some runs measure on a host that just did tens of GiB of metadata-heavy deletion and others do not. Pairing within a run limits the bias, but cross-run comparisons, such as a screening forecast against local-scale, are confounded.\n- The receipt is uploaded but not linked to the measurement summary or case.\n- Fix: surface whether preparation acted, and what it freed, in `final-summary.md` or the qualification record.\n- Separately, preparation runs before the cheap local-scale time-admission check, so a run that admission rejects still deletes first. Moving admission ahead of preparation avoids that wasted work.",
+        "session_id": "23fedb5a-f9c1-45be-a0ef-a6e1938da8ca",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 17558,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 6346,
+          "output_tokens_details": {
+            "thinking_tokens": 4432
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 17558,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 6346,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 17558,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 17558
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 6346,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 17558,
+            "webSearchRequests": 0,
+            "costUSD": 0.2676908,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 4432,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 17558,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-runner-disk-prep-followup-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**[P2] The paired job's timeout may not cover the new 5-minute step.**\n- **Where:** `.github/workflows/representative-bench.yml`, the `paired` job's `timeout-minutes: ${{ fromJSON(needs.build.outputs.paired_job_minutes) }}` and the new `Prepare ephemeral runner disk when needed` step (`timeout-minutes: 5`).\n- **Problem:** The job and step caps are unchanged, but the job now has a step that can take up to about 275 s.\n  - If `stage_timeouts()` leaves less slack than checkout, download, admission, 5 min of preparation, the measured step cap, cleanup and upload need, a slow preparation lets the job timeout cut off the measured step first.\n  - The job cancellation also limits the time for `bench-representative.sh`'s cleanup (`docker rm`, `umount`, `losetup -d`). That risks a mounted volume or a missing `runner-cleanup.json` and summary.\n- **Missing context:** `scripts/bench_v1_admission.py` was not supplied, so the margin cannot be checked.\n- **Fix:** Show or assert that `job_minutes \u2265 step_minutes + 5 + existing overhead`. Alternatively, add the preparation minutes to `job_minutes` and record the change in the admission receipt.\n\n**[P2] The preparation floor equals the benchmark's hard minimum, with no headroom, and is defined three times.**\n- **Where:** `scripts/bench_v1_runner_prepare.py` `FLOOR = 42 * 1024 ** 3`, the workflow fallback `floor_bytes=42*1024**3`, and `scripts/bench-representative.sh` `required_gib=42`.\n- **Problem:** Preparation stops as soon as `available_bytes >= 42 GiB`.\n  - After `fallocate -l 40G`, at most about 2 GiB remains on the same root filesystem. That space has to hold the Docker image build (Docker's data-root is on `/`), the outputs and the observers.\n  - For `OPERATIONS='scan refresh'`, the second `bench-representative.sh` run checks 42 GiB again. By then the image, the build cache and the first operation's results are still on disk, and ext4 may not yet have released the first `disk.img` blocks. The second run can fail after the first operation's measured time has been spent.\n  - The three constants can drift apart without any test noticing.\n- **Fix:**\n  - Define one shared floor and use it in all three places, or have the test parse `required_gib` from the script and assert it equals `FLOOR`.\n  - Have preparation target the floor plus explicit headroom for the image and the second operation, or re-run preparation per operation.\n\n**[P3] The Python `subprocess.run(timeout=limit + 5)` bound is not an independent bound against root `sudo`, and the mocked test hides the real failure path.**\n- **Where:** `prepare()` `run([... 'sudo', '-n', 'timeout', ...], timeout=limit + 5, stderr=subprocess.PIPE)`.\n- **Problem:**\n  - On `TimeoutExpired`, `subprocess.run` calls `process.kill()` on a root-owned `sudo`. An unprivileged caller normally cannot signal it, so `PermissionError` propagates.\n  - `Popen.__exit__` then calls `wait()` with no timeout. If `sudo` hangs before it executes `timeout` (for example in PAM or hostname lookup), only the outer 270 s `timeout` ends the step, and the root `sudo` is orphaned.\n  - The test `test_errors_fail_closed_and_never_use_real_deletion` injects `TimeoutExpired` directly, so this path is never exercised.\n  - `stderr` is captured but never stored. A `CalledProcessError` record therefore loses rm's diagnostics, such as \"skipping \u2026, since it's on a different device\" from `--one-file-system`.\n- **Fix:**\n  - Record `error.stderr`, truncated, in the action.\n  - Document that the inner root `timeout` is the real bound, or run `sudo` with `start_new_session=True` and handle a `PermissionError` from kill explicitly as `possibly_orphaned`.\n\n**[P3] Free space is read right after `rm` without forcing a commit, which can trigger extra deletions and misattribute freed bytes.**\n- **Where:** the `finally:` block, `receipt['after'] = read_disk(path)`.\n- **Problem:**\n  - ext4 returns freed blocks to the `statvfs` counters at journal commit (default 5 s). A read taken right after a large `rm -rf` can undercount the freed space. The loop may then delete another SDK it did not need to, and part of one action's `freed_bytes` is credited to the next action.\n  - Same-VM measurement context: Ubuntu cloud images normally mount `/` with `discard`. Deleting about 20 GB queues background discards and writeback, which can overlap `fallocate`, `mkfs` and `bench-disk-calibration.py` on the loop file in the same filesystem.\n  - Calibration runs afterwards and captures the resulting state. However, runs where preparation acted and runs where it did not are not marked as comparable or incomparable anywhere except the receipt.\n- **Fix:**\n  - Call `os.sync()` or run `sync -f \"$RUNNER_TEMP\"` before each `read_disk` after an action, and once at the end.\n  - Copy `acted` and `freed_bytes` into the measurement or calibration metadata, so that cross-run comparisons can filter on them.\n\n**[P3] The timeout fallback records no duration, and a failure in the fallback hides the original exit status.**\n- **Where:** the workflow fallback heredoc and the `Summarize runner disk preparation` step.\n- **Problem:**\n  - When the outer `timeout` fires (exit 124 or 137), Python never writes `duration_seconds`. The step summary then prints `duration_seconds=None` in exactly the case where timing evidence matters most.\n  - The fallback Python runs under the default `bash -eo pipefail`. If the fallback itself fails, for example on a corrupt receipt or an unwritable directory, the step exits with the fallback's status. `exit \"$status\"` never runs and the real 124 or 137 is lost.\n- **Fix:**\n  - Capture `start=$SECONDS` before the call and pass the step's elapsed time into the fallback.\n  - Write the fallback as `PREP_EXIT_CODE=\u2026 python3 - <<'PY' \u2026 PY || true`, followed by `exit \"$status\"`.\n\n**[P3] Local test runs leave untracked bytecode in the work tree.**\n- **Where:** `git status` shows `?? scripts/__pycache__/` and `?? scripts/tests/__pycache__/`.\n- **Problem:** These directories are a side effect of running the unit tests and `compileall`, and they could be committed by accident.\n- **Fix:** Add `__pycache__/` to `.gitignore`, or run the tests with `PYTHONDONTWRITEBYTECODE=1` / `python3 -B`.",
+        "session_id": "38a1990a-992e-4539-8a61-27856ddc167f",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 21975,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 13817,
+          "output_tokens_details": {
+            "thinking_tokens": 11418
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 21975,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 13817,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 21975,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 21975
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 13817,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 21975,
+            "webSearchRequests": 0,
+            "costUSD": 0.4524468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 11418,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 21975,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-runner-disk-prep-final-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] `.github/workflows/representative-bench.yml:~280`: the fallback sets `timed_out=status==124`. Outer GNU `timeout --kill-after=5s` exits 137 when the 270 s deadline expires and SIGKILL is needed. In that case the receipt says `timed_out=false` with `possibly_killed=true`, so a deadline overrun is indistinguishable from an OOM or external kill. Suggested fix: set `timed_out` for `status in (124, 137)`, or record the elapsed time against 270 s.\n\n[P3] `scripts/bench_v1_runner_prepare.py:~114-115`: `possibly_orphaned=True` on `PermissionError` is inaccurate.\n- When `subprocess.run` times out and `process.kill()` raises `EPERM` against root `sudo`, `Popen.__exit__` still calls an unbounded `wait()`. The exception surfaces only after sudo has exited, so nothing is orphaned at that point.\n- The real bound in that path is the outer 270 s `timeout`, not `limit+5`. The fallback's `interrupted` marking already covers the case where sudo really is orphaned.\n- The flag misleads diagnosis. The code comment and the receipt field should state that the Python timeout is advisory, and that the root GNU timeout plus the outer step timeout are the bounds.\n\n[P3] `scripts/bench_v1_runner_prepare.py:~136-142`: the final `sync -f` runs right after the per-action sync. When the last successful removal finishes close to the deadline, the per-action sync can use up the remaining budget. `sync_limit <= 0` then raises `TimeoutError` and reports failure even though space reached `TARGET` and was already synced and re-read. Suggested fix: skip the final sync when the last action already synced, or reserve time for exactly one sync.\n\n[P3] `scripts/bench_v1_summary.py` (`summarize`): `manifest.runner_preparation` is recorded but never validated. A v4 manifest is accepted with the field absent, `null`, or malformed. Examples of malformed values that pass:\n- non-int `freed_bytes`\n- `floor_bytes` not equal to `V1_HARD_FLOOR_GIB*GIB`\n- `target_bytes < floor_bytes`\n\nThe gate exists only in `bench_v1_pair.host` (`scripts/bench_v1_pair.py:82-91`). That gate also checks only `success is True` and does no type or constant checks. If preparation context is part of the receipt contract, validate its shape and constants in the summary.\n\n[P3] `scripts/bench-representative.sh:~100-108` (pre-existing, same failure class as the prior delayed-frees finding): in the `screen` stage, OPERATIONS is `scan refresh`, so the script runs twice. The second run's 42 GiB floor check depends on the first run's 40 GiB `disk.img` being freed.\n- `losetup -d` can defer the release while the device is still referenced, so the unlink may not free blocks immediately.\n- No `sync -f` follows the removal.\n- Free space would then read about 4 GiB, and the second operation fails closed after a full first operation.\n\nSuggested fix: after `rm -f disk.img`, run a bounded `sync -f \"$RUNNER_TEMP\"`. Optionally wait until `losetup -l` no longer lists the backing file.\n\n[P3] `scripts/tests/`: three new paths have no tests.\n- `bench_v1_pair`'s preparation gate: rejection when `success` is not `True`, and the computed `acted`/`freed_bytes`.\n- The shell constant import in `bench-representative.sh`.\n- The cross-constant invariant `V1_HARD_FLOOR_GIB > V1_VOLUME_GIB`. Only `TARGET-FLOOR == 2 GiB` is asserted, so a future edit could make the floor no larger than the volume without any test failing.",
+        "session_id": "a16fa57c-95d2-4b1b-b22c-f1df25a6b616",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 52259,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 19815,
+          "output_tokens_details": {
+            "thinking_tokens": 18494
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 52259,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 19815,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 52259,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 52259
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 19815,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 52259,
+            "webSearchRequests": 0,
+            "costUSD": 0.8146788,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 18494,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 52259,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-runner-disk-prep-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] `scripts/bench_v1_runner_prepare.py`, `prepare()`, the final sync block after the allowlist loop: the final sync is always redundant, and on the time boundary it hides the real failure reason.\n- Every action that runs already syncs in its own `finally` and then re-reads `after`. The final `sync -f` is only reached when `after < TARGET`, so it cannot change the outcome. It can only re-read the same value or fail.\n- Near the deadline (`sync_limit <= 0`, or the sync times out), it raises `TimeoutError('no time remains for final filesystem sync')`. That skips `'insufficient free space after permitted preparation'`. The receipt then blames timing rather than lack of reclaimable space.\n- Suggested fix: remove the final sync block entirely. If you keep it, record the insufficiency error before attempting it.\n\n[P3] `scripts/bench_v1_pair.py`, `host()`: the runner preparation check runs outside the `try`/`finally`, so a rejected receipt leaves no host failure record.\n- `prep_path`, `json.loads` and `runner_preparation_context` all run after `output.mkdir` and `setup_output.mkdir`, but before the `try`.\n- A missing, unreadable or invalid receipt raises straight out of `host()`. No `status.json` with `failures`, `summary.json` or `summary.md` is written.\n- The run still fails closed: `finish_cleanup` summarizes and reports a missing manifest, status and admission. But the actual cause appears only in the step log. This differs from how `test_early_admission_failure_still_writes_invalid_summary` treats capacity-admission failures.\n- The check also runs only after the shell has allocated the 40 GiB loop volume and finished disk calibration.\n- Suggested fix: move the check into the `try` so `failures` records the reason, or run it before any directory is created.\n\n[P3] `.github/workflows/representative-bench.yml`, \"Summarize runner disk preparation\" step: two artifacts use `acted` with different meanings.\n- The step summary counts `('removed','error','interrupted')`, meaning \"may have modified the host\".\n- `runner_preparation_context` and the manifest count only `'removed'`.\n- They agree on every successful receipt, but the same word means different things across the run summary and the manifest.\n- Suggested fix: rename one of them (for example `possibly_modified` in the step summary), or document the difference.",
+        "session_id": "e8c47f33-e74c-4a27-9856-476e33584fc0",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 68941,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 13698,
+          "output_tokens_details": {
+            "thinking_tokens": 12888
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 68941,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 13698,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 68941,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 68941
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 13698,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 68941,
+            "webSearchRequests": 0,
+            "costUSD": 0.8257947999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 12888,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 68941,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-runner-disk-prep-clean-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] `.github/workflows/representative-bench.yml` (Summarize runner disk preparation): `possibly_modified` counts only `removed`, `error` and `interrupted`, so it misses an action left as `started`. That status survives when the fallback rewrite fails (it is suppressed by `|| true`) or never runs (step timeout, cancellation, or the runner killing the step), and in that case the summary reports `possibly_modified=False` even though an `rm -rf` may have run. Add `started` to the status set and cover it in `test_step_summary_calls_partial_failure_possibly_modified`.",
+        "session_id": "b0dd7171-a62c-47d6-b962-812bb2471964",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 57950,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 2382,
+          "output_tokens_details": {
+            "thinking_tokens": 2182
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 57950,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 2382,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 57950,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 57950
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 2382,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 57950,
+            "webSearchRequests": 0,
+            "costUSD": 0.5115468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2182,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 57950,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "disposition": {
+    "outside_review": "Completed with one final P3; not a NO_FINDINGS claim",
+    "final_P3": "The diagnostic possibly_modified set omitted started after interruption. Added that exact enum value and extended its existing subtest after review; focused test passed in0.012seconds. All previous findings fixed.",
+    "validation": "Structured outside completion passes; requested model reported. Ten frozen hashes verified; normal pre-push Rust check,size,shell,tsc,biome pass. No Rust tests or local SDK operations.",
+    "runtime_gate": "Actual deletion duration and effectiveness must be measured on admitted GitHub runs; source checks do not establish that every runner image has sufficient reclaimable SDK space."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "created_at": "2026-10-31T19:53:54.215687+00:00",
+  "source_revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+  "source_review": "v1-runner-preparation-source-reviews-2026-10-31.json",
+  "plans": [
+    {
+      "id": "runner-preparation-smoke-large-folder",
+      "branch": "perf/v1-runner-disk-prep",
+      "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "operations": [
+        "refresh"
+      ],
+      "files": 100000,
+      "expected_entries": 100005,
+      "subtree_entries": 100000,
+      "scenario": "unchanged",
+      "memory_mib": 512,
+      "observer_memory_mib": 4096,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "pairs_per_operation": 1,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3300,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "profile_policy": "profile-v2",
+      "runner_preparation_policy": "sdk-space-v1",
+      "hard_floor_gib": 42,
+      "preparation_target_gib": 44,
+      "dedicated_volume_gib": 40,
+      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "status": "admitted_not_dispatched",
+      "depends_on": "Published reviewed immutable preparation source, mechanical final diagnostic fix and normal hooks completed. Precheck still refuses insufficient bytes; no repeat of the failed old source.",
+      "purpose": "Prospective infrastructure and large-folder protocol verification. Application source unchanged; no optimization or minimum full-scale RAM claim."
+    }
+  ],
+  "campaign_cap_seconds": 216000,
+  "stop_rules": [
+    "No automatic retry if SDK cleanup is insufficient or times out",
+    "Exact allowlist only on an ephemeral GitHub-hosted runner and the same filesystem as RUNNER_TEMP; no SDK operation locally",
+    "Keep the40GiB filesystem,8.5million inodes and42GiB hard floor; preparation targets44GiB with explicit headroom",
+    "Strict ordinary success, observer, profile and actual baseline artifact identity required before expanding",
+    "Record acted/duration/available-byte delta and host filesystem. Compare arms within the sameVM; crossVM setup time is only an admission forecast",
+    "Full scan total memory is the next resource priority. RSS-only refresh savings do not establish lower memory requirements for scan"
+  ]
+}

@@ -480,15 +480,16 @@
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
       "forecast_seconds": 2952,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted",
       "manifest": "v1-combined-sql-manifest-2026-10-31.json",
       "run_id": 41230966330,
       "created_at": "2026-10-31T18:45:36Z",
       "head_sha_verified": true,
       "purpose": "combined-sql-full-exploratory",
-      "conclusion": "",
-      "completed_job_seconds": 162.0
+      "conclusion": "success",
+      "completed_job_seconds": 2991.0,
+      "job_seconds": 2991.0
     },
     {
       "id": "qualification-smoke-default",
@@ -579,10 +580,10 @@
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T19:12:46.505427+00:00",
-  "completed_job_seconds": 20623.0,
-  "maximum_committed_seconds": 57661.0,
-  "remaining_unreserved_seconds": 158339.0,
+  "updated_at": "2026-10-31T19:53:54.215687+00:00",
+  "completed_job_seconds": 23452.0,
+  "maximum_committed_seconds": 54952.0,
+  "remaining_unreserved_seconds": 161048.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -621,7 +622,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 28200,
+  "planned_reserved_seconds": 31500,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Exact node capacity after actual subtree walk",
@@ -696,6 +697,38 @@
     }
   ],
   "planned_next_dispatches": [
+    {
+      "id": "runner-preparation-smoke-large-folder",
+      "branch": "perf/v1-runner-disk-prep",
+      "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "operations": [
+        "refresh"
+      ],
+      "files": 100000,
+      "expected_entries": 100005,
+      "subtree_entries": 100000,
+      "scenario": "unchanged",
+      "memory_mib": 512,
+      "observer_memory_mib": 4096,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "pairs_per_operation": 1,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3300,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "profile_policy": "profile-v2",
+      "runner_preparation_policy": "sdk-space-v1",
+      "hard_floor_gib": 42,
+      "preparation_target_gib": 44,
+      "dedicated_volume_gib": 40,
+      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "status": "admitted_not_dispatched",
+      "depends_on": "Published reviewed immutable preparation source, mechanical final diagnostic fix and normal hooks completed. Precheck still refuses insufficient bytes; no repeat of the failed old source.",
+      "purpose": "Prospective infrastructure and large-folder protocol verification. Application source unchanged; no optimization or minimum full-scale RAM claim."
+    },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
       "comparison": "candidate",

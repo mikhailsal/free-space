@@ -1,0 +1,386 @@
+{
+  "archive": "v1-combined-sql-full-2026-10-31.tar.gz",
+  "archive_sha256": "f14651ed0bf69247d724c769b76ed23a54aaeaa9088cbe8f9d1e9b7dfc9951e4",
+  "original_files": 65,
+  "support_files": 4,
+  "archive_verified": true,
+  "description": [
+    {
+      "operation": "scan",
+      "protocol": "v1-single-operation-pairs-v3",
+      "github": {
+        "GITHUB_SHA": "d1c9f014ed185d663947590b388b444c08da7fda",
+        "GITHUB_RUN_ID": "41230966330",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 7264383,
+        "expected_entries": 7297076,
+        "expected_subtree_entries": 100,
+        "directories": 32693,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 458.000774684
+      },
+      "identical_binaries": false,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 639.785248939,
+          "candidate_median": 477.1397663759999,
+          "paired_deltas": [
+            -162.6454825630001
+          ],
+          "paired_percent_changes": [
+            -25.42188692732855
+          ],
+          "median_paired_percent_change": -25.42188692732855,
+          "max_abs_percent_change": 25.42188692732855,
+          "max_abs_delta": 162.6454825630001
+        },
+        "peak_rss_kib": {
+          "baseline_median": 35272,
+          "candidate_median": 35052,
+          "paired_deltas": [
+            -220
+          ],
+          "paired_percent_changes": [
+            -0.6237242004989763
+          ],
+          "median_paired_percent_change": -0.6237242004989763,
+          "max_abs_percent_change": 0.6237242004989763,
+          "max_abs_delta": 220
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 3363758080,
+          "candidate_median": 3363733504,
+          "paired_deltas": [
+            -24576
+          ],
+          "paired_percent_changes": [
+            -0.0007306113999683284
+          ],
+          "median_paired_percent_change": -0.0007306113999683284,
+          "max_abs_percent_change": 0.0007306113999683284,
+          "max_abs_delta": 24576
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "674faf7ab978502a7d17674599083d575dd57fc9914703a2673154f93d790aa9",
+          "elapsed_seconds": 639.785248939,
+          "rss_kib": 35272,
+          "app_disk_peak_bytes": 3363758080,
+          "cgroup_peak_bytes": 4294967296,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8556544,
+            "file": 1371611136,
+            "kernel": 2329579520,
+            "slab_reclaimable": 2329144336
+          },
+          "memory_events": "low 0\nhigh 0\nmax 15297\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 366.775175452,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 263.112383088,
+            "index_seconds": 9.751194577,
+            "publish_seconds": 0.00225811,
+            "total_seconds": 639.753425076
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+          "binary_sha256": "e0302ebce40463283ee94562f706c502f0df3d63eed966a898bf4231603923d1",
+          "elapsed_seconds": 477.1397663759999,
+          "rss_kib": 35052,
+          "app_disk_peak_bytes": 3363733504,
+          "cgroup_peak_bytes": 4294967296,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8556544,
+            "file": 1319223296,
+            "kernel": 2388242432,
+            "slab_reclaimable": 2387856440
+          },
+          "memory_events": "low 0\nhigh 0\nmax 15525\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 364.577427339,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 100.054807304,
+            "index_seconds": 12.357433026,
+            "publish_seconds": 0.001320732,
+            "total_seconds": 477.107042587
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "valid": true,
+    "issues": [],
+    "pairs": [
+      {
+        "pair": 1,
+        "elapsed_seconds": {
+          "baseline": 639.785248939,
+          "candidate": 477.1397663759999,
+          "delta": -162.6454825630001
+        },
+        "peak_rss_kib": {
+          "baseline": 35272,
+          "candidate": 35052,
+          "delta": -220
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 3363758080,
+          "candidate": 3363733504,
+          "delta": -24576
+        }
+      }
+    ],
+    "summary": {
+      "elapsed_seconds": {
+        "median_delta": -162.6454825630001,
+        "max_abs_delta": 162.6454825630001
+      },
+      "peak_rss_kib": {
+        "median_delta": -220,
+        "max_abs_delta": 220
+      },
+      "app_disk_peak_bytes": {
+        "median_delta": -24576,
+        "max_abs_delta": 24576
+      }
+    },
+    "identical_binaries": false,
+    "measurement_protocol": "v1-single-operation-pairs-v3"
+  },
+  "github": {
+    "conclusion": "success",
+    "createdAt": "2026-10-31T18:45:36Z",
+    "event": "workflow_dispatch",
+    "headSha": "d1c9f014ed185d663947590b388b444c08da7fda",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T18:48:21Z",
+        "conclusion": "success",
+        "databaseId": 124624910588,
+        "name": "build",
+        "startedAt": "2026-10-31T18:45:39Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T18:45:41Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T18:45:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:45:43Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-31T18:45:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:45:43Z",
+            "conclusion": "success",
+            "name": "Validate per-stage time envelope",
+            "number": 3,
+            "startedAt": "2026-10-31T18:45:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:45:54Z",
+            "conclusion": "success",
+            "name": "Run dtolnay/rust-toolchain@1.99.1",
+            "number": 4,
+            "startedAt": "2026-10-31T18:45:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:46:03Z",
+            "conclusion": "success",
+            "name": "Install musl tools",
+            "number": 5,
+            "startedAt": "2026-10-31T18:45:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:46:04Z",
+            "conclusion": "success",
+            "name": "Run oven-sh/setup-bun@v2",
+            "number": 6,
+            "startedAt": "2026-10-31T18:46:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:46:07Z",
+            "conclusion": "success",
+            "name": "Run Swatinem/rust-cache@v2",
+            "number": 7,
+            "startedAt": "2026-10-31T18:46:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:47:22Z",
+            "conclusion": "success",
+            "name": "Check benchmark contracts and repository gates",
+            "number": 8,
+            "startedAt": "2026-10-31T18:46:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:17Z",
+            "conclusion": "success",
+            "name": "Build both arms with one recorded toolchain",
+            "number": 9,
+            "startedAt": "2026-10-31T18:47:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:19Z",
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 10,
+            "startedAt": "2026-10-31T18:48:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:19Z",
+            "conclusion": "success",
+            "name": "Post Run Swatinem/rust-cache@v2",
+            "number": 18,
+            "startedAt": "2026-10-31T18:48:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:19Z",
+            "conclusion": "success",
+            "name": "Post Run oven-sh/setup-bun@v2",
+            "number": 19,
+            "startedAt": "2026-10-31T18:48:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 20,
+            "startedAt": "2026-10-31T18:48:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-10-31T18:48:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/mikhailsal/free-space/actions/runs/41230966330/job/124624910588"
+      },
+      {
+        "completedAt": "2026-10-31T19:35:32Z",
+        "conclusion": "success",
+        "databaseId": 124625544387,
+        "name": "paired",
+        "startedAt": "2026-10-31T18:48:23Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T18:48:24Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T18:48:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:25Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-31T18:48:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:26Z",
+            "conclusion": "success",
+            "name": "Run actions/download-artifact@v4",
+            "number": 3,
+            "startedAt": "2026-10-31T18:48:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:48:26Z",
+            "conclusion": "success",
+            "name": "Check time admission before local-scale allocation",
+            "number": 4,
+            "startedAt": "2026-10-31T18:48:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T19:35:29Z",
+            "conclusion": "success",
+            "name": "Paired v1 commands with isolated observers",
+            "number": 5,
+            "startedAt": "2026-10-31T18:48:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T19:35:30Z",
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 6,
+            "startedAt": "2026-10-31T19:35:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T19:35:31Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 12,
+            "startedAt": "2026-10-31T19:35:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T19:35:31Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 13,
+            "startedAt": "2026-10-31T19:35:31Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/mikhailsal/free-space/actions/runs/41230966330/job/124625544387"
+      }
+    ],
+    "status": "completed",
+    "updatedAt": "2026-10-31T19:35:33Z",
+    "url": "https://github.com/mikhailsal/free-space/actions/runs/41230966330",
+    "workflowName": "Representative scanner benchmark"
+  },
+  "rust_tests": {
+    "passed": 316,
+    "failed": 0,
+    "ignored": 1
+  },
+  "python_test_counts": [
+    "82"
+  ],
+  "job_seconds": {
+    "build": 162.0,
+    "paired": 2829.0
+  }
+}

@@ -78,11 +78,16 @@
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
       "forecast_seconds": 2952,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted",
       "run_id": 41230966330,
       "created_at": "2026-10-31T18:45:36Z",
-      "head_sha_verified": true
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 2991,
+      "ordinary_receipts_valid": true,
+      "receipt": "v1-combined-sql-full-2026-10-31.json",
+      "promotion": false
     }
   ],
   "initial_maximum_runner_seconds": 14100,
@@ -133,5 +138,24 @@
     "admitted": true,
     "limits": "Initial linear projection of worst observed screen components, not promised latency; common memory and I/O; no tuning of benefit bars"
   },
-  "updated_at": "2026-10-31T18:44:42.412930+00:00"
+  "updated_at": "2026-10-31T19:42:43.770756+00:00",
+  "full_disposition": {
+    "operation": "scan",
+    "pairs": 1,
+    "elapsed_baseline_seconds": 639.785248939,
+    "elapsed_candidate_seconds": 477.1397663759999,
+    "elapsed_change_pct": -25.42188692732855,
+    "rss_delta_kib": -220,
+    "disk_delta_bytes": -24576,
+    "cgroup_peak_both_bytes": 4294967296,
+    "cgroup_memory_max_events": [
+      15297,
+      15525
+    ],
+    "oom_kills": [
+      0,
+      0
+    ],
+    "decision": "Exploratory speed floor met in this pair; no promotion. Repeated confirmation, refresh guard, I/O profile and minimum tested budgets remain open. Joint variant differs and cannot inherit this result."
+  }
 }
