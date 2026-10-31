@@ -1,10 +1,12 @@
 import importlib.util
 import json
+import sys
 from pathlib import Path
 import tempfile
 import unittest
 
 PATH = Path(__file__).resolve().parents[1] / 'bench_v1_summary.py'
+sys.path.insert(0, str(PATH.parent))
 SPEC = importlib.util.spec_from_file_location('bench_v1_summary', PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
@@ -56,6 +58,25 @@ class SummaryTest(unittest.TestCase):
         obj = json.loads(file.read_text())
         obj[key] = value
         put(file, obj)
+
+    def test_runner_preparation_policy_requires_valid_context(self):
+        self.assertTrue(MODULE.summarize(self.root)['valid'])  # Historical receipt has no policy.
+        self.change('manifest.json', 'runner_preparation_policy', 'sdk-space-v1')
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        valid = {'success': True, 'acted': True, 'freed_bytes': -4096, 'duration_seconds': 1.5,
+                 'floor_bytes': 42 * 1024**3, 'target_bytes': 44 * 1024**3}
+        self.change('manifest.json', 'runner_preparation', valid)
+        self.assertTrue(MODULE.summarize(self.root)['valid'])
+        for key, value in (('success', False), ('acted', 1), ('freed_bytes', True), ('freed_bytes', '0'),
+                           ('duration_seconds', float('nan')), ('floor_bytes', 0), ('target_bytes', 42 * 1024**3)):
+            with self.subTest(key=key, value=value):
+                self.change('manifest.json', 'runner_preparation', dict(valid, **{key: value}))
+                self.assertFalse(MODULE.summarize(self.root)['valid'])
+        manifest = json.loads((self.root / 'manifest.json').read_text())
+        del manifest['runner_preparation_policy']
+        manifest['runner_preparation'] = {'bad': True}
+        put(self.root / 'manifest.json', manifest)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
 
     def test_qualification_case_rejects_missing_and_mismatched_bindings(self):
         self.change('manifest.json', 'measurement_protocol', MODULE.PROTOCOL)

@@ -248,6 +248,59 @@ jobs:
           print(receipt)
           if not receipt['success'] or not receipt['case_matches']: raise SystemExit('No admissible case-matched screening forecast')
           PY
+      - name: Prepare ephemeral runner disk when needed
+        timeout-minutes: 5
+        run: |
+          mkdir -p representative-results/runner-preparation
+          prep_started=$SECONDS
+          status=0
+          timeout --kill-after=5s 270s python3 scripts/bench_v1_runner_prepare.py || status=$?
+          if (( status != 0 )); then
+            PREP_EXIT_CODE="$status" PREP_ELAPSED="$((SECONDS-prep_started))" python3 - <<'PY' || true
+          import json,os,sys
+          sys.path.insert(0,'scripts')
+          from bench_v1_admission import GIB,V1_HARD_FLOOR_GIB,V1_PREP_HEADROOM_GIB
+          path='representative-results/runner-preparation/receipt.json'
+          try:
+              with open(path) as source: receipt=json.load(source)
+          except (OSError,ValueError): receipt={'before':None,'actions':[],'errors':[]}
+          target=os.environ.get('RUNNER_TEMP')
+          try:
+              if not target or not os.path.isabs(target) or os.path.realpath(target) != target:
+                  raise ValueError('invalid RUNNER_TEMP')
+              info=os.stat(target); s=os.statvfs(target)
+              disk={'total_bytes':s.f_blocks*s.f_frsize,'used_bytes':(s.f_blocks-s.f_bfree)*s.f_frsize,'available_bytes':s.f_bavail*s.f_frsize}
+              receipt['target_dev']=info.st_dev
+          except (OSError,ValueError) as error:
+              disk={'error':str(error)}
+          status=int(os.environ['PREP_EXIT_CODE'])
+          receipt.update(success=False,after=disk,target_path=target,floor_bytes=V1_HARD_FLOOR_GIB*GIB,
+                         target_bytes=(V1_HARD_FLOOR_GIB+V1_PREP_HEADROOM_GIB)*GIB,
+                         duration_seconds=int(os.environ['PREP_ELAPSED']),exit_code=status,
+                         timed_out=status==124 or (status==137 and int(os.environ['PREP_ELAPSED'])>=270),possibly_killed=status==137)
+          for action in receipt.get('actions',[]):
+              if action.get('status') == 'started': action.update(status='interrupted',duration_seconds=None,root_process_state_unknown=True)
+          receipt.setdefault('errors',[]).append(f'preparation command failed with exit {status}')
+          tmp=path+'.tmp'
+          with open(tmp,'w') as out: json.dump(receipt,out,allow_nan=False,indent=2)
+          os.replace(tmp,path)
+          PY
+            exit "$status"
+          fi
+      - name: Summarize runner disk preparation
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          path=pathlib.Path('representative-results/runner-preparation/receipt.json')
+          if path.is_file():
+              r=json.loads(path.read_text())
+              before=(r.get('before') or {}).get('available_bytes')
+              after=(r.get('after') or {}).get('available_bytes')
+              freed=after-before if isinstance(after,int) and isinstance(before,int) else None
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as out:
+                  out.write(f"\nRunner preparation: success={r.get('success')}; possibly_modified={any(a.get('status') in ('started','removed','error','interrupted') for a in r.get('actions',[]))}; freed_bytes={freed}; duration_seconds={r.get('duration_seconds')}. Receipt: runner-preparation/receipt.json in run artifact.\n")
+          PY
       - name: Paired v1 commands with isolated observers
         timeout-minutes: ${{ fromJSON(needs.build.outputs.paired_step_minutes) }}
         env:
@@ -260,6 +313,7 @@ jobs:
           BENCH_SCENARIO: ${{ needs.build.outputs.scenario }}
           BENCH_MEMORY: ${{ needs.build.outputs.memory_mib }}
           BENCH_FILES: ${{ needs.build.outputs.files }}
+          BENCH_PREP_RECEIPT: ${{ github.workspace }}/representative-results/runner-preparation/receipt.json
         run: |
           set -euo pipefail
           case "$OPERATIONS" in
