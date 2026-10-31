@@ -1,0 +1,144 @@
+{
+  "created_at": "2026-10-31T17:17:07.673165+00:00",
+  "candidate_revision": "f04a109124c3747d937547e4fc1f6d37ad59392a",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_sha256": {
+    "core/src/refresh.rs": "f1f3c7b8ba8fd4d9bf2f0cfad9de536e8347ebf4a69817928b3a9d1096d0f4d8",
+    "core/src/refresh/load.rs": "c40f46f6c33cc3f3e8d2a11b0ec64cfea455c8a63b1545bc82f438cb509a6c92",
+    "core/src/refresh/load/tests.rs": "4c558f0eed626bc42ede59beb88c3cd046e0cef1d53ffa597a4054f31a96af79"
+  },
+  "provider": "claude-code",
+  "requested_model": "claude-opus-5-5",
+  "final_verdict": "NO_FINDINGS",
+  "strict_outside_review_validation": {
+    "completed": true,
+    "gate": "pass"
+  },
+  "normal_pre_push": "rust,size,shell,tsc,biome passed underCPU50%Memory2G180s; nohookbypass",
+  "new_Rust_tests": "3prepared, compiled bynormalhook; notrunlocally; GitHubbeforebenchmark",
+  "findings_disposition": {
+    "progress": "Chronology and99percentclamp explicitlydocumented; nofalse100percentcompletion ornewUIstage",
+    "capacity_test": "Veccontractisminimumcapacity; exactrequestarithmetictest+realprep/grafttest; do notassertallocatorrounding",
+    "test_location": "Movedto load/tests.rs perrepositoryinstructions"
+  },
+  "reviews": [
+    {
+      "status": "completed",
+      "provider": "claude-code",
+      "result": "# Review: v1 refresh exact-capacity candidate (`core/src/refresh.rs`, `core/src/refresh/load.rs`)\n\nI found no P1 or P2 issues: nothing in the diff breaks correctness, introduces a race, or violates a size or Clippy gate. There are three P3 findings, plus some missing context that only running the tests will settle. Since there are findings, the conclusion is not `NO_FINDINGS`.\n\n## Checked and clean\n\n- **Exact capacity:** `graft` pushes `sub.nodes.len() - 1` nodes (`skip(1)`, root merged into `x`). So `capacity = n + extra` equals the final `nodes.len()`, and no realloc should happen in `refresh_after_nodes`.\n- **Reserve path:** `try_reserve_exact(capacity)` runs on an empty Vec, and the later `resize(parent.len())` stays within it. With `extra == 0`, the public `load_tree` keeps the old `resize` allocation behaviour.\n- **Roots:** `roots()` uses the same `load_roots` query that `loaded.tree.roots` used before, so `rescan_subtree` receives the same data. `load_tree_with_extra` still fills `tree.roots`, so `update_fs_stats` is unaffected.\n- **Overflow check:** `checked_capacity` with `<= u32::MAX` is conservative and keeps `NO_PARENT` out of range. The public `load_tree` can now reject more than `u32::MAX` entries where it used to truncate silently. That is harmless.\n- **Visibility and imports:** `super::rescan_subtree` is visible from the child module. All new imports in `load.rs` are used, and `refresh.rs` still uses `Instant`, `Arc`, `AtomicU64`, `PathBuf` and `RootInfo`.\n- **Gates:**\n  - `prepare_refresh` has 6 arguments and `load_nodes` still has 7 (the parameter was renamed, not added).\n  - Every function is well under 80 lines, and nesting is at most 3.\n  - `load.rs` is about 403 lines, under 500, and `refresh.rs` got shorter.\n- **The tests can detect the bug they target:**\n  - Without the change, 0\u2192128 gives a capacity of 4 after `resize(2)`, and 128\u21921 gives 130, below the 131 needed.\n  - The capacity assertion fails in both cases, and the pointer-stability assertion catches the realloc on its own.\n- **Profile events:** the `refresh_loaded` marker still comes before the graft markers and its event name is unchanged. This assumes, as you stated, that `scan::walk` emits no markers.\n\n## Findings\n\n**P3 \u2013 `core/src/refresh/load.rs:31-44` / `core/src/refresh.rs:233-244`: progress behaviour visibly changes during load.**\n`ProgressWriter` stays in its initial stage until `STAGE_WRITE`.\n- **Before:** the snapshot load ran while `seen == 0`, at the start of the progress bar.\n- **Now:** it runs after the walk, with `seen` near `x.items + 1`. On a 7M-entry snapshot, CLI and GUI progress (and any ETA) will sit near 100% for the whole `load_seconds`.\n\nThis does not affect correctness, but users can see it. If the representative or GUI evidence compares progress output, it will differ. Fix options:\n- set a distinct stage before `load_tree_with_extra`, or\n- state the change in the PR.\n\n**P3 \u2013 `core/src/refresh/load.rs` test `check_refresh`: capacity is only checked as a lower bound.**\n`capacity() >= old_nodes + expected_extra` together with the pointer check proves there is no realloc. It does not prove the reservation is exact. A later change to `reserve`, or an extra headroom factor, would still pass, and avoiding magic headroom is a stated goal.\n\nOn the growth path, the global allocator can round up, so asserting equality could be flaky. A tighter check that `extra` comes from the walk could test `checked_capacity` or `load_tree_with_extra(snap, k)` with `len + k <= cap < len + k + small` instead.\n\nThe tests also do not show that the public `load_tree(snap)` still takes the zero-extra `resize` path. Its capacity there is `max(n, 4)` under std's growth rule. One assertion would pin that down.\n\n**P3 \u2013 `core/src/refresh/load.rs`: tests live in a source file (convention, not a gate).**\nThe new `mod tests` is about 105 lines, and the project CLAUDE.md says \"Put long Rust tests in a `tests.rs` submodule.\" The file is within 500 lines today, but these lines count toward the source-file limit. A future `load.rs` change would then have to split under pressure. I suggest moving the tests to `core/src/refresh/load/tests.rs` (or the crate's existing `tests.rs` pattern) now.\n\n## Not findings (already accepted)\n\nThese are the risks you flagged, so I did not count them as findings:\n- the walked subtree overlapping the load's transient vectors (`parent`, `child_count`, `block_start`, `fill`, `raw_of`, each 4N bytes);\n- a corrupt or non-dense DB now being detected only after a possibly long walk, with walk errors reported first;\n- `load_seconds` now including the roots query.\n\n## Missing context (unverified, settle by running the tests)\n\n- **Test helper APIs:** `check_refresh`/`snapshot()` rely on APIs this diff does not show:\n  - `WalkOptions::new`;\n  - `Tree::finalize()`;\n  - `SnapshotDir::path` and `Reserve { dir, min_free, check_every }` being public fields (struct-literal construction);\n  - `SnapshotDir::current()`;\n  - `tempfile` being a dev-dependency of `core`.\n- **Snapshot opening:** whether `Snapshot::open_current` can open a snapshot written straight to `dir.current()` without `publish_current`, `state.json` or a generation link.\n- **Finalize semantics:** whether `finalize_with` leaves `REMOVED` nodes out of `fin.order` and writes `items` into `nodes[root_raw]`. Two assertions assume this.\n- **`items` counting:** that `row.items` excludes the directory itself, which the `assert_eq!(row.items as usize, old)` assumes.\n- **Post-graft pushes:** that nothing between the graft and the finalization profile point pushes into `tree.nodes`, which would undo the exact-capacity effect. The `after_finalize` RSS delta suggests that growth comes from other vectors, but I can't confirm that here.\n\nSince the tests have not been run, none of the new tests should be counted as passing yet.",
+      "session_id": "51c14b86-eef2-4aca-aa46-25379fd29ffb",
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 21635,
+        "cache_read_input_tokens": 1494,
+        "output_tokens": 8029,
+        "output_tokens_details": {
+          "thinking_tokens": 5756
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 21635,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 8029,
+            "cache_read_input_tokens": 1494,
+            "cache_creation_input_tokens": 21635,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 21635
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5-5": {
+          "inputTokens": 2,
+          "outputTokens": 8029,
+          "cacheReadInputTokens": 1494,
+          "cacheCreationInputTokens": 21635,
+          "webSearchRequests": 0,
+          "costUSD": 0.3339668,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 128000,
+          "thinkingTokens": 5756,
+          "cacheCreationEphemeral5mInputTokens": 0,
+          "cacheCreationEphemeral1hInputTokens": 21635,
+          "canonicalModel": "claude-opus-5-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "exit_code": 0
+    },
+    {
+      "status": "completed",
+      "provider": "claude-code",
+      "result": "# Review: refresh exact-capacity candidate (final follow-up)\n\nI reviewed the three-file diff, the final `refresh.rs`, `load.rs`, `load/tests.rs`, the `progress.rs` clamp and the design note. I compiled and ran nothing, so everything below comes from reading the source.\n\n## Production source\n\n- **Requested capacity is exact for graft.** `replace_subtree` pushes `sub.nodes.iter().skip(1)`, which is `len \u2212 1` nodes. `extra = len.saturating_sub(1)` matches that. For removal, `None` gives `extra = 0`, and graft pushes nothing.\n- **Reserve placement is correct.** `try_reserve_exact(capacity)` runs on an empty `Vec`, so the argument is the total capacity, not an addition to an existing length. `resize(parent.len())` then stays within it. When `capacity == parent.len()`, skipping the reserve is safe because `resize` allocates exactly that.\n- **Raw-ID bound is sound.** The largest grafted raw ID is `capacity \u2212 1`, which is at most `u32::MAX \u2212 1`. That never collides with `NO_PARENT`, assuming `NO_PARENT` is `u32::MAX`. I didn't see its definition.\n  - `checked_capacity` runs before `load_parents`. A too-large request therefore fails before any per-node allocation.\n- **The roots split is equivalent to the old code.** `roots()` uses the same `load_roots` query that previously filled `loaded.tree.roots` before `rescan_subtree`. Dropping the roots before the full load is harmless.\n- **Visibility and module paths resolve.**\n  - The child module can call the parent's private `rescan_subtree` via `super::`.\n  - Inside a file loaded through `#[path]`, the nested `#[path = \"load/tests.rs\"]` resolves relative to `core/src/refresh/`.\n  - The tests file falls under the `*/tests.rs` 1000-line class.\n- **Argument counts stay under the clippy default (7).** `prepare_refresh` takes 6 and `load_nodes` takes 7.\n- **Public API is unchanged.** `load_tree` keeps zero-extra behaviour through its re-export.\n- **Behaviour changes are all disclosed in the design note:**\n  - error-precedence reordering\n  - the walked subtree staying live during load\n  - progress reaching 99% before the load finishes\n  - `load_seconds` now including the roots read\n\n## Tests\n\n- **Each case asserts the walked count, `old + 2` loaded nodes, a lower-bound capacity, an unchanged pointer across graft, and finalized order/items.**\n- **The capacity assertion is the one that catches a regression.** Pointer equality alone could pass if the allocator grew the buffer in place. The `capacity() >=` assertion runs before graft and would fail independently.\n  - The shrink case (`128 \u2192 1`) is meaningful: without the reserve, `resize` would give exactly 130, and the single push would have to reallocate.\n- **No snapshot-in-root contamination.** The snapshot directory sits outside the walked root.\n- **`checked_capacity` covers equality, raw-ID overflow and `usize` overflow.**\n\n## Coverage not established (not counted as passing)\n\n- **Nothing compiled or ran.**\n- **Some APIs used only by the tests were not shown, so compilation depends on them:**\n  - `WalkOptions::new`\n  - `Node::items`, populated by `finalize_with`\n  - `Row::{items, id, subtree_end}` types\n  - `crate::refresh` being reachable at that path\n- **The 8 GNU-only v2 fault tests are excluded under MUSL** (307 vs 315), so W6 GNU coverage is still required.\n- **No RSS or benefit evidence exists for the candidate yet.**\n\nNO_FINDINGS",
+      "session_id": "c521bf5b-e0e5-435b-aab6-b0861f91ab21",
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 25208,
+        "cache_read_input_tokens": 1494,
+        "output_tokens": 4849,
+        "output_tokens_details": {
+          "thinking_tokens": 3545
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 25208,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 4849,
+            "cache_read_input_tokens": 1494,
+            "cache_creation_input_tokens": 25208,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 25208
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5-5": {
+          "inputTokens": 2,
+          "outputTokens": 4849,
+          "cacheReadInputTokens": 1494,
+          "cacheCreationInputTokens": 25208,
+          "webSearchRequests": 0,
+          "costUSD": 0.2989508,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 128000,
+          "thinkingTokens": 3545,
+          "cacheCreationEphemeral5mInputTokens": 0,
+          "cacheCreationEphemeral1hInputTokens": 25208,
+          "canonicalModel": "claude-opus-5-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "exit_code": 0
+    }
+  ]
+}

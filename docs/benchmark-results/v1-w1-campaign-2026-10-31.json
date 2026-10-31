@@ -18,7 +18,8 @@
     41206306054,
     41208041797,
     41216093276,
-    41220168826
+    41220168826,
+    41222190491
   ],
   "runs": [
     {
@@ -303,13 +304,46 @@
       "completed_job_seconds": 1163.0,
       "purpose": "Identical-binary release musl target control, prospectiveprofile-v2, nooptimization",
       "job_seconds": 1163.0
+    },
+    {
+      "comparison": "control",
+      "branch": "perf/v1-refresh-scale-harness",
+      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
+      "owner_allocation": "D19 continuation under60hours",
+      "id": "refresh-release-target-full-control",
+      "stage": "local-scale",
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "timeout_minutes": 120,
+      "maximum_job_seconds": 9000,
+      "forecast_seconds": 1473,
+      "depends_on": "Satisfied screen/trace structure, frozen formula1915seconds withmargin <=7200, remainingaggregateadmission",
+      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json",
+      "status": "in_progress",
+      "run_id": 41222190491,
+      "conclusion": "",
+      "completed_job_seconds": 0,
+      "purpose": "Full-size release-musl refresh allocation control; nooptimization"
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T16:57:28.411303+00:00",
+  "updated_at": "2026-10-31T17:17:07.674697+00:00",
   "completed_job_seconds": 12855.0,
-  "maximum_committed_seconds": 21855.0,
-  "remaining_unreserved_seconds": 194145.0,
+  "maximum_committed_seconds": 35955.0,
+  "remaining_unreserved_seconds": 180045.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -348,16 +382,14 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 9000,
+  "planned_reserved_seconds": 14100,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
-    "name": "Release-target refresh diagnostic controls",
-    "status": "musl screen complete; full refresh control admitted before dispatch",
-    "owner_allocation": "D19",
-    "branch": "perf/v1-refresh-scale-harness",
-    "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-    "run_id": 41220168826,
-    "receipt": "v1-refresh-musl-screen-2026-10-31.json"
+    "name": "Exact node capacity after actual subtree walk",
+    "branch": "perf/v1-refresh-exact-capacity",
+    "revision": "f04a109124c3747d937547e4fc1f6d37ad59392a",
+    "status": "screen admitted before dispatch; full baseline control runs separately",
+    "owner_allocation": "D19"
   },
   "candidate_dispositions": {
     "W3": {
@@ -424,9 +456,10 @@
   ],
   "planned_next_dispatches": [
     {
-      "comparison": "control",
-      "branch": "perf/v1-refresh-scale-harness",
-      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "branch": "perf/v1-refresh-exact-capacity",
+      "revision": "f04a109124c3747d937547e4fc1f6d37ad59392a",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
       "build_target": "x86_64-unknown-linux-musl",
       "io": "local",
       "scenario": "unchanged",
@@ -435,9 +468,40 @@
       "cpus": 2,
       "workers": 1,
       "measurement_protocol": "v1-single-operation-pairs-v3",
-      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
-      "owner_allocation": "D19 continuation under60hours",
-      "id": "refresh-release-target-full-control",
+      "profile_policy": "profile-v2",
+      "owner_allocation": "D19 accepted-plan continuation under60hours",
+      "source_review": "v1-refresh-exact-capacity-source-reviews-2026-10-31.json",
+      "id": "refresh-exact-capacity-screen",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "depends_on": "Final requested Opus source review, normal hooks, immutable candidate revision and pre-dispatch budget admission"
+    },
+    {
+      "comparison": "candidate",
+      "branch": "perf/v1-refresh-exact-capacity",
+      "revision": "f04a109124c3747d937547e4fc1f6d37ad59392a",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2",
+      "owner_allocation": "D19 accepted-plan continuation under60hours",
+      "source_review": "v1-refresh-exact-capacity-source-reviews-2026-10-31.json",
+      "id": "refresh-exact-capacity-full-exploratory",
       "stage": "local-scale",
       "files": 7264383,
       "expected_entries": 7297076,
@@ -447,10 +511,8 @@
       ],
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
-      "forecast_seconds": 1473,
-      "depends_on": "Satisfied screen/trace structure, frozen formula1915seconds withmargin <=7200, remainingaggregateadmission",
-      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json",
-      "status": "admitted_before_dispatch"
+      "forecast_seconds": null,
+      "depends_on": "Valid candidate screen and full baseline receipts; positive attributable RAM effect; no confirmed disk/RAM/refresh regression; immutable same candidate and renewed measured forecast+30pct margin; this pair alone cannot promote"
     }
   ]
 }
