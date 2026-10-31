@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import time
@@ -14,6 +15,209 @@ from bench_v1_pair import arguments, host, seed_timestamp
 
 
 class OracleTests(unittest.TestCase):
+    def test_runtime_import_does_not_load_summary_or_admission(self):
+        script = "import sys; import bench_v1_runtime; assert 'bench_v1_summary' not in sys.modules; assert 'bench_v1_admission' not in sys.modules"
+        result = subprocess.run([sys.executable, '-c', script], cwd=Path(__file__).resolve().parents[1],
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_changed_full_host_rejects_noncanonical_baseline_before_fixture(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            args = arguments(['--baseline', '/fake', '--candidate', '/fake', '--output', str(Path(tmp)/'out'),
+                              '--operation', 'refresh', '--scenario', 'changed-full'])
+            source = dict(sha256='a'*64, source_revision='afce6fd', build={})
+            env = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted')
+            with patch.dict(os.environ, env), patch('bench_v1_pair.legacy', return_value=SimpleNamespace()), \
+                 patch('bench_v1_pair.provenance', return_value=source), \
+                 patch('bench_v1_pair.prepare') as prepare_mock, patch('bench_v1_pair.subprocess.run') as run:
+                with self.assertRaisesRegex(ValueError, 'canonical baseline'):
+                    host(args)
+                prepare_mock.assert_not_called()
+                run.assert_not_called()
+    def test_signed_sqlite_identity_and_lookup_deadline(self):
+        from unittest.mock import Mock, patch
+        from bench_v1_runtime import full_link_facts
+        from bench_v1_summary import sqlite_i64
+        self.assertEqual([sqlite_i64(x) for x in (0, 2**63-1, 2**63, 2**64-1)],
+                         [0, 2**63-1, -(2**63), -1])
+        for value in (-1, 2**64, True):
+            with self.assertRaises(ValueError):
+                sqlite_i64(value)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'snapshot.db'
+            with self.assertRaises(TimeoutError):
+                full_link_facts(path, {}, 'seed', time.monotonic() - 1)
+            db = Mock()
+            db.execute.side_effect = sqlite3.OperationalError('interrupted')
+            with patch('bench_v1_runtime.sqlite3.connect', return_value=db):
+                with self.assertRaisesRegex(sqlite3.OperationalError, 'interrupted'):
+                    full_link_facts(path, {}, 'seed', time.monotonic() + 10)
+            db.set_progress_handler.assert_called_once()
+            db.close.assert_called_once()
+            for caller_deadline, elapsed in ((100, 11), (5, 6)):
+                db = Mock()
+                def interrupted(*_):
+                    self.assertEqual(db.set_progress_handler.call_args.args[0](), 1)
+                    raise sqlite3.OperationalError('interrupted')
+                db.execute.side_effect = interrupted
+                with patch('bench_v1_runtime.sqlite3.connect', return_value=db), \
+                     patch('bench_v1_runtime.time.monotonic', side_effect=[0, 0, elapsed]):
+                    with self.assertRaisesRegex(sqlite3.OperationalError, 'interrupted'):
+                        full_link_facts(path, {}, 'seed', caller_deadline)
+                db.close.assert_called_once()
+
+    def test_changed_full_inside_wires_facts_and_reports_lookup_failure(self):
+        from unittest.mock import Mock, patch
+        from types import SimpleNamespace
+        from bench_v1_runtime import inside
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = Path(tmp) / 'spec.json'
+            spec.write_text(json.dumps(dict(id='x', seed_sha256='a'*64, seed_timestamp=1,
+                                            timeout_seconds=10, expected_entries=3,
+                                            scenario='changed-full', mutation_plan={'key': 1})))
+            output = []
+            helper = SimpleNamespace(cgroup=lambda: None, cg_read=lambda _: {},
+                                     snapshot_integrity=lambda _: {'snapshot.prev.db': {'sha256': 'b'*64}},
+                                     dump=lambda _, value: output.append(value))
+            with patch('bench_v1_runtime.legacy', return_value=helper), \
+                 patch('bench_v1_runtime.observe_database', return_value=(3, 'digest')), \
+                 patch('bench_v1_runtime.full_link_facts', side_effect=[{'current': 1}, {'previous': 2}]) as facts:
+                self.assertEqual(inside('observer', spec), 0)
+                self.assertEqual([c.args[2] for c in facts.call_args_list], ['refresh', 'seed'])
+                self.assertTrue(all(c.args[1] == {'key': 1} for c in facts.call_args_list))
+                self.assertEqual(output[-1]['previous_sha256'], 'b'*64)
+                self.assertEqual(output[-1]['full_link_facts']['previous'], {'previous': 2})
+            with patch('bench_v1_runtime.legacy', return_value=helper), \
+                 patch('bench_v1_runtime.observe_database', return_value=(3, 'digest')), \
+                 patch('bench_v1_runtime.full_link_facts', side_effect=TimeoutError('deadline')):
+                self.assertEqual(inside('observer', spec), 1)
+                self.assertIn('deadline', output[-1]['errors']['observer'])
+
+    def test_changed_full_host_wires_seed_and_both_arm_specs(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out = root / 'out'
+            prep = root / 'prep.json'
+            prep.write_text('{}')
+            args = arguments(['--baseline', '/fake', '--candidate', '/fake', '--output', str(out),
+                              '--operation', 'refresh', '--scenario', 'changed-full'])
+            plan = {'example': 'plan'}
+            fixture = {'expected_entries': 103, 'expected_subtree_entries': 100, 'mutation_plan': plan}
+            source = dict(sha256='a'*64, source_revision='e8265778ef78ec4acd9da1375eedb0be37a123f5', build=dict(
+                compiler='same', target='same', flags='', profile='release', release_profile={}, cargo_config={}))
+            def flush(directory, name):
+                (directory / (name + '.cache-flush.json')).write_text('{}')
+            helper = SimpleNamespace(dump=lambda path, value: path.write_text(json.dumps(value)),
+                                     capture=lambda argv: '' if argv[:2] == ['docker', 'ps'] else '{}',
+                                     occupancy=lambda _: {'total': {'allocated_bytes': 1}},
+                                     filesystem_used=lambda _: 0, flush_caches=flush)
+            def fake_container(image, binary, seed, tree, output, spec_path, spec, mode, label):
+                if spec['id'].startswith('seed-'):
+                    (output / spec['id'] / 'metrics.json').write_text('{"validated": true}')
+            env = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted',
+                       FREESPACE_BENCHMARK_RUN_TOKEN='test', RUNNER_TEMP=tmp, BENCH_PREP_RECEIPT=str(prep))
+            with patch.dict(os.environ, env), patch('bench_v1_pair.legacy', return_value=helper), \
+                 patch('bench_v1_pair.provenance', return_value=source), \
+                 patch('bench_v1_pair.subprocess.run'), patch('bench_v1_pair.check_capacity', return_value={'success': True}), \
+                 patch('bench_v1_pair.runner_preparation_context', return_value={}), \
+                 patch('bench_v1_pair.prepare', return_value=fixture) as prepare_mock, \
+                 patch('bench_v1_pair.container', side_effect=fake_container), \
+                 patch('bench_v1_pair.seed_hash', side_effect=lambda _, **kw: ('c'*64, {'snapshot.prev.db': 'b'*64}) if kw else 'c'*64), \
+                 patch('bench_v1_pair.file_hash', return_value='b'*64), \
+                 patch('bench_v1_pair.seed_timestamp', return_value=1), \
+                 patch('bench_v1_pair.full_link_facts', side_effect=[{'current': 1}, {'previous': 2}]) as facts, \
+                 patch('bench_v1_pair.mutate_full', return_value={'recipe': 'full'}) as mutate_mock, \
+                 patch('bench_v1_pair.time.sleep'), \
+                 patch('bench_v1_pair.summarize', return_value={'valid': True}), \
+                 patch('bench_v1_pair.markdown', return_value='ok'), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(host(args), 0)
+            self.assertEqual(prepare_mock.call_args.args[-1], 'changed-full')
+            mutate_mock.assert_called_once()
+            self.assertEqual([c.args[0].name for c in facts.call_args_list], ['snapshot.db', 'snapshot.prev.db'])
+            manifest = json.loads((out / 'manifest.json').read_text())
+            self.assertEqual(manifest['seed_link_facts'], {'snapshot.db': {'current': 1}, 'snapshot.prev.db': {'previous': 2}})
+            self.assertEqual(manifest['seed_previous_sha256'], 'b'*64)
+            for arm in ('baseline', 'candidate'):
+                self.assertEqual(json.loads((out / f'p1-{arm}-v1' / 'spec.json').read_text())['mutation_plan'], plan)
+
+    def test_targeted_hardlink_seed_and_refresh_facts(self):
+        from unittest.mock import patch
+        from bench_v1_fixture import prepare
+        from bench_v1_runtime import full_link_facts
+        from bench_v1_summary import full_link_evidence_ok, sqlite_i64
+        with tempfile.TemporaryDirectory() as tmp, patch('bench_v1_fixture.os.sync'):
+            root = Path(tmp)
+            plan = prepare(root / 'tree', 100, 100, 'changed-full')['mutation_plan']
+            plan.update(old_owner_dev=2**63, old_owner_inode=2**64-1,
+                        outside_owner_dev=2**63+1, outside_owner_inode=2**64-2)
+            dbpath = root / 'snapshot.db'
+            with sqlite3.connect(dbpath) as db:
+                db.executescript('CREATE TABLE roots(entry_id INTEGER,path BLOB); CREATE TABLE entries(id INTEGER PRIMARY KEY,parent_id INTEGER,name BLOB,flags INTEGER,allocated INTEGER,apparent INTEGER,mtime INTEGER,nlink INTEGER); CREATE TABLE hardlinks(entry_id INTEGER,dev INTEGER,ino INTEGER,allocated INTEGER,apparent INTEGER);')
+                db.execute('INSERT INTO roots VALUES (0,?)', (b'/scratch/tree',))
+                def row(i, parent, name, flags=0, alloc=0, apparent=0, mtime=1700000000, nlink=1):
+                    db.execute('INSERT INTO entries VALUES (?,?,?,?,?,?,?,?)', (i, parent, name.encode(), flags, alloc, apparent, mtime, nlink))
+                row(0, None, 'root'); row(1, 0, 'small'); row(2, 1, 'nested'); row(3, 0, 'unrelated')
+                row(4, 2, 'owner', 0, plan['old_owner_allocated'], plan['old_owner_size'], nlink=2)
+                row(5, 3, 'old-link', 2, 0, 0, nlink=2)
+                row(6, 3, 'outside-owner', 0, plan['outside_owner_allocated'], plan['outside_owner_size'])
+                for ident in (4, 5):
+                    db.execute('INSERT INTO hardlinks VALUES (?,?,?,?,?)', (ident, sqlite_i64(plan['old_owner_dev']), sqlite_i64(plan['old_owner_inode']), plan['old_owner_allocated'], plan['old_owner_size']))
+            seed = full_link_facts(dbpath, plan, 'seed', time.monotonic() + 10)
+            self.assertTrue(full_link_evidence_ok(seed, plan, 'seed'))
+            with sqlite3.connect(dbpath) as db:
+                db.execute('DELETE FROM entries WHERE id IN (2,4)')
+                db.execute('DELETE FROM hardlinks WHERE entry_id=4')
+                db.execute('UPDATE entries SET flags=0, allocated=?, apparent=? WHERE id=5', (plan['old_owner_allocated'], plan['old_owner_size']))
+                db.execute('INSERT INTO entries VALUES (7,1,?,0,0,0,1700000000,1)', (b'replacement',))
+                db.execute('INSERT INTO entries VALUES (8,7,?,2,0,0,1700000000,2)', (b'new-link',))
+                db.execute('INSERT INTO hardlinks VALUES (8,?,?,?,?)', (sqlite_i64(plan['outside_owner_dev']), sqlite_i64(plan['outside_owner_inode']), plan['outside_owner_allocated'], plan['outside_owner_size']))
+            refreshed = full_link_facts(dbpath, plan, 'refresh', time.monotonic() + 10)
+            self.assertTrue(full_link_evidence_ok(refreshed, plan, 'refresh'))
+            refreshed[plan['new_link_path']][0] = 0
+            self.assertFalse(full_link_evidence_ok(refreshed, plan, 'refresh'))
+
+    def test_full_mutation_preserves_counts_and_cross_boundary_inodes(self):
+        from unittest.mock import patch
+        from bench_v1_fixture import prepare, mutate_full, STAMP
+        from bench_v1_summary import full_mutation_ok
+        for files, size in ((100, 100), (1000, 100)):
+            with self.subTest(files=files), tempfile.TemporaryDirectory() as tmp, patch('bench_v1_fixture.os.sync'):
+                tree = Path(tmp) / 'tree'
+                fixture = prepare(tree, files, size, 'changed-full')
+                count = lambda: sum(1 + len(names) for _, _, names in os.walk(tree))
+                subtree = lambda: sum(1 + len(names) for _, _, names in os.walk(tree / 'small'))
+                self.assertEqual((count(), subtree()), (fixture['expected_entries'], size))
+                self.assertEqual(fixture['distribution']['small_files'] + fixture['distribution']['outer_files'], files)
+                old = (tree / 'small/nested/owner').stat().st_ino
+                renamed = (tree / 'small/f00000').stat().st_ino
+                deleted = (tree / 'small/f00002').stat().st_ino
+                self.assertEqual(old, (tree / 'unrelated/old-link').stat().st_ino)
+                new = (tree / 'unrelated/outside-owner').stat().st_ino
+                receipt = mutate_full(tree)
+                self.assertEqual((count(), subtree()), (fixture['expected_entries'], size))
+                self.assertFalse((tree / 'small/nested').exists())
+                self.assertFalse((tree / 'small/f00002').exists())
+                self.assertEqual((tree / 'small/renamed').stat().st_ino, renamed)
+                self.assertNotEqual((tree / 'small/added').stat().st_ino, deleted)
+                self.assertEqual((tree / 'small/f00001').stat().st_size, 8192)
+                for path in ('small/f00001', 'small/added', 'small/replacement', 'small/replacement/new-file', 'small'):
+                    self.assertEqual((tree / path).stat().st_mtime, STAMP + 60)
+                self.assertEqual((tree / 'small/f00003').stat().st_mtime, STAMP)
+                self.assertEqual(old, (tree / 'unrelated/old-link').stat().st_ino)
+                self.assertEqual(new, (tree / 'small/replacement/new-link').stat().st_ino)
+                self.assertTrue(full_mutation_ok(receipt, fixture))
+                receipt['new_link_inode'] = old
+                self.assertFalse(full_mutation_ok(receipt, fixture))
+        for scenario, size in (('invalid', 100), ('changed-full', 7)):
+            with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
+                prepare(Path(tmp) / 'tree', 100, size, scenario)
+
     def test_shell_argv_dispatch_and_memory_modes(self):
         import runpy
         from types import ModuleType
@@ -66,6 +270,9 @@ class OracleTests(unittest.TestCase):
         for extra in (['--subtree-entries', '101'], ['--subtree-entries', '10000', '--files', '100'], ['--memory', '128'], ['--memory', '256']):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 arguments(base + extra)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            arguments(base + ['--scenario', 'changed-full'])
+        self.assertEqual(arguments(base + ['--operation', 'refresh', '--scenario', 'changed-full']).scenario, 'changed-full')
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -154,6 +361,9 @@ class OracleTests(unittest.TestCase):
         state = self.root / 'state.json'
         state.write_text('{"generation":2}')
         before = seed_hash(self.root)
+        combined, files = seed_hash(self.root, include_files=True)
+        self.assertEqual(combined, before)
+        self.assertEqual(files['snapshot.prev.db'], __import__('hashlib').sha256((self.root / 'snapshot.prev.db').read_bytes()).hexdigest())
         state.write_text('{"generation":3}')
         self.assertNotEqual(before, seed_hash(self.root))
         (self.root / 'unsafe').symlink_to('/etc/passwd')

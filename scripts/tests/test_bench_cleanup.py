@@ -71,6 +71,10 @@ sudo() {
             calls = (Path(directory) / "calls").read_text().splitlines()
             receipt = (Path(directory) / "cleanup.log").read_text()
             backing_exists = (Path(directory) / "volume/disk.img").exists()
+            if mode in ("ok", "empty", "producer-needs-kill", "sync-fail"):
+                sync_call = f"sync -f -- {Path(directory) / 'volume'}"
+                self.assertEqual(calls[-2:], [
+                    f"timeout --kill-after=2s 15s {sync_call}", sync_call])
             if mode in ("umount-fail", "detach-fail", "list-fail", "remove-fail", "producer-stuck"):
                 self.assertTrue(backing_exists)
             else:

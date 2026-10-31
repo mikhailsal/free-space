@@ -12,9 +12,9 @@ import tempfile
 import time
 import uuid
 
-from bench_v1_admission import RUNNER_PREPARATION_POLICY, check_capacity, runner_preparation_context
-from bench_v1_fixture import prepare, mutate
-from bench_v1_runtime import container, file_hash, legacy, seed_hash
+from bench_v1_admission import RUNNER_PREPARATION_POLICY, check_capacity, runner_preparation_context, validate_changed_full_baseline
+from bench_v1_fixture import prepare, mutate, mutate_full
+from bench_v1_runtime import container, file_hash, full_link_facts, legacy, seed_hash
 from bench_v1_summary import PROTOCOL, summarize, markdown
 
 
@@ -25,7 +25,7 @@ def arguments(argv):
     parser.add_argument("--files", type=int, default=100000)
     parser.add_argument("--pairs", type=int, default=1)
     parser.add_argument("--operation", choices=("scan", "refresh"), default="scan")
-    parser.add_argument("--scenario", choices=("unchanged", "changed"), default="unchanged")
+    parser.add_argument("--scenario", choices=("unchanged", "changed", "changed-full"), default="unchanged")
     parser.add_argument("--subtree-entries", type=int, choices=(100, 10000, 100000), default=100)
     parser.add_argument("--memory", type=int, choices=(512, 1024, 2048, 4096), default=4096)
     parser.add_argument("--timeout-seconds", type=int, default=1200)
@@ -38,7 +38,7 @@ def arguments(argv):
     limits = [getattr(args, x) for x in ("read_bps", "write_bps", "read_iops", "write_iops")]
     if any(x is not None and x <= 0 for x in limits) or (any(limits) and not args.io_device):
         parser.error("positive I/O limits require --io-device")
-    if args.scenario == "changed" and args.operation != "refresh":
+    if args.scenario != "unchanged" and args.operation != "refresh":
         parser.error("changed scenario is refresh-only")
     if args.subtree_entries > args.files:
         parser.error("subtree entries cannot exceed requested files")
@@ -79,6 +79,7 @@ def host(args):
     setup_output.mkdir(exist_ok=False)
     binaries = {"baseline-v1": args.baseline.resolve(), "candidate-v1": args.candidate.resolve()}
     sources = {arm: provenance(binary) for arm, binary in binaries.items()}
+    validate_changed_full_baseline(args.scenario, 'candidate', sources['baseline-v1']['source_revision'])
     build_keys = ("compiler", "target", "flags", "profile", "release_profile", "cargo_config")
     if any(sources["baseline-v1"]["build"][key] != sources["candidate-v1"]["build"][key] for key in build_keys):
         raise ValueError("both arms must use identical toolchains/targets/flags")
@@ -103,7 +104,7 @@ def host(args):
         if not admission["success"]:
             raise RuntimeError("insufficient fixture/snapshot bytes or inodes")
         fixture_started = time.monotonic()
-        fixture = prepare(scratch / "fixture" / "tree", args.files, args.subtree_entries)
+        fixture = prepare(scratch / "fixture" / "tree", args.files, args.subtree_entries, args.scenario)
         fixture["setup_seconds"] = time.monotonic() - fixture_started
         tree = scratch / "fixture" / "tree"
         io_limits = {key: getattr(args, flag) for flag, key in (("read_bps", "rbps"), ("write_bps", "wbps"),
@@ -138,17 +139,23 @@ def host(args):
             if not json.loads((setup_output / ident / "metrics.json").read_text())["validated"]:
                 raise ValueError("seed scan validation failed")
             time.sleep(1.05)
-        seed_digest = seed_hash(seed / "snapshot")
+        seed_digest, seed_files = seed_hash(seed / "snapshot", include_files=True)
+        deadline = time.monotonic() + args.timeout_seconds
+        seed_links = ({name: full_link_facts(seed / 'snapshot' / name, fixture['mutation_plan'], 'seed', deadline)
+                       for name in ('snapshot.db', 'snapshot.prev.db')} if args.scenario == 'changed-full' else None)
+        seed_previous_sha256 = seed_files['snapshot.prev.db'] if seed_links is not None else None
         cutoff = seed_timestamp(seed / "snapshot")
         time.sleep(max(0, cutoff + 1.01 - time.time()))
-        mutation = mutate(tree) if args.scenario == "changed" else None
+        mutation = (mutate(tree) if args.scenario == "changed" else
+                    mutate_full(tree) if args.scenario == "changed-full" else None)
         expected_ids = [f"p{pair}-{arm}" for pair in range(1, args.pairs + 1) for arm in binaries]
         manifest = dict(measurement_protocol=PROTOCOL, pairs=args.pairs, files=args.files,
                         operation=args.operation, scenario=args.scenario, fixture_receipt=fixture,
                         runner_preparation=preparation,
                         runner_preparation_policy=RUNNER_PREPARATION_POLICY,
                         case_policy="qualification-v1", subtree_entries=fixture["expected_subtree_entries"], memory_mib=args.memory,
-                        setup_memory_mib=4096, observer_memory_mib=4096, mutation_receipt=mutation,
+                        setup_memory_mib=4096, observer_memory_mib=4096, mutation_receipt=mutation, seed_link_facts=seed_links,
+                        seed_previous_sha256=seed_previous_sha256,
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,
                         sample_interval_seconds=0.02, cache_policy="cold after seed copy, before single CLI",
                         observer_policy="separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
@@ -183,6 +190,8 @@ def host(args):
                             seed_sha256=seed_digest, seed_timestamp=cutoff,
                             initial_snapshot_allocated_bytes=initial,
                             binary_sha256=sources[arm]["sha256"], source_revision=sources[arm]["source_revision"])
+                if args.scenario == 'changed-full':
+                    spec['mutation_plan'] = fixture['mutation_plan']
                 spec_path = output / (ident + ".json")
                 helper.dump(spec_path, spec)
                 helper.dump(directory / "spec.json", spec)

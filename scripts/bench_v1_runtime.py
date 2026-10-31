@@ -11,6 +11,12 @@ import time
 import uuid
 
 
+def sqlite_i64(value):
+    if type(value) is not int or not 0 <= value < 2**64:
+        raise ValueError('expected u64')
+    return value if value < 2**63 else value - 2**64
+
+
 def legacy():
     spec = importlib.util.spec_from_file_location("bench_legacy", Path(__file__).with_name("bench-v2-container.py"))
     module = importlib.util.module_from_spec(spec)
@@ -26,7 +32,7 @@ def file_hash(path):
     return digest.hexdigest()
 
 
-def seed_hash(snapshot):
+def seed_hash(snapshot, *, include_files=False):
     files = {}
     for path in sorted(snapshot.rglob("*")):
         if path.is_symlink():
@@ -37,7 +43,52 @@ def seed_hash(snapshot):
             files[str(path.relative_to(snapshot))] = file_hash(path)
     if "snapshot.db" not in files or "snapshot.prev.db" not in files:
         raise ValueError("seed has no databases")
-    return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+    digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+    return (digest, files) if include_files else digest
+
+
+def full_link_facts(snapshot, plan, phase, deadline):
+    """Bounded component lookups of the two designated inode groups."""
+    deadline = min(deadline, time.monotonic() + 10)
+    if time.monotonic() >= deadline:
+        raise TimeoutError('hardlink lookup deadline exceeded')
+    with closing(sqlite3.connect(snapshot.as_uri() + '?mode=ro&immutable=1', uri=True, timeout=0)) as db:
+        db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
+        root = db.execute('SELECT entry_id FROM roots WHERE path=?', (b'/scratch/tree',)).fetchone()
+        if root is None:
+            raise ValueError('missing fixture root')
+        def get(path):
+            ident = root[0]
+            for component in path.split('/'):
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('hardlink lookup deadline exceeded')
+                row = db.execute('SELECT id FROM entries WHERE parent_id=? AND name=?', (ident, component.encode())).fetchall()
+                if len(row) != 1:
+                    raise ValueError('missing or ambiguous fixture path: ' + path)
+                ident = row[0][0]
+            row = db.execute('SELECT e.flags,e.allocated,e.apparent,e.mtime,e.nlink,h.dev,h.ino,h.allocated,h.apparent FROM entries e LEFT JOIN hardlinks h ON h.entry_id=e.id WHERE e.id=?', (ident,)).fetchone()
+            return list(row)
+        paths = ([plan['old_owner_path'], plan['old_outside_path'], plan['new_owner_path']]
+                 if phase == 'seed' else [plan['old_outside_path'], plan['new_owner_path'], plan['new_link_path']])
+        facts = {path: get(path) for path in paths}
+    old = facts[plan['old_owner_path'] if phase == 'seed' else plan['old_outside_path']]
+    outside_old = facts[plan['old_outside_path']]
+    new_owner = facts[plan['new_owner_path']]
+    def hardlink(row, prefix):
+        return row[5:9] == [sqlite_i64(plan[prefix + '_dev']), sqlite_i64(plan[prefix + '_inode']), plan[prefix + '_allocated'], plan[prefix + '_size']]
+    if not (hardlink(old, 'old_owner') and hardlink(outside_old, 'old_owner')
+            and not (old[0] & 2) and old[1:4] == [plan['old_owner_allocated'], plan['old_owner_size'], plan['old_owner_mtime'] // 10**9]
+            and new_owner[1:4] == [plan['outside_owner_allocated'], plan['outside_owner_size'], plan['outside_owner_mtime'] // 10**9]
+            and new_owner[5] is None):
+        raise ValueError('fixture owner facts differ from expected')
+    if phase == 'seed' and not (outside_old[0] & 2 and outside_old[1:3] == [0, 0] and new_owner[4] == 1):
+        raise ValueError('seed owner or alias differs from expected')
+    if phase == 'refresh':
+        new_link = facts[plan['new_link_path']]
+        if not (hardlink(new_link, 'outside_owner') and new_link[0] & 2 and new_link[1:3] == [0, 0]
+                and new_link[3] == plan['outside_owner_mtime'] // 10**9 and new_link[4] == 2):
+            raise ValueError('new link is not the expected zeroed alias')
+    return facts
 
 
 def normalize(table, columns, row, cutoff):
@@ -158,6 +209,12 @@ def inside(mode, spec_path):
         result.update(current_entries=current_entries, previous_entries=previous_entries,
                       semantic_sha256=hashlib.sha256((current + previous).encode()).hexdigest(),
                       logical_content_unchanged=integrity == helper.snapshot_integrity(snapshot))
+        if spec.get('scenario') == 'changed-full':
+            plan = spec['mutation_plan']
+            deadline = started + spec['timeout_seconds']
+            result['full_link_facts'] = dict(current=full_link_facts(snapshot / 'snapshot.db', plan, 'refresh', deadline),
+                                             previous=full_link_facts(snapshot / 'snapshot.prev.db', plan, 'seed', deadline))
+            result['previous_sha256'] = integrity['snapshot.prev.db']['sha256']
         result["validated"] = result["logical_content_unchanged"] and current_entries == spec["expected_entries"]
     except Exception as error:
         result["errors"]["observer"] = repr(error)

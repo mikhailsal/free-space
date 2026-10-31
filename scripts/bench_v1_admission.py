@@ -15,6 +15,12 @@ V1_VOLUME_GIB = 40
 V1_HARD_FLOOR_GIB = 42
 V1_PREP_HEADROOM_GIB = 2
 RUNNER_PREPARATION_POLICY = 'sdk-space-v1'
+CANONICAL_BASELINE = 'e8265778ef78ec4acd9da1375eedb0be37a123f5'
+
+
+def validate_changed_full_baseline(scenario, comparison, revision):
+    if scenario == 'changed-full' and (comparison != 'candidate' or revision != CANONICAL_BASELINE):
+        raise ValueError('changed-full requires candidate comparison and canonical baseline')
 
 
 def valid_runner_preparation(context):
@@ -173,11 +179,11 @@ def qualification_case(subtree, scenario, memory, operations, files) -> dict:
     """Validate one ordinary successful-operation case before allocation."""
     if subtree not in ('100', '10000', '100000') or int(subtree) > files:
         raise ValueError('invalid subtree size for stage')
-    if scenario not in ('unchanged', 'changed'):
+    if scenario not in ('unchanged', 'changed', 'changed-full'):
         raise ValueError('invalid scenario')
     if memory not in ('512', '1024', '2048', '4096'):
         raise ValueError('invalid ordinary memory budget')
-    if scenario == 'changed' and operations != ['refresh']:
+    if scenario != 'unchanged' and operations != ['refresh']:
         raise ValueError('changed scenario requires refresh only')
     return dict(subtree_entries=int(subtree), scenario=scenario, memory_mib=int(memory))
 
