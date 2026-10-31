@@ -3,6 +3,7 @@ import argparse
 from contextlib import closing
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import sqlite3
@@ -128,6 +129,9 @@ def host(args):
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,
                         sample_interval_seconds=0.02, cache_policy="cold after seed copy, before single CLI",
                         observer_policy="separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+                        environment=dict(kernel=platform.release(), cpu=Path("/proc/cpuinfo").read_text(),
+                                         memory=Path("/proc/meminfo").read_text(),
+                                         image=json.loads(helper.capture(["docker", "image", "inspect", image]))),
                         filesystem=json.loads(helper.capture(["findmnt", "-T", str(scratch), "-J"])),
                         github={k: os.environ.get(k) for k in ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")})
         helper.dump(output / "manifest.json", manifest)
