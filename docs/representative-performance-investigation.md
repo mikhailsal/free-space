@@ -11,7 +11,8 @@ completed successfully. All 16 commands pass the hardened completeness checker:
 CLI, observers, terminal experiment status and arm receipts. Product source is
 master `afce6fd`; measured harness is `5b62c148d14f5b3a1f947928d11ec2430b045a3c`.
 [Raw JSON archive](benchmark-results/representative-local-scale-native-2026-10-31.json.gz).
-The limited-I/O full-scale job remains pending. Pilot results below are separate.
+The limited-I/O full-scale sequence is incomplete; five completed v2 scans
+are reported separately below. Pilot results are also separate.
 
 | Metric | v1 | v2 |
 | --- | ---: | ---: |
@@ -55,6 +56,38 @@ Each command is followed by full snapshot integrity reads and SQLite table/index
 observations outside its timing. These warm or evict cache before the next
 command. The sequence is instrumented and has one repeat; it establishes neither
 ordinary uninterrupted cache behavior nor run-to-run variance.
+
+## Limited-I/O full-scale sequence: incomplete
+
+The measurement step failed after 280 minutes and 12 seconds, at its configured
+280-minute deadline; the final GitHub log explicitly confirms the timeout.
+The workflow concluded `failure`. Artifact upload succeeded. Five v2 full scans have successful
+CLI and observer evidence; the complete paired experiment is rejected. The first
+refresh lacks its required observer output, two more refreshes are missing and
+the v1 arm was never reached. No limited-profile refresh latency or paired v1/v2
+comparison is accepted. [Partial archive and rejection diagnostics](benchmark-results/representative-local-scale-limited-partial-2026-10-31.json.gz).
+
+| Completed v2 scan | Full CLI seconds | Preparation seconds | Transaction seconds |
+| --- | ---: | ---: | ---: |
+| 1 | 1584.617 | 768.246 | 609.378 |
+| 2 | 2256.192 | 776.409 | 996.717 |
+| 3 | 2335.802 | 746.933 | 1061.339 |
+| 4 | 2500.211 | 733.217 | 1200.002 |
+| 5 | 2787.267 | 749.154 | 1407.287 |
+
+Across those five completed commands, sampled filesystem allocation above the
+initial 264,273,920-byte baseline peaks at **11.349 GiB**, named allocation at
+**9.761 GiB**, and the final database occupies **5.877 GiB**. Maximum scan RSS is
+31.53 MiB and cumulative cgroup memory peak is 4 GiB. Version counts again grow
+from 7,202,464 to 36,012,320 with constant live/identity counts. These are partial
+observations, not a successfully completed five-scan/three-refresh paired run.
+
+Calibration verified requested `io.max` and charged loop-device I/O. Probes
+achieved 16,770,507 write bytes/s, 33,527,609 read bytes/s, 499.80 random-write
+IOPS and 999.50 random-read IOPS. The five CLI durations sum to about 191 minutes;
+setup and between-command observation consume additional job time. The 280-minute
+failure is not the latency of any single scan. Future slow-profile experiments
+should separate arms/jobs and budget observation overhead before launch.
 
 ## Passive observation of the scheduled local scan
 
@@ -321,3 +354,30 @@ experiment. Acceptance requires successful terminal status, expected commands,
 completed observers, healthy final cgroup state and exited successful Docker
 state. New cleanup bounds producer termination, container removal, unmount and
 loop detach; older running jobs retain their original cleanup behavior.
+
+## Debug report
+
+- **Symptom:** growing local snapshot size and full-scan time; insufficiently
+  representative small-fixture measurements of disk, memory and folder refresh.
+- **Root cause of storage growth:** v2 full publication creates a complete new version set on each
+  scan and does not automatically reclaim obsolete history. Unchanged-tree
+  experiments confirm historical row and I/O growth. The causal share of that
+  accumulation in scan slowdown, exact SQL timing attribution and the benefit of
+  a particular optimization remain counterfactual questions.
+- **Changes:** runner-only 7.2-million-entry protocol, verified I/O limits,
+  filesystem allocation accounting, observer validity, bounded cleanup and strict
+  incomplete-experiment rejection. Product code remains master `afce6fd`.
+- **Evidence:** native full-scale 16/16 commands validated; limited full-scale
+  has five individually validated scan observations but the overall experiment
+  is incomplete. Local scheduled scan observed passively. Original GitHub build:
+  315 Rust tests passed, zero failed, one pre-existing ignored; final harness
+  suite: 35 tests passed. Subsequent pilot-validation workflows succeeded.
+- **Regression checks:** `scripts/tests/test_bench_summary.py` rejects missing
+  terminal status, incomplete observation and missing arm state; cleanup and
+  calibration tests cover the corresponding harness failure modes.
+- **Related experiments:** retention maintenance including its full cycle cost;
+  destination-cache sensitivity; identity lookup cost. Sweep total memory limits
+  separately to establish a useful RAM budget instead of inferring it from RSS.
+- **Status:** DONE_WITH_CONCERNS — investigation and baseline evidence recorded;
+  limited paired sequence incomplete, minimum RAM and exact local-device
+  equivalence unestablished. No product performance fix has been claimed.
