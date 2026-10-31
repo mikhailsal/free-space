@@ -1,4 +1,8 @@
 use super::*;
+
+mod batch;
+#[cfg(test)]
+mod tests;
 use std::os::unix::ffi::OsStrExt;
 
 use crate::scan::tree::{path_hash, push_component};
@@ -12,9 +16,15 @@ struct Raw {
 struct Frame {
     raw: u64,
     id: u64,
+    kind: Kind,
     cursor: Option<(Vec<u8>, u64)>,
     path_len: usize,
     agg: SubtreeAgg,
+    pending: batch::Pending,
+}
+
+fn is_leaf(kind: Kind) -> bool {
+    matches!(kind, Kind::File | Kind::Symlink | Kind::Other)
 }
 
 impl Raw {
@@ -102,27 +112,6 @@ impl StagedTree {
         Ok((stats, denied, errors))
     }
 
-    fn next_child(&self, frame: &Frame) -> Result<Option<Raw>> {
-        let row = if let Some((name, id)) = &frame.cursor {
-            self.conn
-                .prepare_cached(&format!(
-                    "SELECT {RAW_COLS} FROM raw
-                WHERE parent=?1 AND (name,id)>(?2,?3) ORDER BY name,id LIMIT 1"
-                ))?
-                .query_row(params![frame.raw as i64, name, *id as i64], Raw::from_sql)
-                .optional()?
-        } else {
-            self.conn
-                .prepare_cached(&format!(
-                    "SELECT {RAW_COLS} FROM raw
-                WHERE parent=?1 ORDER BY name,id LIMIT 1"
-                ))?
-                .query_row([frame.raw as i64], Raw::from_sql)
-                .optional()?
-        };
-        Ok(row)
-    }
-
     fn write_root(
         &self,
         conn: &Connection,
@@ -140,10 +129,23 @@ impl StagedTree {
         let first = self.enter(conn, raw, None, *next_id, &path, denied)?;
         *next_id += 1;
         let mut stack = vec![first];
+        let mut budget = batch::Budget::default();
         loop {
             guard.tick()?;
+            evict_for_directory(&mut stack, &mut budget);
             let parent = stack.last_mut().unwrap();
-            if let Some(raw) = self.next_child(parent)? {
+            let child = if !is_leaf(parent.kind) {
+                batch::next(
+                    &self.conn,
+                    parent.raw,
+                    &parent.cursor,
+                    &mut parent.pending,
+                    &mut budget,
+                )?
+            } else {
+                None
+            };
+            if let Some(raw) = child {
                 parent.cursor = Some((raw.name.clone(), raw.id));
                 path.truncate(parent.path_len);
                 push_component(&mut path, &raw.name);
@@ -153,20 +155,22 @@ impl StagedTree {
                 continue;
             }
             let frame = stack.pop().unwrap();
-            conn.prepare_cached(
-                "UPDATE entries SET allocated=?2,apparent=?3,items=?4,errors=?5,
+            if !is_leaf(frame.kind) {
+                conn.prepare_cached(
+                    "UPDATE entries SET allocated=?2,apparent=?3,items=?4,errors=?5,
                     min_scanned_at=?6,newest_mtime=?7,subtree_end=?8 WHERE id=?1",
-            )?
-            .execute(params![
-                frame.id as i64,
-                frame.agg.allocated as i64,
-                frame.agg.apparent as i64,
-                frame.agg.items as i64,
-                frame.agg.errors as i64,
-                frame.agg.min_scanned_at,
-                frame.agg.stored_newest_mtime(),
-                (frame.id + frame.agg.items) as i64
-            ])?;
+                )?
+                .execute(params![
+                    frame.id as i64,
+                    frame.agg.allocated as i64,
+                    frame.agg.apparent as i64,
+                    frame.agg.items as i64,
+                    frame.agg.errors as i64,
+                    frame.agg.min_scanned_at,
+                    frame.agg.stored_newest_mtime(),
+                    (frame.id + frame.agg.items) as i64
+                ])?;
+            }
             if let Some(parent) = stack.last_mut() {
                 parent.agg.merge(&frame.agg);
                 // Match Tree's per-merge u32 saturation.
@@ -236,9 +240,11 @@ impl StagedTree {
         Ok(Frame {
             raw: raw.id,
             id,
+            kind: node.kind(),
             cursor: None,
             path_len: path.len(),
             agg,
+            pending: batch::Pending::default(),
         })
     }
 
@@ -273,5 +279,23 @@ impl StagedTree {
             }
         }
         Ok(())
+    }
+}
+
+// Evicted ancestors resume from their last consumed cursor when revisited.
+fn evict_for_directory(stack: &mut [Frame], budget: &mut batch::Budget) {
+    let Some((current, ancestors)) = stack.split_last_mut() else {
+        return;
+    };
+    if is_leaf(current.kind) || !current.pending.is_empty() {
+        return;
+    }
+    for ancestor in ancestors {
+        if budget.can_prefetch_full_batch() {
+            break;
+        }
+        if !ancestor.pending.is_empty() {
+            ancestor.pending.release(budget);
+        }
     }
 }

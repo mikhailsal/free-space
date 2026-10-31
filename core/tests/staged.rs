@@ -142,6 +142,37 @@ fn disk_scan_handles_wide_directories_and_pending_directory_jobs() {
 }
 
 #[test]
+fn disk_scan_matches_deep_wide_tree_with_pending_ancestor_batches() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("tree");
+    fs::create_dir(&root).unwrap();
+    let mut dir = root.clone();
+    for _ in 0..10 {
+        for index in 0..40 {
+            // Long but valid filesystem components, after the next directory.
+            let name = format!("z-{index:02}-{}", "x".repeat(180));
+            fs::write(dir.join(name), b"payload").unwrap();
+        }
+        dir = dir.join("0-next");
+        fs::create_dir(&dir).unwrap();
+    }
+    fs::hard_link(
+        root.join(format!("z-00-{}", "x".repeat(180))),
+        dir.join("hardlink"),
+    )
+    .unwrap();
+    symlink("missing", dir.join("symlink")).unwrap();
+    let fast = SnapshotDir::new(tmp.path().join("fast"));
+    let disk = SnapshotDir::new(tmp.path().join("disk"));
+    assert_eq!(scan(&[&root], &fast, false).entries, 413);
+    assert_eq!(scan(&[&root], &disk, true).entries, 413);
+    assert_equivalent(
+        &Snapshot::open_current(&fast).unwrap(),
+        &Snapshot::open_current(&disk).unwrap(),
+    );
+}
+
+#[test]
 fn disk_snapshots_support_queries_refresh_and_generation_rotation() {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path().join("tree");
