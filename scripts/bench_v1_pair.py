@@ -69,6 +69,27 @@ def seed_timestamp(snapshot):
     return cutoff
 
 
+def stage_space_receipt(current_logical, old_entries, subtree_entries, initial_allocated, available):
+    """Apply both the existing case check and W5's pre-stage allowance."""
+    values = (current_logical, old_entries, subtree_entries, initial_allocated, available)
+    if any(type(value) is not int or value < 0 for value in values) or subtree_entries < 1:
+        raise ValueError("invalid W5 admission inputs")
+    estimated_entries = old_entries + subtree_entries - 1
+    estimated_bytes = 150 * estimated_entries
+    sixfold = 6 * max(current_logical, estimated_bytes) + 512 * 1024 * 1024
+    common = 2 * initial_allocated + 2**31
+    if any(value > 2**64 - 1 for value in (estimated_entries, estimated_bytes, sixfold, common)):
+        raise ValueError("W5 admission estimate overflows u64")
+    return dict(policy="w5-case-space-v1", current_logical_bytes=current_logical,
+                old_entries=old_entries, subtree_entries=subtree_entries,
+                estimated_entries=estimated_entries, bytes_per_entry=150,
+                factor=6, reserve_bytes=512 * 1024 * 1024,
+                initial_allocated_bytes=initial_allocated, common_required_bytes=common,
+                stage_required_bytes=sixfold, available_bytes=available,
+                success=available >= common and available >= sixfold,
+                scope="admission allowance, not an upper bound; live guards remain active")
+
+
 def host(args):
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
         raise RuntimeError("paired benchmark requires a dedicated ephemeral GitHub-hosted runner")
@@ -115,7 +136,7 @@ def host(args):
                       workers=1, cpus=2, keep_previous=True,
                       scan_profile="disk", timeout_seconds=args.timeout_seconds,
                       io_limits=io_limits, io_device=args.io_device, io_device_number=device_number,
-                      minimum_free_bytes=2**31)
+                      minimum_free_bytes=2**31, stage_admission_policy="w5-case-space-v1")
         seed = scratch / "seed"
         (seed / "snapshot" / "tmp").mkdir(parents=True)
         (seed / "tree").mkdir()
@@ -145,8 +166,9 @@ def host(args):
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,
                         sample_interval_seconds=0.02, cache_policy="cold after seed copy, before single CLI",
                         observer_policy="separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
-                        diagnostic_policy=dict(profile_policy="profile-v2", allocation_diagnostics=args.operation == "refresh",
-                                               scope="measured refresh CLI only; seeds and observers disabled"),
+                        stage_admission_policy="w5-case-space-v1",
+                        diagnostic_policy=dict(profile_policy="none", allocation_diagnostics=False,
+                                               scope="complete-command measurements only; no vector allocation trace"),
                         environment=dict(kernel=platform.release(), cpu=Path("/proc/cpuinfo").read_text(),
                                          memory=Path("/proc/meminfo").read_text(),
                                          image=json.loads(helper.capture(["docker", "image", "inspect", image]))),
@@ -166,12 +188,21 @@ def host(args):
                     raise ValueError("copied seed digest mismatch")
                 initial = helper.occupancy(case / "snapshot")["total"]["allocated_bytes"]
                 available = os.statvfs(case)
+                uri = (case / "snapshot" / "snapshot.db").as_uri() + "?mode=ro&immutable=1"
+                with closing(sqlite3.connect(uri, uri=True)) as db:
+                    old_entries = db.execute("SELECT entries FROM meta").fetchone()[0]
+                if old_entries != fixture["expected_entries"]:
+                    raise ValueError("seed entry count differs from fixture")
+                admission = stage_space_receipt((case / "snapshot" / "snapshot.db").stat().st_size,
+                                                old_entries, fixture["expected_subtree_entries"], initial,
+                                                available.f_bavail * available.f_frsize)
                 helper.dump(directory / "setup.json", dict(elapsed_seconds=time.monotonic() - started_setup,
-                            copied_seed_bytes=initial, filesystem_used_bytes=helper.filesystem_used(case)))
-                if available.f_bavail * available.f_frsize < 2 * initial + 2**31:
+                            copied_seed_bytes=initial, filesystem_used_bytes=helper.filesystem_used(case),
+                            stage_admission=admission))
+                if not admission["success"]:
                     raise ValueError("not enough free space for output/staging and reserve")
                 spec = dict(common, id=ident, arm=arm, pair=pair, operation=args.operation,
-                            allocation_diagnostics=args.operation == "refresh",
+                            allocation_diagnostics=False,
                             target="/scratch/tree/small" if args.operation == "refresh" else "/scratch/tree",
                             seed_sha256=seed_digest, seed_timestamp=cutoff,
                             initial_snapshot_allocated_bytes=initial,

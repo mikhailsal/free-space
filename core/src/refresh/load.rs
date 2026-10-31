@@ -185,6 +185,12 @@ fn load_links(
     Ok(links)
 }
 
+pub(super) fn roots(snap: &Snapshot) -> Result<Vec<RootInfo>> {
+    let mut tree = Tree::default();
+    load_roots(&snap.conn, &mut tree)?;
+    Ok(tree.roots)
+}
+
 fn load_roots(conn: &rusqlite::Connection, tree: &mut Tree) -> Result<()> {
     let mut st = conn.prepare("SELECT entry_id, path, fs_type, fs_used, fs_total, fs_avail, inodes_used FROM roots ORDER BY entry_id")?;
     let mut rows = st.query([])?;

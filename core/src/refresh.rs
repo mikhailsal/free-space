@@ -1,9 +1,6 @@
-//! `refresh <path>`: rescan one subtree and publish a new generation without
-//! rotating prev. The published snapshot is loaded into the same in-memory
-//! tree the scanner builds (own values are derived as aggregate − Σ children),
-//! the subtree is replaced by a fresh walk, and the scan pipeline runs again:
-//! preorder ids, hardlink attribution with the refresh rules (T19, OV-11),
-//! the full fold (F2: max/min aggregates are recomputed, never patched), write.
+//! `refresh <path>` rescans one subtree, stages the reconstructed snapshot on
+//! disk, and publishes the new current generation without rotating prev.
+//! Final aggregation and hardlink attribution happen in the staged writer.
 
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
@@ -18,14 +15,18 @@ use rusqlite::params;
 pub(crate) mod mounts;
 
 use crate::error::{Error, ErrorCode, Result};
-use crate::job::{denied_paths, denied_warning};
+#[cfg(test)]
+use crate::job::denied_paths;
+use crate::job::denied_warning;
 use crate::platform;
 use crate::queries::common::{Paths, Row, normalize, resolve, shell_path_word};
 use crate::scan::tree::LinkPolicy;
 use crate::scan::{self, Kind, MountRow, RootInfo, Tree, flags};
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
 use crate::snapshot::reader::Snapshot;
-use crate::snapshot::writer::{self, RefreshRow, Reserve, WriteMeta, WriteStats};
+#[cfg(test)]
+use crate::snapshot::writer;
+use crate::snapshot::writer::{RefreshRow, Reserve, WriteMeta, WriteStats};
 use crate::snapshot::{SnapshotDir, lock, publish, state};
 
 pub struct RefreshRequest {
@@ -54,6 +55,10 @@ pub struct RefreshReport {
 
 #[path = "refresh/load.rs"]
 mod load;
+#[path = "refresh/precheck.rs"]
+mod precheck;
+#[path = "refresh/staged.rs"]
+mod staged;
 use load::OldLink;
 pub use load::{Loaded, load_tree};
 
@@ -208,7 +213,7 @@ pub fn run_refresh(req: RefreshRequest) -> Result<RefreshReport> {
     let _lock = lock::acquire_with_path_arg(&req.dir, "refresh", &label, path_arg.as_deref())?;
     let dir = req.dir.clone();
     scan::profile::phase("refresh_start");
-    let r = refresh_locked(req, path, &label);
+    let r = staged::run(req, path, &label);
     if let Err(e) = &r
         && !matches!(
             e.code,
@@ -224,6 +229,7 @@ pub fn run_refresh(req: RefreshRequest) -> Result<RefreshReport> {
     r
 }
 
+#[cfg(test)]
 fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<RefreshReport> {
     let t_all = Instant::now();
     publish::cleanup_tmp(&req.dir);
@@ -274,7 +280,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let denied = denied_paths(&tree, &fin);
 
     pw.set_stage(progress::STAGE_WRITE);
-    precheck(&req.dir, fin.order.len() as u64)?;
+    precheck::run(&req.dir, fin.order.len() as u64, 2)?;
     crate::fault::point(&req.dir, "prechecked");
     let (generation, _) = crate::job::next_generation(&req.dir);
     let meta = refresh_meta(&snap, generation, &xpath, started)?;
@@ -414,17 +420,6 @@ fn update_fs_stats(tree: &mut Tree, xpath: &[u8]) {
     {
         r.stats = st;
     }
-}
-
-fn precheck(dir: &SnapshotDir, entries: u64) -> Result<publish::PrecheckInfo> {
-    publish::precheck(dir, Some(entries), 2).map_err(|mut e| {
-        e.last_error = Some(state::LastError {
-            ts: platform::now_secs(),
-            op: "precheck".into(),
-            message: e.message.clone(),
-        });
-        e
-    })
 }
 
 fn refresh_meta(snap: &Snapshot, generation: u64, xpath: &[u8], started: i64) -> Result<WriteMeta> {

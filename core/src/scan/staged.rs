@@ -15,6 +15,8 @@ use crate::platform;
 use crate::snapshot::fsutil;
 use crate::snapshot::writer::{self, Reserve, WriteMeta, WriteStats};
 
+mod refresh;
+mod refresh_ingest;
 pub(crate) mod visit;
 mod walk;
 mod write;
@@ -30,6 +32,7 @@ pub struct StagedTree {
     one_file_system: bool,
     reserve: Reserve,
     cleanup: bool,
+    refresh_mode: bool,
 }
 
 impl Drop for StagedTree {
@@ -77,15 +80,29 @@ impl SpaceGuard {
 }
 
 fn open_database(path: &Path) -> Result<Connection> {
-    use std::os::unix::fs::OpenOptionsExt;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
     let file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o640)
         .open(path)
         .map_err(|e| Error::storage_io(format!("create {}", path.display()), e))?;
-    fsutil::secure_file(&file).map_err(|e| Error::io("secure scan database", e))?;
-    configure_database(Connection::open(path)?)
+    let owned = file
+        .metadata()
+        .map_err(|e| Error::io("stat scan database", e))?;
+    let result = (|| {
+        fsutil::secure_file(&file).map_err(|e| Error::io("secure scan database", e))?;
+        configure_database(Connection::open(path)?)
+    })();
+    if result.is_err()
+        && let Ok(current) = std::fs::symlink_metadata(path)
+        && current.is_file()
+        && current.dev() == owned.dev()
+        && current.ino() == owned.ino()
+    {
+        let _ = std::fs::remove_file(path);
+    }
+    result
 }
 
 fn connect_database(path: &Path) -> Result<Connection> {
@@ -176,6 +193,7 @@ impl StagedTree {
             one_file_system: opts.one_file_system,
             reserve: reserve.clone(),
             cleanup: create,
+            refresh_mode: false,
         };
         for (id, path) in paths.iter().enumerate() {
             let node = tree.roots.nodes[id];

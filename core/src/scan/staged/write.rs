@@ -42,16 +42,21 @@ impl StagedTree {
     /// Finalization and row insertion happen together; no permutation or rank
     /// vector is allocated. The caller publishes only after this closes/fsyncs.
     pub fn write(self, path: &Path, meta: &WriteMeta) -> Result<(WriteStats, DeniedPaths, u64)> {
-        let result = self.write_inner(path, meta);
+        let conn = open_database(path)?;
+        let result = self.write_inner(path, meta, conn);
         if result.is_err() {
             let _ = std::fs::remove_file(path);
         }
         result
     }
 
-    fn write_inner(&self, path: &Path, meta: &WriteMeta) -> Result<(WriteStats, DeniedPaths, u64)> {
+    fn write_inner(
+        &self,
+        path: &Path,
+        meta: &WriteMeta,
+        conn: Connection,
+    ) -> Result<(WriteStats, DeniedPaths, u64)> {
         let mut guard = SpaceGuard::new(&self.reserve)?;
-        let conn = open_database(path)?;
         let mut denied = DeniedPaths::on_disk(&self.reserve.dir)?;
         let begin = Instant::now();
         conn.execute_batch("BEGIN")?;
@@ -68,9 +73,8 @@ impl StagedTree {
             let id = next_id;
             errors += self.write_root(&conn, root as u64, &mut next_id, &mut denied, &mut guard)?;
             let info = &self.roots.roots[root];
-            conn.execute(
-                "INSERT INTO roots VALUES (?1,?2,?3,?4,?5,?6,?7)",
-                params![
+            conn.prepare_cached("INSERT INTO roots VALUES (?1,?2,?3,?4,?5,?6,?7)")?
+                .execute(params![
                     id as i64,
                     info.path.as_os_str().as_bytes(),
                     info.fs_type,
@@ -78,8 +82,10 @@ impl StagedTree {
                     info.stats.total as i64,
                     info.stats.avail as i64,
                     info.stats.inodes_used().map(|v| v as i64)
-                ],
-            )?;
+                ])?;
+        }
+        if self.refresh_mode {
+            self.write_refresh_mounts(&conn, &mut guard)?;
         }
         if next_id != self.count {
             return Err(Error::generic(
@@ -218,20 +224,29 @@ impl StagedTree {
             agg.stored_newest_mtime()
         ])?;
         if node.flags & flags::DENIED != 0 {
-            conn.execute("INSERT INTO denied VALUES (?1)", [id as i64])?;
+            conn.prepare_cached("INSERT INTO denied VALUES (?1)")?
+                .execute([id as i64])?;
             denied.push(path)?;
         }
-        if node.kind() == Kind::Mount {
-            let (path, fs_type, used, total): (Vec<u8>, String, Option<i64>, Option<i64>) =
-                self.conn.query_row(
-                    "SELECT path,fs_type,fs_used,fs_total FROM mount_info WHERE id=?1",
-                    [raw.id as i64],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-                )?;
-            conn.execute(
-                "INSERT INTO mounts VALUES (?1,?2,?3,?4,?5)",
-                params![id as i64, path, fs_type, used, total],
-            )?;
+        if !self.refresh_mode && node.kind() == Kind::Mount {
+            let mount = self
+                .conn
+                .prepare_cached("SELECT path,fs_type,fs_used,fs_total FROM mount_info WHERE id=?1")?
+                .query_row([raw.id as i64], |r| {
+                    Ok((
+                        r.get::<_, Vec<u8>>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, Option<i64>>(2)?,
+                        r.get::<_, Option<i64>>(3)?,
+                    ))
+                });
+            match mount {
+                Ok((path, fs_type, used, total)) => {
+                    conn.prepare_cached("INSERT INTO mounts VALUES (?1,?2,?3,?4,?5)")?
+                        .execute(params![id as i64, path, fs_type, used, total])?;
+                }
+                Err(error) => return Err(error.into()),
+            }
         }
         Ok(Frame {
             raw: raw.id,
@@ -242,7 +257,37 @@ impl StagedTree {
         })
     }
 
+    fn write_refresh_mounts(&self, conn: &Connection, guard: &mut SpaceGuard) -> Result<()> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT id,path,fs_type,fs_used,fs_total FROM mount_info")?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let raw: i64 = row.get(0)?;
+            let ordinal: Option<i64> = self
+                .conn
+                .prepare_cached("SELECT ordinal FROM live WHERE id=?1")?
+                .query_row([raw], |r| r.get(0))
+                .optional()?;
+            if let Some(id) = ordinal {
+                conn.prepare_cached("INSERT INTO mounts VALUES (?1,?2,?3,?4,?5)")?
+                    .execute(params![
+                        id,
+                        row.get::<_, Vec<u8>>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<i64>>(3)?,
+                        row.get::<_, Option<i64>>(4)?,
+                    ])?;
+            }
+            guard.tick()?;
+        }
+        Ok(())
+    }
+
     fn attribute_link(&self, conn: &Connection, raw: u64, id: u64, node: &mut Node) -> Result<()> {
+        if self.refresh_mode {
+            return self.attribute_refresh_link(conn, raw, id, node);
+        }
         if node.kind() == Kind::Dir || node.nlink <= 1 {
             return Ok(());
         }
@@ -267,6 +312,34 @@ impl StagedTree {
                     node.apparent as i64
                 ])?;
             if owner as u64 != raw {
+                node.flags |= flags::ALIAS;
+                node.allocated = 0;
+                node.apparent = 0;
+            }
+        }
+        Ok(())
+    }
+
+    fn attribute_refresh_link(
+        &self,
+        conn: &Connection,
+        raw: u64,
+        id: u64,
+        node: &mut Node,
+    ) -> Result<()> {
+        let link: Option<(i64, i64, Option<i64>)> = self.conn.prepare_cached("SELECT l.dev,l.ino,w.id FROM links l JOIN winners w ON w.dev=l.dev AND w.ino=l.ino WHERE l.id=?1")?.query_row(
+            [raw as i64], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        ).optional()?;
+        if let Some((dev, ino, owner)) = link {
+            conn.prepare_cached("INSERT INTO hardlinks VALUES (?1,?2,?3,?4,?5)")?
+                .execute(params![
+                    id as i64,
+                    dev,
+                    ino,
+                    node.allocated as i64,
+                    node.apparent as i64
+                ])?;
+            if owner != Some(raw as i64) {
                 node.flags |= flags::ALIAS;
                 node.allocated = 0;
                 node.apparent = 0;

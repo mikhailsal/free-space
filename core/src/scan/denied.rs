@@ -81,6 +81,31 @@ impl DeniedPaths {
         self.count == 0
     }
 
+    pub(crate) fn into_paths(self) -> Result<Vec<String>> {
+        let Some(spool) = &self.spool else {
+            return Ok(self.examples);
+        };
+        let mut file = spool
+            .lock()
+            .map_err(|_| Error::generic("denied-path spool lock poisoned"))?;
+        file.seek(SeekFrom::Start(0))
+            .map_err(|e| Error::io("seek denied-path spool", e))?;
+        let mut paths = Vec::with_capacity(self.count);
+        for _ in 0..self.count {
+            let mut length = [0; 8];
+            file.read_exact(&mut length)
+                .map_err(|e| Error::io("read denied-path spool", e))?;
+            let mut bytes = vec![0; u64::from_le_bytes(length) as usize];
+            file.read_exact(&mut bytes)
+                .map_err(|e| Error::io("read denied-path spool", e))?;
+            paths.push(
+                String::from_utf8(bytes)
+                    .map_err(|e| Error::generic(format!("invalid denied-path spool: {e}")))?,
+            );
+        }
+        Ok(paths)
+    }
+
     pub fn warning(&self) -> Option<String> {
         if self.is_empty() {
             return None;
