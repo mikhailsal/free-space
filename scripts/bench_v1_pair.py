@@ -51,9 +51,19 @@ def provenance(binary):
 
 
 def seed_timestamp(snapshot):
-    uri = (snapshot / "snapshot.db").as_uri() + "?mode=ro&immutable=1"
-    with closing(sqlite3.connect(uri, uri=True)) as db:
-        return db.execute("SELECT scanned_at FROM meta").fetchone()[0]
+    """Preserve every seeded timestamp, including entries observed after meta start."""
+    cutoff = 0
+    for name in ("snapshot.db", "snapshot.prev.db"):
+        uri = (snapshot / name).as_uri() + "?mode=ro&immutable=1"
+        with closing(sqlite3.connect(uri, uri=True)) as db:
+            header = db.execute("SELECT scanned_at FROM meta").fetchone()[0]
+            latest, minimum, invalid = db.execute(
+                "SELECT max(scanned_at),max(min_scanned_at),max(min_scanned_at>scanned_at) FROM entries"
+            ).fetchone()
+            if latest is None or invalid:
+                raise ValueError("invalid seeded observation timestamps")
+            cutoff = max(cutoff, header, latest, minimum)
+    return cutoff
 
 
 def host(args):
@@ -121,6 +131,7 @@ def host(args):
             time.sleep(1.05)
         seed_digest = seed_hash(seed / "snapshot")
         cutoff = seed_timestamp(seed / "snapshot")
+        time.sleep(max(0, cutoff + 1.01 - time.time()))
         if args.scenario == "changed":
             mutate(tree)
         expected_ids = [f"p{pair}-{arm}" for pair in range(1, args.pairs + 1) for arm in binaries]
