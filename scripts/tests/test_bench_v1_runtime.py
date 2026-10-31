@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from bench_v1_runtime import observe_database, seed_hash, normalize
-from bench_v1_pair import arguments, host
+from bench_v1_pair import arguments, host, seed_timestamp
 
 
 class OracleTests(unittest.TestCase):
@@ -70,6 +70,16 @@ class OracleTests(unittest.TestCase):
         (self.root / 'unsafe').symlink_to('/etc/passwd')
         with self.assertRaisesRegex(ValueError, 'symlink'):
             seed_hash(self.root)
+
+    def test_seed_cutoff_preserves_times_after_generation_start(self):
+        for name in ('snapshot.db', 'snapshot.prev.db'):
+            self.database(name, old_time=100, new_time=300)
+            with sqlite3.connect(self.root / name) as db:
+                db.execute('ALTER TABLE meta ADD COLUMN scanned_at INTEGER')
+                db.execute('UPDATE meta SET scanned_at=90')
+        self.assertEqual(seed_timestamp(self.root), 300)
+        self.assertEqual(normalize('entries', ['scanned_at'], [300], seed_timestamp(self.root)), [300])
+        self.assertEqual(normalize('entries', ['scanned_at'], [301], seed_timestamp(self.root)), ['new observation'])
 
     def test_host_refuses_local_execution_before_allocation(self):
         from unittest.mock import patch

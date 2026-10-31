@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import statistics
 
-PROTOCOL = 'v1-single-operation-pairs-v2'
+PROTOCOL = 'v1-single-operation-pairs-v3'
 SCOPE = 'single CLI and sampler; observer excluded'
 ARMS = ('baseline-v1', 'candidate-v1')
 HEX = re.compile(r'^[0-9a-f]{64}$')
