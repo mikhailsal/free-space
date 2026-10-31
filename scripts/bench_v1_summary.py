@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import statistics
 
-PROTOCOL = 'v1-single-operation-pairs-v1'
+PROTOCOL = 'v1-single-operation-pairs-v2'
 SCOPE = 'single CLI and sampler; observer excluded'
 ARMS = ('baseline-v1', 'candidate-v1')
 HEX = re.compile(r'^[0-9a-f]{64}$')
@@ -59,12 +59,16 @@ def state_ok(state):
             and state.get('Running') is False and state.get('OOMKilled') is False and state.get('Error') == '')
 
 
-def summarize(root: Path) -> dict:
+def summarize(root: Path, require_runner_cleanup=True) -> dict:
     root = Path(root)
     issues, pairs = [], []
     manifest = read_json(root / 'manifest.json', issues)
     status = read_json(root / 'status.json', issues)
     admission = read_json(root / 'capacity-admission.json', issues)
+    if require_runner_cleanup:
+        cleanup = read_json(root / 'runner-cleanup.json', issues)
+        if cleanup.get('success') is not True:
+            issues.append('runner cleanup failed or missing')
     if (status.get('success') is not True or status.get('completed') is not True
             or status.get('cleanup_success') is not True or status.get('failures') != []):
         issues.append('status: experiment failed or incomplete')
@@ -174,7 +178,7 @@ def summarize(root: Path) -> dict:
                 continue
             sa, ma, oa = a
             sb, mb, ob = b
-            ignored = {'id', 'arm', 'binary_sha256', 'source_revision'}
+            ignored = {'id', 'arm', 'binary_sha256', 'source_revision', 'initial_snapshot_allocated_bytes'}
             if {k: v for k, v in sa.items() if k not in ignored} != {k: v for k, v in sb.items() if k not in ignored}:
                 issues.append(f'pair {pair}: configuration or seed mismatch')
             if any(oa.get(k) != ob.get(k) for k in ('semantic_sha256', 'current_entries', 'previous_entries')):

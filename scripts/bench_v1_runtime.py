@@ -47,8 +47,11 @@ def normalize(table, columns, row, cutoff):
             value = "generated"
         elif table in ("roots", "mounts") and name in ("fs_used", "fs_total", "fs_avail", "inodes_used"):
             value = "filesystem observation"
-        elif name in ("scanned_at", "min_scanned_at") and value > cutoff:
-            value = "new observation"
+        elif name in ("scanned_at", "min_scanned_at"):
+            if not isinstance(value, int):
+                raise ValueError("timestamp must be an integer")
+            if value > cutoff:
+                value = "new observation"
         if isinstance(value, bytes):
             value = {"bytes": value.hex()}
         result.append(value)
@@ -74,7 +77,9 @@ def observe_database(path, cutoff, deadline):
             columns = [row[1] for row in db.execute(f'PRAGMA table_info("{table}")')]
             digest.update(json.dumps([table, columns], separators=(",", ":")).encode())
             primary = "id" if table == "entries" else "entry_id" if "entry_id" in columns else columns[0]
-            for row in db.execute(f'SELECT * FROM "{table}" ORDER BY "{primary}"'):
+            order = [primary] + [name for name in columns if name != primary]
+            ordering = ",".join('"' + name.replace('"', '""') + '"' for name in order)
+            for row in db.execute(f'SELECT * FROM "{table}" ORDER BY {ordering}'):
                 digest.update(json.dumps([table, normalize(table, columns, row, cutoff)], separators=(",", ":")).encode())
                 digest.update(b"\n")
         return entries, digest.hexdigest()

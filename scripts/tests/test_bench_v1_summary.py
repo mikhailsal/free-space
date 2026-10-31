@@ -23,6 +23,7 @@ def fixture(root):
     put(root / 'manifest.json', manifest)
     put(root / 'status.json', {'success': True, 'completed': True, 'failures': [], 'cleanup_success': True})
     put(root / 'capacity-admission.json', {'success': True})
+    put(root / 'runner-cleanup.json', {'success': True})
     cg = {'memory.events': 'low 0\noom 0\noom_kill 0\n', 'memory.max': str(256 * 1024 * 1024),
           'memory.swap.max': '0'}
     state = {'Status': 'exited', 'ExitCode': 0, 'Running': False, 'OOMKilled': False, 'Error': ''}
@@ -94,6 +95,16 @@ class SummaryTest(unittest.TestCase):
         (self.root / 'extra').mkdir()
         self.assertFalse(MODULE.summarize(self.root)['valid'])
         self.change('manifest.json', 'expected_arms', ['../outside', 'two'])
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+
+    def test_copy_allocation_and_runner_cleanup(self):
+        self.change('one/spec.json', 'initial_snapshot_allocated_bytes', 4096)
+        self.change('two/spec.json', 'initial_snapshot_allocated_bytes', 8192)
+        self.assertTrue(MODULE.summarize(self.root)['valid'])
+        (self.root / 'runner-cleanup.json').unlink()
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        self.assertTrue(MODULE.summarize(self.root, require_runner_cleanup=False)['valid'])
+        put(self.root / 'runner-cleanup.json', {'success': False})
         self.assertFalse(MODULE.summarize(self.root)['valid'])
 
     def test_malformed_cgroup_and_duplicate_pair(self):

@@ -1,5 +1,7 @@
 """Small semantic-oracle fixtures; no scanner, Docker, cache flush or disk load."""
 from pathlib import Path
+import json
+import os
 import sqlite3
 import sys
 import tempfile
@@ -7,7 +9,7 @@ import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from bench_v1_runtime import observe_database, seed_hash
+from bench_v1_runtime import observe_database, seed_hash, normalize
 from bench_v1_pair import arguments, host
 
 
@@ -81,6 +83,48 @@ class OracleTests(unittest.TestCase):
         import io
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             arguments(['--baseline', '/missing', '--candidate', '/missing', '--output', '/unused', '--scenario', 'changed'])
+
+    def test_timestamp_boundary_and_null(self):
+        self.assertEqual(normalize('entries', ['scanned_at'], [200], 200), [200])
+        self.assertEqual(normalize('entries', ['scanned_at'], [201], 200), ['new observation'])
+        with self.assertRaisesRegex(ValueError, 'timestamp'):
+            normalize('entries', ['scanned_at'], [None], 200)
+
+    def test_mixed_fixture_entry_count_and_mutation(self):
+        from unittest.mock import patch
+        from bench_v1_fixture import prepare, mutate
+        tree = self.root / 'tree'
+        with patch('bench_v1_fixture.os.sync'):
+            receipt = prepare(tree, 2100)
+            count = sum(1 + len(files) for _, _, files in os.walk(tree))
+            self.assertEqual(receipt['expected_entries'], count)
+            self.assertEqual(len(list((tree / 'small').iterdir())) + 1, 100)
+            a = next(tree.rglob('f000000998'))
+            b = next(tree.rglob('f000000999'))
+            self.assertEqual(a.stat().st_ino, b.stat().st_ino)
+            mutate(tree)
+            self.assertEqual(sum(1 + len(files) for _, _, files in os.walk(tree)), count)
+
+    def test_early_admission_failure_still_writes_invalid_summary(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        out = self.root / 'out'
+        args = arguments(['--baseline', '/fake', '--candidate', '/fake', '--output', str(out)])
+        helper = SimpleNamespace(dump=lambda path, value: path.write_text(json.dumps(value)), capture=lambda args: '')
+        source = dict(sha256='a'*64, source_revision='revision', build=dict(
+            compiler='same', target='same', flags='', profile='release', release_profile={}, cargo_config={}))
+        env = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted',
+                   FREESPACE_BENCHMARK_RUN_TOKEN='test', RUNNER_TEMP=str(self.root))
+        import contextlib
+        import io
+        with patch.dict(os.environ, env), patch('bench_v1_pair.legacy', return_value=helper), \
+                patch('bench_v1_pair.provenance', return_value=source), \
+                patch('bench_v1_pair.subprocess.run'), \
+                patch('bench_v1_pair.check_capacity', return_value={'success': False}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(host(args), 1)
+        self.assertFalse(json.loads((out / 'summary.json').read_text())['valid'])
+        self.assertTrue(json.loads((out / 'status.json').read_text())['failures'])
 
 
 if __name__ == '__main__':

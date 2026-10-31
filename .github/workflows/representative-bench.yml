@@ -69,6 +69,7 @@ jobs:
         env:
           BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
           COMPARISON: ${{ inputs.comparison || 'control' }}
+          RUSTUP_TOOLCHAIN: 1.99.1
         run: |
           set -euo pipefail
           mkdir binaries
@@ -81,19 +82,26 @@ jobs:
           else
             git worktree add --detach "$RUNNER_TEMP/baseline-source" "$BASE_REF"
             git -C "$RUNNER_TEMP/baseline-source" rev-parse HEAD > binaries/baseline.revision.txt
-            CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target" cargo build --release --locked -p freespace \
-              --manifest-path "$RUNNER_TEMP/baseline-source/Cargo.toml"
+            (cd "$RUNNER_TEMP/baseline-source" && CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target" \
+              cargo build --release --locked -p freespace)
             cp target/release/freespace binaries/baseline
           fi
           python3 - <<'PY'
-          import hashlib,json,pathlib,subprocess
+          import hashlib,json,os,pathlib,subprocess,tomllib
           compiler=subprocess.check_output(['rustc','-Vv'],text=True)
           target=next(x.split(': ',1)[1] for x in compiler.splitlines() if x.startswith('host: '))
           for arm in ('baseline','candidate'):
               p=pathlib.Path('binaries')/arm
+              root=(pathlib.Path(os.environ['RUNNER_TEMP'])/'baseline-source'
+                    if arm=='baseline' and os.environ['COMPARISON']=='candidate' else pathlib.Path.cwd())
+              release=tomllib.loads((root/'Cargo.toml').read_text()).get('profile',{}).get('release',{})
+              config={str(path.relative_to(root)):path.read_text() for path in
+                      (root/'.cargo/config',root/'.cargo/config.toml') if path.is_file()}
               record={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
                       'source_revision':p.with_name(arm+'.revision.txt').read_text().strip(),
-                      'compiler':compiler,'target':target,'flags':'','profile':'release --locked',
+                      'compiler':compiler,'target':target,'profile':'release --locked',
+                      'flags':{k:os.environ.get(k,'') for k in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')},
+                      'release_profile':release,'cargo_config':config,
                       'bun':subprocess.check_output(['bun','--version'],text=True).strip()}
               p.with_name(arm+'.build.json').write_text(json.dumps(record,indent=2)+'\n')
           PY

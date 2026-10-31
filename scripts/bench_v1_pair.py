@@ -65,7 +65,7 @@ def host(args):
     setup_output.mkdir(exist_ok=False)
     binaries = {"baseline-v1": args.baseline.resolve(), "candidate-v1": args.candidate.resolve()}
     sources = {arm: provenance(binary) for arm, binary in binaries.items()}
-    build_keys = ("compiler", "target", "flags", "profile")
+    build_keys = ("compiler", "target", "flags", "profile", "release_profile", "cargo_config")
     if any(sources["baseline-v1"]["build"][key] != sources["candidate-v1"]["build"][key] for key in build_keys):
         raise ValueError("both arms must use identical toolchains/targets/flags")
     image = "freespace-pairs:" + uuid.uuid4().hex
@@ -79,11 +79,13 @@ def host(args):
         # upper estimate; receipt is replaced by exact generator accounting below.
         estimated_entries = args.files + 3 + ((args.files + 999) // 1000) * 7
         admission = check_capacity(scratch, args.files, estimated_entries,
-                                   seed_bytes=estimated_entries * 256 * 2)
+                                   seed_bytes=estimated_entries * 512 * 2)
         helper.dump(output / "capacity-admission.json", admission)
         if not admission["success"]:
             raise RuntimeError("insufficient fixture/snapshot bytes or inodes")
+        fixture_started = time.monotonic()
         fixture = prepare(scratch / "fixture" / "tree", args.files)
+        fixture["setup_seconds"] = time.monotonic() - fixture_started
         tree = scratch / "fixture" / "tree"
         io_limits = {key: getattr(args, flag) for flag, key in (("read_bps", "rbps"), ("write_bps", "wbps"),
                      ("read_iops", "riops"), ("write_iops", "wiops")) if getattr(args, flag) is not None}
@@ -162,13 +164,18 @@ def host(args):
         completed = True
     except Exception as error:
         failures.append(repr(error))
-        raise
     finally:
+        helper.dump(output / "status.json", dict(success=False, completed=completed,
+                    cleanup_success=False, failures=failures, cleanup_pending=True))
         try:
             remaining = helper.capture(["docker", "ps", "-aq", "--filter", "label=" + label])
             if remaining:
                 raise RuntimeError("preserving scratch: owned containers still exist")
-            shutil.rmtree(scratch)
+            # The owned exclusive filesystem is torn down by the shell. Do not
+            # unlink millions of fixture names before saving terminal receipts.
+            for folder in (scratch / "case", scratch / "seed"):
+                if folder.exists():
+                    shutil.rmtree(folder)
         except Exception as error:
             cleaned = False
             failures.append("scratch cleanup: " + repr(error))
@@ -179,7 +186,8 @@ def host(args):
             failures.append("image cleanup: " + repr(error))
         helper.dump(output / "status.json", dict(success=completed and cleaned and not failures,
                     completed=completed, cleanup_success=cleaned, failures=failures))
-    result = summarize(output)
+    result = summarize(output, require_runner_cleanup=False)
+    result["runner_cleanup_pending"] = True
     helper.dump(output / "summary.json", result)
     (output / "summary.md").write_text(markdown(result) + "\n")
     print(markdown(result))

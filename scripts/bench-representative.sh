@@ -22,6 +22,23 @@ else
   export FREESPACE_BENCHMARK_RUN_TOKEN
 fi
 benchmark_label="freespace.benchmark=$FREESPACE_BENCHMARK_RUN_TOKEN"
+finish_cleanup() {
+  if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs && -d $output/measurements ]]; then
+    python3 -c 'import json,sys; json.dump({"success": int(sys.argv[2]) == 0, "exit_code": int(sys.argv[2])}, open(sys.argv[1], "w")); print()' \
+      "$output/measurements/runner-cleanup.json" "$status" || status=1
+    if ! python3 scripts/bench_v1_summary.py "$output/measurements" > "$output/final-summary.md"; then
+      if (( status == 0 )); then status=1; fi
+      python3 -c 'import json,sys; json.dump({"success": False, "exit_code": int(sys.argv[2])}, open(sys.argv[1], "w")); print()' \
+        "$output/measurements/runner-cleanup.json" "$status" || true
+    fi
+    cat "$output/final-summary.md" >> "$GITHUB_STEP_SUMMARY" || { if (( status == 0 )); then status=1; fi; }
+    if (( status != 0 )); then
+      python3 -c 'import json,sys; json.dump({"success": False, "exit_code": int(sys.argv[2])}, open(sys.argv[1], "w")); print()' \
+        "$output/measurements/runner-cleanup.json" "$status" || true
+    fi
+  fi
+  printf 'cleanup final_status=%s\n' "$status" >> "$output/cleanup.log"
+}
 cleanup() {
   local status=$?
   local containers container attempt containers_stopped=true storage_released=true
@@ -68,6 +85,7 @@ cleanup() {
   fi
   if [[ $containers_stopped != true ]]; then
     echo 'Container cleanup failed; preserving mounted volume.' >> "$output/cleanup.log"
+    finish_cleanup
     exit "$status"
   fi
   if mountpoint -q "$mount_dir"; then
@@ -87,7 +105,7 @@ cleanup() {
   else
     echo 'Unmount or loop detach failed; preserving backing file.' >> "$output/cleanup.log"
   fi
-  printf 'cleanup final_status=%s\n' "$status" >> "$output/cleanup.log"
+  finish_cleanup
   exit "$status"
 }
 run_owned() {
@@ -107,11 +125,14 @@ lsblk -o NAME,MAJ:MIN,SIZE,TYPE,ROTA,MODEL >> "$output/host-disk.txt"
 # No host cache or device is changed outside this ephemeral runner.
 # Reserve actual backing blocks; inner statvfs must not promise absent storage.
 available=$(df -B1 --output=avail "$volume" | tail -1)
-if (( available < 32 * 1024 * 1024 * 1024 )); then
-  echo 'Need at least 32 GiB free on the runner for the dedicated filesystem.' >&2
+volume_gib=30
+required_gib=32
+if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then volume_gib=40; required_gib=42; fi
+if (( available < required_gib * 1024 * 1024 * 1024 )); then
+  echo "Need at least $required_gib GiB free on the runner for the dedicated filesystem." >&2
   exit 1
 fi
-fallocate -l 30G "$volume/disk.img"
+fallocate -l "${volume_gib}G" "$volume/disk.img"
 loop_device=$(sudo losetup --find --show --direct-io=on "$volume/disk.img")
 sudo mkfs.ext4 -q -F -N 8500000 -m 0 -E nodiscard,lazy_itable_init=0,lazy_journal_init=0 "$loop_device"
 mkdir "$mount_dir"
@@ -136,12 +157,16 @@ mkdir "$mount_dir/jobs"
 export RUNNER_TEMP="$mount_dir/jobs"
 if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then
   chmod +x binaries/baseline
+  measurement_status=0
   run_owned python3 scripts/bench-v2-container.py --v1-pairs --baseline binaries/baseline \
     --candidate binaries/candidate --output "$output/measurements" --files "${BENCH_FILES:?}" \
     --pairs "${BENCH_PAIRS:-1}" --operation "${BENCH_OPERATION:-scan}" \
     --scenario "${BENCH_SCENARIO:-unchanged}" --memory "${BENCH_MEMORY:-4096}" \
-    --timeout-seconds "${BENCH_COMMAND_TIMEOUT:-1200}" "${extra[@]}"
-  cat "$output/measurements/summary.md" >> "$GITHUB_STEP_SUMMARY"
+    --timeout-seconds "${BENCH_COMMAND_TIMEOUT:-1200}" "${extra[@]}" || measurement_status=$?
+  if [[ -f $output/measurements/summary.md ]]; then
+    cat "$output/measurements/summary.md" >> "$GITHUB_STEP_SUMMARY" || measurement_status=1
+  fi
+  (( measurement_status == 0 )) || exit "$measurement_status"
 else
   run_owned python3 scripts/bench-v2-container.py --candidate binaries/candidate --current-backends \
     --output "$output/measurements" --steps "${BENCH_FILES:?}" --memory 4096 \

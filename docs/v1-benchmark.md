@@ -1,5 +1,8 @@
 # Paired v1 benchmark protocol
 
+Protocol `v1-single-operation-pairs-v2` includes the mandatory outer-runner
+cleanup receipt. Early v1-protocol runs remain pre-hardening evidence only.
+
 W1 extends the existing GitHub-hosted representative runner. Run it only on an
 ephemeral standard Ubuntu VM. The guard rejects local execution, including host
 cache flushing, fixture generation and Docker measurements.
@@ -24,7 +27,7 @@ Caches are synced/dropped after copying, before the single measured command.
 A separate container mounts the closed snapshot read-only and records its own
 memory/I/O/time. Full-file hashes check observer immutability. SQLite quick checks,
 row counts and streaming semantic hashes compare current and previous generations.
-Generated IDs/timing and changing filesystem-capacity observations are normalized;
+Generated snapshot IDs/timing and changing filesystem-capacity observations are normalized;
 untouched timestamps, generations, IDs, hardlink records and content stay exact.
 New observation timestamps are normalized relative to the seed timestamp. This is
 a baseline-v1-refresh oracle, not a fresh-full-scan replacement for refresh policy.
@@ -33,7 +36,8 @@ Application peak disk includes case current/previous/output/staging/temp allocat
 It derives from dedicated-filesystem occupancy minus the static fixture/setup
 baseline, adding initial case snapshot allocation. Extra growth is reported
 separately. This captures open unlinked allocation; 20ms samples remain lower
-bounds. Before fixture creation, bytes and inodes must satisfy documented planning
+bounds. The paired runner preallocates a 40 GiB filesystem (42 GiB host headroom).
+Before fixture creation, bytes and inodes must satisfy documented planning
 allowances, retained seed storage and reserve. During commands, exhausted reserve
 aborts the operation. Final cleanup must succeed; active mounts/backing files are
 preserved on teardown failure.
