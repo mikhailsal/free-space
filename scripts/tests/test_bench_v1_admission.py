@@ -40,12 +40,13 @@ class CapacityTests(unittest.TestCase):
     def test_qualification_case_whitelist(self):
         for size in ('100', '10000', '100000'):
             for memory in ('512', '1024', '2048', '4096'):
-                for scenario in ('unchanged', 'changed'):
+                for scenario in ('unchanged', 'changed', 'changed-full'):
                     case = ADMISSION.qualification_case(size, scenario, memory, ['refresh'], 100000)
                     self.assertEqual(case['subtree_entries'], int(size))
                     self.assertEqual(case['memory_mib'], int(memory))
         for args in (('101', 'unchanged', '4096', ['refresh'], 100000),
                      ('100', 'changed', '4096', ['scan', 'refresh'], 100000),
+                     ('100', 'changed-full', '4096', ['scan'], 100000),
                      ('100', 'unchanged', '256', ['refresh'], 100000),
                      ('100000', 'unchanged', '4096', ['refresh'], 1000)):
             with self.subTest(args=args), self.assertRaises(ValueError):

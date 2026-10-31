@@ -28,6 +28,71 @@ def digest(value):
     return isinstance(value, str) and HEX.fullmatch(value) is not None
 
 
+def full_mutation_ok(receipt, fixture):
+    if not isinstance(receipt, dict) or not isinstance(fixture, dict):
+        return False
+    keys = ('renamed_inode', 'deleted_inode', 'old_owner_inode', 'old_outside_inode',
+            'outside_owner_inode', 'new_link_inode', 'changed_size', 'changed_mtime',
+            'target_mtime', 'added_inode', 'replacement_inode', 'nested_deleted_inode', 'new_file_inode',
+            'added_size', 'added_mtime', 'new_file_size', 'new_file_mtime', 'replacement_mtime',
+            'old_outside_size', 'old_outside_mtime', 'new_link_size', 'new_link_mtime')
+    plan = fixture.get('mutation_plan')
+    if not isinstance(plan, dict):
+        return False
+    return (receipt.get('recipe') == 'full-balanced-v1'
+            and fixture.get('shape') == 'mixed-full-mutation-subtree-v1'
+            and all(integer(receipt.get(k), True) for k in keys)
+            and receipt['old_owner_inode'] == receipt['old_outside_inode']
+            and receipt['outside_owner_inode'] == receipt['new_link_inode']
+            and integer(receipt.get('subtree_entries_before'), True)
+            and receipt['subtree_entries_before'] == receipt.get('subtree_entries_after')
+            and receipt['subtree_entries_before'] == fixture.get('expected_subtree_entries')
+            and plan.get('old_owner_path') == 'small/nested/owner'
+            and plan.get('old_outside_path') == 'unrelated/old-link'
+            and plan.get('new_owner_path') == 'unrelated/outside-owner'
+            and plan.get('new_link_path') == 'small/replacement/new-link'
+            and plan.get('old_owner_inode') == receipt['old_owner_inode']
+            and plan.get('outside_owner_inode') == receipt['outside_owner_inode']
+            and all(integer(plan.get(k), True) for k in ('old_owner_dev', 'old_owner_allocated', 'old_owner_size', 'old_owner_mtime', 'outside_owner_dev', 'outside_owner_allocated', 'outside_owner_size', 'outside_owner_mtime'))
+            and receipt['changed_size'] == 8192 and receipt['added_size'] == 5 and receipt['new_file_size'] == 11
+            and all(receipt[k] == 1700000060 * 10**9 for k in ('changed_mtime', 'target_mtime', 'added_mtime', 'new_file_mtime', 'replacement_mtime'))
+            and (receipt['old_outside_size'], receipt['old_outside_mtime']) == (plan['old_owner_size'], plan['old_owner_mtime'])
+            and (receipt['new_link_size'], receipt['new_link_mtime']) == (plan['outside_owner_size'], plan['outside_owner_mtime'])
+            and len({receipt['added_inode'], receipt['replacement_inode'], receipt['new_file_inode'], receipt['deleted_inode'], receipt['nested_deleted_inode'], receipt['old_owner_inode']}) == 6
+            and all(type(plan.get(k)) is int and plan[k] == v for k, v in
+                    (('removed_nested_entries', 3), ('added_nested_entries', 3), ('expected_entry_delta', 0), ('expected_file_delta', 0)))
+            and receipt['old_owner_inode'] != receipt['outside_owner_inode']
+            and type(receipt.get('entry_delta')) is int and receipt['entry_delta'] == 0
+            and type(receipt.get('file_delta')) is int and receipt['file_delta'] == 0
+            and type(receipt.get('removed_nested_entries')) is int and receipt['removed_nested_entries'] == 3
+            and type(receipt.get('added_nested_entries')) is int and receipt['added_nested_entries'] == 3)
+
+
+def full_link_evidence_ok(facts, plan, phase):
+    if not isinstance(facts, dict) or not isinstance(plan, dict):
+        return False
+    try:
+        old = facts[plan['old_owner_path'] if phase == 'seed' else plan['old_outside_path']]
+        alias = facts[plan['old_outside_path']]
+        owner = facts[plan['new_owner_path']]
+        rows = [old, alias, owner] + ([facts[plan['new_link_path']]] if phase == 'refresh' else [])
+        if any(not isinstance(row, list) or len(row) != 9 for row in rows):
+            return False
+        def link(row, prefix):
+            return row[5:] == [plan[prefix + '_dev'], plan[prefix + '_inode'], plan[prefix + '_allocated'], plan[prefix + '_size']]
+        ok = (link(old, 'old_owner') and link(alias, 'old_owner') and type(old[0]) is int and not old[0] & 2
+              and old[1:4] == [plan['old_owner_allocated'], plan['old_owner_size'], plan['old_owner_mtime'] // 10**9]
+              and owner[1:4] == [plan['outside_owner_allocated'], plan['outside_owner_size'], plan['outside_owner_mtime'] // 10**9]
+              and owner[5] is None)
+        if phase == 'seed':
+            return ok and type(alias[0]) is int and bool(alias[0] & 2) and alias[1:3] == [0, 0] and owner[4] == 1
+        new = rows[-1]
+        return (ok and link(new, 'outside_owner') and type(new[0]) is int and bool(new[0] & 2)
+                and new[1:3] == [0, 0] and new[3] == plan['outside_owner_mtime'] // 10**9 and new[4] == 2)
+    except (KeyError, TypeError, IndexError):
+        return False
+
+
 def read_json(path, issues):
     try:
         if path.is_symlink():
@@ -72,12 +137,16 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
                 or type(manifest.get('memory_mib')) is not int
                 or manifest.get('case_policy') != 'qualification-v1'
                 or manifest.get('setup_memory_mib') != 4096 or manifest.get('observer_memory_mib') != 4096
-                or manifest.get('scenario') not in ('unchanged', 'changed')
-                or (manifest.get('scenario') == 'changed' and manifest.get('operation') != 'refresh')
+                or manifest.get('scenario') not in ('unchanged', 'changed', 'changed-full')
+                or (manifest.get('scenario') != 'unchanged' and manifest.get('operation') != 'refresh')
                 or not isinstance(manifest.get('fixture_receipt'), dict)
                 or type(manifest['fixture_receipt'].get('expected_subtree_entries')) is not int
                 or manifest['fixture_receipt'].get('expected_subtree_entries') != manifest.get('subtree_entries')
                 or (manifest.get('scenario') == 'unchanged' and manifest.get('mutation_receipt', 'missing') is not None)
+                or (manifest.get('scenario') == 'changed-full' and not full_mutation_ok(manifest.get('mutation_receipt'), manifest.get('fixture_receipt')))
+                or (manifest.get('scenario') == 'changed-full' and (not isinstance(manifest.get('seed_link_facts'), dict)
+                    or set(manifest['seed_link_facts']) != {'snapshot.db', 'snapshot.prev.db'}
+                    or not all(full_link_evidence_ok(v, manifest['fixture_receipt'].get('mutation_plan'), 'seed') for v in manifest['seed_link_facts'].values())))
                 or (manifest.get('scenario') == 'changed' and (not isinstance(manifest.get('mutation_receipt'), dict)
                     or manifest['mutation_receipt'].get('recipe') != 'rename-size-mtime'
                     or any(not integer(manifest['mutation_receipt'].get(k), True) for k in
@@ -197,6 +266,14 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
                 or resources['cgroup'].get('memory.max') != str(4096 * 1024 * 1024)
                 or resources['cgroup'].get('memory.swap.max') != '0'):
             issues.append(f'{ident}: invalid observer limit')
+        if protocol == PROTOCOL and manifest.get('scenario') == 'changed-full':
+            links = obs.get('full_link_facts')
+            if not (isinstance(manifest.get('fixture_receipt'), dict)
+                    and spec.get('mutation_plan') == manifest['fixture_receipt'].get('mutation_plan')
+                    and isinstance(links, dict) and isinstance(manifest.get('seed_link_facts'), dict)
+                    and links.get('previous') == manifest['seed_link_facts'].get('snapshot.prev.db')
+                    and full_link_evidence_ok(links.get('current'), spec.get('mutation_plan'), 'refresh')):
+                issues.append(f'{ident}: missing or mismatched hardlink evidence')
         if flush.get('success') is not True or not state_ok(writer) or not state_ok(observer_state):
             issues.append(f'{ident}: cache flush or container state failed')
         if valid_spec:

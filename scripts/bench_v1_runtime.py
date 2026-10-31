@@ -40,6 +40,44 @@ def seed_hash(snapshot):
     return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
 
 
+def full_link_facts(snapshot, plan, phase):
+    """Bounded component lookups of the two designated inode groups."""
+    with closing(sqlite3.connect(snapshot.as_uri() + '?mode=ro&immutable=1', uri=True)) as db:
+        root = db.execute('SELECT entry_id FROM roots WHERE path=?', (b'/scratch/tree',)).fetchone()
+        if root is None:
+            raise ValueError('missing fixture root')
+        def get(path):
+            ident = root[0]
+            for component in path.split('/'):
+                row = db.execute('SELECT id FROM entries WHERE parent_id=? AND name=?', (ident, component.encode())).fetchall()
+                if len(row) != 1:
+                    raise ValueError('missing or ambiguous fixture path: ' + path)
+                ident = row[0][0]
+            row = db.execute('SELECT e.flags,e.allocated,e.apparent,e.mtime,e.nlink,h.dev,h.ino,h.allocated,h.apparent FROM entries e LEFT JOIN hardlinks h ON h.entry_id=e.id WHERE e.id=?', (ident,)).fetchone()
+            return list(row)
+        paths = ([plan['old_owner_path'], plan['old_outside_path'], plan['new_owner_path']]
+                 if phase == 'seed' else [plan['old_outside_path'], plan['new_owner_path'], plan['new_link_path']])
+        facts = {path: get(path) for path in paths}
+    old = facts[plan['old_owner_path'] if phase == 'seed' else plan['old_outside_path']]
+    outside_old = facts[plan['old_outside_path']]
+    new_owner = facts[plan['new_owner_path']]
+    def hardlink(row, prefix):
+        return row[5:9] == [plan[prefix + '_dev'], plan[prefix + '_inode'], plan[prefix + '_allocated'], plan[prefix + '_size']]
+    if not (hardlink(old, 'old_owner') and hardlink(outside_old, 'old_owner')
+            and not (old[0] & 2) and old[1:4] == [plan['old_owner_allocated'], plan['old_owner_size'], plan['old_owner_mtime'] // 10**9]
+            and new_owner[1:4] == [plan['outside_owner_allocated'], plan['outside_owner_size'], plan['outside_owner_mtime'] // 10**9]
+            and new_owner[5] is None):
+        raise ValueError('fixture owner facts differ from expected')
+    if phase == 'seed' and not (outside_old[0] & 2 and outside_old[1:3] == [0, 0] and new_owner[4] == 1):
+        raise ValueError('seed owner or alias differs from expected')
+    if phase == 'refresh':
+        new_link = facts[plan['new_link_path']]
+        if not (hardlink(new_link, 'outside_owner') and new_link[0] & 2 and new_link[1:3] == [0, 0]
+                and new_link[3] == plan['outside_owner_mtime'] // 10**9 and new_link[4] == 2):
+            raise ValueError('new link is not the expected zeroed alias')
+    return facts
+
+
 def normalize(table, columns, row, cutoff):
     result = []
     for name, value in zip(columns, row):
@@ -158,6 +196,10 @@ def inside(mode, spec_path):
         result.update(current_entries=current_entries, previous_entries=previous_entries,
                       semantic_sha256=hashlib.sha256((current + previous).encode()).hexdigest(),
                       logical_content_unchanged=integrity == helper.snapshot_integrity(snapshot))
+        if spec.get('scenario') == 'changed-full':
+            plan = spec['mutation_plan']
+            result['full_link_facts'] = dict(current=full_link_facts(snapshot / 'snapshot.db', plan, 'refresh'),
+                                             previous=full_link_facts(snapshot / 'snapshot.prev.db', plan, 'seed'))
         result["validated"] = result["logical_content_unchanged"] and current_entries == spec["expected_entries"]
     except Exception as error:
         result["errors"]["observer"] = repr(error)

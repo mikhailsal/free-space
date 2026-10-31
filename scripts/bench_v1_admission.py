@@ -134,11 +134,11 @@ def qualification_case(subtree, scenario, memory, operations, files) -> dict:
     """Validate one ordinary successful-operation case before allocation."""
     if subtree not in ('100', '10000', '100000') or int(subtree) > files:
         raise ValueError('invalid subtree size for stage')
-    if scenario not in ('unchanged', 'changed'):
+    if scenario not in ('unchanged', 'changed', 'changed-full'):
         raise ValueError('invalid scenario')
     if memory not in ('512', '1024', '2048', '4096'):
         raise ValueError('invalid ordinary memory budget')
-    if scenario == 'changed' and operations != ['refresh']:
+    if scenario != 'unchanged' and operations != ['refresh']:
         raise ValueError('changed scenario requires refresh only')
     return dict(subtree_entries=int(subtree), scenario=scenario, memory_mib=int(memory))
 

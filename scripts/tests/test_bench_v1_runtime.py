@@ -14,6 +14,76 @@ from bench_v1_pair import arguments, host, seed_timestamp
 
 
 class OracleTests(unittest.TestCase):
+    def test_targeted_hardlink_seed_and_refresh_facts(self):
+        from unittest.mock import patch
+        from bench_v1_fixture import prepare
+        from bench_v1_runtime import full_link_facts
+        from bench_v1_summary import full_link_evidence_ok
+        with tempfile.TemporaryDirectory() as tmp, patch('bench_v1_fixture.os.sync'):
+            root = Path(tmp)
+            plan = prepare(root / 'tree', 100, 100, 'changed-full')['mutation_plan']
+            dbpath = root / 'snapshot.db'
+            with sqlite3.connect(dbpath) as db:
+                db.executescript('CREATE TABLE roots(entry_id INTEGER,path BLOB); CREATE TABLE entries(id INTEGER PRIMARY KEY,parent_id INTEGER,name BLOB,flags INTEGER,allocated INTEGER,apparent INTEGER,mtime INTEGER,nlink INTEGER); CREATE TABLE hardlinks(entry_id INTEGER,dev INTEGER,ino INTEGER,allocated INTEGER,apparent INTEGER);')
+                db.execute('INSERT INTO roots VALUES (0,?)', (b'/scratch/tree',))
+                def row(i, parent, name, flags=0, alloc=0, apparent=0, mtime=1700000000, nlink=1):
+                    db.execute('INSERT INTO entries VALUES (?,?,?,?,?,?,?,?)', (i, parent, name.encode(), flags, alloc, apparent, mtime, nlink))
+                row(0, None, 'root'); row(1, 0, 'small'); row(2, 1, 'nested'); row(3, 0, 'unrelated')
+                row(4, 2, 'owner', 0, plan['old_owner_allocated'], plan['old_owner_size'], nlink=2)
+                row(5, 3, 'old-link', 2, 0, 0, nlink=2)
+                row(6, 3, 'outside-owner', 0, plan['outside_owner_allocated'], plan['outside_owner_size'])
+                for ident in (4, 5):
+                    db.execute('INSERT INTO hardlinks VALUES (?,?,?,?,?)', (ident, plan['old_owner_dev'], plan['old_owner_inode'], plan['old_owner_allocated'], plan['old_owner_size']))
+            seed = full_link_facts(dbpath, plan, 'seed')
+            self.assertTrue(full_link_evidence_ok(seed, plan, 'seed'))
+            with sqlite3.connect(dbpath) as db:
+                db.execute('DELETE FROM entries WHERE id IN (2,4)')
+                db.execute('DELETE FROM hardlinks WHERE entry_id=4')
+                db.execute('UPDATE entries SET flags=0, allocated=?, apparent=? WHERE id=5', (plan['old_owner_allocated'], plan['old_owner_size']))
+                db.execute('INSERT INTO entries VALUES (7,1,?,0,0,0,1700000000,1)', (b'replacement',))
+                db.execute('INSERT INTO entries VALUES (8,7,?,2,0,0,1700000000,2)', (b'new-link',))
+                db.execute('INSERT INTO hardlinks VALUES (8,?,?,?,?)', (plan['outside_owner_dev'], plan['outside_owner_inode'], plan['outside_owner_allocated'], plan['outside_owner_size']))
+            refreshed = full_link_facts(dbpath, plan, 'refresh')
+            self.assertTrue(full_link_evidence_ok(refreshed, plan, 'refresh'))
+            refreshed[plan['new_link_path']][0] = 0
+            self.assertFalse(full_link_evidence_ok(refreshed, plan, 'refresh'))
+
+    def test_full_mutation_preserves_counts_and_cross_boundary_inodes(self):
+        from unittest.mock import patch
+        from bench_v1_fixture import prepare, mutate_full, STAMP
+        from bench_v1_summary import full_mutation_ok
+        for files, size in ((100, 100), (1000, 100)):
+            with self.subTest(files=files), tempfile.TemporaryDirectory() as tmp, patch('bench_v1_fixture.os.sync'):
+                tree = Path(tmp) / 'tree'
+                fixture = prepare(tree, files, size, 'changed-full')
+                count = lambda: sum(1 + len(names) for _, _, names in os.walk(tree))
+                subtree = lambda: sum(1 + len(names) for _, _, names in os.walk(tree / 'small'))
+                self.assertEqual((count(), subtree()), (fixture['expected_entries'], size))
+                self.assertEqual(fixture['distribution']['small_files'] + fixture['distribution']['outer_files'], files)
+                old = (tree / 'small/nested/owner').stat().st_ino
+                renamed = (tree / 'small/f00000').stat().st_ino
+                deleted = (tree / 'small/f00002').stat().st_ino
+                self.assertEqual(old, (tree / 'unrelated/old-link').stat().st_ino)
+                new = (tree / 'unrelated/outside-owner').stat().st_ino
+                receipt = mutate_full(tree)
+                self.assertEqual((count(), subtree()), (fixture['expected_entries'], size))
+                self.assertFalse((tree / 'small/nested').exists())
+                self.assertFalse((tree / 'small/f00002').exists())
+                self.assertEqual((tree / 'small/renamed').stat().st_ino, renamed)
+                self.assertNotEqual((tree / 'small/added').stat().st_ino, deleted)
+                self.assertEqual((tree / 'small/f00001').stat().st_size, 8192)
+                for path in ('small/f00001', 'small/added', 'small/replacement', 'small/replacement/new-file', 'small'):
+                    self.assertEqual((tree / path).stat().st_mtime, STAMP + 60)
+                self.assertEqual((tree / 'small/f00003').stat().st_mtime, STAMP)
+                self.assertEqual(old, (tree / 'unrelated/old-link').stat().st_ino)
+                self.assertEqual(new, (tree / 'small/replacement/new-link').stat().st_ino)
+                self.assertTrue(full_mutation_ok(receipt, fixture))
+                receipt['new_link_inode'] = old
+                self.assertFalse(full_mutation_ok(receipt, fixture))
+        for scenario, size in (('invalid', 100), ('changed-full', 7)):
+            with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
+                prepare(Path(tmp) / 'tree', 100, size, scenario)
+
     def test_shell_argv_dispatch_and_memory_modes(self):
         import runpy
         from types import ModuleType
@@ -66,6 +136,9 @@ class OracleTests(unittest.TestCase):
         for extra in (['--subtree-entries', '101'], ['--subtree-entries', '10000', '--files', '100'], ['--memory', '128'], ['--memory', '256']):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 arguments(base + extra)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            arguments(base + ['--scenario', 'changed-full'])
+        self.assertEqual(arguments(base + ['--operation', 'refresh', '--scenario', 'changed-full']).scenario, 'changed-full')
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

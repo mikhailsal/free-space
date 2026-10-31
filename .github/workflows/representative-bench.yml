@@ -35,7 +35,7 @@ on:
       scenario:
         description: Changed requires refresh-only operation
         type: choice
-        options: [unchanged, changed]
+        options: [unchanged, changed, changed-full]
         default: unchanged
       memory_mib:
         description: Ordinary successful-operation memory limit (MiB)
