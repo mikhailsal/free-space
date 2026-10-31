@@ -425,6 +425,16 @@ qualified dependency: a batching-only experiment must start from unchanged v1.
 If larger
 caches harm low-memory hosts, keep defaults and publish the sensitivity result.
 
+Prepared experiment: [bounded child batches](v1-child-batch-experiment.md), branch
+`perf/v1-child-batches`. Normal pre-push checks compile the tests and pass; the
+[Opus source review](v1-child-batch-implementation-review.md) closes its P2 findings
+with a final no-findings verdict. Rust test execution and W4 timings remain
+unmeasured. D18 is pending: two 1m screening dispatches (current-observer control,
+then candidate only after a valid control) would reserve at most11,400 aggregate
+runner-seconds from the remaining13,482, within the same21,600-second cap. No W4
+job starts before the owner's allocation choice. No full-scale expansion or
+threshold exception is included.
+
 ## W5: improve v1 refresh without recreating v2
 
 Current refresh loads the full tree (`core/src/refresh.rs:242`), grafts/refinalizes
@@ -1166,5 +1176,6 @@ is authorized; candidate implementation/qualification and normal repository gate
 remain necessary before declaring any optimization successful.
 
 NO UNRESOLVED OWNER DECISIONS FOR COMPLETED D17 WORK. W3's combined candidate was
-not promoted. Any W4 runner campaign requires a new recorded scope allocation
-within the remaining cap or a separately approved campaign; no new job is started.
+not promoted. NEXT OWNER DECISION D18: two bounded W4 screening jobs within the
+existing remainder, or stop the first campaign. No new job starts without the
+answer; the same six-hour cap and existing metric gates remain binding.
