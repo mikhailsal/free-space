@@ -32,7 +32,8 @@
     41237971343,
     41239317973,
     41240117136,
-    41240352711
+    41240352711,
+    41241552473
   ],
   "runs": [
     {
@@ -45,7 +46,8 @@
       "status": "completed",
       "conclusion": "success",
       "job_seconds": 202.0,
-      "completed_job_seconds": 202.0
+      "completed_job_seconds": 202.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41194949486,
@@ -58,7 +60,8 @@
       "scope": "1m files, 3 same-binary pairs each for scan and refresh",
       "conclusion": "cancelled",
       "completed_job_seconds": 704.0,
-      "job_seconds": 704.0
+      "job_seconds": 704.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41195360648,
@@ -71,7 +74,8 @@
       "measurement_protocol": "v1-single-operation-pairs-v2",
       "conclusion": "cancelled",
       "completed_job_seconds": 0,
-      "job_seconds": 0
+      "job_seconds": 0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41195441593,
@@ -83,7 +87,8 @@
       "status": "completed",
       "conclusion": "cancelled",
       "completed_job_seconds": 0,
-      "job_seconds": 0
+      "job_seconds": 0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41195761328,
@@ -95,7 +100,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 153.0,
-      "job_seconds": 153.0
+      "job_seconds": 153.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41196033116,
@@ -108,7 +114,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 1166.0,
-      "job_seconds": 1166.0
+      "job_seconds": 1166.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41197321746,
@@ -121,7 +128,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 144.0,
-      "job_seconds": 144.0
+      "job_seconds": 144.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41197635230,
@@ -135,7 +143,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 2131.0,
-      "job_seconds": 2131.0
+      "job_seconds": 2131.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41197637087,
@@ -149,7 +158,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 1282.0,
-      "job_seconds": 1282.0
+      "job_seconds": 1282.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41199678638,
@@ -166,7 +176,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 2195.0,
-      "job_seconds": 2195.0
+      "job_seconds": 2195.0,
+      "running_job_seconds_observed": 0
     },
     {
       "run_id": 41200958293,
@@ -180,7 +191,8 @@
       "status": "completed",
       "conclusion": "success",
       "completed_job_seconds": 141.0,
-      "job_seconds": 141.0
+      "job_seconds": 141.0,
+      "running_job_seconds_observed": 0
     },
     {
       "stage": "screen",
@@ -213,7 +225,8 @@
       "completed_job_seconds": 1248.0,
       "owner_allocation": "D18",
       "purpose": "Current-observer 1m same-binary control before child-batch candidate",
-      "job_seconds": 1248.0
+      "job_seconds": 1248.0,
+      "running_job_seconds_observed": 0
     },
     {
       "stage": "screen",
@@ -248,7 +261,8 @@
       "completed_job_seconds": 1249.0,
       "owner_allocation": "D18",
       "purpose": "One fixed child-batch candidate after valid current-observer control",
-      "job_seconds": 1249.0
+      "job_seconds": 1249.0,
+      "running_job_seconds_observed": 0
     },
     {
       "stage": "screen",
@@ -281,7 +295,8 @@
       "conclusion": "success",
       "completed_job_seconds": 1077.0,
       "purpose": "Diagnostic paired baseline to localize full-tree refresh RAM peak",
-      "job_seconds": 1077.0
+      "job_seconds": 1077.0,
+      "running_job_seconds_observed": 0
     },
     {
       "comparison": "control",
@@ -316,7 +331,8 @@
       "conclusion": "success",
       "completed_job_seconds": 1163.0,
       "purpose": "Identical-binary release musl target control, prospectiveprofile-v2, nooptimization",
-      "job_seconds": 1163.0
+      "job_seconds": 1163.0,
+      "running_job_seconds_observed": 0
     },
     {
       "comparison": "control",
@@ -350,7 +366,8 @@
       "conclusion": "success",
       "completed_job_seconds": 1874.0,
       "purpose": "Full-size release-musl refresh allocation control; nooptimization",
-      "job_seconds": 1874.0
+      "job_seconds": 1874.0,
+      "running_job_seconds_observed": 0
     },
     {
       "comparison": "candidate",
@@ -386,7 +403,8 @@
       "conclusion": "success",
       "completed_job_seconds": 1483.0,
       "purpose": "Exact node preallocation after actual subtree walk versusreleaseMUSLbaseline",
-      "job_seconds": 1483.0
+      "job_seconds": 1483.0,
+      "running_job_seconds_observed": 0
     },
     {
       "comparison": "candidate",
@@ -421,7 +439,8 @@
       "conclusion": "success",
       "completed_job_seconds": 2087.0,
       "purpose": "refresh-exact-capacity-full-exploratory",
-      "job_seconds": 2087.0
+      "job_seconds": 2087.0,
+      "running_job_seconds_observed": 0
     },
     {
       "comparison": "candidate",
@@ -457,7 +476,8 @@
       "conclusion": "success",
       "completed_job_seconds": 1428.0,
       "purpose": "combined-sql-screen",
-      "job_seconds": 1428.0
+      "job_seconds": 1428.0,
+      "running_job_seconds_observed": 0
     },
     {
       "comparison": "candidate",
@@ -495,7 +515,8 @@
       "purpose": "combined-sql-full-exploratory",
       "conclusion": "success",
       "completed_job_seconds": 2991.0,
-      "job_seconds": 2991.0
+      "job_seconds": 2991.0,
+      "running_job_seconds_observed": 0
     },
     {
       "id": "qualification-smoke-default",
@@ -524,7 +545,8 @@
       "head_sha_verified": true,
       "conclusion": "success",
       "completed_job_seconds": 315.0,
-      "job_seconds": 315.0
+      "job_seconds": 315.0,
+      "running_job_seconds_observed": 0
     },
     {
       "id": "qualification-smoke-changed",
@@ -553,7 +575,8 @@
       "head_sha_verified": true,
       "conclusion": "success",
       "completed_job_seconds": 240.0,
-      "job_seconds": 240.0
+      "job_seconds": 240.0,
+      "running_job_seconds_observed": 0
     },
     {
       "id": "qualification-smoke-large-folder",
@@ -582,7 +605,8 @@
       "head_sha_verified": true,
       "conclusion": "failure",
       "completed_job_seconds": 179.0,
-      "job_seconds": 179.0
+      "job_seconds": 179.0,
+      "running_job_seconds_observed": 0
     },
     {
       "id": "runner-preparation-smoke-large-folder",
@@ -620,7 +644,8 @@
       "created_at": "2026-10-31T19:54:37Z",
       "head_sha_verified": true,
       "completed_job_seconds": 365.0,
-      "job_seconds": 365.0
+      "job_seconds": 365.0,
+      "running_job_seconds_observed": 0
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -662,7 +687,8 @@
       "job_seconds": 1275.0,
       "scan_profile": "disk",
       "receipt_validation": "strict_valid_profile_v2_structure_valid",
-      "receipt": "v1-joint-aa-screen-2026-10-31.json"
+      "receipt": "v1-joint-aa-screen-2026-10-31.json",
+      "running_job_seconds_observed": 0
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -707,7 +733,8 @@
       "receipt": "v1-joint-screen-2026-10-31.json",
       "qualification": "not_promoted",
       "h2": "inconclusive: scan disk positive median and +8192 B worst pair vs zero matched control spread",
-      "total_memory": "No material total scan-cgroup peak reduction at 4 GiB; lower budgets untested"
+      "total_memory": "No material total scan-cgroup peak reduction at 4 GiB; lower budgets untested",
+      "running_job_seconds_observed": 0
     },
     {
       "branch": "perf/v1-staged-refresh-experiment",
@@ -748,7 +775,8 @@
       "completed_job_seconds": 74.0,
       "job_seconds": 74.0,
       "receipt": "v1-staged-refresh-smoke-failed-2026-10-31.json",
-      "disposition": "Correctness failure before measurement; new reviewed source required"
+      "disposition": "Correctness failure before measurement; new reviewed source required",
+      "running_job_seconds_observed": 0
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -774,7 +802,7 @@
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
       "forecast_with_margin_seconds": 2534,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-2048-aa",
@@ -800,8 +828,16 @@
       "interpretation": "Capacity/pressure screening only; lower cap alone is not a source optimization. Positive disk H2 remains unresolved for joint promotion.",
       "run_id": 41240117136,
       "created_at": "2026-10-31T20:41:59Z",
-      "conclusion": "",
-      "head_sha_verified": true
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 976.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T21:00:19.967119+00:00",
+      "job_seconds": 976.0,
+      "receipt": "v1-fullscan-memory-2048-aa-2026-10-31.json",
+      "receipt_validation": "strict_valid_6of6_semantic_pass",
+      "profile_policy": "not_applicable_scan_only",
+      "memory_outcome": "All six commands success at2GiB; peaks1.81GiB, no memorymax/OOM/PSI. Not a minimum or source-optimization claim."
     },
     {
       "branch": "perf/v1-staged-refresh-experiment",
@@ -845,14 +881,60 @@
       "conclusion": "failure",
       "head_sha_verified": true,
       "completed_job_seconds": 35.0,
-      "job_seconds": 35.0
+      "job_seconds": 35.0,
+      "running_job_seconds_observed": 0,
+      "receipt": "v1-staged-refresh-history-smoke-2026-10-31.json",
+      "measurement_status": "invalid_before_measurement",
+      "failure": "Python isolated-cleanup fixture timeout; Rust and paired measurements not reached"
+    },
+    {
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "screen",
+      "operations": [
+        "scan"
+      ],
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 1949,
+      "forecast_with_margin_seconds": 2533.7000000000003,
+      "status": "in_progress",
+      "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
+      "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
+      "id": "fullscan-memory-2048-joint",
+      "branch": "perf/v1-joint-qualification",
+      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+      "memory_mib": 2048,
+      "scan_profile": "disk",
+      "admitted_at": "2026-10-31T21:00:44.505920+00:00",
+      "dispatch_receipt": "/tmp/freespace-fullscan-memory-2048-joint-dispatch.json",
+      "run_id": 41241552473,
+      "created_at": "2026-10-31T21:00:45Z",
+      "conclusion": "",
+      "head_sha_verified": true,
+      "completed_job_seconds": 167.0,
+      "running_job_seconds_observed": 253.784362,
+      "usage_observed_at": "2026-10-31T21:07:50.784362+00:00"
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T20:46:27.455246+00:00",
-  "completed_job_seconds": 26669.0,
-  "maximum_committed_seconds": 83069.0,
-  "remaining_unreserved_seconds": 132931.0,
+  "updated_at": "2026-10-31T21:07:50.784513+00:00",
+  "completed_job_seconds": 27812.0,
+  "maximum_committed_seconds": 78645.0,
+  "remaining_unreserved_seconds": 137355.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -891,7 +973,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 51000,
+  "planned_reserved_seconds": 45600,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Joint SQL plus exact refresh capacity",
@@ -1057,39 +1139,6 @@
       "status": "conditional_higher_rung_and_control",
       "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
-      "id": "fullscan-memory-2048-joint",
-      "branch": "perf/v1-joint-qualification",
-      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 2048,
-      "scan_profile": "disk"
-    },
-    {
-      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-      "comparison": "candidate",
-      "stage": "screen",
-      "operations": [
-        "scan"
-      ],
-      "files": 1000000,
-      "expected_entries": 1004499,
-      "pairs_per_operation": 3,
-      "subtree_entries": 100,
-      "scenario": "unchanged",
-      "setup_memory_mib": 4096,
-      "observer_memory_mib": 4096,
-      "cpus": 2,
-      "workers": 1,
-      "target": "x86_64-unknown-linux-musl",
-      "io": "local",
-      "runner_preparation_policy": "sdk-space-v1",
-      "measurement_protocol": "v1-single-operation-pairs-v4",
-      "timeout_minutes": 55,
-      "maximum_job_seconds": 5400,
-      "forecast_seconds": 1949,
-      "forecast_with_margin_seconds": 2534,
-      "status": "conditional_higher_rung_and_control",
-      "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
-      "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-1024-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
@@ -1224,8 +1273,8 @@
       "pairs_per_operation": 3,
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
-      "status": "conditional_corrected_smoke_no_confirmed_regression",
-      "depends_on": "New corrected-history smoke must pass full workspace and semantic gates; no confirmed resource/time regression; separately freeze matching whole-step forecast plus30% before any screen dispatch",
+      "status": "conditional_corrected_fixture_review_and_smoke",
+      "depends_on": "Fix isolated test real sync passthrough, obtain exact requested Opus5.5 source review after provider quota reset, publish and separately admit valid new smoke; then no confirmed regression and matching forecast required",
       "purpose": "Single conditional screening job, no full-scale expansion or promotion",
       "previous_unmeasured_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877"
     }
@@ -1237,5 +1286,7 @@
       "manifest": "v1-combined-sql-manifest-2026-10-31.json",
       "run_id": 41227699497
     }
-  }
+  },
+  "running_job_seconds_observed": 253.784362,
+  "used_runner_seconds_observed": 28065.784362
 }

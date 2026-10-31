@@ -1,5 +1,5 @@
 {
-  "status": "2048 MiB A/A full-scan control running; candidate and lower rungs conditional",
+  "status": "2048MiB control valid; joint at same budget next, all lower rungs remain conditional",
   "candidate_revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
   "control_harness_revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
@@ -89,7 +89,7 @@
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
       "forecast_with_margin_seconds": 2534,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-2048-aa",
@@ -115,8 +115,16 @@
       "interpretation": "Capacity/pressure screening only; lower cap alone is not a source optimization. Positive disk H2 remains unresolved for joint promotion.",
       "run_id": 41240117136,
       "created_at": "2026-10-31T20:41:59Z",
-      "conclusion": "",
-      "head_sha_verified": true
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 976.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T21:00:19.967119+00:00",
+      "job_seconds": 976.0,
+      "receipt": "v1-fullscan-memory-2048-aa-2026-10-31.json",
+      "receipt_validation": "strict_valid_6of6_semantic_pass",
+      "profile_policy": "not_applicable_scan_only",
+      "memory_outcome": "All six commands success at2GiB; peaks1.81GiB, no memorymax/OOM/PSI. Not a minimum or source-optimization claim."
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -141,15 +149,22 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
-      "forecast_with_margin_seconds": 2534,
-      "status": "conditional_higher_rung_and_control",
+      "forecast_with_margin_seconds": 2533.7000000000003,
+      "status": "in_progress",
       "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-2048-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
       "memory_mib": 2048,
-      "scan_profile": "disk"
+      "scan_profile": "disk",
+      "admitted_at": "2026-10-31T21:00:44.505920+00:00",
+      "dispatch_receipt": "/tmp/freespace-fullscan-memory-2048-joint-dispatch.json",
+      "run_id": 41241552473,
+      "created_at": "2026-10-31T21:00:45Z",
+      "conclusion": "",
+      "head_sha_verified": true,
+      "completed_job_seconds": 0
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -291,5 +306,5 @@
     "ordinary_in_memory_mode": "Not covered by these measurements",
     "basis": "Explicit existing worker arguments at frozen source, documented without changing any running case"
   },
-  "updated_at": "2026-10-31T20:41:57.211381+00:00"
+  "updated_at": "2026-10-31T21:01:38.961367+00:00"
 }
