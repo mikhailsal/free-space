@@ -120,7 +120,7 @@ def host(args):
         # measured operation. Their resources/time are setup receipts, not results.
         for ordinal in (1, 2):
             ident = f"seed-{ordinal}"
-            spec = dict(common, id=ident, operation="scan", target="/scratch/tree",
+            spec = dict(common, id=ident, operation="scan", target="/scratch/tree", allocation_diagnostics=False,
                         initial_snapshot_allocated_bytes=helper.occupancy(seed / "snapshot")["total"]["allocated_bytes"])
             (setup_output / ident).mkdir()
             spec_path = setup_output / (ident + ".json")
@@ -140,6 +140,8 @@ def host(args):
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,
                         sample_interval_seconds=0.02, cache_policy="cold after seed copy, before single CLI",
                         observer_policy="separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+                        diagnostic_policy=dict(allocation_diagnostics=args.operation == "refresh",
+                                               scope="measured refresh CLI only; seeds and observers disabled"),
                         environment=dict(kernel=platform.release(), cpu=Path("/proc/cpuinfo").read_text(),
                                          memory=Path("/proc/meminfo").read_text(),
                                          image=json.loads(helper.capture(["docker", "image", "inspect", image]))),
@@ -164,6 +166,7 @@ def host(args):
                 if available.f_bavail * available.f_frsize < 2 * initial + 2**31:
                     raise ValueError("not enough free space for output/staging and reserve")
                 spec = dict(common, id=ident, arm=arm, pair=pair, operation=args.operation,
+                            allocation_diagnostics=args.operation == "refresh",
                             target="/scratch/tree/small" if args.operation == "refresh" else "/scratch/tree",
                             seed_sha256=seed_digest, seed_timestamp=cutoff,
                             initial_snapshot_allocated_bytes=initial,

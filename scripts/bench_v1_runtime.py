@@ -185,6 +185,8 @@ def container(image, binary, case, tree, output, spec_path, spec, mode, label):
     for flag, key in (("read-bps", "rbps"), ("write-bps", "wbps"), ("read-iops", "riops"), ("write-iops", "wiops")):
         if key in spec.get("io_limits", {}):
             command += ["--device-" + flag, f'{spec["io_device"]}:{spec["io_limits"][key]}']
+    if mode == "worker" and spec.get("allocation_diagnostics") is True:
+        command += ["--env", f'FREESPACE_MEMORY_PROFILE=/results/{spec["id"]}/allocation-profile.jsonl']
     command += [image, "/harness/bench_v1_runtime.py", mode, "/results/" + spec_path.name]
     result_path = output / spec["id"] / (mode + "-state.json")
     # writer-state is the public receipt name used by the pair validator.

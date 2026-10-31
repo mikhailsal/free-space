@@ -94,6 +94,7 @@ fn replace_subtree(tree: &mut Tree, x: u32, sub: Option<Tree>) -> Vec<(u32, u64,
             let offset = tree.nodes.len() as u32 - 1;
             let names_off = tree.names.len() as u64;
             tree.names.extend_from_slice(&sub.names);
+            scan::profile::allocation("refresh_after_names", tree);
             let map = |r: u32| if r == 0 { x } else { r + offset };
             for (r, nd) in sub.nodes.iter().enumerate().skip(1) {
                 let mut n = *nd;
@@ -105,6 +106,7 @@ fn replace_subtree(tree: &mut Tree, x: u32, sub: Option<Tree>) -> Vec<(u32, u64,
                 debug_assert_eq!(tree.nodes.len() as u32, map(r as u32));
                 tree.nodes.push(n);
             }
+            scan::profile::allocation("refresh_after_nodes", tree);
             let root = sub.nodes[0];
             let xn = &mut tree.nodes[x as usize];
             xn.allocated = root.allocated;
@@ -205,6 +207,7 @@ pub fn run_refresh(req: RefreshRequest) -> Result<RefreshReport> {
     let path_arg = shell_path_word(&path);
     let _lock = lock::acquire_with_path_arg(&req.dir, "refresh", &label, path_arg.as_deref())?;
     let dir = req.dir.clone();
+    scan::profile::phase("refresh_start");
     let r = refresh_locked(req, path, &label);
     if let Err(e) = &r
         && !matches!(
@@ -241,6 +244,7 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
     let t = Instant::now();
     let mut loaded = load_tree(&snap)?;
     let load_seconds = t.elapsed().as_secs_f64();
+    scan::profile::allocation("refresh_loaded", &loaded.tree);
 
     let t = Instant::now();
     let sub = rescan_subtree(
@@ -258,11 +262,14 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
 
     let t = Instant::now();
     let mut paths = Paths::new(&snap.conn);
+    scan::profile::allocation("refresh_before_graft", &loaded.tree);
     let policy = graft(&mut loaded, x.id, x.subtree_end, sub, &mut paths)?;
+    scan::profile::allocation("refresh_after_graft", &loaded.tree);
     drop(paths);
     let mut tree = loaded.tree;
     update_fs_stats(&mut tree, &xpath);
     let fin = tree.finalize_with(&policy);
+    scan::profile::allocation("refresh_after_finalize", &tree);
     let finalize_seconds = t.elapsed().as_secs_f64();
     let denied = denied_paths(&tree, &fin);
 

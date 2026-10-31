@@ -88,6 +88,7 @@ jobs:
           python3 -m compileall -q scripts/bench_v1*.py
           cd web && bun install --frozen-lockfile
           cd .. && scripts/check.sh
+          cargo test --workspace --locked
       - name: Build both arms with one recorded toolchain
         env:
           BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
