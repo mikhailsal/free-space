@@ -1,0 +1,25 @@
+{
+  "run_id": 41240352711,
+  "url": "https://github.com/mikhailsal/free-space/actions/runs/41240352711",
+  "candidate_revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+  "expected_baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "conclusion": "failure",
+  "failed_phase": "build: Check benchmark contracts and repository gates",
+  "first_failure": "Python test_bench_cleanup.CleanupTests.test_interruption_status_retained raised subprocess.TimeoutExpired after 5 seconds; underlying reason unknown.",
+  "python_tests": "112 ran, 1 error",
+  "build_job_seconds": 35,
+  "paired_job": "skipped",
+  "github_artifacts": [],
+  "diagnostic_policy": "none; no profile-v2 result",
+  "measurements": null,
+  "workspace_rust_tests": "not reached",
+  "cli_history_test": "not reached",
+  "new_rust_regressions": "not reached",
+  "binary_hashes": "not produced",
+  "semantic_current_prev_history_cleanup_reserve_cgroup_sdk": "not evaluated",
+  "interpretation": "No paired performance, semantic, resource or no-regression conclusion is possible. No automatic retry was performed.",
+  "raw_files_sha256": {
+    "github.json": "86f042babc47355d09f1a7a84fdf489b37ff0efc789e2a8e8e303bd938188500",
+    "github.log": "0c151d29748292f931e0ae3a8b2e7d73a5ca098800d24a8a48933940c6909b26"
+  }
+}

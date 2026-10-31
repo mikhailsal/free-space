@@ -426,5 +426,240 @@
     "complete-command RSS does not capture all cgroup RAM; measure cgroup current/peak/events and pressure",
     "no full-scale W5 stage planned"
   ],
-  "parent_source_note": "Missing configured root is an existing Usage error, not a root-removal publication feature. Direct tests preserve this behavior. All speculative performance benefits remain unmeasured."
+  "parent_source_note": "Missing configured root is an existing Usage error, not a root-removal publication feature. Direct tests preserve this behavior. All speculative performance benefits remain unmeasured.",
+  "published_history_fix": {
+    "source_revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+    "parent_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+    "source_hashes": {
+      ".github/workflows/representative-bench.yml": "a22259f1adfbb0e4f72e3c7e2d56eb7396e3d772d3add44ddadb8e97fca7044d",
+      "core/src/refresh.rs": "6f3dfa2e07cf277ca720957a0fbea23fc75e8eabd8613e43bdae949e3b836e3f",
+      "core/src/refresh/load.rs": "1845d384c52c35b238de5bb08821b4574374d7941f48b229366a1a67350b5201",
+      "core/src/refresh/precheck.rs": "e141927791a1dda141c75750c89af59d86dc17f9376f581aaa9be84c66b22e6e",
+      "core/src/refresh/staged.rs": "9956342e7279f3823b9fd580f7affd7bdaaea748a071c829024471eaf8e54705",
+      "core/src/refresh/staged/tests.rs": "b7bed40c7aeff91537d3a5c4618dc00746de71b08f198a331a8cf0b25a7abdaf",
+      "core/src/scan/denied.rs": "709bef2292dc680df6dbfd89ff3a6cc826fd4557e079d97071c64539ddc9252b",
+      "core/src/scan/staged.rs": "b86fcbb146cc742012961aea3522d894e8ddb22b5a57dc4b748f96d8f0d8edff",
+      "core/src/scan/staged/refresh.rs": "84537ffbd23edf31090ad658fc3e39f8b6fa27dbd238eb39f51fe61ba7626a11",
+      "core/src/scan/staged/refresh/policy.rs": "c2f47dd3440951a3a7c0102c3fc5614764e18981fd3aa534e47c1df08cf18e0b",
+      "core/src/scan/staged/refresh/policy/tests.rs": "156d3a72c0a9c74a6c5af8a204c9cfb89ccef6cd547d62946584ff5f18c39dcc",
+      "core/src/scan/staged/refresh_ingest.rs": "119f240f99cb2b51b75371a62d86cfb82dff33019d73577b331197817b10234d",
+      "core/src/scan/staged/refresh_ingest/tests.rs": "6f1c84022668f81caff95d6c874e578292ddaeedcb1d3dfa9b7457d88a14e130",
+      "core/src/scan/staged/visit/tests.rs": "dca5b000f46490419d598bc467ddb78240ebcb3f10e3d1937a3999464c56ee43",
+      "core/src/scan/staged/write.rs": "d4678a64fdbcf32f63238a9f2acd89f3003383cb9e58b349795abbb25f58f99c",
+      "core/src/snapshot/writer.rs": "a9462626f4e61a76415469ef22f24613758bdd63c5448bddfd07a793e8edaf07",
+      "scripts/bench-representative.sh": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+      "scripts/bench_v1_admission.py": "a9841c7ec8f15e75dd5fe454a2837fb6bd385f42e2ad38833d66d83be4de0d64",
+      "scripts/bench_v1_fixture.py": "ee9234662055a1525cd25d200e9a345ad60751d929a322e6484555383451d37a",
+      "scripts/bench_v1_pair.py": "552560c82a0e0f43828142dbb1f50ec07b777f8539f76ef6b84f587f537c9f39",
+      "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+      "scripts/bench_v1_runtime.py": "fbd840ed5538dc6eca02d3d9ea33b51e88c397cd4cff31e28e2651cb80a395a4",
+      "scripts/bench_v1_summary.py": "2ad0a6de273ee28d89df9364db35a3481f0a4878783667f21add8ddb7c70e153",
+      "scripts/tests/test_bench_v1_admission.py": "bc0c3668ab997cd259ac352d2b5859d1426b51ffa4c2b65ccdaed0d926ba9be2",
+      "scripts/tests/test_bench_v1_runner_prepare.py": "6edc0654184977c7072b0a37934d3cbfa5035f2de9e66fef86fd99fe2aab2759",
+      "scripts/tests/test_bench_v1_runtime.py": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
+      "scripts/tests/test_bench_v1_stage_space.py": "01a85356383f8ba9f6f5666bc1e7de989b448d77cf08fc1c64bc3486661d7ab1",
+      "scripts/tests/test_bench_v1_summary.py": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838"
+    },
+    "failed_github_run": {
+      "run_id": 41239317973,
+      "result": "failure before benchmark measurement",
+      "cause": "The staged output writer omitted the existing insert_refreshes helper, leaving refresh history empty; CLI refresh_republishes_and_diff_sees_changes failed on its refreshed path assertion.",
+      "review_limit": "Original reviews missed this defect; the GitHub CLI gate caught it before measurement."
+    },
+    "fix": "Reuse the existing history insertion helper in the staged output transaction before commit. The public regression covers prior, new, and repeated paths across generations; the staged/oracle comparison now includes nonempty repeated history with deterministic ordering. Full scans retain empty history.",
+    "focused_reviews": [
+      {
+        "response_artifact": {
+          "path": "/tmp/freespace-w5-staged-history-review.json",
+          "sha256": "6d65e66f048578455c7b2005a741165e6c3b5b6235caa702d135db2a077ac73b"
+        },
+        "response": {
+          "status": "completed",
+          "provider": "claude-code",
+          "result": "[P3] `core/src/refresh/staged/tests.rs:~99` (`compare_case`, the `let meta = WriteMeta::new(2, None, snap.meta.scanned_at);` line) and the table loop at ~124\u2013134: the oracle comparison of the `refreshes` table can never fail. Both writers get a `meta` whose `refreshes` is empty, so the oracle DB and the staged DB both have zero history rows. This is how the GH smoke regression got past the oracle cases. The new public test now covers history content directly, but the oracle comparison still gives false assurance for that table. Fix: before the two writes in `compare_case`, set a non-empty `meta.refreshes`, for example a prior row plus a repeated-path row:\n```rust\nlet mut meta = WriteMeta::new(2, None, snap.meta.scanned_at);\nmeta.refreshes = vec![\n    RefreshRow { path: b\"/a\".to_vec(), scanned_at: 1, generation: 1 },\n    RefreshRow { path: target.as_os_str().as_bytes().to_vec(), scanned_at: 2, generation: 2 },\n    RefreshRow { path: target.as_os_str().as_bytes().to_vec(), scanned_at: 3, generation: 3 },\n];\n```\nThen every staged/oracle case checks history byte-for-byte. `RefreshRow` is already in scope through `super::*`. Also change the table query to a total order such as `ORDER BY 1,2,3`, because `ORDER BY 1` alone leaves ties between rows with the same path.\n\nVerified, with no finding:\n- **Transaction and failure:** `insert_refreshes` runs inside the staged `BEGIN`/`COMMIT` at `core/src/scan/staged/write.rs:95`, after the traversal-count check. Any error returns before `COMMIT`, and `StagedTree::write` removes the output file. Nothing is published, and `run_refresh` records the error.\n- **Error mapping:** passing `&Error::from` drops the legacy DiskFull\u2192`Space` and reserve mapping. Every other staged insert already uses plain `?`, so this adds no new gap.\n- **History content:** `refresh_meta` copies all prior rows and appends the new one, and `insert_refreshes` inserts every row. That gives the same result as the legacy path, including repeated paths.\n- **Ordering:** `generation` values are unique. `status` and `diff` order by `scanned_at`, so ties within the same second are not deterministic, but the legacy path behaves the same way.\n- **New test:**\n  - The timestamp bounds hold, because `before` is taken before `started`.\n  - `String == Cow<str>` compiles.\n  - `state.json` exists after `record_success`.\n  - `prev` stays unchanged.\n  - The `zip` cannot hide a short result, because the length is asserted first.\n- **CLI regression:** `status.refreshed[0].path` now comes from the committed row.\n\nNot verifiable from the material provided:\n- **Full scan history:** an empty history on a full scan depends on the full-scan caller of `StagedTree::write` (`refresh_mode == false`) building its meta with `WriteMeta::new`, which leaves `refreshes` empty. That caller is not in the packet.\n- **Compilation:** whether `crate::queries::status(&dir)` resolves depends on a re-export in `queries/mod.rs`, which was not shown. The hook compile reportedly passed, so it presumably resolves.",
+          "session_id": "51503068-5261-44ee-b4e9-39b7382ecf82",
+          "usage": {
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 61660,
+            "cache_read_input_tokens": 1494,
+            "output_tokens": 4895,
+            "output_tokens_details": {
+              "thinking_tokens": 3729
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 61660,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 4895,
+                "cache_read_input_tokens": 1494,
+                "cache_creation_input_tokens": 61660,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 61660
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "modelUsage": {
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 4895,
+              "cacheReadInputTokens": 1494,
+              "cacheCreationInputTokens": 61660,
+              "webSearchRequests": 0,
+              "costUSD": 0.5914868,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 3729,
+              "cacheCreationEphemeral5mInputTokens": 0,
+              "cacheCreationEphemeral1hInputTokens": 61660,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "exit_code": 0
+        },
+        "packet": {
+          "path": "/tmp/freespace-w5-staged-history-review-prompt.txt",
+          "sha256": "e2b884441b2d8fdafeb3b8ba15908768f1b234e14a2bb090d17c46e0f99a2769"
+        },
+        "structured_validation": {
+          "validator": "validateOutsideReview(result, structured)",
+          "completed": true,
+          "gate": "pass"
+        }
+      },
+      {
+        "response_artifact": {
+          "path": "/tmp/freespace-w5-staged-history-closure-review.json",
+          "sha256": "d6e3f4cd837806de9b266ccf492e0ec0fdee372091efcedb541d2cb947c2e336"
+        },
+        "response": {
+          "status": "completed",
+          "provider": "claude-code",
+          "result": "NO_FINDINGS",
+          "session_id": "b4143457-f377-4c33-ab4d-1264fe3d689a",
+          "usage": {
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 72800,
+            "cache_read_input_tokens": 1494,
+            "output_tokens": 3164,
+            "output_tokens_details": {
+              "thinking_tokens": 3153
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 72800,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 3164,
+                "cache_read_input_tokens": 1494,
+                "cache_creation_input_tokens": 72800,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 72800
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "modelUsage": {
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 3164,
+              "cacheReadInputTokens": 1494,
+              "cacheCreationInputTokens": 72800,
+              "webSearchRequests": 0,
+              "costUSD": 0.6459868,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 3153,
+              "cacheCreationEphemeral5mInputTokens": 0,
+              "cacheCreationEphemeral1hInputTokens": 72800,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "exit_code": 0
+        },
+        "packet": {
+          "path": "/tmp/freespace-w5-staged-history-closure-review-prompt.txt",
+          "sha256": "35bff9b26cbc002fe68c11f1aca61c09b0c4c541e12c0fb6935784a2efb72885"
+        },
+        "structured_validation": {
+          "validator": "validateOutsideReview(result, structured)",
+          "completed": true,
+          "gate": "pass"
+        }
+      }
+    ],
+    "first_focused_p3": "The differential oracle fixture compared empty refresh history in both arms, so it could not detect history insertion regressions. The closure fixture adds nonempty history including repeated paths and compares all columns in a total order.",
+    "closure_validation": {
+      "result": "NO_FINDINGS",
+      "transport_status": "completed",
+      "exit_code": 0,
+      "requested_and_reported_model": "claude-opus-5-5",
+      "validateOutsideReview_structured": "pass",
+      "source_and_packet_hashes_verified_before_and_after": true
+    },
+    "evidence": {
+      "first_input_hashes": {
+        "/tmp/freespace-w5-staged-history-source-hashes.json": "c95163a4adc7275d5ebdce1d8340443178540e8610f5035b4dcff96cf35da92c",
+        "/tmp/freespace-w5-staged-history-review-prompt.txt": "e2b884441b2d8fdafeb3b8ba15908768f1b234e14a2bb090d17c46e0f99a2769"
+      },
+      "closure_input_hashes": {
+        "/tmp/freespace-w5-staged-history-closure-review-prompt.txt": "35bff9b26cbc002fe68c11f1aca61c09b0c4c541e12c0fb6935784a2efb72885",
+        "/tmp/freespace-w5-staged-history-closure-source-hashes.json": "3ec2f443c6e1e3142563d3adb66484733dff38f8115f96214a79c389cacc2dfb"
+      },
+      "closure_source_manifest": {
+        "path": "/tmp/freespace-w5-staged-history-closure-source-hashes.json",
+        "sha256": "3ec2f443c6e1e3142563d3adb66484733dff38f8115f96214a79c389cacc2dfb"
+      },
+      "fast_gate_log": {
+        "path": "/tmp/freespace-w5-history-closure-gates.log",
+        "sha256": "64d0c6d033e933f1d729b33f2ab75940d65657519283796485109b86fe76bfcc",
+        "content": "check: rust\n    Checking freespace-core v0.2.0 (/tmp/free-space-v1-staged-refresh-experiment/core)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.28s\ncheck: size\ncheck: shell\ncheck: tsc\ncheck: biome\n\u001b[0m\u001b[34mChecked 69 files in 202\u001b[0m\u001b[0m\u001b[2m\u001b[34mms\u001b[0m\u001b[0m\u001b[34m.\u001b[0m\u001b[0m\u001b[34m No fixes applied.\u001b[0m\n"
+      },
+      "commit_log": {
+        "path": "/tmp/freespace-w5-history-commit.log",
+        "sha256": "ed235c7e7cce817ab911184b8c6d98102a9cb6488d7bc7bedae713c43e98af88",
+        "content": "[perf/v1-staged-refresh-experiment a4ffffb] fix(refresh): preserve staged refresh history\n 3 files changed, 90 insertions(+), 10 deletions(-)\n"
+      },
+      "push_log": {
+        "path": "/tmp/freespace-w5-history-push.log",
+        "sha256": "5f3407ab5249f21f4351327c82d46f161deed233d363bf726a166ecdbde81dda",
+        "content": "check: rust\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.39s\ncheck: size\ncheck: shell\ncheck: tsc\ncheck: biome\n\u001b[0m\u001b[34mChecked 69 files in 126\u001b[0m\u001b[0m\u001b[2m\u001b[34mms\u001b[0m\u001b[0m\u001b[34m.\u001b[0m\u001b[0m\u001b[34m No fixes applied.\u001b[0m\nTo https://github.com/mikhailsal/free-space.git\n   9a1c9f4..a4ffffb  perf/v1-staged-refresh-experiment -> perf/v1-staged-refresh-experiment\nBranch 'perf/v1-staged-refresh-experiment' set up to track remote branch 'perf/v1-staged-refresh-experiment' from 'origin'.\n"
+      }
+    },
+    "validation_limits": {
+      "normal_pre_push_checks": "Rust metadata/clippy, size, shell, TypeScript and Biome passed with normal hooks; no bypass.",
+      "local_rust_test_execution": false,
+      "local_app_execution": false,
+      "new_github_dispatch": false
+    }
+  }
 }

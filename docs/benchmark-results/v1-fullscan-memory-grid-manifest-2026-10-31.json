@@ -1,5 +1,5 @@
 {
-  "status": "Preregistered conditional campaign under the accepted plan and explicit full-scan total-memory priority; not dispatched",
+  "status": "2048 MiB A/A full-scan control running; candidate and lower rungs conditional",
   "candidate_revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
   "control_harness_revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
@@ -89,14 +89,34 @@
       "maximum_job_seconds": 5400,
       "forecast_seconds": 1949,
       "forecast_with_margin_seconds": 2534,
-      "status": "conditional_higher_rung_and_control",
+      "status": "in_progress",
       "depends_on": "Valid 4 GiB control and joint screens first. Each lower rung requires its matched A/A and all higher-rung pairs valid. Stop descending on OOM, timeout, incomplete or semantic failure. Candidate is unmeasured at this rung if baseline fails first.",
       "purpose": "Total-memory and pressure sensitivity; lowering a cap alone is not a code memory improvement",
       "id": "fullscan-memory-2048-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
       "memory_mib": 2048,
-      "scan_profile": "disk"
+      "scan_profile": "disk",
+      "admitted_at": "2026-10-31T20:41:57.211381+00:00",
+      "prerequisites_verified": [
+        "SDK smoke valid",
+        "matched 4 GiB A/A and joint strict receipts valid",
+        "profile-v2 structure valid with original HWM anomalies retained",
+        "actual baseline/candidate binaries verified",
+        "published control branch SHA verified",
+        "existing 5400-second reservation fits 60-hour aggregate cap"
+      ],
+      "source_controls": [
+        41237970872,
+        41237971343
+      ],
+      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "actual_expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "interpretation": "Capacity/pressure screening only; lower cap alone is not a source optimization. Positive disk H2 remains unresolved for joint promotion.",
+      "run_id": 41240117136,
+      "created_at": "2026-10-31T20:41:59Z",
+      "conclusion": "",
+      "head_sha_verified": true
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -270,5 +290,6 @@
     "worker_argument": "--low-memory",
     "ordinary_in_memory_mode": "Not covered by these measurements",
     "basis": "Explicit existing worker arguments at frozen source, documented without changing any running case"
-  }
+  },
+  "updated_at": "2026-10-31T20:41:57.211381+00:00"
 }

@@ -1,20 +1,21 @@
 {
-  "status": "Preregistered smoke and conditional screen; no dispatch yet",
+  "status": "Failed first source retained; corrected source reviewed, published and separately admitted for smoke",
   "purpose": "compile/runtime/semantic and bounded staged-refresh prototype smoke; no qualification or promotion",
   "priority": "separate W5 branch/job; user full-scan total-RAM lane remains primary and must not be blocked",
   "authority": "D7 authorizes staged experiment; proposal is not a dispatch",
   "source": {
     "candidate_branch": "perf/v1-staged-refresh-experiment",
-    "candidate_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+    "candidate_revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
     "candidate_engine_commit": "a5e7ba700532ac2f53a9a5e0bbce0dc86172968e",
     "product_baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
     "runner_preparation_source_commit": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
     "source_hashes": {
+      ".github/workflows/representative-bench.yml": "a22259f1adfbb0e4f72e3c7e2d56eb7396e3d772d3add44ddadb8e97fca7044d",
       "core/src/refresh.rs": "6f3dfa2e07cf277ca720957a0fbea23fc75e8eabd8613e43bdae949e3b836e3f",
       "core/src/refresh/load.rs": "1845d384c52c35b238de5bb08821b4574374d7941f48b229366a1a67350b5201",
       "core/src/refresh/precheck.rs": "e141927791a1dda141c75750c89af59d86dc17f9376f581aaa9be84c66b22e6e",
       "core/src/refresh/staged.rs": "9956342e7279f3823b9fd580f7affd7bdaaea748a071c829024471eaf8e54705",
-      "core/src/refresh/staged/tests.rs": "554950eb9e2f93b12645b01aa9d77c517eaf079ca1f328b8fe0dc11d37ef988d",
+      "core/src/refresh/staged/tests.rs": "b7bed40c7aeff91537d3a5c4618dc00746de71b08f198a331a8cf0b25a7abdaf",
       "core/src/scan/denied.rs": "709bef2292dc680df6dbfd89ff3a6cc826fd4557e079d97071c64539ddc9252b",
       "core/src/scan/staged.rs": "b86fcbb146cc742012961aea3522d894e8ddb22b5a57dc4b748f96d8f0d8edff",
       "core/src/scan/staged/refresh.rs": "84537ffbd23edf31090ad658fc3e39f8b6fa27dbd238eb39f51fe61ba7626a11",
@@ -23,11 +24,22 @@
       "core/src/scan/staged/refresh_ingest.rs": "119f240f99cb2b51b75371a62d86cfb82dff33019d73577b331197817b10234d",
       "core/src/scan/staged/refresh_ingest/tests.rs": "6f1c84022668f81caff95d6c874e578292ddaeedcb1d3dfa9b7457d88a14e130",
       "core/src/scan/staged/visit/tests.rs": "dca5b000f46490419d598bc467ddb78240ebcb3f10e3d1937a3999464c56ee43",
-      "core/src/scan/staged/write.rs": "bba18fbc478a985342ad4e9ecf1a2cce85f70984f04ed9c9c60478fc1ddcd891",
+      "core/src/scan/staged/write.rs": "d4678a64fdbcf32f63238a9f2acd89f3003383cb9e58b349795abbb25f58f99c",
+      "core/src/snapshot/writer.rs": "a9462626f4e61a76415469ef22f24613758bdd63c5448bddfd07a793e8edaf07",
+      "scripts/bench-representative.sh": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+      "scripts/bench_v1_admission.py": "a9841c7ec8f15e75dd5fe454a2837fb6bd385f42e2ad38833d66d83be4de0d64",
+      "scripts/bench_v1_fixture.py": "ee9234662055a1525cd25d200e9a345ad60751d929a322e6484555383451d37a",
       "scripts/bench_v1_pair.py": "552560c82a0e0f43828142dbb1f50ec07b777f8539f76ef6b84f587f537c9f39",
-      "scripts/tests/test_bench_v1_stage_space.py": "01a85356383f8ba9f6f5666bc1e7de989b448d77cf08fc1c64bc3486661d7ab1"
+      "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+      "scripts/bench_v1_runtime.py": "fbd840ed5538dc6eca02d3d9ea33b51e88c397cd4cff31e28e2651cb80a395a4",
+      "scripts/bench_v1_summary.py": "2ad0a6de273ee28d89df9364db35a3481f0a4878783667f21add8ddb7c70e153",
+      "scripts/tests/test_bench_v1_admission.py": "bc0c3668ab997cd259ac352d2b5859d1426b51ffa4c2b65ccdaed0d926ba9be2",
+      "scripts/tests/test_bench_v1_runner_prepare.py": "6edc0654184977c7072b0a37934d3cbfa5035f2de9e66fef86fd99fe2aab2759",
+      "scripts/tests/test_bench_v1_runtime.py": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
+      "scripts/tests/test_bench_v1_stage_space.py": "01a85356383f8ba9f6f5666bc1e7de989b448d77cf08fc1c64bc3486661d7ab1",
+      "scripts/tests/test_bench_v1_summary.py": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838"
     },
-    "reviewed_w5_hashes_path": "/tmp/freespace-w5-staged-cached-source-hashes.json",
+    "reviewed_w5_hashes_path": "/tmp/freespace-w5-staged-history-closure-source-hashes.json",
     "reviewed_source_files_unchanged": 15,
     "only_reviewed_file_changed_after_cherry_pick": "scripts/bench_v1_pair.py",
     "runner_prep_integrated_file_hashes": {
@@ -42,7 +54,9 @@
       "scripts/tests/test_bench_v1_runtime.py": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
       "scripts/tests/test_bench_v1_summary.py": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838"
     },
-    "binary_hashes": "not yet built; record both immutable build provenance and hashes before measurement"
+    "binary_hashes": "not yet built; record both immutable build provenance and hashes before measurement",
+    "history_fix_commit": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+    "source_hashes_scope": "28 reviewed engine and integrated harness paths"
   },
   "reviews": {
     "initial": "/tmp/freespace-w5-staged-review.json",
@@ -55,15 +69,20 @@
     "runner_prep_final": "/tmp/freespace-runner-disk-prep-final-review.json",
     "runner_prep_closure": "/tmp/freespace-runner-disk-prep-closure-review.json",
     "runner_prep_clean": "/tmp/freespace-runner-disk-prep-clean-review.json",
-    "runner_prep_note": "reviewed SDK source and P3 mechanical closure merged; review artifacts retained"
+    "runner_prep_note": "reviewed SDK source and P3 mechanical closure merged; review artifacts retained",
+    "history_initial": "/tmp/freespace-w5-staged-history-review.json",
+    "history_closure": "/tmp/freespace-w5-staged-history-closure-review.json",
+    "history_closure_status": "completed exit0, exact claude-opus-5-5, validated exact NO_FINDINGS"
   },
   "validation_before_dispatch": {
     "normal_pre_push_gates": "rust clippy all-target metadata, size, shell, tsc and biome passed; no hook bypass",
     "post_merge_python_tests": 61,
     "rust_tests_executed_locally": false,
     "rust_compiled_for_clippy": true,
-    "gh_workspace_tests": "required before measured jobs",
-    "push_log": "/tmp/freespace-w5-integrated-push.log"
+    "gh_workspace_tests": "Required on new corrected source before any measurement; old source failed CLI history gate",
+    "push_log": "/tmp/freespace-w5-integrated-push.log",
+    "history_fix_gates": "/tmp/freespace-w5-history-closure-gates.log",
+    "history_fix_push": "/tmp/freespace-w5-history-push.log"
   },
   "smoke": {
     "stage": "smoke",
@@ -139,7 +158,7 @@
     "complete-command RSS does not capture all cgroup RAM; measure cgroup current/peak/events and pressure",
     "no full-scale W5 stage planned"
   ],
-  "next_action": "parent reviews this proposal and explicitly preregisters before deciding any dispatch; no job was dispatched by proposal author",
+  "next_action": "Dispatch only new immutable a4ffffb corrected smoke. Full-scan total-RAM ladder stays primary.",
   "created_at": "2026-10-31T20:29:53.907078+00:00",
   "campaign_cap_seconds": 216000,
   "source_review": "v1-staged-refresh-source-reviews-2026-10-31.json",
@@ -173,13 +192,21 @@
       "pairs_per_operation": 1,
       "timeout_minutes": 20,
       "maximum_job_seconds": 3300,
-      "status": "admitted_not_dispatched",
+      "status": "completed",
       "depends_on": "Reviewed published source, normal hooks, integrated SDK policy and successful revised protocol smoke. GitHub workspace tests must pass before measurement.",
-      "purpose": "Bounded compatibility/prototype measurement, no product qualification"
+      "purpose": "Bounded compatibility/prototype measurement, no product qualification",
+      "run_id": 41239317973,
+      "created_at": "2026-10-31T20:31:43Z",
+      "head_sha_verified": true,
+      "conclusion": "failure",
+      "completed_job_seconds": 74.0,
+      "job_seconds": 74.0,
+      "receipt": "v1-staged-refresh-smoke-failed-2026-10-31.json",
+      "disposition": "Correctness failure before measurement; new reviewed source required"
     },
     {
       "branch": "perf/v1-staged-refresh-experiment",
-      "revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+      "revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
       "comparison": "candidate",
       "operations": [
@@ -206,9 +233,98 @@
       "pairs_per_operation": 3,
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
-      "status": "conditional_smoke_no_confirmed_regression",
-      "depends_on": "Valid smoke semantics and no confirmed disk/RAM/refresh regression; matching measured whole-step forecast plus30% fits3300seconds and the remaining campaign budget before dispatch.",
-      "purpose": "Single conditional screening job, no full-scale expansion or promotion"
+      "status": "conditional_corrected_smoke_no_confirmed_regression",
+      "depends_on": "New corrected-history smoke must pass full workspace and semantic gates; no confirmed resource/time regression; separately freeze matching whole-step forecast plus30% before any screen dispatch",
+      "purpose": "Single conditional screening job, no full-scale expansion or promotion",
+      "previous_unmeasured_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877"
+    },
+    {
+      "branch": "perf/v1-staged-refresh-experiment",
+      "revision": "a4ffffb791652a5b7fbd3da04533e5cc143c4414",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "runner_preparation_policy": "sdk-space-v1",
+      "profile_policy": "none",
+      "allocation_diagnostics": false,
+      "stage_admission_policy": "w5-case-space-v1",
+      "id": "w5-staged-refresh-history-smoke",
+      "stage": "smoke",
+      "files": 100000,
+      "expected_entries": 100449,
+      "pairs_per_operation": 1,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3300,
+      "status": "completed",
+      "depends_on": "Actual missing-history cause fixed, public and differential regression coverage added, requested Opus5.5 closure NO_FINDINGS, normal hooks passed; GitHub full workspace tests must pass before measurement",
+      "purpose": "Bounded compatibility/prototype measurement, no product qualification",
+      "admitted_at": "2026-10-31T20:45:01.766968+00:00",
+      "supersedes_failed_run": 41239317973,
+      "forecast_seconds": 525,
+      "forecast_with_margin_seconds": 683,
+      "forecast_basis": "Planning allowance: fixture8s, two seeds10s, workers125s, observers10s, copies2s, calibration and cleanup120s, unmeasured prototype uncertainty250s; no performance transfer or measured prototype latency claimed",
+      "run_id": 41240352711,
+      "created_at": "2026-10-31T20:45:04Z",
+      "conclusion": "failure",
+      "head_sha_verified": true,
+      "completed_job_seconds": 35.0,
+      "job_seconds": 35.0
     }
-  ]
+  ],
+  "first_smoke_disposition": "No paired job, worker measurements or GitHub artifacts; no performance conclusion.",
+  "first_smoke_receipt": "v1-staged-refresh-smoke-failed-2026-10-31.json",
+  "previous_source_freeze": {
+    "candidate_branch": "perf/v1-staged-refresh-experiment",
+    "candidate_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+    "candidate_engine_commit": "a5e7ba700532ac2f53a9a5e0bbce0dc86172968e",
+    "product_baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "runner_preparation_source_commit": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+    "source_hashes": {
+      "core/src/refresh.rs": "6f3dfa2e07cf277ca720957a0fbea23fc75e8eabd8613e43bdae949e3b836e3f",
+      "core/src/refresh/load.rs": "1845d384c52c35b238de5bb08821b4574374d7941f48b229366a1a67350b5201",
+      "core/src/refresh/precheck.rs": "e141927791a1dda141c75750c89af59d86dc17f9376f581aaa9be84c66b22e6e",
+      "core/src/refresh/staged.rs": "9956342e7279f3823b9fd580f7affd7bdaaea748a071c829024471eaf8e54705",
+      "core/src/refresh/staged/tests.rs": "554950eb9e2f93b12645b01aa9d77c517eaf079ca1f328b8fe0dc11d37ef988d",
+      "core/src/scan/denied.rs": "709bef2292dc680df6dbfd89ff3a6cc826fd4557e079d97071c64539ddc9252b",
+      "core/src/scan/staged.rs": "b86fcbb146cc742012961aea3522d894e8ddb22b5a57dc4b748f96d8f0d8edff",
+      "core/src/scan/staged/refresh.rs": "84537ffbd23edf31090ad658fc3e39f8b6fa27dbd238eb39f51fe61ba7626a11",
+      "core/src/scan/staged/refresh/policy.rs": "c2f47dd3440951a3a7c0102c3fc5614764e18981fd3aa534e47c1df08cf18e0b",
+      "core/src/scan/staged/refresh/policy/tests.rs": "156d3a72c0a9c74a6c5af8a204c9cfb89ccef6cd547d62946584ff5f18c39dcc",
+      "core/src/scan/staged/refresh_ingest.rs": "119f240f99cb2b51b75371a62d86cfb82dff33019d73577b331197817b10234d",
+      "core/src/scan/staged/refresh_ingest/tests.rs": "6f1c84022668f81caff95d6c874e578292ddaeedcb1d3dfa9b7457d88a14e130",
+      "core/src/scan/staged/visit/tests.rs": "dca5b000f46490419d598bc467ddb78240ebcb3f10e3d1937a3999464c56ee43",
+      "core/src/scan/staged/write.rs": "bba18fbc478a985342ad4e9ecf1a2cce85f70984f04ed9c9c60478fc1ddcd891",
+      "scripts/bench_v1_pair.py": "552560c82a0e0f43828142dbb1f50ec07b777f8539f76ef6b84f587f537c9f39",
+      "scripts/tests/test_bench_v1_stage_space.py": "01a85356383f8ba9f6f5666bc1e7de989b448d77cf08fc1c64bc3486661d7ab1"
+    },
+    "reviewed_w5_hashes_path": "/tmp/freespace-w5-staged-cached-source-hashes.json",
+    "reviewed_source_files_unchanged": 15,
+    "only_reviewed_file_changed_after_cherry_pick": "scripts/bench_v1_pair.py",
+    "runner_prep_integrated_file_hashes": {
+      ".github/workflows/representative-bench.yml": "a22259f1adfbb0e4f72e3c7e2d56eb7396e3d772d3add44ddadb8e97fca7044d",
+      "scripts/bench-representative.sh": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+      "scripts/bench_v1_admission.py": "a9841c7ec8f15e75dd5fe454a2837fb6bd385f42e2ad38833d66d83be4de0d64",
+      "scripts/bench_v1_pair.py": "552560c82a0e0f43828142dbb1f50ec07b777f8539f76ef6b84f587f537c9f39",
+      "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+      "scripts/bench_v1_summary.py": "2ad0a6de273ee28d89df9364db35a3481f0a4878783667f21add8ddb7c70e153",
+      "scripts/tests/test_bench_v1_admission.py": "bc0c3668ab997cd259ac352d2b5859d1426b51ffa4c2b65ccdaed0d926ba9be2",
+      "scripts/tests/test_bench_v1_runner_prepare.py": "6edc0654184977c7072b0a37934d3cbfa5035f2de9e66fef86fd99fe2aab2759",
+      "scripts/tests/test_bench_v1_runtime.py": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
+      "scripts/tests/test_bench_v1_summary.py": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838"
+    },
+    "binary_hashes": "not yet built; record both immutable build provenance and hashes before measurement"
+  },
+  "updated_at": "2026-10-31T20:46:27.455246+00:00"
 }

@@ -32,14 +32,17 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 2400,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
       "purpose": "joint-matched-control-screen",
       "runner_preparation_policy": "sdk-space-v1",
       "run_id": 41237970872,
       "created_at": "2026-10-31T20:14:29Z",
       "head_sha_verified": true,
-      "scan_profile": "disk"
+      "scan_profile": "disk",
+      "conclusion": "success",
+      "receipt_validation": "strict_valid_profile_v2_structure_valid",
+      "receipt": "v1-joint-aa-screen-2026-10-31.json"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -69,14 +72,20 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 2400,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
       "purpose": "joint-candidate-screen",
       "runner_preparation_policy": "sdk-space-v1",
       "run_id": 41237971343,
       "created_at": "2026-10-31T20:14:29Z",
       "head_sha_verified": true,
-      "scan_profile": "disk"
+      "scan_profile": "disk",
+      "conclusion": "success",
+      "receipt_validation": "strict_valid_profile_v2_structure_valid",
+      "receipt": "v1-joint-screen-2026-10-31.json",
+      "qualification": "not_promoted",
+      "h2": "inconclusive: scan disk positive median and +8192 B worst pair vs zero matched control spread",
+      "total_memory": "No material total scan-cgroup peak reduction at 4 GiB; lower budgets untested"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -156,12 +165,13 @@
   ],
   "previous_source_revision": "2599947cae2c074234bd570955e3dfe565388c79",
   "integration_source_review": "v1-joint-source-reviews-2026-10-31.json",
-  "updated_at": "2026-10-31T20:08:26.122633+00:00",
+  "updated_at": "2026-10-31T20:41:57.211381+00:00",
   "scan_mode_scope": {
     "scan_profile": "disk",
     "low_memory": true,
     "worker_argument": "--low-memory",
     "ordinary_in_memory_mode": "Not covered by these measurements",
     "basis": "Explicit existing worker arguments at frozen source, documented without changing any running case"
-  }
+  },
+  "screen_disposition": "Ordinary semantics and profile-v2 structure valid; scan speed useful, no material total-RAM saving; sampled scan disk H2 inconclusive. No promotion or full-scale qualification."
 }

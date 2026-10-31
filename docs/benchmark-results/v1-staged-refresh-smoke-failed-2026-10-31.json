@@ -1,0 +1,166 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41239317973",
+  "run_id": 41239317973,
+  "source_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+  "conclusion": "failed_before_measurement",
+  "failed_test": "cli/tests/cli.rs::refresh_republishes_and_diff_sees_changes",
+  "root_cause": "StagedTree::write_inner inserted metadata but did not insert meta.refreshes; published refresh history was empty although the refresh command succeeded.",
+  "expected_gate": "Existing CLI test requires the refreshed path in status JSON.",
+  "measurement_status": "No paired job, worker measurements or GitHub artifacts; no performance conclusion.",
+  "fix_status": "A separate uncommitted source fix reuses writer::insert_refreshes inside the output transaction, with a public multiple-refresh regression; requested outside review is pending.",
+  "job_seconds": {
+    "build": 74.0,
+    "paired": 0.0
+  },
+  "runner_seconds": 74.0,
+  "archive": "v1-staged-refresh-smoke-failed-2026-10-31.tar.gz",
+  "archive_sha256": "b94daff0684de4f5dce1ad77b4071cfd26f2ae1db3eaae24e0010c10a8d5637a",
+  "archive_verified": true,
+  "support_payloads": 2,
+  "github": {
+    "attempt": 1,
+    "conclusion": "failure",
+    "createdAt": "2026-10-31T20:31:43Z",
+    "event": "workflow_dispatch",
+    "headSha": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T20:33:06Z",
+        "conclusion": "failure",
+        "databaseId": 124649677081,
+        "name": "build",
+        "startedAt": "2026-10-31T20:31:52Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T20:31:54Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T20:31:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:31:55Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-31T20:31:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:31:55Z",
+            "conclusion": "success",
+            "name": "Validate per-stage time envelope",
+            "number": 3,
+            "startedAt": "2026-10-31T20:31:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:32:04Z",
+            "conclusion": "success",
+            "name": "Run dtolnay/rust-toolchain@1.99.1",
+            "number": 4,
+            "startedAt": "2026-10-31T20:31:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:32:13Z",
+            "conclusion": "success",
+            "name": "Install musl tools",
+            "number": 5,
+            "startedAt": "2026-10-31T20:32:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:32:14Z",
+            "conclusion": "success",
+            "name": "Run oven-sh/setup-bun@v2",
+            "number": 6,
+            "startedAt": "2026-10-31T20:32:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:32:14Z",
+            "conclusion": "success",
+            "name": "Run Swatinem/rust-cache@v2",
+            "number": 7,
+            "startedAt": "2026-10-31T20:32:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "failure",
+            "name": "Check benchmark contracts and repository gates",
+            "number": 8,
+            "startedAt": "2026-10-31T20:32:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "skipped",
+            "name": "Build both arms with one recorded toolchain",
+            "number": 9,
+            "startedAt": "2026-10-31T20:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "skipped",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 10,
+            "startedAt": "2026-10-31T20:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "skipped",
+            "name": "Post Run Swatinem/rust-cache@v2",
+            "number": 18,
+            "startedAt": "2026-10-31T20:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "skipped",
+            "name": "Post Run oven-sh/setup-bun@v2",
+            "number": 19,
+            "startedAt": "2026-10-31T20:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 20,
+            "startedAt": "2026-10-31T20:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T20:33:04Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-10-31T20:33:04Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/mikhailsal/free-space/actions/runs/41239317973/job/124649677081"
+      },
+      {
+        "completedAt": "2026-10-31T20:33:06Z",
+        "conclusion": "skipped",
+        "databaseId": 124650003080,
+        "name": "paired",
+        "startedAt": "2026-10-31T20:33:06Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/mikhailsal/free-space/actions/runs/41239317973/job/124650003080"
+      }
+    ],
+    "status": "completed",
+    "updatedAt": "2026-10-31T20:33:07Z",
+    "url": "https://github.com/mikhailsal/free-space/actions/runs/41239317973",
+    "workflowName": "Representative scanner benchmark"
+  }
+}
