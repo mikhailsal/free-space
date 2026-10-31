@@ -91,3 +91,24 @@ def admit_time(remaining_seconds, estimated_seconds, margin=0.3) -> dict:
     if not receipt["success"]:
         receipt["error"] = "insufficient remaining time"
     return receipt
+
+
+def stage_timeouts(stage, requested_minutes=None) -> dict:
+    """Return bounded step, job and total runner budgets for a campaign stage."""
+    caps = {"smoke": 30, "screen": 65, "local-scale": 120}
+    if not isinstance(stage, str) or stage not in caps:
+        raise ValueError("unknown benchmark stage")
+    if requested_minutes is None or requested_minutes == "":
+        minutes = caps[stage]
+    elif isinstance(requested_minutes, bool):
+        raise ValueError("requested minutes must be an integer within the stage cap")
+    elif isinstance(requested_minutes, int):
+        minutes = requested_minutes
+    elif isinstance(requested_minutes, str) and requested_minutes.isascii() and requested_minutes.isdecimal():
+        minutes = int(requested_minutes)
+    else:
+        raise ValueError("requested minutes must be an integer within the stage cap")
+    if not 1 <= minutes <= caps[stage]:
+        raise ValueError("requested minutes must be an integer within the stage cap")
+    return dict(step_minutes=minutes, job_minutes=minutes + 5, build_minutes=25,
+                maximum_runner_minutes=minutes + 30)
