@@ -48,6 +48,25 @@ class CapacityTests(unittest.TestCase):
 
 
 class TimeTests(unittest.TestCase):
+    def test_stage_defaults_and_bounded_override(self):
+        for stage, cap in (("smoke", 30), ("screen", 65), ("local-scale", 120)):
+            for requested in (None, "", cap, str(cap)):
+                with self.subTest(stage=stage, requested=requested):
+                    self.assertEqual(ADMISSION.stage_timeouts(stage, requested),
+                                     dict(step_minutes=cap, job_minutes=cap + 5,
+                                          build_minutes=25, maximum_runner_minutes=cap + 30))
+        self.assertEqual(ADMISSION.stage_timeouts("local-scale", "47"),
+                         dict(step_minutes=47, job_minutes=52, build_minutes=25,
+                              maximum_runner_minutes=77))
+
+    def test_stage_timeout_rejects_invalid_inputs(self):
+        for stage, requested in (("unknown", None), (None, None), ("smoke", 31),
+                                 ("screen", 0), ("local-scale", 121), ("smoke", True),
+                                 ("smoke", 1.5), ("smoke", float("nan")),
+                                 ("smoke", "1.5"), ("smoke", "NaN"), ("smoke", "-1")):
+            with self.subTest(stage=stage, requested=requested), self.assertRaises(ValueError):
+                ADMISSION.stage_timeouts(stage, requested)
+
     def test_time_with_margin(self):
         self.assertTrue(ADMISSION.admit_time(130, 100)["success"])
         self.assertFalse(ADMISSION.admit_time(129, 100)["success"])

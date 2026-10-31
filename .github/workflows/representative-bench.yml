@@ -31,6 +31,10 @@ on:
         description: Immutable product baseline revision
         type: string
         default: afce6fd
+      timeout_minutes:
+        description: Optional lower measured-step cap within the stage maximum
+        type: string
+        default: ''
       forecast_seconds:
         description: Required measured screening forecast for local-scale, including setup/observers
         type: string
@@ -47,11 +51,30 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    outputs:
+      paired_job_minutes: ${{ steps.policy.outputs.job_minutes }}
+      paired_step_minutes: ${{ steps.policy.outputs.step_minutes }}
+      maximum_runner_minutes: ${{ steps.policy.outputs.maximum_runner_minutes }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Validate per-stage time envelope
+        id: policy
+        env:
+          STAGE: ${{ inputs.stage || 'smoke' }}
+          REQUESTED_MINUTES: ${{ inputs.timeout_minutes }}
+        run: |
+          python3 - <<'PY'
+          import os,sys
+          sys.path.insert(0,'scripts')
+          from bench_v1_admission import stage_timeouts
+          policy=stage_timeouts(os.environ['STAGE'],os.environ.get('REQUESTED_MINUTES'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
+              stream.write(''.join(f'{key}={value}\n' for key,value in policy.items()))
+          print(policy)
+          PY
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt, clippy
@@ -115,7 +138,7 @@ jobs:
   paired:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ inputs.stage == 'local-scale' && 125 || inputs.stage == 'screen' && 70 || 35 }}
+    timeout-minutes: ${{ fromJSON(needs.build.outputs.paired_job_minutes) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -128,17 +151,18 @@ jobs:
         if: inputs.stage == 'local-scale'
         env:
           FORECAST: ${{ inputs.forecast_seconds }}
+          STEP_CAP: ${{ needs.build.outputs.paired_step_minutes }}
         run: |
           python3 - <<'PY'
           import os,sys
           sys.path.insert(0,'scripts')
           from bench_v1_admission import admit_time
-          receipt=admit_time(120*60,float(os.environ['FORECAST']))
+          receipt=admit_time(int(os.environ['STEP_CAP'])*60,float(os.environ['FORECAST']))
           print(receipt)
           if not receipt['success']: raise SystemExit('No admissible screening forecast')
           PY
       - name: Paired v1 commands with isolated observers
-        timeout-minutes: ${{ inputs.stage == 'local-scale' && 120 || inputs.stage == 'screen' && 65 || 30 }}
+        timeout-minutes: ${{ fromJSON(needs.build.outputs.paired_step_minutes) }}
         env:
           BENCH_PROTOCOL: v1-pairs
           BENCH_IO: ${{ inputs.io || 'native' }}
