@@ -385,7 +385,7 @@ fn insert_denied(
     Ok(())
 }
 
-fn insert_refreshes(
+pub(crate) fn insert_refreshes(
     conn: &Connection,
     meta: &WriteMeta,
     map_err: &impl Fn(rusqlite::Error) -> Error,

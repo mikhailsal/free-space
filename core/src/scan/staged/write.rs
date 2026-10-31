@@ -92,6 +92,7 @@ impl StagedTree {
                 "staging traversal did not visit every entry",
             ));
         }
+        writer::insert_refreshes(&conn, meta, &Error::from)?;
         conn.execute_batch("COMMIT")?;
         let insert_seconds = begin.elapsed().as_secs_f64();
         crate::scan::profile::phase("index");

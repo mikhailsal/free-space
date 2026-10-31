@@ -96,7 +96,24 @@ fn compare_case(remove: bool, outside: &str, replacement: &str, external: bool, 
     let mut paths = Paths::new(&snap.conn);
     let policy = graft(&mut loaded, x.id, x.subtree_end, replacement, &mut paths).unwrap();
     let fin = loaded.tree.finalize_with(&policy);
-    let meta = WriteMeta::new(2, None, snap.meta.scanned_at);
+    let mut meta = WriteMeta::new(3, None, snap.meta.scanned_at);
+    meta.refreshes = vec![
+        RefreshRow {
+            path: b"/prior".to_vec(),
+            scanned_at: 1,
+            generation: 1,
+        },
+        RefreshRow {
+            path: target.as_os_str().as_bytes().to_vec(),
+            scanned_at: 2,
+            generation: 2,
+        },
+        RefreshRow {
+            path: target.as_os_str().as_bytes().to_vec(),
+            scanned_at: 3,
+            generation: 3,
+        },
+    ];
     let mut reserve = Reserve::new(dir.as_path());
     reserve.min_free = 0;
     let oracle = tmp.path().join("oracle.db");
@@ -118,17 +135,12 @@ fn compare_case(remove: bool, outside: &str, replacement: &str, external: bool, 
     assert_eq!(denied.len(), usize::from(marker == "denied"));
     let a = Connection::open(oracle).unwrap();
     let b = Connection::open(output).unwrap();
-    for table in [
-        "entries",
-        "hardlinks",
-        "roots",
-        "mounts",
-        "denied",
-        "refreshes",
-    ] {
+    for table in ["entries", "hardlinks", "roots", "mounts", "denied"] {
         let sql = format!("SELECT * FROM {table} ORDER BY 1");
         assert_eq!(rows(&a, &sql), rows(&b, &sql), "table {table}");
     }
+    let history = "SELECT path,scanned_at,generation FROM refreshes ORDER BY 1,2,3";
+    assert_eq!(rows(&a, history), rows(&b, history), "table refreshes");
 }
 
 #[test]
@@ -253,6 +265,73 @@ fn public_refresh_publishes_history_and_keeps_previous_snapshot() {
     assert_eq!(fs::read(dir.prev()).unwrap(), previous);
     assert!(!dir.as_path().join("snapshot.stage.tmp").exists());
     assert!(!dir.tmp(2).exists());
+}
+
+#[test]
+fn public_refresh_retains_multiple_history_rows_and_repeated_paths() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("root");
+    let first = root.join("first");
+    let second = root.join("second");
+    fs::create_dir_all(&first).unwrap();
+    fs::create_dir_all(&second).unwrap();
+    let dir = SnapshotDir::new(tmp.path().join("snapshot"));
+    drop(snapshot(&root, &dir));
+    let old = root.join("older");
+    let conn = Connection::open(dir.current()).unwrap();
+    conn.execute(
+        "INSERT INTO refreshes VALUES (?1,?2,?3)",
+        rusqlite::params![old.as_os_str().as_bytes(), 1_600_000_000_i64, 1_i64],
+    )
+    .unwrap();
+    drop(conn);
+    fs::copy(dir.current(), dir.prev()).unwrap();
+    let previous = fs::read(dir.prev()).unwrap();
+    let before = platform::now_secs();
+    for (target, generation) in [(&first, 2), (&second, 3), (&first, 4)] {
+        let result = run_refresh(RefreshRequest {
+            path: target.as_os_str().as_bytes().to_vec(),
+            workers: 1,
+            dir: dir.clone(),
+            on_progress: None,
+        })
+        .unwrap();
+        assert_eq!(result.generation, generation);
+    }
+    let after = platform::now_secs();
+    let current = Snapshot::open_current(&dir).unwrap();
+    assert_eq!(current.meta.generation, 4);
+    let history = rows(
+        &current.conn,
+        "SELECT path,scanned_at,generation FROM refreshes ORDER BY generation",
+    );
+    assert_eq!(history.len(), 4);
+    for (row, (path, generation)) in
+        history
+            .iter()
+            .zip([(&old, 1), (&first, 2), (&second, 3), (&first, 4)])
+    {
+        assert_eq!(row[0], Value::Blob(path.as_os_str().as_bytes().to_vec()));
+        assert_eq!(row[2], Value::Integer(generation));
+        let Value::Integer(timestamp) = &row[1] else {
+            panic!("invalid timestamp")
+        };
+        if generation == 1 {
+            assert_eq!(*timestamp, 1_600_000_000);
+        } else {
+            assert!((before..=after).contains(timestamp));
+        }
+    }
+    let status = crate::queries::status(&dir).unwrap();
+    assert_eq!(status.generation, Some(4));
+    assert_eq!(status.refreshed.len(), 4);
+    let repeated = status.refreshed.iter().find(|r| r.generation == 4).unwrap();
+    assert_eq!(repeated.path, first.to_string_lossy());
+    assert!(status.last_error.is_none());
+    let state = state::read(&dir).unwrap().unwrap();
+    assert_eq!(state.current_generation, Some(4));
+    assert!(state.last_error.is_none());
+    assert_eq!(fs::read(dir.prev()).unwrap(), previous);
 }
 
 #[test]
