@@ -7,7 +7,8 @@ from pathlib import Path
 import re
 import statistics
 
-PROTOCOL = 'v1-single-operation-pairs-v3'
+LEGACY_PROTOCOL = 'v1-single-operation-pairs-v3'
+PROTOCOL = 'v1-single-operation-pairs-v4'
 SCOPE = 'single CLI and sampler; observer excluded'
 ARMS = ('baseline-v1', 'candidate-v1')
 HEX = re.compile(r'^[0-9a-f]{64}$')
@@ -63,6 +64,29 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
     root = Path(root)
     issues, pairs = [], []
     manifest = read_json(root / 'manifest.json', issues)
+    protocol = manifest.get('measurement_protocol')
+    if protocol == PROTOCOL:
+        if (manifest.get('subtree_entries') not in (100, 10000, 100000)
+                or type(manifest.get('subtree_entries')) is not int
+                or manifest.get('memory_mib') not in (512, 1024, 2048, 4096)
+                or type(manifest.get('memory_mib')) is not int
+                or manifest.get('case_policy') != 'qualification-v1'
+                or manifest.get('setup_memory_mib') != 4096 or manifest.get('observer_memory_mib') != 4096
+                or manifest.get('scenario') not in ('unchanged', 'changed')
+                or (manifest.get('scenario') == 'changed' and manifest.get('operation') != 'refresh')
+                or not isinstance(manifest.get('fixture_receipt'), dict)
+                or type(manifest['fixture_receipt'].get('expected_subtree_entries')) is not int
+                or manifest['fixture_receipt'].get('expected_subtree_entries') != manifest.get('subtree_entries')
+                or (manifest.get('scenario') == 'unchanged' and manifest.get('mutation_receipt', 'missing') is not None)
+                or (manifest.get('scenario') == 'changed' and (not isinstance(manifest.get('mutation_receipt'), dict)
+                    or manifest['mutation_receipt'].get('recipe') != 'rename-size-mtime'
+                    or any(not integer(manifest['mutation_receipt'].get(k), True) for k in
+                           ('renamed_inode', 'changed_size', 'changed_mtime', 'target_mtime'))))):
+            issues.append('invalid qualification case fields')
+    elif protocol == LEGACY_PROTOCOL and any(k in manifest for k in ('case_policy', 'subtree_entries', 'memory_mib', 'setup_memory_mib', 'observer_memory_mib', 'mutation_receipt')):
+        issues.append('v4 case fields are not valid in legacy protocol')
+    elif protocol != LEGACY_PROTOCOL:
+        issues.append('manifest: incorrect measurement protocol')
     status = read_json(root / 'status.json', issues)
     admission = read_json(root / 'capacity-admission.json', issues)
     if require_runner_cleanup:
@@ -79,8 +103,6 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
     receipt = manifest.get('fixture_receipt')
     expected = receipt.get('expected_entries') if isinstance(receipt, dict) else None
     provenance = manifest.get('provenance')
-    if manifest.get('measurement_protocol') != PROTOCOL:
-        issues.append('manifest: incorrect measurement protocol')
     if not integer(count, True) or not integer(files, True) or operation not in ('scan', 'refresh') or not integer(expected):
         issues.append('manifest: invalid pair count, files, operation or fixture receipt')
     if (not isinstance(ids, list) or not ids or any(not isinstance(x, str) or not ID.fullmatch(x) for x in ids)
@@ -126,6 +148,10 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
                       and spec.get('files') == files and integer(spec.get('memory_mib'), True)
                       and spec.get('expected_entries') == expected
                       and (operation != 'refresh' or integer(spec.get('expected_subtree_entries')))
+                      and ('subtree_entries' not in manifest or spec.get('expected_subtree_entries') == manifest['subtree_entries'])
+                      and ('memory_mib' not in manifest or spec.get('memory_mib') == manifest['memory_mib'])
+                      and (protocol != PROTOCOL or (spec.get('scenario') == manifest.get('scenario')
+                           and spec.get('observer_memory_mib') == 4096))
                       and spec.get('binary_sha256') == p.get('sha256')
                       and spec.get('source_revision') == p.get('source_revision')
                       and (digest(spec.get('seed_sha256')) or (operation == 'scan' and spec.get('seed_sha256') == 'empty')))
@@ -167,6 +193,10 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
                 and 'previous_entries' in obs and obs.get('errors') == {} and obs.get('seed_sha256') == spec.get('seed_sha256')
                 and number(resources.get('elapsed_seconds'), True) and cgroup_ok(resources.get('cgroup'))):
             issues.append(f'{ident}: invalid observer')
+        if protocol == PROTOCOL and (not isinstance(resources.get('cgroup'), dict)
+                or resources['cgroup'].get('memory.max') != str(4096 * 1024 * 1024)
+                or resources['cgroup'].get('memory.swap.max') != '0'):
+            issues.append(f'{ident}: invalid observer limit')
         if flush.get('success') is not True or not state_ok(writer) or not state_ok(observer_state):
             issues.append(f'{ident}: cache flush or container state failed')
         if valid_spec:
@@ -207,14 +237,17 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
                  and digest(provenance[ARMS[0]].get('sha256'))
                  and provenance[ARMS[0]].get('sha256') == provenance[ARMS[1]].get('sha256'))
     return {'valid': not issues, 'issues': issues, 'pairs': pairs, 'summary': summary,
-            'identical_binaries': bool(identical), 'measurement_protocol': PROTOCOL}
+            'identical_binaries': bool(identical), 'measurement_protocol': protocol if protocol in (PROTOCOL, LEGACY_PROTOCOL) else 'invalid',
+            'case': {k: manifest.get(k) for k in ('case_policy', 'scenario', 'subtree_entries', 'memory_mib', 'setup_memory_mib', 'observer_memory_mib', 'mutation_receipt')} if protocol == PROTOCOL else None}
 
 
 def markdown(result):
-    lines = [f'# {PROTOCOL}', '', 'Descriptive paired results; no automatic promotion or uncertainty estimate.',
+    lines = [f"# {result.get('measurement_protocol')}", '', 'Descriptive paired results; no automatic promotion or uncertainty estimate.',
              'Application disk peak is sampled; RSS excludes the observer.', '',
              '| Pair | Elapsed baseline → candidate (s) | RSS baseline → candidate (MiB) | App disk baseline → candidate (GiB) |',
              '|---:|---:|---:|---:|']
+    if result.get('case') is not None:
+        lines[1:1] = ['', 'Case: ' + json.dumps(result['case'], sort_keys=True), '']
     for row in result['pairs']:
         def fmt(key, scale):
             x = row[key]

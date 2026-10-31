@@ -1,6 +1,12 @@
 """Admission calculations do not touch disks or start benchmarks."""
 import importlib.util
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import textwrap
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -12,6 +18,39 @@ SPEC.loader.exec_module(ADMISSION)
 
 
 class CapacityTests(unittest.TestCase):
+    def test_baseline_epoch_resolves_commit_without_shell_interpolation(self):
+        commit = 'a' * 40
+        with patch.object(ADMISSION.subprocess, 'check_output', side_effect=[commit + '\n', '1700000000\n']) as call:
+            self.assertEqual(ADMISSION.baseline_epoch('--odd;$(ignored)'), (commit, 1700000000))
+        self.assertEqual(call.call_args_list[0].args[0], ['git', 'rev-parse', '--verify', '--end-of-options', '--odd;$(ignored)^{commit}'])
+        self.assertEqual(call.call_args_list[1].args[0], ['git', 'show', '-s', '--format=%ct', commit])
+        with patch.object(ADMISSION.subprocess, 'check_output', return_value='not-a-commit\n'), self.assertRaises(ValueError):
+            ADMISSION.baseline_epoch('invalid')
+        with patch.object(ADMISSION.subprocess, 'check_output', side_effect=[commit, '-1']), self.assertRaises(ValueError):
+            ADMISSION.baseline_epoch('invalid-time')
+
+    def test_stage_and_forecast_case_identity(self):
+        self.assertEqual(ADMISSION.stage_files('screen'), 1000000)
+        case = ADMISSION.forecast_case_id('x86_64-unknown-linux-musl', 'local', ['refresh'], '10000', 'changed', '512')
+        self.assertEqual(case, 'x86_64-unknown-linux-musl|local|refresh|10000|changed|512')
+        self.assertNotEqual(case, ADMISSION.forecast_case_id('x86_64-unknown-linux-musl', 'local', ['refresh'], '10000', 'changed', '1024'))
+        with self.assertRaises(ValueError):
+            ADMISSION.forecast_case_id('x86_64-unknown-linux-musl', 'other', ['refresh'], '10000', 'changed', '512')
+
+    def test_qualification_case_whitelist(self):
+        for size in ('100', '10000', '100000'):
+            for memory in ('512', '1024', '2048', '4096'):
+                for scenario in ('unchanged', 'changed'):
+                    case = ADMISSION.qualification_case(size, scenario, memory, ['refresh'], 100000)
+                    self.assertEqual(case['subtree_entries'], int(size))
+                    self.assertEqual(case['memory_mib'], int(memory))
+        for args in (('101', 'unchanged', '4096', ['refresh'], 100000),
+                     ('100', 'changed', '4096', ['scan', 'refresh'], 100000),
+                     ('100', 'unchanged', '256', ['refresh'], 100000),
+                     ('100000', 'unchanged', '4096', ['refresh'], 1000)):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                ADMISSION.qualification_case(*args)
+
     def test_components_cover_concurrent_snapshots_and_seed(self):
         plan = ADMISSION.estimate_capacity(7_000_000, 7_007_020, seed_bytes=12345)
         parts = plan["components"]
@@ -48,6 +87,40 @@ class CapacityTests(unittest.TestCase):
 
 
 class TimeTests(unittest.TestCase):
+    def test_workflow_forecast_always_writes_strict_rejection_receipt(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / '.github/workflows/representative-bench.yml').read_text()
+        step = workflow.split('name: Check time admission before local-scale allocation', 1)[1]
+        code = textwrap.dedent(step.split("python3 - <<'PY'\n", 1)[1].split('\n          PY', 1)[0])
+        case = 'x86_64-unknown-linux-musl|local|refresh|100|unchanged|4096'
+        base = dict(FORECAST='100', STEP_CAP='3', TARGET='x86_64-unknown-linux-musl', IO='local',
+                    OPERATIONS='refresh', SUBTREE='100', SCENARIO='unchanged', MEMORY='4096', FORECAST_CASE=case)
+        for forecast, expected in (('100', True), ('', False), ('abc', False), ('nan', False),
+                                   ('inf', False), ('1.7e308', False), ('0', False)):
+            with self.subTest(forecast=forecast), tempfile.TemporaryDirectory() as tmp:
+                Path(tmp, 'scripts').symlink_to(root / 'scripts', target_is_directory=True)
+                env = dict(os.environ, **base)
+                env['FORECAST'] = forecast
+                run = subprocess.run([sys.executable, '-c', code], cwd=tmp, env=env, capture_output=True, text=True)
+                text = Path(tmp, 'representative-results/forecast-admission.json').read_text()
+                receipt = json.loads(text, parse_constant=lambda s: self.fail('non-standard JSON: ' + s))
+                self.assertEqual(receipt['success'], expected, run.stderr)
+                self.assertEqual(run.returncode == 0, expected, run.stderr)
+                if not expected:
+                    self.assertTrue(receipt.get('error'))
+                if forecast in ('', 'abc', 'nan', 'inf'):
+                    self.assertIsNone(receipt['estimated_seconds'])
+        for override in ({'FORECAST_CASE': 'wrong'}, {'SUBTREE': 'invalid'}, {'STEP_CAP': 'bad'}):
+            with self.subTest(override=override), tempfile.TemporaryDirectory() as tmp:
+                Path(tmp, 'scripts').symlink_to(root / 'scripts', target_is_directory=True)
+                env = dict(os.environ, **base)
+                env.update(override)
+                run = subprocess.run([sys.executable, '-c', code], cwd=tmp, env=env, capture_output=True, text=True)
+                receipt = json.loads(Path(tmp, 'representative-results/forecast-admission.json').read_text())
+                self.assertNotEqual(run.returncode, 0)
+                self.assertFalse(receipt['success'])
+                self.assertTrue(receipt.get('error'))
+
     def test_benchmark_target(self):
         for target in ("x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"):
             with self.subTest(target=target):

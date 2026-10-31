@@ -26,7 +26,8 @@ def arguments(argv):
     parser.add_argument("--pairs", type=int, default=1)
     parser.add_argument("--operation", choices=("scan", "refresh"), default="scan")
     parser.add_argument("--scenario", choices=("unchanged", "changed"), default="unchanged")
-    parser.add_argument("--memory", type=int, choices=(128, 256, 512, 1024, 2048, 4096), default=4096)
+    parser.add_argument("--subtree-entries", type=int, choices=(100, 10000, 100000), default=100)
+    parser.add_argument("--memory", type=int, choices=(512, 1024, 2048, 4096), default=4096)
     parser.add_argument("--timeout-seconds", type=int, default=1200)
     parser.add_argument("--io-device")
     for flag in ("read-bps", "write-bps", "read-iops", "write-iops"):
@@ -39,6 +40,8 @@ def arguments(argv):
         parser.error("positive I/O limits require --io-device")
     if args.scenario == "changed" and args.operation != "refresh":
         parser.error("changed scenario is refresh-only")
+    if args.subtree_entries > args.files:
+        parser.error("subtree entries cannot exceed requested files")
     return args
 
 
@@ -95,7 +98,7 @@ def host(args):
         if not admission["success"]:
             raise RuntimeError("insufficient fixture/snapshot bytes or inodes")
         fixture_started = time.monotonic()
-        fixture = prepare(scratch / "fixture" / "tree", args.files)
+        fixture = prepare(scratch / "fixture" / "tree", args.files, args.subtree_entries)
         fixture["setup_seconds"] = time.monotonic() - fixture_started
         tree = scratch / "fixture" / "tree"
         io_limits = {key: getattr(args, flag) for flag, key in (("read_bps", "rbps"), ("write_bps", "wbps"),
@@ -107,8 +110,9 @@ def host(args):
             if device_number != f"{os.major(scratch.stat().st_dev)}:{os.minor(scratch.stat().st_dev)}":
                 raise ValueError("I/O device does not directly back scratch")
         common = dict(backend="v1", single_operation=True, files=args.files,
-                      expected_entries=fixture["expected_entries"], expected_subtree_entries=100,
-                      memory_mib=args.memory, workers=1, cpus=2, keep_previous=True,
+                      expected_entries=fixture["expected_entries"], expected_subtree_entries=fixture["expected_subtree_entries"],
+                      memory_mib=args.memory, observer_memory_mib=4096, scenario=args.scenario,
+                      workers=1, cpus=2, keep_previous=True,
                       scan_profile="disk", timeout_seconds=args.timeout_seconds,
                       io_limits=io_limits, io_device=args.io_device, io_device_number=device_number,
                       minimum_free_bytes=2**31)
@@ -120,7 +124,7 @@ def host(args):
         # measured operation. Their resources/time are setup receipts, not results.
         for ordinal in (1, 2):
             ident = f"seed-{ordinal}"
-            spec = dict(common, id=ident, operation="scan", target="/scratch/tree", allocation_diagnostics=False,
+            spec = dict(common, id=ident, operation="scan", target="/scratch/tree", allocation_diagnostics=False, memory_mib=4096,
                         initial_snapshot_allocated_bytes=helper.occupancy(seed / "snapshot")["total"]["allocated_bytes"])
             (setup_output / ident).mkdir()
             spec_path = setup_output / (ident + ".json")
@@ -132,11 +136,12 @@ def host(args):
         seed_digest = seed_hash(seed / "snapshot")
         cutoff = seed_timestamp(seed / "snapshot")
         time.sleep(max(0, cutoff + 1.01 - time.time()))
-        if args.scenario == "changed":
-            mutate(tree)
+        mutation = mutate(tree) if args.scenario == "changed" else None
         expected_ids = [f"p{pair}-{arm}" for pair in range(1, args.pairs + 1) for arm in binaries]
         manifest = dict(measurement_protocol=PROTOCOL, pairs=args.pairs, files=args.files,
                         operation=args.operation, scenario=args.scenario, fixture_receipt=fixture,
+                        case_policy="qualification-v1", subtree_entries=fixture["expected_subtree_entries"], memory_mib=args.memory,
+                        setup_memory_mib=4096, observer_memory_mib=4096, mutation_receipt=mutation,
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,
                         sample_interval_seconds=0.02, cache_policy="cold after seed copy, before single CLI",
                         observer_policy="separate no-swap container, read-only snapshot, full-file integrity and semantic digest",

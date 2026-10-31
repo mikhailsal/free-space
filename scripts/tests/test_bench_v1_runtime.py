@@ -14,6 +14,59 @@ from bench_v1_pair import arguments, host, seed_timestamp
 
 
 class OracleTests(unittest.TestCase):
+    def test_shell_argv_dispatch_and_memory_modes(self):
+        import runpy
+        from types import ModuleType
+        from unittest.mock import patch, Mock
+        from bench_v1_runtime import container_memory
+        spec = {'memory_mib': 512, 'observer_memory_mib': 4096}
+        self.assertEqual(container_memory(spec, 'worker'), 512)
+        self.assertEqual(container_memory(spec, 'observer'), 4096)
+        fake = ModuleType('bench_v1_pair')
+        fake.main = Mock(return_value=0)
+        argv = ['bench-v2-container.py', '--v1-pairs', '--subtree-entries', '10000', '--memory', '512']
+        with patch.dict(sys.modules, {'bench_v1_pair': fake}), patch.object(sys, 'argv', argv):
+            with self.assertRaises(SystemExit) as exit_status:
+                runpy.run_path(str(Path(__file__).resolve().parents[1] / 'bench-v2-container.py'), run_name='__main__')
+        self.assertEqual(exit_status.exception.code, 0)
+        fake.main.assert_called_once_with(argv[2:])
+    def test_qualification_fixture_counts_and_shared_mutation(self):
+        from unittest.mock import patch
+        from bench_v1_fixture import prepare, mutate, STAMP
+        for files, subtree in ((100, 100), (1000, 7)):
+            with self.subTest(files=files, subtree=subtree), tempfile.TemporaryDirectory() as tmp:
+                tree = Path(tmp) / 'tree'
+                with patch('bench_v1_fixture.os.sync'):
+                    receipt = prepare(tree, files, subtree)
+                    count = lambda: sum(1 + len(names) for _, _, names in os.walk(tree))
+                    self.assertEqual(count(), receipt['expected_entries'])
+                    self.assertEqual(receipt['distribution']['small_files'] + receipt['distribution']['outer_files'], files)
+                    self.assertEqual(receipt['shape'] == 'mixed-parameterized-subtree-v1', subtree != 100)
+                    self.assertEqual(len(list((tree / 'small').iterdir())) + 1, subtree)
+                    original = (tree / 'small' / 'f00000').stat().st_ino
+                    unchanged_ids = {p.name: p.stat().st_ino for p in (tree / 'small').iterdir()}
+                    mutation = mutate(tree)
+                    self.assertEqual(mutation['recipe'], 'rename-size-mtime')
+                    self.assertEqual(mutation['renamed_inode'], original)
+                    self.assertEqual(count(), receipt['expected_entries'])
+                    self.assertEqual((tree / 'small' / 'renamed').stat().st_ino, original)
+                    self.assertEqual((tree / 'small' / 'f00001').stat().st_mtime, STAMP + 60)
+                    changed_ids = {p.name: p.stat().st_ino for p in (tree / 'small').iterdir()}
+                    self.assertEqual(changed_ids, {('renamed' if k == 'f00000' else k): v
+                                                   for k, v in unchanged_ids.items()})
+
+    def test_qualification_argument_choices_and_defaults(self):
+        import contextlib
+        import io
+        base = ['--baseline', '/missing', '--candidate', '/missing', '--output', '/unused']
+        defaults = arguments(base)
+        self.assertEqual((defaults.subtree_entries, defaults.scenario, defaults.memory), (100, 'unchanged', 4096))
+        for value in ('100', '10000', '100000'):
+            self.assertEqual(arguments(base + ['--files', '100000', '--subtree-entries', value]).subtree_entries, int(value))
+        for extra in (['--subtree-entries', '101'], ['--subtree-entries', '10000', '--files', '100'], ['--memory', '128'], ['--memory', '256']):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                arguments(base + extra)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

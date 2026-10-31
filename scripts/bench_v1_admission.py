@@ -7,8 +7,22 @@ filesystem overhead and SQLite growth must be checked against observations.
 """
 import math
 import os
+import re
+import subprocess
 
 GIB = 1024 ** 3
+
+
+def baseline_epoch(ref):
+    """Resolve one commit safely and derive the common reproducible build epoch."""
+    resolved = subprocess.check_output(
+        ['git', 'rev-parse', '--verify', '--end-of-options', ref + '^{commit}'], text=True).strip()
+    if not re.fullmatch(r'[0-9a-f]{40,64}', resolved):
+        raise ValueError('invalid resolved baseline commit')
+    stamp = subprocess.check_output(['git', 'show', '-s', '--format=%ct', resolved], text=True).strip()
+    if not stamp.isascii() or not stamp.isdecimal():
+        raise ValueError('invalid baseline commit timestamp')
+    return resolved, int(stamp)
 
 
 def _count(name, value):
@@ -99,6 +113,34 @@ def benchmark_target(requested) -> str:
             "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"):
         raise ValueError("unknown benchmark target")
     return requested
+
+
+def stage_files(stage):
+    sizes = {'smoke': 100000, 'screen': 1000000, 'local-scale': 7264383}
+    if stage not in sizes:
+        raise ValueError('unknown benchmark stage')
+    return sizes[stage]
+
+
+def forecast_case_id(target, io, operations, subtree, scenario, memory):
+    benchmark_target(target)
+    if io not in ('native', 'local', 'limited') or operations not in (['scan'], ['refresh'], ['scan', 'refresh']):
+        raise ValueError('invalid case I/O or operations')
+    qualification_case(subtree, scenario, memory, operations, 8000000)
+    return '|'.join((target, io, '+'.join(operations), subtree, scenario, memory))
+
+
+def qualification_case(subtree, scenario, memory, operations, files) -> dict:
+    """Validate one ordinary successful-operation case before allocation."""
+    if subtree not in ('100', '10000', '100000') or int(subtree) > files:
+        raise ValueError('invalid subtree size for stage')
+    if scenario not in ('unchanged', 'changed'):
+        raise ValueError('invalid scenario')
+    if memory not in ('512', '1024', '2048', '4096'):
+        raise ValueError('invalid ordinary memory budget')
+    if scenario == 'changed' and operations != ['refresh']:
+        raise ValueError('changed scenario requires refresh only')
+    return dict(subtree_entries=int(subtree), scenario=scenario, memory_mib=int(memory))
 
 
 def stage_operations(stage, requested='auto') -> list:

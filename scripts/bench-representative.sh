@@ -162,6 +162,7 @@ if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then
     --candidate binaries/candidate --output "$output/measurements" --files "${BENCH_FILES:?}" \
     --pairs "${BENCH_PAIRS:-1}" --operation "${BENCH_OPERATION:-scan}" \
     --scenario "${BENCH_SCENARIO:-unchanged}" --memory "${BENCH_MEMORY:-4096}" \
+    --subtree-entries "${BENCH_SUBTREE_ENTRIES:-100}" \
     --timeout-seconds "${BENCH_COMMAND_TIMEOUT:-1200}" "${extra[@]}" || measurement_status=$?
   if [[ -f $output/measurements/summary.md ]]; then
     cat "$output/measurements/summary.md" >> "$GITHUB_STEP_SUMMARY" || measurement_status=1

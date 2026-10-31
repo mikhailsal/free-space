@@ -17,7 +17,7 @@ def put(path, data):
 
 def fixture(root):
     sha = 'a' * 64
-    manifest = {'measurement_protocol': MODULE.PROTOCOL, 'expected_arms': ['one', 'two'], 'pairs': 1,
+    manifest = {'measurement_protocol': MODULE.LEGACY_PROTOCOL, 'expected_arms': ['one', 'two'], 'pairs': 1,
                 'files': 10, 'operation': 'refresh', 'fixture_receipt': {'expected_entries': 12},
                 'provenance': {arm: {'sha256': sha, 'source_revision': 'revision'} for arm in MODULE.ARMS}}
     put(root / 'manifest.json', manifest)
@@ -57,9 +57,56 @@ class SummaryTest(unittest.TestCase):
         obj[key] = value
         put(file, obj)
 
+    def test_qualification_case_rejects_missing_and_mismatched_bindings(self):
+        self.change('manifest.json', 'measurement_protocol', MODULE.PROTOCOL)
+        self.change('manifest.json', 'case_policy', 'qualification-v1')
+        self.change('manifest.json', 'scenario', 'unchanged')
+        self.change('manifest.json', 'setup_memory_mib', 4096)
+        self.change('manifest.json', 'observer_memory_mib', 4096)
+        self.change('manifest.json', 'mutation_receipt', None)
+        self.change('manifest.json', 'fixture_receipt', {'expected_entries': 12, 'expected_subtree_entries': 100})
+        for subtree, memory in ((None, 512), (100, None), (True, 512), (100, 256)):
+            self.change('manifest.json', 'subtree_entries', subtree)
+            self.change('manifest.json', 'memory_mib', memory)
+            self.assertFalse(MODULE.summarize(self.root)['valid'])
+        self.change('manifest.json', 'subtree_entries', 100)
+        self.change('manifest.json', 'memory_mib', 512)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])  # Both specs disagree.
+        for arm in ('one', 'two'):
+            self.change(f'{arm}/spec.json', 'expected_subtree_entries', 100)
+            self.change(f'{arm}/spec.json', 'memory_mib', 512)
+            self.change(f'{arm}/spec.json', 'observer_memory_mib', 4096)
+            self.change(f'{arm}/spec.json', 'scenario', 'unchanged')
+            self.change(f'{arm}/metrics.json', 'memory_mib', 512)
+            observer = json.loads((self.root / arm / 'observer.json').read_text())
+            observer['resources']['cgroup']['memory.max'] = str(4096 * 1024 * 1024)
+            put(self.root / arm / 'observer.json', observer)
+            metric = json.loads((self.root / arm / 'metrics.json').read_text())
+            metric['report']['subtree_entries'] = 100
+            metric['cgroup_after']['memory.max'] = str(512 * 1024 * 1024)
+            put(self.root / arm / 'metrics.json', metric)
+        self.assertTrue(MODULE.summarize(self.root)['valid'])
+        self.assertEqual(MODULE.summarize(self.root)['measurement_protocol'], MODULE.PROTOCOL)
+        observer = json.loads((self.root / 'one' / 'observer.json').read_text())
+        observer['resources']['cgroup']['memory.max'] = str(512 * 1024 * 1024)
+        put(self.root / 'one' / 'observer.json', observer)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        observer['resources']['cgroup']['memory.max'] = str(4096 * 1024 * 1024)
+        put(self.root / 'one' / 'observer.json', observer)
+        manifest = json.loads((self.root / 'manifest.json').read_text())
+        del manifest['case_policy']
+        put(self.root / 'manifest.json', manifest)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        self.change('manifest.json', 'case_policy', 'qualification-v1')
+        self.change('one/spec.json', 'expected_subtree_entries', 99)
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+        self.change('manifest.json', 'case_policy', 'unknown')
+        self.assertFalse(MODULE.summarize(self.root)['valid'])
+
     def test_valid_pair_and_cli(self):
         result = MODULE.summarize(self.root)
         self.assertTrue(result['valid'], result['issues'])
+        self.assertEqual(result['measurement_protocol'], MODULE.LEGACY_PROTOCOL)
         self.assertEqual(result['pairs'][0]['elapsed_seconds']['delta'], 1)
         self.assertEqual(result['summary']['elapsed_seconds']['max_abs_delta'], 1)
         self.assertTrue(result['identical_binaries'])

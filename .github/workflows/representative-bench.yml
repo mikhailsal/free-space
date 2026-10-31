@@ -27,6 +27,21 @@ on:
         type: choice
         options: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
         default: x86_64-unknown-linux-gnu
+      subtree_entries:
+        description: Refresh subtree entries including the directory
+        type: choice
+        options: ['100', '10000', '100000']
+        default: '100'
+      scenario:
+        description: Changed requires refresh-only operation
+        type: choice
+        options: [unchanged, changed]
+        default: unchanged
+      memory_mib:
+        description: Ordinary successful-operation memory limit (MiB)
+        type: choice
+        options: ['512', '1024', '2048', '4096']
+        default: '4096'
       io:
         description: Runner I/O sensitivity, not an exact local-disk replica
         type: choice
@@ -49,6 +64,10 @@ on:
         description: Required measured screening forecast for local-scale, including setup/observers
         type: string
         default: '0'
+      forecast_case_id:
+        description: Canonical case ID corresponding to the local-scale forecast
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -67,6 +86,10 @@ jobs:
       maximum_runner_minutes: ${{ steps.policy.outputs.maximum_runner_minutes }}
       operations: ${{ steps.policy.outputs.operations }}
       target: ${{ steps.policy.outputs.target }}
+      subtree_entries: ${{ steps.policy.outputs.subtree_entries }}
+      scenario: ${{ steps.policy.outputs.scenario }}
+      memory_mib: ${{ steps.policy.outputs.memory_mib }}
+      files: ${{ steps.policy.outputs.files }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,14 +102,25 @@ jobs:
           REQUESTED_MINUTES: ${{ inputs.timeout_minutes }}
           OPERATION: ${{ inputs.operation || 'auto' }}
           TARGET: ${{ inputs.target || 'x86_64-unknown-linux-gnu' }}
+          SUBTREE: ${{ inputs.subtree_entries || '100' }}
+          SCENARIO: ${{ inputs.scenario || 'unchanged' }}
+          MEMORY: ${{ inputs.memory_mib || '4096' }}
+          BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
         run: |
           python3 - <<'PY'
           import os,sys
           sys.path.insert(0,'scripts')
-          from bench_v1_admission import benchmark_target,stage_operations,stage_timeouts
+          from bench_v1_admission import baseline_epoch,benchmark_target,qualification_case,stage_files,stage_operations,stage_timeouts
           policy=stage_timeouts(os.environ['STAGE'],os.environ.get('REQUESTED_MINUTES'))
-          policy['operations']=' '.join(stage_operations(os.environ['STAGE'],os.environ['OPERATION']))
+          operations=stage_operations(os.environ['STAGE'],os.environ['OPERATION'])
+          files=stage_files(os.environ['STAGE'])
+          policy['files']=files
+          policy.update(qualification_case(os.environ['SUBTREE'],os.environ['SCENARIO'],os.environ['MEMORY'],operations,files))
+          policy['operations']=' '.join(operations)
           policy['target']=benchmark_target(os.environ['TARGET'])
+          policy['baseline_revision'],policy['source_date_epoch']=baseline_epoch(os.environ['BASE_REF'])
+          with open(os.environ['GITHUB_ENV'],'a') as stream:
+              stream.write(f"SOURCE_DATE_EPOCH={policy['source_date_epoch']}\n")
           with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
               stream.write(''.join(f'{key}={value}\n' for key,value in policy.items()))
           print(policy)
@@ -105,7 +139,7 @@ jobs:
           bun-version: 1.4.2
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ steps.policy.outputs.target }}
+          key: ${{ steps.policy.outputs.target }}-${{ steps.policy.outputs.source_date_epoch }}
       - name: Check benchmark contracts and repository gates
         env:
           BENCH_TARGET: ${{ steps.policy.outputs.target }}
@@ -118,7 +152,7 @@ jobs:
           cargo test --workspace --locked --target "$BENCH_TARGET"
       - name: Build both arms with one recorded toolchain
         env:
-          BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
+          BASE_REF: ${{ steps.policy.outputs.baseline_revision }}
           COMPARISON: ${{ inputs.comparison || 'control' }}
           RUSTUP_TOOLCHAIN: 1.99.1
           BENCH_TARGET: ${{ steps.policy.outputs.target }}
@@ -153,7 +187,7 @@ jobs:
               record={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
                       'source_revision':p.with_name(arm+'.revision.txt').read_text().strip(),
                       'compiler':compiler,'compiler_host':host,'target':target,'profile':'release --locked',
-                      'flags':{k:os.environ.get(k,'') for k in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')},
+                      'flags':{k:os.environ.get(k,'') for k in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','SOURCE_DATE_EPOCH')},
                       'release_profile':release,'cargo_config':config,
                       'bun':subprocess.check_output(['bun','--version'],text=True).strip()}
               p.with_name(arm+'.build.json').write_text(json.dumps(record,indent=2)+'\n')
@@ -182,15 +216,37 @@ jobs:
           FORECAST: ${{ inputs.forecast_seconds }}
           STEP_CAP: ${{ needs.build.outputs.paired_step_minutes }}
           OPERATIONS: ${{ needs.build.outputs.operations }}
+          TARGET: ${{ needs.build.outputs.target }}
+          IO: ${{ inputs.io || 'native' }}
+          SUBTREE: ${{ needs.build.outputs.subtree_entries }}
+          SCENARIO: ${{ needs.build.outputs.scenario }}
+          MEMORY: ${{ needs.build.outputs.memory_mib }}
+          FORECAST_CASE: ${{ inputs.forecast_case_id }}
         run: |
           python3 - <<'PY'
-          import os,sys
+          import json,math,os,sys
           sys.path.insert(0,'scripts')
-          from bench_v1_admission import admit_time
-          receipt=admit_time(int(os.environ['STEP_CAP'])*60,float(os.environ['FORECAST']))
-          receipt['operations']=os.environ['OPERATIONS']
+          from bench_v1_admission import admit_time,forecast_case_id
+          receipt={'success':False,'estimated_seconds':None,'case_id':None,'case_matches':False,
+                   'forecast_case_id':os.environ.get('FORECAST_CASE',''),
+                   'case':{k:os.environ.get(k) for k in ('TARGET','IO','OPERATIONS','SUBTREE','SCENARIO','MEMORY')}}
+          try:
+              forecast=float(os.environ['FORECAST'])
+              if not math.isfinite(forecast): raise ValueError('forecast must be finite')
+              receipt.update(admit_time(int(os.environ['STEP_CAP'])*60,forecast))
+              case=forecast_case_id(os.environ['TARGET'],os.environ['IO'],os.environ['OPERATIONS'].split(),os.environ['SUBTREE'],os.environ['SCENARIO'],os.environ['MEMORY'])
+              receipt.update(case_id=case,case_matches=case==receipt['forecast_case_id'])
+              if not receipt['case_matches']:
+                  receipt.update(success=False,error='forecast case does not match')
+          except (KeyError,ValueError,OverflowError) as error:
+              receipt.update(success=False,error=str(error))
+          for key,value in list(receipt.items()):
+              if isinstance(value,float) and not math.isfinite(value):
+                  receipt.update({key:None,'success':False,'error':'non-finite admission value'})
+          os.makedirs('representative-results',exist_ok=True)
+          with open('representative-results/forecast-admission.json','w') as out: json.dump(receipt,out,indent=2,allow_nan=False)
           print(receipt)
-          if not receipt['success']: raise SystemExit('No admissible screening forecast')
+          if not receipt['success'] or not receipt['case_matches']: raise SystemExit('No admissible case-matched screening forecast')
           PY
       - name: Paired v1 commands with isolated observers
         timeout-minutes: ${{ fromJSON(needs.build.outputs.paired_step_minutes) }}
@@ -200,6 +256,10 @@ jobs:
           STAGE: ${{ inputs.stage || 'smoke' }}
           OPERATIONS: ${{ needs.build.outputs.operations }}
           BENCH_TARGET: ${{ needs.build.outputs.target }}
+          BENCH_SUBTREE_ENTRIES: ${{ needs.build.outputs.subtree_entries }}
+          BENCH_SCENARIO: ${{ needs.build.outputs.scenario }}
+          BENCH_MEMORY: ${{ needs.build.outputs.memory_mib }}
+          BENCH_FILES: ${{ needs.build.outputs.files }}
         run: |
           set -euo pipefail
           case "$OPERATIONS" in
@@ -207,9 +267,9 @@ jobs:
             *) echo 'Invalid benchmark operations' >&2; exit 1 ;;
           esac
           case $STAGE in
-            smoke) export BENCH_FILES=100000 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=600 ;;
-            screen) export BENCH_FILES=1000000 BENCH_PAIRS=3 BENCH_COMMAND_TIMEOUT=1200 ;;
-            local-scale) export BENCH_FILES=7264383 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=1800 ;;
+            smoke) export BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=600 ;;
+            screen) export BENCH_PAIRS=3 BENCH_COMMAND_TIMEOUT=1200 ;;
+            local-scale) export BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=1800 ;;
           esac
           for operation in $OPERATIONS; do
             BENCH_OPERATION=$operation BENCH_OUTPUT="$PWD/representative-results/$operation" \

@@ -168,14 +168,19 @@ def inside(mode, spec_path):
     return 0 if result["validated"] else 1
 
 
+def container_memory(spec, mode):
+    return spec.get("observer_memory_mib", spec["memory_mib"]) if mode == "observer" else spec["memory_mib"]
+
+
 def container(image, binary, case, tree, output, spec_path, spec, mode, label):
     """One fresh cgroup; bind mounts keep fixture and observed snapshots read-only."""
     helper = legacy()
     name = "fs-v1-pair-" + uuid.uuid4().hex
     readonly = ",readonly" if mode == "observer" else ""
+    memory = container_memory(spec, mode)
     command = ["docker", "run", "--name", name, "--label", label, "--hostname", "freespace-benchmark",
-               "--network", "none", "--cpus", str(spec["cpus"]), "--memory", f'{spec["memory_mib"]}m',
-               "--memory-swap", f'{spec["memory_mib"]}m', "--cgroupns", "private", "--pids-limit", "128",
+               "--network", "none", "--cpus", str(spec["cpus"]), "--memory", f'{memory}m',
+               "--memory-swap", f'{memory}m', "--cgroupns", "private", "--pids-limit", "128",
                "--user", f"{os.getuid()}:{os.getgid()}", "--entrypoint", "python3",
                "--mount", f"type=bind,src={case},dst=/scratch{readonly}",
                "--mount", f"type=bind,src={tree},dst=/scratch/tree,readonly",
