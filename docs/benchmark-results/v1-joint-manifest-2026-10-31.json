@@ -32,10 +32,14 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 2400,
-      "status": "admitted_not_dispatched",
+      "status": "in_progress",
       "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
-      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization",
-      "runner_preparation_policy": "sdk-space-v1"
+      "purpose": "joint-matched-control-screen",
+      "runner_preparation_policy": "sdk-space-v1",
+      "run_id": 41237970872,
+      "created_at": "2026-10-31T20:14:29Z",
+      "head_sha_verified": true,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -65,10 +69,14 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5400,
       "forecast_seconds": 2400,
-      "status": "admitted_not_dispatched",
+      "status": "in_progress",
       "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
-      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization",
-      "runner_preparation_policy": "sdk-space-v1"
+      "purpose": "joint-candidate-screen",
+      "runner_preparation_policy": "sdk-space-v1",
+      "run_id": 41237971343,
+      "created_at": "2026-10-31T20:14:29Z",
+      "head_sha_verified": true,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -100,7 +108,8 @@
       "status": "conditional_screen_and_memory_priority",
       "depends_on": "Valid matched controls and joint screen with useful gain and no confirmed regression. Prioritize the accepted full-scan memory ladder before more full-scale work. Freeze the matching whole-step forecast plus 30% margin within 7200 seconds and recheck aggregate admission before dispatch. One pair is exploratory only.",
       "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification",
-      "runner_preparation_policy": "sdk-space-v1"
+      "runner_preparation_policy": "sdk-space-v1",
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -132,7 +141,8 @@
       "status": "conditional_screen_and_memory_priority",
       "depends_on": "Valid matched controls and joint screen with useful gain and no confirmed regression. Prioritize the accepted full-scan memory ladder before more full-scale work. Freeze the matching whole-step forecast plus 30% margin within 7200 seconds and recheck aggregate admission before dispatch. One pair is exploratory only.",
       "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification",
-      "runner_preparation_policy": "sdk-space-v1"
+      "runner_preparation_policy": "sdk-space-v1",
+      "scan_profile": "disk"
     }
   ],
   "maximum_runner_seconds": 29400,
@@ -146,5 +156,12 @@
   ],
   "previous_source_revision": "2599947cae2c074234bd570955e3dfe565388c79",
   "integration_source_review": "v1-joint-source-reviews-2026-10-31.json",
-  "updated_at": "2026-10-31T20:08:26.122633+00:00"
+  "updated_at": "2026-10-31T20:08:26.122633+00:00",
+  "scan_mode_scope": {
+    "scan_profile": "disk",
+    "low_memory": true,
+    "worker_argument": "--low-memory",
+    "ordinary_in_memory_mode": "Not covered by these measurements",
+    "basis": "Explicit existing worker arguments at frozen source, documented without changing any running case"
+  }
 }

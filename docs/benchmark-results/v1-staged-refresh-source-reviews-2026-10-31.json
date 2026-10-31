@@ -1,0 +1,430 @@
+{
+  "created_at": "2026-10-31T20:29:53.907078+00:00",
+  "source_revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+  "engine_commit": "a5e7ba700532ac2f53a9a5e0bbce0dc86172968e",
+  "source_hashes": {
+    "core/src/refresh.rs": "6f3dfa2e07cf277ca720957a0fbea23fc75e8eabd8613e43bdae949e3b836e3f",
+    "core/src/refresh/load.rs": "1845d384c52c35b238de5bb08821b4574374d7941f48b229366a1a67350b5201",
+    "core/src/refresh/precheck.rs": "e141927791a1dda141c75750c89af59d86dc17f9376f581aaa9be84c66b22e6e",
+    "core/src/refresh/staged.rs": "9956342e7279f3823b9fd580f7affd7bdaaea748a071c829024471eaf8e54705",
+    "core/src/refresh/staged/tests.rs": "554950eb9e2f93b12645b01aa9d77c517eaf079ca1f328b8fe0dc11d37ef988d",
+    "core/src/scan/denied.rs": "709bef2292dc680df6dbfd89ff3a6cc826fd4557e079d97071c64539ddc9252b",
+    "core/src/scan/staged.rs": "b86fcbb146cc742012961aea3522d894e8ddb22b5a57dc4b748f96d8f0d8edff",
+    "core/src/scan/staged/refresh.rs": "84537ffbd23edf31090ad658fc3e39f8b6fa27dbd238eb39f51fe61ba7626a11",
+    "core/src/scan/staged/refresh/policy.rs": "c2f47dd3440951a3a7c0102c3fc5614764e18981fd3aa534e47c1df08cf18e0b",
+    "core/src/scan/staged/refresh/policy/tests.rs": "156d3a72c0a9c74a6c5af8a204c9cfb89ccef6cd547d62946584ff5f18c39dcc",
+    "core/src/scan/staged/refresh_ingest.rs": "119f240f99cb2b51b75371a62d86cfb82dff33019d73577b331197817b10234d",
+    "core/src/scan/staged/refresh_ingest/tests.rs": "6f1c84022668f81caff95d6c874e578292ddaeedcb1d3dfa9b7457d88a14e130",
+    "core/src/scan/staged/visit/tests.rs": "dca5b000f46490419d598bc467ddb78240ebcb3f10e3d1937a3999464c56ee43",
+    "core/src/scan/staged/write.rs": "bba18fbc478a985342ad4e9ecf1a2cce85f70984f04ed9c9c60478fc1ddcd891",
+    "scripts/bench_v1_pair.py": "552560c82a0e0f43828142dbb1f50ec07b777f8539f76ef6b84f587f537c9f39",
+    "scripts/tests/test_bench_v1_stage_space.py": "01a85356383f8ba9f6f5666bc1e7de989b448d77cf08fc1c64bc3486661d7ab1"
+  },
+  "integrated_runner_hashes": {
+    ".github/workflows/representative-bench.yml": "a22259f1adfbb0e4f72e3c7e2d56eb7396e3d772d3add44ddadb8e97fca7044d",
+    "scripts/bench-representative.sh": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+    "scripts/bench_v1_admission.py": "a9841c7ec8f15e75dd5fe454a2837fb6bd385f42e2ad38833d66d83be4de0d64",
+    "scripts/bench_v1_pair.py": "552560c82a0e0f43828142dbb1f50ec07b777f8539f76ef6b84f587f537c9f39",
+    "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+    "scripts/bench_v1_summary.py": "2ad0a6de273ee28d89df9364db35a3481f0a4878783667f21add8ddb7c70e153",
+    "scripts/tests/test_bench_v1_admission.py": "bc0c3668ab997cd259ac352d2b5859d1426b51ffa4c2b65ccdaed0d926ba9be2",
+    "scripts/tests/test_bench_v1_runner_prepare.py": "6edc0654184977c7072b0a37934d3cbfa5035f2de9e66fef86fd99fe2aab2759",
+    "scripts/tests/test_bench_v1_runtime.py": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
+    "scripts/tests/test_bench_v1_summary.py": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838"
+  },
+  "review_chain": [
+    {
+      "file": "freespace-w5-staged-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "## Review findings\n\nNo P0 or P1 issues found. Nothing was compiled or run. Line numbers are counted from the supplied text.\n\n**[P2] `core/src/refresh/staged.rs:35-46` and `core/src/scan/staged/refresh.rs:18-19`: the space precheck runs only after the full staging copy exists**\n- **Trigger:** any refresh on a filesystem with little free space.\n- **What happens:** `StagedTree::refresh` builds the whole stage before `precheck(&req.dir, stage.len())` runs. The stage holds `old_raw`, `raw` with `raw_children(parent,name,id)` (which repeats every name), `old_link`, `links`, `old_map`, `live` and `winners`. That is roughly two to three times the snapshot's row volume.\n- **Why it matters:** the only guard during staging is `SpaceGuard` at `RESERVE_BYTES`, checked every 1024 ticks. A refresh can push the disk down to the 512 MB reserve before it fails, and the failure comes late.\n- **Comparison:** a low-memory scan prechecks before staging, with factor 3 or 4. The oracle needed no staging space at all.\n- **Fix:** add a precheck before `StagedTree::refresh` that covers staging plus output.\n- **Data safety:** the snapshot stays safe. The stage is removed on drop.\n\n**[P2] `core/src/scan/staged/refresh.rs:152` and `:180`: likely `clippy::nonminimal_bool` failure under `-D warnings`**\n- **Trigger:** `cargo clippy`.\n- **What happens:** `!(old > target && old <= end) && (keep_root || old != target)` will probably be reported as simplifiable to `(old <= target || old > end) && \u2026`.\n- **Fix:** rewrite both conditions positively, or extract an `outside(old, target, end)` helper. Confirm with `scripts/check.sh rust`.\n\n**[P2] `core/src/refresh.rs:217` (`staged::run`): the public refresh no longer emits the refresh profile-v2 allocation phases, and nothing gates the benchmark**\n- **Trigger:** representative-bench or `bench_v1_profile` refresh jobs (commits e826577 and 8aa6345).\n- **What happens:** `refresh_loaded`, `refresh_before_graft`, `refresh_after_graft`, `refresh_after_finalize`, `refresh_after_names` and `refresh_after_nodes` are now emitted only from the `#[cfg(test)]` oracle and `graft`.\n- **Status:** the diff contains no benchmark or policy change, so the known problem is still open. Any CI check that expects those phases will fail or record empty evidence.\n- **Missing context:** the benchmark policy files were not supplied.\n\n**[P3] `core/src/scan/staged/refresh_ingest.rs:110-112`: the `old_link.seq` order is not guaranteed**\n- **What happens:** the `SELECT \u2026 FROM hardlinks h JOIN entries e \u2026` has no `ORDER BY`. The doc comment at line 95 promises to \"preserve the oracle's input iteration order\", and the oracle's `load_links` uses `ORDER BY h.entry_id`.\n- **Where it matters:** `policy.rs:144` picks the owner with `ORDER BY seq LIMIT 1`, so the order matters whenever a key has more than one `was_owner` row.\n- **Fix:** add `ORDER BY h.entry_id`.\n\n**[P3] `core/src/scan/staged/refresh_ingest.rs:54`: errors conversion differs from the oracle on out-of-range values**\n- **What happens:** `row.get::<_, u32>(9)` fails when the value is outside u32, while the oracle (`load.rs`) uses `get::<_, i64>(8)? as u32` and truncates.\n- **Impact:** only corrupt or foreign snapshots are affected, but the parity contract breaks for them.\n\n**[P3] `core/src/scan/staged/write.rs` (`enter`, `Kind::Mount` branch) and `core/src/scan/staged/refresh.rs:167-195`: a missing mount row aborts the whole refresh**\n- **What happens:** staged write calls `query_row` on `mount_info` for every Mount entry. If an old in-memory snapshot has a Mount entry without a `mounts` row, refresh now fails completely.\n- **Comparison:** the oracle `insert_mounts` would just omit that row.\n- **To confirm:** check that the in-memory walker always pushes a `MountRow` for each Mount node.\n\n**[P3] `core/src/refresh/staged.rs:54`: an `into_paths` failure leaves the output file behind**\n- **Trigger:** any error from `denied.into_paths()` after `stage.write` succeeded.\n- **What happens:** the fully written `snapshot.<gen>.tmp` stays on disk unpublished until the next `cleanup_tmp`.\n- **Fix:** remove `tmp` on that error path, or read denied paths before the write returns.\n\n**[P3] `core/src/scan/staged/refresh.rs:19`: stage file leaks if database configuration fails**\n- **What happens:** `open_database` creates the stage file before `configure_database`. If configuration fails, no `StagedTree` exists yet, so its Drop never removes the file.\n- **Mitigation:** the next `cleanup_tmp` removes it. The same pattern exists in `walk_inner`.\n\n**[P3] `core/src/refresh/staged.rs:21-44`: progress appears stuck during staging**\n- **What happens:** staging re-ingests the entire snapshot while the progress stage is still \"walk\" with `seen` at the subtree count. Nothing advances `seen` during ingest or policy.\n\n**[P3] `core/src/scan/staged/refresh.rs:126`: temporary B-tree written outside the guarded directory**\n- **What happens:** `DELETE FROM raw WHERE id IN (SELECT \u2026)` may build an O(subtree) ephemeral B-tree. With `temp_store=FILE`, that goes to SQLite's temp directory, not `reserve.dir`, so `SpaceGuard` does not cover it.\n\n**[P3] `core/src/scan/staged/refresh_ingest.rs:1` and `core/src/refresh.rs:1-6`: stale documentation**\n- `refresh_ingest.rs` still says \"Not wired into the active refresh path.\"\n- The `refresh.rs` module doc still describes the in-memory load, graft and finalize pipeline as the refresh implementation.\n\n**[P3] Formatting: several new statements are not in rustfmt layout**\n- **Locations:** `core/src/scan/staged/refresh/policy.rs:62` and `:144` (`let owner:Option<i64>=\u2026`), the `needs_zero` and last-query lines in `choose`, `core/src/scan/staged/refresh.rs:100`, `:126` and the `UPDATE raw` line in `insert_subtree`, and `core/src/scan/staged/write.rs:288-291`.\n- **Risk:** rustfmt may silently skip over-long statements, so `cargo fmt --check` might pass, but this is unverified. Run `scripts/check.sh rust`.\n\n**[P3] `core/src/refresh/staged/tests.rs`: parity coverage gaps**\n- **Not covered:**\n  - the forced-path last-tie (identical paths in overlapping roots)\n  - the ordinary first-tie\n  - multiple roots\n  - DENIED entries and the denied spool (every case asserts `denied.is_empty()`)\n  - Mount rows\n  - removal with an inside owner\n  - a root target\n- **No end-to-end test:** nothing calls `staged::run` / `run_refresh`, so precheck, publish, `record_success` and stage-file removal are not checked.\n- **Noise:** `assert!(!xpath.is_empty())` asserts nothing useful.\n\n**[P3] Unverified compile and lint assumptions (context not supplied)**\n- `graft`, `load_tree` and `Loaded` are now reachable only from `#[cfg(test)]` code. They avoid `dead_code` under `-D warnings` only if `crate::refresh` is publicly exported from `lib.rs`.\n- Any `StagedTree { \u2026 }` struct literal outside the shown files (for example in other test modules) will fail to compile without the new `refresh_mode` field.\n- Not supplied:\n  - `Paths::path`, needed to confirm it matches `old_path` byte for byte for the forced path\n  - the walker's child sort, needed to confirm byte order matches SQLite BLOB `ORDER BY name`\n\n## Checked and consistent with the oracle\n\n- **Root mapping:** `roots ORDER BY entry_id` maps to stage ids `0..R`, which matches `make_layout`.\n- **Child subtraction:** same id order and read-after-write behaviour, unsigned saturating arithmetic on the `as u64` bit patterns, and hardlink size overrides applied after subtraction.\n- **Hardlink attribution:**\n  - owner precedence: zeroed, then live forced_raw, then forced_path, then best\n  - forced-path ties: last ordinal wins\n  - ordinary ties: path, then first ordinal\n  - `needs_zero` counts and nlink sources\n- **Fold:** u32 saturation for items and errors does not depend on merge order.\n- **Replacement root:** the update copies the same fields and leaves kind and name unchanged.\n- **Mount and denied rows:** handled the same way.\n- **Stage lifecycle:** the stage file is removed on drop on every path after construction.",
+        "session_id": "900d2b3d-dcc4-4608-9dab-7aa0e3d9760d",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 82451,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 46156,
+          "output_tokens_details": {
+            "thinking_tokens": 42888
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 82451,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 46156,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 82451,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 82451
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 46156,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 82451,
+            "webSearchRequests": 0,
+            "costUSD": 1.5830348,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 42888,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 82451,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-w5-staged-followup-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] scripts/bench_v1_pair.py:171 vs core/src/refresh/staged.rs:28,78-91. **The per-case admission check does not cover the candidate's 6\u00d7 stage precheck.**\n- **What the harness checks:** each case needs `f_bavail*f_frsize \u2265 2*initial + 2**31`. Here `initial` is the allocated bytes of the snapshot directory, which is current plus prev, so roughly `4*current + 2 GiB`.\n- **What the candidate requires:** `stage_precheck` \u2192 `precheck::run(dir, old+sub-1, 6)` needs `6*max(current, 150*est) + RESERVE_BYTES`, roughly `6*current + 512 MiB`. The baseline needs only `2*current + 512 MiB`.\n- **Trigger:** a large case where current is about 1.2 GB, for example `--files 8000000`, with free space between about 6.8 and 7.7 GB. The case passes admission and the baseline succeeds. The candidate exits with `SPACE`/`precheck` and only shows up as an invalid summary.\n- **Effect:** this fails closed, so no result is corrupted. It does waste a GitHub run, and the error message (\"output/staging and reserve\") overstates what the check guards.\n- **Fix:** derive the admission formula from the candidate's 6\u00d7 requirement or record it explicitly.\n\n[P3] core/src/scan/staged/write.rs:224-240 together with core/src/scan/staged/refresh.rs:180-210 (`copy_mounts`). **The staged path drops a `mounts` row whose entry is not `Kind::Mount`; the oracle keeps it.**\n- **Staged path:** `copy_mounts` copies every retained old `mounts` row into `mount_info`. `enter` reads `mount_info` only when `node.kind() == Kind::Mount`.\n- **Oracle:** `writer::insert_mounts` writes every live `tree.mounts` row regardless of kind.\n- **Trigger:** a malformed snapshot with a `mounts` row on a kind\u22604 entry outside the refreshed subtree. This is the inverse of the `mark_snapshot(\"mount_row\")` fixture.\n- **Effect:** the staged output silently loses the row and diverges from the oracle on the `mounts` table.\n- **Fix:** reject this input or match the oracle. Either way, add the fixture to `staged_refresh_preserves_denied_and_optional_mount_rows`.\n\n[P3] core/src/scan/staged/write.rs:287-293, core/src/scan/staged/refresh/policy.rs:64-72, and core/src/scan/staged/refresh.rs:226 (`UPDATE raw SET ...` / `params![x,root.flags,...]`). **These hand-packed expressions may fail the `rustfmt --check` gate.**\n- **Trigger:** `scripts/check.sh rust`. Examples are `[raw as i64], |r| ...` sharing one line, and argument lists with no spaces after commas.\n- **Why it is uncertain:** rustfmt usually leaves over-width chains containing long SQL literals untouched. Whether the check passes therefore depends on the exact widths.\n- **Fix:** nothing has been compiled or checked yet, so run `cargo fmt` and `clippy -D warnings --all-targets` before relying on the oracle tests.\n\nThe other areas I checked show no divergence from the in-memory oracle:\n- **Old-link input:** `ORDER BY h.entry_id` feeds `seq`, the first `was_owner` wins, and outside membership is decided on old IDs.\n- **Group facts:** the `coalesce(r.nlink, o.nlink)` max, forced-raw liveness, the forced path as the last DFS tie versus the normal first tie by ordinal, and the zeroed\u2192NULL winner\u2192ALIAS behaviour.\n- **Reconstruction:** saturating u64/u32 subtraction order before link overrides, ALIAS clearing, x-root field replacement, and the stage-ID ranges (subtree IDs start at n).\n- **Output:** roots and fs-stats, the aggregate fold and saturation, path bytes, denied ordering and lossy text.\n- **Lifecycle:** `cleanup_tmp`/Drop removes the stage on every error and kill path, and `LastError` for both prechecks and the overflow.\n- **Analyzer:** profile-v2 still rejects `profile_policy=\"none\"` / `allocation_diagnostics=False`, and the strict summary is unaffected.",
+        "session_id": "dee81ba4-8ab3-447e-8e77-64d2ba89b9ad",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 119981,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 31162,
+          "output_tokens_details": {
+            "thinking_tokens": 29633
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 119981,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 31162,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 119981,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 119981
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 31162,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 119981,
+            "webSearchRequests": 0,
+            "costUSD": 1.5833948000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 29633,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 119981,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-w5-staged-rootcase-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "# Review: missing-root rejection delta\n\n**Verdict:** No blocking defects in the supplied material. Below are two low-severity findings and the context gaps that limit what I could verify. This is a source-only review; nothing was compiled or run.\n\n## Findings\n\n**[P2] The new internal guard has no test.** `core/src/scan/staged/refresh.rs`, `replace_old`\n- The two new tests go through `run_refresh` and `refresh_locked`. Both stop at `rescan_subtree`, so `StagedTree::refresh(.., root_target, .., None, ..)` is never called.\n- Without a test, the root-ordinal check `(x as usize) < self.roots.roots.len()` is unverified.\n- Add a direct test that resolves a root, calls `StagedTree::refresh` with `sub = None`, and asserts:\n  - the error code is `Usage`;\n  - the stage path does not exist afterwards, which tests the `cleanup: true` drop path after `BEGIN` without `ROLLBACK`;\n  - the current and prev bytes are unchanged.\n- In the two-root case this also covers the first-root mapping. `occupied_stage_path_is_not_replaced` and `stage_reserve_failure_keeps_current_and_previous` show the setup.\n\n**[P3] The internal guard's message differs from the public one, and it rejects late.** Same location.\n- The internal message is `\"a missing root requires a full scan\"`. The public path says `\"root {label} no longer exists; run a full scan\"`. Internal callers can't reach the public path today, so nothing user-visible changes. But if a future caller hits the internal guard, it will produce a different `Usage` message.\n- The rejection also happens after `import_nodes`, `subtract_children`, `import_links` and `map_old` have already filled the stage DB. A cheaper option is to check `target` against `snap.conn`'s `roots` table in `StagedTree::refresh` before `open_database`. No stage file would be created at all.\n- This is optional; the current behavior is correct.\n\n## Verified from the supplied source\n\n**Mapping and root ordinals:**\n- `map_old` assigns stage ids `0..roots.len()` to the `roots.entry_id` rows in ascending order. It checks that count against `self.roots.roots.len()` and then assigns non-roots densely from `roots.len()`.\n- So `stage_id < roots.len()` holds exactly when the target is a configured root.\n- The guard runs before any `DELETE FROM raw`, and applies only to `sub.is_none()`. Root refresh with `Some` (`staged_refresh_accepts_root_target_and_preserves_generation`) and non-root removal are unaffected.\n\n**Public path:**\n- For a missing configured root, `subtree_exists` calls `mounts::check(.., None, ..)`. `enclosing_root` returns the root itself, and the `target == root` check returns `Ok` before the root is stat'ed. `subtree_exists` then returns `false`.\n- Because `x.parent_id.is_none()`, `rescan_subtree` returns `Usage(\"root {label} no longer exists; run a full scan\")`.\n- In the oracle, that happens before `graft`, `precheck`, `next_generation` and any writes.\n- `run_refresh` skips `state::record_error` for `Usage`.\n\n**Test correctness:**\n- The fixture writes the snapshot directly from `scan::walk(&[first(, second)])`. `first` is root 0 and gets preorder id 0, because roots are pushed onto the stack in reverse.\n- The fixture then copies current to prev and to the oracle directory, and records the bytes.\n- It removes the empty `first` and compares code, message, and the current/prev bytes in both directories, plus the absence of `snapshot.stage.tmp`.\n- Function lengths (~60 lines) and file sizes are within the project limits.\n\n## Context I could not verify\n\n1. **`core/src/refresh/staged.rs` (`staged::run`) is not in the packet.** The claim that candidate rejection happens before stage construction depends on it. Specifically, it must call `rescan_subtree` (or the equivalent) with snapshot roots before `StagedTree::refresh`, `precheck`, `next_generation` or any write. Please include it, or confirm that order.\n2. **`normalize` is not shown.** The candidate's label comes from `normalize(&req.path)`, while the oracle gets the raw bytes. The `message` equality only holds if `normalize` is lexical and doesn't fail on a nonexistent path; otherwise you would get `PathNotFound` or a different label. Refresh-removal being a supported feature suggests it is lexical, but that isn't shown.\n3. **`Snapshot::open_current` is not shown.** The byte-equality assertion on `current` in both directories assumes the reader opens without writing, for example read-only with no write PRAGMAs. The existing tests only byte-compare `prev`, so this is the first test that relies on it.",
+        "session_id": "bcd38503-3d24-472b-a130-b861f602fcd2",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 36930,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 4410,
+          "output_tokens_details": {
+            "thinking_tokens": 2758
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 36930,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 4410,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 36930,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 36930
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 4410,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 36930,
+            "webSearchRequests": 0,
+            "costUSD": 0.3839468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2758,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 36930,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-w5-staged-final-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "# W5 staged-refresh review\n\n**Verdict: no P0 or P1 findings.** There is one P2 (performance that affects benchmark validity) and one P3.\n\n## [P2] Hot loops re-prepare SQL statements for every entry, which can bias W5 elapsed time against the candidate\n\n- **Paths and lines**\n  - `core/src/scan/staged/write.rs:330` and `:335`: `attribute_refresh_link`\n  - `core/src/scan/staged/refresh/policy.rs:36` and `:38`: `enter`\n  - `core/src/scan/staged/refresh.rs:97` and `:110`: `map_old`\n  - Also `replace_old`, `copy_old_links`, `copy_mounts`, `insert_subtree` (links, new_link, link_keys), `import_links` (link_keys), `write_refresh_mounts`, and `choose`, `choose_live` and `group_facts`.\n- **Trigger:** any refresh of a large snapshot, which is the W5 case at up to 8M entries.\n- In rusqlite, `Connection::execute` and `Connection::query_row` call `prepare` on every invocation. That means each call parses and compiles the SQL again.\n- The worst case is `attribute_refresh_link`. In refresh mode it runs for every output entry, with no `kind`/`nlink` filter. The scan path keeps that filter and uses `prepare_cached`.\n- **Per-entry statement compilations per refresh:**\n  - one in `map_old`\n  - two in `policy::enter`\n  - one or two in `attribute_refresh_link`\n  - more for each hardlink and each removed descendant\n- `group_facts` and `choose_live` also call `prepare` once per hardlink key.\n- **Effect:**\n  - Output is unchanged.\n  - The candidate pays CPU cost that is not inherent to staging.\n  - The paired elapsed-time delta would then partly measure statement compilation, not the disk-backed design.\n- **Fix:** switch these call sites to `prepare_cached`, as `import_nodes`, `subtract_children` and the scan writer already do. Keep `attribute_refresh_link` unfiltered: the oracle attributes every retained link row regardless of its current kind or nlink.\n\n## [P3] `StagedTree::write` deletes the output path even when `open_database` refused a file it did not create\n\n- **Path and line:** `core/src/scan/staged/write.rs:44\u201350`, together with `core/src/scan/staged.rs` `open_database`.\n- **Trigger:** `open_database(tmp)` fails `create_new` because `snapshot.N.tmp` already exists.\n- The wrapper then runs `remove_file(path)` without any condition. That undoes the new same-inode guard in `open_database`.\n- **Why this is minor:**\n  - For refresh, the risk is mitigated by the snapshot lock and by `cleanup_tmp` at the start.\n  - The behavior was inherited from the scan path.\n  - `occupied_stage_path_is_not_replaced` covers only the stage file, not the output.\n- **Fix:** perform the unconditional cleanup only after the database has been opened successfully.\n\n## Oracle equivalence: checked, no divergence found\n\nEach item below was compared against `refresh_locked`, `graft`, `hardlink_policy` and `finalize_with`.\n\n- **Reconstruction**\n  - ALIAS is cleared on load.\n  - Subtraction runs in id order with u64/u32 saturation on the raw unsigned bit patterns.\n  - Hardlink-row size overrides are applied after subtraction, in `entry_id` order.\n- **Replacement of the target node `x`**\n  - The same fields are overwritten: flags, allocated, apparent, mtime, nlink, errors, scanned_at.\n  - Name and kind are kept.\n  - When the path is missing, `x` and its subtree are dropped.\n- **Hardlink policy**\n  - The first `was_owner` is taken in seq order.\n  - `outside` includes `x`.\n  - `forced_raw` requires the owner to be live; otherwise it falls back to `best`.\n  - `forced_path` keeps the old snapshot path and chooses the *last* DFS match.\n  - `best` keeps the *first* DFS occurrence on equal paths.\n  - The zeroed condition is checked only when there is no outside owner, using `known < max(nlink)` over outside and new links.\n  - The key set is the union of old and new keys.\n  - Every link key gets a `winners` row, so `JOIN winners` never drops a link.\n- **Mounts**\n  - Rows do not depend on kind.\n  - `x`'s own row is kept when the subtree is replaced and dropped when it is removed.\n  - Output ids come from `live.ordinal`. The policy DFS and the write DFS use the same `(name,id)` cursor, so ordinals equal output ids.\n- **Roots, metadata and other outputs**\n  - Root ordering, `update_fs_stats`, `refresh_meta` and `prev_generation` match.\n  - A missing root is rejected in `rescan_subtree` and again in `StagedTree::refresh`.\n  - The denied order and lossy UTF-8 rendering match.\n- **Space checks**\n  - Both prechecks apply: 6\u00d7 before the stage is created, 2\u00d7 after.\n  - Overflow is checked before the unchecked arithmetic in `publish::required_space`.\n- **Cleanup**\n  - The stage file is cleaned up by `Drop` and by `cleanup_tmp`.\n  - On a denied-spool read failure, `collect_denied` removes the unpublished tmp file.\n- **The four post-packet gate fixes are behavior-neutral:**\n  - `count` read as i64 then checked to u64\n  - the reshaped mount `match`, equivalent to `?`\n  - the borrowed `LastError` in a test\n  - the `.err().unwrap()` test simplification\n\n## Residual risk and context I could not verify\n\n- **Nothing was executed.** Equivalence rests on reading the code alone. That includes `compare_case`, the public refresh vs oracle tests, the fault tests (`a_kill_during_refresh_keeps_current_and_prev` with a leftover stage file) and the policy and ingest unit tests.\n- **Child ordering assumption:** both DFS passes order children by `ORDER BY name,id` (byte/memcmp order). This assumes every existing snapshot's children are in byte order of name. The source for walker sorting and older writers was not provided.\n- **`RESERVE_BYTES`** was not shown. `stage_space_receipt` hardcodes 512 MiB and assumes it equals `crate::snapshot::RESERVE_BYTES`.\n- **Admission applies to scan cases too.** The harness applies the W5 receipt to `--operation scan` cases as well. It is admission-only and does not bias measurements, but it records a refresh-specific policy on scan runs.",
+        "session_id": "0b7cee7f-6e35-4f33-8605-8499063f7907",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 125869,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 27991,
+          "output_tokens_details": {
+            "thinking_tokens": 25671
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 125869,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 27991,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 125869,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 125869
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 27991,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 125869,
+            "webSearchRequests": 0,
+            "costUSD": 1.5670788,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 25671,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 125869,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-w5-staged-cached-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**NO_FINDINGS**\n\nBoth previous findings are resolved in this delta, and I found no new P0\u2013P3 issue.\n\n**Previous P2 (statement caching): resolved**\n- Every repeated SQL loop in the refresh path now uses `prepare_cached`. This covers:\n  - ingest: `import_nodes`, `subtract_children`, `import_links`\n  - `map_old`, `replace_old`, `copy_old_links`, `copy_mounts`, `insert_subtree`\n  - the policy steps: `enter`, `visit_root`, `choose_groups`, `choose`, `choose_live`, `group_facts`\n  - write: roots, denied, mounts, `write_refresh_mounts`, and both `attribute_link` variants.\n- `attribute_refresh_link` runs for every entry with no kind or nlink filter, as required. Its SQL is unchanged.\n- The cache budget is unchanged: nothing calls `set_prepared_statement_cache_capacity`, so the default of 16 applies.\n- The ingest phase uses more than 16 distinct statements on the stage connection in total. No single loop uses more than about 8 at once, so eviction only happens between phases and never inside a loop.\n- Reentrancy is safe. Where one cached statement is held while another is prepared on the same connection (`write_refresh_mounts`, `choose_live`, `choose_groups`, `copy_old_links`, `subtract_children`, `import_links`), the SQL text always differs. rusqlite takes a statement out of the cache while it is in use, so even identical SQL would only cause a fresh prepare, not a conflict.\n- Cached statements are reset when returned to the cache, so `COMMIT` does not see a statement still in progress. `Connection::close` flushes the cache before closing.\n- The `CREATE TABLE` in `map_old` after earlier statements were cached only triggers SQLite's automatic re-prepare.\n- The non-refresh mount lookup in `enter` now uses an explicit `match`, which behaves the same as the old `?`. A missing `mount_info` row is still an error.\n- Bounded behavior is kept: every row loop still calls `guard.tick()`, including the new `write_refresh_mounts`.\n\n**Previous P3 (occupied output): resolved**\n- `core/src/scan/staged/write.rs:44`: `write` now calls `open_database(path)?` before any cleanup. If `create_new` fails with EEXIST, it returns immediately without removing the existing file.\n- In `core/src/scan/staged.rs` (`open_database`), a failure after the file is created removes it only if the dev/ino still match the file this call created.\n- `occupied_output_path_is_not_removed` covers this case. It checks that the foreign bytes are untouched, the error is returned, the stage file is removed by `Drop`, and current is kept. `occupied_stage_path_is_not_replaced` covers the same rule for the stage file.\n- The guard check now runs after the output file is opened. A reserve failure there leaves a file this call owns, which is then removed. That is acceptable.\n\n**Python admission receipt**\n- `stage_space_receipt` matches `stage_precheck`:\n  - It uses `6 \u00d7 max(logical size of current, 150 \u00d7 (entries + subtree \u2212 1)) + 512 MiB`, the same as `required_space` with `RESERVE_BYTES`.\n  - The existing `2 \u00d7 allocated + 2 GiB` check is still applied.\n- The diagnostics settings (profile `none`, allocation diagnostics off) match the staged path, which emits no `refresh_loaded` or later profile phases. Note that `bench_v1_profile.py` will therefore refuse W5 runs, which is intended.\n\n**Residual caveats (not findings)**\n- No Rust tests ran in this round. The new tests and the caching changes have only passed compile, clippy and fmt; their runtime behavior is unverified until CI or a local test run.\n- No test covers the failure path where the file was created but `secure_file` or `configure_database` then fails.\n- `required_space` multiplies `factor * estimate` without an overflow check, and W5 calls it with factor 6. In practice this cannot overflow, because u32 IDs cap the entry count.\n- The existing W5 caveats you listed still apply: the O(subtree) walker, the O(denied) report, fused timing, the factor-six figure being an allowance rather than an upper bound, and no diagnostics.",
+        "session_id": "ddb6bb36-9cce-421c-ab2c-296ac0d606d3",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 110389,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 5781,
+          "output_tokens_details": {
+            "thinking_tokens": 4305
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 110389,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 5781,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 110389,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 110389
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 5781,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 110389,
+            "webSearchRequests": 0,
+            "costUSD": 0.9990388,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 4305,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 110389,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-w5-staged-structured-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "4d346ef6-6399-42ae-b914-5d5a95224496",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 110660,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 2069,
+          "output_tokens_details": {
+            "thinking_tokens": 2058
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 110660,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 2069,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 110660,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 110660
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 2069,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 110660,
+            "webSearchRequests": 0,
+            "costUSD": 0.9269668,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2058,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 110660,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "final_validation": {
+    "result": "NO_FINDINGS",
+    "status": "completed",
+    "exit_code": 0,
+    "requested_and_reported_model": "claude-opus-5-5",
+    "structured_gate": "pass",
+    "normal_hooks": "fmt, suppression check, clippy all targets, size, shell, tsc, biome passed; no bypass",
+    "post_merge_python_tests": 61,
+    "local_rust_test_execution": false,
+    "runtime_contracts": "GitHub workspace and CLI tests precede smoke; compile checks are not runtime evidence"
+  },
+  "integration": "SDK preparation merged cleanly; fifteen reviewed W5 files unchanged, only paired-host metadata context changed. Phase diagnostics explicitly disabled for both arms; profile-v2 is not used or claimed.",
+  "limitations": [
+    "replacement subtree walk retains O(subtree) RAM",
+    "public denied-path result retains O(number denied) memory",
+    "finalization is fused into stage write so phase timings differ",
+    "stage/output coexist; factor-six admission is an allowance not a guaranteed upper bound and live guards remain necessary",
+    "complete-command RSS does not capture all cgroup RAM; measure cgroup current/peak/events and pressure",
+    "no full-scale W5 stage planned"
+  ],
+  "parent_source_note": "Missing configured root is an existing Usage error, not a root-removal publication feature. Direct tests preserve this behavior. All speculative performance benefits remain unmeasured."
+}

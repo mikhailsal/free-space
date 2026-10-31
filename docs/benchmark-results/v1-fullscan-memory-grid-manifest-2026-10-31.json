@@ -95,7 +95,8 @@
       "id": "fullscan-memory-2048-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "memory_mib": 2048
+      "memory_mib": 2048,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -127,7 +128,8 @@
       "id": "fullscan-memory-2048-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 2048
+      "memory_mib": 2048,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -159,7 +161,8 @@
       "id": "fullscan-memory-1024-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "memory_mib": 1024
+      "memory_mib": 1024,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -191,7 +194,8 @@
       "id": "fullscan-memory-1024-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 1024
+      "memory_mib": 1024,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -223,7 +227,8 @@
       "id": "fullscan-memory-512-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "memory_mib": 512
+      "memory_mib": 512,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -255,7 +260,15 @@
       "id": "fullscan-memory-512-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 512
+      "memory_mib": 512,
+      "scan_profile": "disk"
     }
-  ]
+  ],
+  "scan_mode_scope": {
+    "scan_profile": "disk",
+    "low_memory": true,
+    "worker_argument": "--low-memory",
+    "ordinary_in_memory_mode": "Not covered by these measurements",
+    "basis": "Explicit existing worker arguments at frozen source, documented without changing any running case"
+  }
 }

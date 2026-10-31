@@ -27,7 +27,9 @@
     41231314351,
     41232072330,
     41232507959,
-    41236396792
+    41236396792,
+    41237970872,
+    41237971343
   ],
   "runs": [
     {
@@ -616,13 +618,85 @@
       "head_sha_verified": true,
       "completed_job_seconds": 365.0,
       "job_seconds": 365.0
+    },
+    {
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "profile_policy": "profile-v2",
+      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "campaign_cap_seconds": 216000,
+      "id": "joint-matched-control-screen",
+      "branch": "perf/v1-runner-disk-prep",
+      "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 2400,
+      "status": "in_progress",
+      "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
+      "purpose": "joint-matched-control-screen",
+      "runner_preparation_policy": "sdk-space-v1",
+      "run_id": 41237970872,
+      "created_at": "2026-10-31T20:14:29Z",
+      "head_sha_verified": true
+    },
+    {
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "profile_policy": "profile-v2",
+      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "campaign_cap_seconds": 216000,
+      "id": "joint-candidate-screen",
+      "branch": "perf/v1-joint-qualification",
+      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 2400,
+      "status": "in_progress",
+      "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
+      "purpose": "joint-candidate-screen",
+      "runner_preparation_policy": "sdk-space-v1",
+      "run_id": 41237971343,
+      "created_at": "2026-10-31T20:14:29Z",
+      "head_sha_verified": true
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T20:08:56.330728+00:00",
+  "updated_at": "2026-10-31T20:29:53.907078+00:00",
   "completed_job_seconds": 23817.0,
-  "maximum_committed_seconds": 85617.0,
-  "remaining_unreserved_seconds": 130383.0,
+  "maximum_committed_seconds": 94317.0,
+  "remaining_unreserved_seconds": 121683.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -661,7 +735,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 61800,
+  "planned_reserved_seconds": 59700,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Exact node capacity after actual subtree walk",
@@ -750,72 +824,6 @@
       "profile_policy": "profile-v2",
       "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "campaign_cap_seconds": 216000,
-      "id": "joint-matched-control-screen",
-      "branch": "perf/v1-runner-disk-prep",
-      "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "stage": "screen",
-      "files": 1000000,
-      "expected_entries": 1004499,
-      "pairs_per_operation": 3,
-      "operations": [
-        "scan",
-        "refresh"
-      ],
-      "timeout_minutes": 55,
-      "maximum_job_seconds": 5400,
-      "forecast_seconds": 2400,
-      "status": "admitted_not_dispatched",
-      "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
-      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization",
-      "runner_preparation_policy": "sdk-space-v1"
-    },
-    {
-      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-      "comparison": "candidate",
-      "target": "x86_64-unknown-linux-musl",
-      "io": "local",
-      "subtree_entries": 100,
-      "scenario": "unchanged",
-      "memory_mib": 4096,
-      "cpus": 2,
-      "workers": 1,
-      "measurement_protocol": "v1-single-operation-pairs-v4",
-      "profile_policy": "profile-v2",
-      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "campaign_cap_seconds": 216000,
-      "id": "joint-candidate-screen",
-      "branch": "perf/v1-joint-qualification",
-      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "stage": "screen",
-      "files": 1000000,
-      "expected_entries": 1004499,
-      "pairs_per_operation": 3,
-      "operations": [
-        "scan",
-        "refresh"
-      ],
-      "timeout_minutes": 55,
-      "maximum_job_seconds": 5400,
-      "forecast_seconds": 2400,
-      "status": "admitted_not_dispatched",
-      "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
-      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization",
-      "runner_preparation_policy": "sdk-space-v1"
-    },
-    {
-      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-      "comparison": "candidate",
-      "target": "x86_64-unknown-linux-musl",
-      "io": "local",
-      "subtree_entries": 100,
-      "scenario": "unchanged",
-      "memory_mib": 4096,
-      "cpus": 2,
-      "workers": 1,
-      "measurement_protocol": "v1-single-operation-pairs-v4",
-      "profile_policy": "profile-v2",
-      "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "campaign_cap_seconds": 216000,
       "id": "joint-full-scan-exploratory",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
@@ -832,7 +840,8 @@
       "status": "conditional_screen_and_memory_priority",
       "depends_on": "Valid matched controls and joint screen with useful gain and no confirmed regression. Prioritize the accepted full-scan memory ladder before more full-scale work. Freeze the matching whole-step forecast plus 30% margin within 7200 seconds and recheck aggregate admission before dispatch. One pair is exploratory only.",
       "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification",
-      "runner_preparation_policy": "sdk-space-v1"
+      "runner_preparation_policy": "sdk-space-v1",
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -864,7 +873,8 @@
       "status": "conditional_screen_and_memory_priority",
       "depends_on": "Valid matched controls and joint screen with useful gain and no confirmed regression. Prioritize the accepted full-scan memory ladder before more full-scale work. Freeze the matching whole-step forecast plus 30% margin within 7200 seconds and recheck aggregate admission before dispatch. One pair is exploratory only.",
       "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification",
-      "runner_preparation_policy": "sdk-space-v1"
+      "runner_preparation_policy": "sdk-space-v1",
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -896,7 +906,8 @@
       "id": "fullscan-memory-2048-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "memory_mib": 2048
+      "memory_mib": 2048,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -928,7 +939,8 @@
       "id": "fullscan-memory-2048-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 2048
+      "memory_mib": 2048,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -960,7 +972,8 @@
       "id": "fullscan-memory-1024-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "memory_mib": 1024
+      "memory_mib": 1024,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -992,7 +1005,8 @@
       "id": "fullscan-memory-1024-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 1024
+      "memory_mib": 1024,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -1024,7 +1038,8 @@
       "id": "fullscan-memory-512-aa",
       "branch": "perf/v1-runner-disk-prep",
       "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
-      "memory_mib": 512
+      "memory_mib": 512,
+      "scan_profile": "disk"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -1056,7 +1071,74 @@
       "id": "fullscan-memory-512-joint",
       "branch": "perf/v1-joint-qualification",
       "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
-      "memory_mib": 512
+      "memory_mib": 512,
+      "scan_profile": "disk"
+    },
+    {
+      "branch": "perf/v1-staged-refresh-experiment",
+      "revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "runner_preparation_policy": "sdk-space-v1",
+      "profile_policy": "none",
+      "allocation_diagnostics": false,
+      "stage_admission_policy": "w5-case-space-v1",
+      "id": "w5-staged-refresh-smoke",
+      "stage": "smoke",
+      "files": 100000,
+      "expected_entries": 100449,
+      "pairs_per_operation": 1,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3300,
+      "status": "admitted_not_dispatched",
+      "depends_on": "Reviewed published source, normal hooks, integrated SDK policy and successful revised protocol smoke. GitHub workspace tests must pass before measurement.",
+      "purpose": "Bounded compatibility/prototype measurement, no product qualification"
+    },
+    {
+      "branch": "perf/v1-staged-refresh-experiment",
+      "revision": "9a1c9f4f7fc9b262b14df288b3df67ab26e80877",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "runner_preparation_policy": "sdk-space-v1",
+      "profile_policy": "none",
+      "allocation_diagnostics": false,
+      "stage_admission_policy": "w5-case-space-v1",
+      "id": "w5-staged-refresh-screen",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "status": "conditional_smoke_no_confirmed_regression",
+      "depends_on": "Valid smoke semantics and no confirmed disk/RAM/refresh regression; matching measured whole-step forecast plus30% fits3300seconds and the remaining campaign budget before dispatch.",
+      "purpose": "Single conditional screening job, no full-scale expansion or promotion"
     }
   ],
   "parallel_candidates": {
