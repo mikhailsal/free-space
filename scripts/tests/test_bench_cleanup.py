@@ -12,7 +12,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "bench-representative.sh"
 class CleanupTests(unittest.TestCase):
     def run_cleanup(self, mode="ok", initial_status=0):
         source = SCRIPT.read_text()
-        cleanup = source[source.index("cleanup() {"):source.index("run_owned() {")]
+        cleanup = source[source.index("finish_cleanup() {"):source.index("run_owned() {")]
         mocks = r'''
 set -euo pipefail
 output=$TEST_DIRECTORY
