@@ -12,7 +12,7 @@ import tempfile
 import time
 import uuid
 
-from bench_v1_admission import check_capacity
+from bench_v1_admission import RUNNER_PREPARATION_POLICY, check_capacity, runner_preparation_context
 from bench_v1_fixture import prepare, mutate, mutate_full
 from bench_v1_runtime import container, file_hash, full_link_facts, legacy, seed_hash
 from bench_v1_summary import PROTOCOL, summarize, markdown
@@ -89,6 +89,11 @@ def host(args):
     temporary = tempfile.mkdtemp(prefix="freespace-v1-pairs-", dir=os.environ["RUNNER_TEMP"])
     scratch = Path(temporary)
     try:
+        prep_path = os.environ.get('BENCH_PREP_RECEIPT')
+        if not prep_path:
+            raise ValueError('runner preparation receipt is required')
+        prep = json.loads(Path(prep_path).read_text())
+        preparation = runner_preparation_context(prep)
         # Additional entries from deterministic mixed directory shape. This is an
         # upper estimate; receipt is replaced by exact generator accounting below.
         estimated_entries = args.files + 3 + ((args.files + 999) // 1000) * 7
@@ -143,6 +148,8 @@ def host(args):
         expected_ids = [f"p{pair}-{arm}" for pair in range(1, args.pairs + 1) for arm in binaries]
         manifest = dict(measurement_protocol=PROTOCOL, pairs=args.pairs, files=args.files,
                         operation=args.operation, scenario=args.scenario, fixture_receipt=fixture,
+                        runner_preparation=preparation,
+                        runner_preparation_policy=RUNNER_PREPARATION_POLICY,
                         case_policy="qualification-v1", subtree_entries=fixture["expected_subtree_entries"], memory_mib=args.memory,
                         setup_memory_mib=4096, observer_memory_mib=4096, mutation_receipt=mutation, seed_link_facts=seed_links,
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,

@@ -285,8 +285,12 @@ class OracleTests(unittest.TestCase):
         helper = SimpleNamespace(dump=lambda path, value: path.write_text(json.dumps(value)), capture=lambda args: '')
         source = dict(sha256='a'*64, source_revision='revision', build=dict(
             compiler='same', target='same', flags='', profile='release', release_profile={}, cargo_config={}))
+        prep = self.root / 'prep.json'
+        prep.write_text(json.dumps({'success': True, 'actions': [], 'before': {'available_bytes': 44 * 1024**3},
+                                    'after': {'available_bytes': 44 * 1024**3}, 'duration_seconds': 0,
+                                    'floor_bytes': 42 * 1024**3, 'target_bytes': 44 * 1024**3}))
         env = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted',
-                   FREESPACE_BENCHMARK_RUN_TOKEN='test', RUNNER_TEMP=str(self.root))
+                   FREESPACE_BENCHMARK_RUN_TOKEN='test', RUNNER_TEMP=str(self.root), BENCH_PREP_RECEIPT=str(prep))
         import contextlib
         import io
         with patch.dict(os.environ, env), patch('bench_v1_pair.legacy', return_value=helper), \
@@ -296,6 +300,31 @@ class OracleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(host(args), 1)
         self.assertFalse(json.loads((out / 'summary.json').read_text())['valid'])
+
+    def test_missing_or_malformed_preparation_is_recorded_in_host_failure(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        import contextlib
+        import io
+        helper = SimpleNamespace(dump=lambda path, value: path.write_text(json.dumps(value)), capture=lambda args: '')
+        source = dict(sha256='a'*64, source_revision='revision', build=dict(
+            compiler='same', target='same', flags='', profile='release', release_profile={}, cargo_config={}))
+        bad = self.root / 'bad.json'
+        bad.write_text('{not-json')
+        for case, prep in (('missing', ''), ('malformed', str(bad))):
+            with self.subTest(case=case):
+                out = self.root / ('out-' + case)
+                args = arguments(['--baseline', '/fake', '--candidate', '/fake', '--output', str(out)])
+                env = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted',
+                           FREESPACE_BENCHMARK_RUN_TOKEN='test', RUNNER_TEMP=str(self.root), BENCH_PREP_RECEIPT=prep)
+                with patch.dict(os.environ, env), patch('bench_v1_pair.legacy', return_value=helper), \
+                        patch('bench_v1_pair.provenance', return_value=source), patch('bench_v1_pair.subprocess.run'), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(host(args), 1)
+                status = json.loads((out / 'status.json').read_text())
+                self.assertFalse(status['success'])
+                self.assertIn('runner preparation receipt is required' if case == 'missing' else 'JSONDecodeError', status['failures'][0])
+                self.assertFalse(json.loads((out / 'summary.json').read_text())['valid'])
         self.assertTrue(json.loads((out / 'status.json').read_text())['failures'])
 
 

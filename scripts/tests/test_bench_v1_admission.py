@@ -18,6 +18,28 @@ SPEC.loader.exec_module(ADMISSION)
 
 
 class CapacityTests(unittest.TestCase):
+    def test_shell_imports_shared_volume_and_floor(self):
+        root = Path(__file__).resolve().parents[2]
+        script = (root / 'scripts/bench-representative.sh').read_text()
+        line = next(line.strip() for line in script.splitlines() if line.strip().startswith('constants=$(python3 '))
+        output = subprocess.check_output(['bash', '-c', line + '\nprintf "%s" "$constants"'], cwd=root, text=True)
+        self.assertEqual(output, f'{ADMISSION.V1_VOLUME_GIB} {ADMISSION.V1_HARD_FLOOR_GIB}')
+        self.assertGreater(ADMISSION.V1_HARD_FLOOR_GIB, ADMISSION.V1_VOLUME_GIB)
+
+    def test_runner_preparation_context_strict_gate(self):
+        floor = ADMISSION.V1_HARD_FLOOR_GIB * ADMISSION.GIB
+        target = (ADMISSION.V1_HARD_FLOOR_GIB + ADMISSION.V1_PREP_HEADROOM_GIB) * ADMISSION.GIB
+        receipt = {'success': True, 'actions': [{'status': 'removed'}], 'before': {'available_bytes': target + 10},
+                   'after': {'available_bytes': target}, 'duration_seconds': 2.5, 'floor_bytes': floor, 'target_bytes': target}
+        context = ADMISSION.runner_preparation_context(receipt)
+        self.assertTrue(ADMISSION.valid_runner_preparation(context))
+        self.assertTrue(context['acted']); self.assertEqual(context['freed_bytes'], -10)
+        for key, value in (('success', False), ('floor_bytes', 1), ('target_bytes', floor), ('duration_seconds', float('nan'))):
+            broken = dict(receipt, **{key: value})
+            with self.subTest(key=key), self.assertRaises(ValueError): ADMISSION.runner_preparation_context(broken)
+        self.assertFalse(ADMISSION.valid_runner_preparation(dict(context, freed_bytes=True)))
+        self.assertGreater(ADMISSION.V1_HARD_FLOOR_GIB, ADMISSION.V1_VOLUME_GIB)
+
     def test_baseline_epoch_resolves_commit_without_shell_interpolation(self):
         commit = 'a' * 40
         with patch.object(ADMISSION.subprocess, 'check_output', side_effect=[commit + '\n', '1700000000\n']) as call:
@@ -149,11 +171,11 @@ class TimeTests(unittest.TestCase):
             for requested in (None, "", cap, str(cap)):
                 with self.subTest(stage=stage, requested=requested):
                     self.assertEqual(ADMISSION.stage_timeouts(stage, requested),
-                                     dict(step_minutes=cap, job_minutes=cap + 5,
-                                          build_minutes=25, maximum_runner_minutes=cap + 30))
+                                     dict(step_minutes=cap, job_minutes=cap + 10,
+                                          build_minutes=25, maximum_runner_minutes=cap + 35))
         self.assertEqual(ADMISSION.stage_timeouts("local-scale", "47"),
-                         dict(step_minutes=47, job_minutes=52, build_minutes=25,
-                              maximum_runner_minutes=77))
+                         dict(step_minutes=47, job_minutes=57, build_minutes=25,
+                              maximum_runner_minutes=82))
 
     def test_stage_timeout_rejects_invalid_inputs(self):
         for stage, requested in (("unknown", None), (None, None), ("smoke", 31),

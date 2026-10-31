@@ -99,7 +99,12 @@ cleanup() {
     timeout --kill-after=5s 15s sudo losetup -d "$loop_device" >> "$output/cleanup.log" 2>&1 || { status=1; storage_released=false; }
   fi
   if [[ $storage_released == true ]]; then
-    rm -f -- "$volume/disk.img" || status=1
+    if rm -f -- "$volume/disk.img"; then
+      timeout --kill-after=2s 15s sync -f -- "$volume" >> "$output/cleanup.log" 2>&1 || { status=1; storage_released=false; }
+    else
+      status=1
+      storage_released=false
+    fi
     if [[ -d $mount_dir ]]; then rmdir -- "$mount_dir" 2>/dev/null || true; fi
     rmdir -- "$volume" 2>/dev/null || true
   else
@@ -127,7 +132,11 @@ lsblk -o NAME,MAJ:MIN,SIZE,TYPE,ROTA,MODEL >> "$output/host-disk.txt"
 available=$(df -B1 --output=avail "$volume" | tail -1)
 volume_gib=30
 required_gib=32
-if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then volume_gib=40; required_gib=42; fi
+if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then
+  constants=$(python3 -c 'import sys; sys.path.insert(0,"scripts"); from bench_v1_admission import V1_VOLUME_GIB,V1_HARD_FLOOR_GIB; print(V1_VOLUME_GIB,V1_HARD_FLOOR_GIB)') || exit 1
+  read -r volume_gib required_gib <<< "$constants"
+  [[ $volume_gib =~ ^[0-9]+$ && $required_gib =~ ^[0-9]+$ ]] || exit 1
+fi
 if (( available < required_gib * 1024 * 1024 * 1024 )); then
   echo "Need at least $required_gib GiB free on the runner for the dedicated filesystem." >&2
   exit 1
