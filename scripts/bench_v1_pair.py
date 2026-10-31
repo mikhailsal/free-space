@@ -140,7 +140,7 @@ def host(args):
                         expected_arms=expected_ids, provenance=sources, seed_sha256=seed_digest,
                         sample_interval_seconds=0.02, cache_policy="cold after seed copy, before single CLI",
                         observer_policy="separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
-                        diagnostic_policy=dict(allocation_diagnostics=args.operation == "refresh",
+                        diagnostic_policy=dict(profile_policy="profile-v2", allocation_diagnostics=args.operation == "refresh",
                                                scope="measured refresh CLI only; seeds and observers disabled"),
                         environment=dict(kernel=platform.release(), cpu=Path("/proc/cpuinfo").read_text(),
                                          memory=Path("/proc/meminfo").read_text(),
