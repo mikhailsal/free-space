@@ -1,0 +1,147 @@
+{
+  "created_at": "2026-10-31T18:47:31.689810+00:00",
+  "source_review": "v1-qualification-harness-source-reviews-2026-10-31.json",
+  "source_hash_manifest": {
+    "base_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "branch": "perf/v1-qualification-harness",
+    "files": {
+      ".github/workflows/representative-bench.yml": {
+        "sha256": "4267f1fcaa17e0687438bcae4b902cfb1d60d067ba19341d8f9ebb6f69aa93c6",
+        "bytes": 13341,
+        "lines": 283
+      },
+      "scripts/bench-representative.sh": {
+        "sha256": "d1033d9be7efe7cb9c707012b2e3b71ac767e806aca312ab96df7213a5f2e22a",
+        "bytes": 8333,
+        "lines": 177
+      },
+      "scripts/bench_v1_admission.py": {
+        "sha256": "8e611d824bf94543c1e7ce25330e8be2d7615aab630b2ecf50bbe92f72596eba",
+        "bytes": 8726,
+        "lines": 174
+      },
+      "scripts/bench_v1_fixture.py": {
+        "sha256": "ee9234662055a1525cd25d200e9a345ad60751d929a322e6484555383451d37a",
+        "bytes": 3410,
+        "lines": 76
+      },
+      "scripts/bench_v1_pair.py": {
+        "sha256": "d92358741514ce8944ecae1a2aa8ed3ab2034bb6c5688e75168ef8608b32a136",
+        "bytes": 13578,
+        "lines": 225
+      },
+      "scripts/bench_v1_runtime.py": {
+        "sha256": "fbd840ed5538dc6eca02d3d9ea33b51e88c397cd4cff31e28e2651cb80a395a4",
+        "bytes": 10677,
+        "lines": 215
+      },
+      "scripts/bench_v1_summary.py": {
+        "sha256": "79993682b6d03e734511046636d8cd15acc2e5ab2597d975d5fe6ac342791e10",
+        "bytes": 16683,
+        "lines": 280
+      },
+      "scripts/tests/test_bench_v1_admission.py": {
+        "sha256": "3161dceb25a56b8d6403c27a2a2de3204909363c04b45d6abb84bbabe785e53c",
+        "bytes": 10849,
+        "lines": 178
+      },
+      "scripts/tests/test_bench_v1_runtime.py": {
+        "sha256": "d9ea8e6bcbc73b854efba7fb97addb7fb89f46a987b3660d337d93bc5dd3b6b0",
+        "bytes": 12634,
+        "lines": 230
+      },
+      "scripts/tests/test_bench_v1_summary.py": {
+        "sha256": "30dc213589262377c597c24cf81b1ef91daaab5068fc773ef124fff485a95d32",
+        "bytes": 9835,
+        "lines": 166
+      }
+    }
+  },
+  "plans": [
+    {
+      "id": "qualification-smoke-default",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
+      "pairs_per_operation": 1,
+      "operations": [
+        "scan"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
+      "status": "admitted_not_dispatched",
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+    },
+    {
+      "id": "qualification-smoke-changed",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 10000,
+      "scenario": "changed",
+      "memory_mib": 1024,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
+      "status": "conditional_default_smoke",
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+    },
+    {
+      "id": "qualification-smoke-large-folder",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100000,
+      "scenario": "unchanged",
+      "memory_mib": 512,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
+      "status": "conditional_default_smoke",
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+    }
+  ],
+  "maximum_runner_seconds": 9000,
+  "campaign_cap_seconds": 216000,
+  "stop_rules": [
+    "No expansion after failed smoke; fix root cause and preregister new source, no blind retry",
+    "No calibration without byte-identical actual source-equivalent arm builds; no normalization of binaries",
+    "NewSOURCE_DATE_EPOCH series remains separate from historical wallclock-built artifacts",
+    "No app speed/RAM/disk acceptance inferred from protocol smoke"
+  ],
+  "candidate_revision": "8aa634532097154447b13850331fd577fdf5d029",
+  "source_review_structured_validation": {
+    "completed": true,
+    "gate": "pass",
+    "result": "NO_FINDINGS",
+    "reported_model": "claude-opus-5-5",
+    "normal_hooks": "rust,size,shell,tsc,biome pass"
+  }
+}

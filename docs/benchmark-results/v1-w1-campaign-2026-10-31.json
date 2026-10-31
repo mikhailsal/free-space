@@ -22,7 +22,8 @@
     41222190491,
     41223904260,
     41227692011,
-    41227699497
+    41227699497,
+    41230966330
   ],
   "runs": [
     {
@@ -448,13 +449,48 @@
       "completed_job_seconds": 1428.0,
       "purpose": "combined-sql-screen",
       "job_seconds": 1428.0
+    },
+    {
+      "comparison": "candidate",
+      "branch": "perf/v1-combined-sql",
+      "revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2",
+      "owner_allocation": "D19 accepted scanner work under60hours; distinct composition of W3/W4 mechanisms",
+      "source_review": "v1-combined-sql-source-reviews-2026-10-31.json",
+      "id": "combined-sql-full-exploratory",
+      "stage": "local-scale",
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "pairs_per_operation": 1,
+      "operations": [
+        "scan"
+      ],
+      "timeout_minutes": 120,
+      "maximum_job_seconds": 9000,
+      "forecast_seconds": 2952,
+      "status": "in_progress",
+      "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted",
+      "manifest": "v1-combined-sql-manifest-2026-10-31.json",
+      "run_id": 41230966330,
+      "created_at": "2026-10-31T18:45:36Z",
+      "head_sha_verified": true,
+      "purpose": "combined-sql-full-exploratory"
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T18:44:42.412930+00:00",
+  "updated_at": "2026-10-31T18:49:10.770026+00:00",
   "completed_job_seconds": 19727.0,
-  "maximum_committed_seconds": 28727.0,
-  "remaining_unreserved_seconds": 187273.0,
+  "maximum_committed_seconds": 37727,
+  "remaining_unreserved_seconds": 178273,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -569,35 +605,73 @@
   ],
   "planned_next_dispatches": [
     {
-      "comparison": "candidate",
-      "branch": "perf/v1-combined-sql",
-      "revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+      "id": "qualification-smoke-default",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-      "build_target": "x86_64-unknown-linux-musl",
-      "io": "local",
-      "scenario": "unchanged",
-      "refresh_subtree_entries": 100,
-      "memory_mib": 4096,
-      "cpus": 2,
-      "workers": 1,
-      "measurement_protocol": "v1-single-operation-pairs-v3",
-      "profile_policy": "profile-v2",
-      "owner_allocation": "D19 accepted scanner work under60hours; distinct composition of W3/W4 mechanisms",
-      "source_review": "v1-combined-sql-source-reviews-2026-10-31.json",
-      "id": "combined-sql-full-exploratory",
-      "stage": "local-scale",
-      "files": 7264383,
-      "expected_entries": 7297076,
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
       "pairs_per_operation": 1,
       "operations": [
         "scan"
       ],
-      "timeout_minutes": 120,
-      "maximum_job_seconds": 9000,
-      "forecast_seconds": 2952,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
       "status": "admitted_not_dispatched",
-      "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted",
-      "manifest": "v1-combined-sql-manifest-2026-10-31.json"
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+    },
+    {
+      "id": "qualification-smoke-changed",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 10000,
+      "scenario": "changed",
+      "memory_mib": 1024,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
+      "status": "conditional_default_smoke",
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+    },
+    {
+      "id": "qualification-smoke-large-folder",
+      "branch": "perf/v1-qualification-harness",
+      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "smoke",
+      "files": 100000,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "subtree_entries": 100000,
+      "scenario": "unchanged",
+      "memory_mib": 512,
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3000,
+      "status": "conditional_default_smoke",
+      "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
+      "purpose": "Protocol and determinism verification only, no product-performance qualification"
     }
   ],
   "parallel_candidates": {

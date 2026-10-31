@@ -78,8 +78,11 @@
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
       "forecast_seconds": 2952,
-      "status": "admitted_not_dispatched",
-      "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted"
+      "status": "in_progress",
+      "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted",
+      "run_id": 41230966330,
+      "created_at": "2026-10-31T18:45:36Z",
+      "head_sha_verified": true
     }
   ],
   "initial_maximum_runner_seconds": 14100,

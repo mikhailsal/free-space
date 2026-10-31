@@ -1,0 +1,326 @@
+{
+  "created_at": "2026-10-31T18:47:31.689810+00:00",
+  "scope": "W1/W6 qualification harness only; application source unchanged from e826; no product gain claim",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_hash_manifest": {
+    "base_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "branch": "perf/v1-qualification-harness",
+    "files": {
+      ".github/workflows/representative-bench.yml": {
+        "sha256": "4267f1fcaa17e0687438bcae4b902cfb1d60d067ba19341d8f9ebb6f69aa93c6",
+        "bytes": 13341,
+        "lines": 283
+      },
+      "scripts/bench-representative.sh": {
+        "sha256": "d1033d9be7efe7cb9c707012b2e3b71ac767e806aca312ab96df7213a5f2e22a",
+        "bytes": 8333,
+        "lines": 177
+      },
+      "scripts/bench_v1_admission.py": {
+        "sha256": "8e611d824bf94543c1e7ce25330e8be2d7615aab630b2ecf50bbe92f72596eba",
+        "bytes": 8726,
+        "lines": 174
+      },
+      "scripts/bench_v1_fixture.py": {
+        "sha256": "ee9234662055a1525cd25d200e9a345ad60751d929a322e6484555383451d37a",
+        "bytes": 3410,
+        "lines": 76
+      },
+      "scripts/bench_v1_pair.py": {
+        "sha256": "d92358741514ce8944ecae1a2aa8ed3ab2034bb6c5688e75168ef8608b32a136",
+        "bytes": 13578,
+        "lines": 225
+      },
+      "scripts/bench_v1_runtime.py": {
+        "sha256": "fbd840ed5538dc6eca02d3d9ea33b51e88c397cd4cff31e28e2651cb80a395a4",
+        "bytes": 10677,
+        "lines": 215
+      },
+      "scripts/bench_v1_summary.py": {
+        "sha256": "79993682b6d03e734511046636d8cd15acc2e5ab2597d975d5fe6ac342791e10",
+        "bytes": 16683,
+        "lines": 280
+      },
+      "scripts/tests/test_bench_v1_admission.py": {
+        "sha256": "3161dceb25a56b8d6403c27a2a2de3204909363c04b45d6abb84bbabe785e53c",
+        "bytes": 10849,
+        "lines": 178
+      },
+      "scripts/tests/test_bench_v1_runtime.py": {
+        "sha256": "d9ea8e6bcbc73b854efba7fb97addb7fb89f46a987b3660d337d93bc5dd3b6b0",
+        "bytes": 12634,
+        "lines": 230
+      },
+      "scripts/tests/test_bench_v1_summary.py": {
+        "sha256": "30dc213589262377c597c24cf81b1ef91daaab5068fc773ef124fff485a95d32",
+        "bytes": 9835,
+        "lines": 166
+      }
+    }
+  },
+  "requested_model": "claude-opus-5-5",
+  "reviews": [
+    {
+      "file": "freespace-qualification-harness-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "# Review: W1/W6 qualification-harness extension (diff over e826577)\n\nThis review covers only the supplied diff and full files. I ran nothing. Contexts I could not see are listed at the end. One P1 depends on a file not supplied (`scripts/bench-v2-container.py`); check it before dispatch.\n\n## P1 (needs verification first)\n\n**P1-1. `--subtree-entries` is passed to `bench-v2-container.py`, which this diff does not change.**\n- **Where:** `scripts/bench-representative.sh`, the v1-pairs `run_owned python3 scripts/bench-v2-container.py --v1-pairs \u2026` call.\n- **Why it matters:** The shell now always passes `--subtree-entries`, even for the default case. That flag is parsed by `bench_v1_pair.arguments`, but the shell calls `bench-v2-container.py`, and git status shows that file is unmodified.\n  - If it forwards `--v1-pairs` argv straight through, this is fine.\n  - If it has its own parser, every v1-pairs run fails at argparse. That includes default runs, so default compatibility breaks. The v2 path also passes `--memory`, which hints at a shared parser.\n- **Coverage:** No test exercises this argv path. The 23 tests you ran cannot catch it.\n- **Fix:** Confirm the forwarding. Add a unit test that feeds the exact shell argv through `bench-v2-container.py`'s parsing and dispatch.\n\n## P2\n\n**P2-1. Seed scans now run under the reduced ordinary budget.**\n- **Where:** `scripts/bench_v1_pair.py`, `common = dict(\u2026 memory_mib=args.memory \u2026)`, which the `seed-{1,2}` specs reuse.\n- **Why it matters:**\n  - Before this change the workflow always ran with 4096 MiB. Now a 512/1024 MiB case also caps the two preparation scans, which are setup work and not measured.\n  - At screen or local-scale, a seed-scan OOM raises `seed scan validation failed` and the run is INVALID. That happens even if the measured refresh would have fit.\n  - So a \"refresh fits in 512 MiB\" case may never be qualifiable. The setup budget also goes unrecorded in the manifest.\n- **Observer:** `container(\u2026, \"observer\", \u2026)` receives the same `spec`. If it applies `memory_mib`, the observer's full-file integrity and digest work is constrained too. I could not verify this.\n- **Fail direction:** This fails closed, not false-green. It is still a real wasted-run and case-validity risk.\n- **Fix:**\n  - Give seeds a fixed setup budget, e.g. `dict(common, memory_mib=4096, \u2026)`, and record `setup_memory_mib` in the manifest.\n  - Confirm the observer limit does not depend on `spec['memory_mib']`.\n\n**P2-2. The fixture receipt is inaccurate for non-default subtree sizes.**\n- **Where:** `scripts/bench_v1_fixture.py`, the `prepare` return value.\n- **Why it matters:** The unrelated part of the tree shrinks to `files \u2212 subtree + 1`, but `shape` and `payload_block_fraction=0.01` stay constant. For smoke (100000 files) with subtree 100000, the unrelated part is 1 file. That leaves:\n  - 1 payload file, 0 sparse files, 0 hardlinks, 1 long name, 5 directories.\n  - The receipt still claims \"payload1pct-sparse-hardlinks\".\n- **Scan comparability:** Scan operations accept any subtree value, so scan results under a non-default subtree measure a materially different tree under the same shape label.\n- **Fix:**\n  - Count payload, sparse, hardlink, long-name, small and unrelated files during generation, and put those counts in the receipt.\n  - Use a distinct shape string when `subtree_entries != 100`, and keep the old string byte-identical for the default.\n  - Either restrict non-default subtree to refresh in `qualification_case` and `arguments`, or bind the receipt counts in the v4 summary.\n\n**P2-3. The \"case-specific forecast\" claim is not enforced.**\n- **Where:** `.github/workflows/representative-bench.yml`, step \"Check time admission before local-scale allocation\".\n- **Why it matters:** `forecast_seconds` is a bare number. The receipt records `operations` but not subtree, scenario or memory, and it is printed rather than uploaded. A forecast measured for 100/4096/unchanged is accepted unchanged for a 100000/512/changed case.\n- **Fix:**\n  - Add case fields to the receipt.\n  - Require a forecast case identifier input that must equal `subtree/scenario/memory/operation`.\n  - Write the receipt into `representative-results/`.\n  - If you intend this to stay procedural, state that explicitly instead of claiming enforcement.\n\n## P3\n\n**P3-1. Stage-to-files mapping is duplicated.**\n- **Where:** The workflow policy step (`files={'smoke':100000,\u2026}`) and the paired step's `case $STAGE`.\n- **Why it matters:** If the two drift, the subtree \u2264 files gate checks a different count than the one the run uses. argparse then catches it late, after the build.\n- **Fix:** Add `stage_files()` in `bench_v1_admission.py` and emit `BENCH_FILES` as a build output.\n\n**P3-2. The late-invalid memory risk is actionable but low.**\n- **Where:** `bench_v1_pair.arguments` still accepts `--memory 128/256`.\n- **Why it matters:** The producer always writes v4, and the v4 summary always rejects 128/256. Any such run burns the full runner and then reports INVALID.\n- **Reachability:** The workflow cannot reach this, but a manual `BENCH_MEMORY` can.\n- **Fix:** Restrict the choices to `(512, 1024, 2048, 4096)` or reject 128/256 in `arguments()`.\n\n**P3-3. The Markdown header renders an untrusted protocol value.**\n- **Where:** `bench_v1_summary.markdown`, which uses `result['measurement_protocol']`.\n- **Why it matters:** The header is now taken from the manifest verbatim, even when the protocol is invalid. That allows arbitrary text or newlines in `$GITHUB_STEP_SUMMARY`, and a missing manifest renders `# None`.\n- **Fix:** Render a known constant, or `unknown-protocol`.\n\n**P3-4. Downgrade and mixed-marker cases in the summary.**\n- **Where:** The `bench_v1_summary.summarize` v3 branch.\n- **Why it matters:** A v3-labelled manifest carrying `case_policy`, `subtree_entries` or `memory_mib=512` is VALID and labelled v3. This is consistent with your non-cryptographic claim, but it is cheap to reject v4-only keys under v3.\n- **Fix:** Reject v4-only keys under v3. Also type-check `fixture_receipt.expected_subtree_entries` as an int, since JSON `100.0 == 100` currently passes.\n\n**P3-5. Case evidence is not visible.**\n- **Where:** The artifact name is `representative-v1-<stage>-<io>-<target>`, and the Markdown output does not show subtree, scenario or memory.\n- **Fix:** Add the case fields to the artifact name and the summary header, so downloaded artifacts are self-describing.\n\n**P3-6. The changed scenario has no mutation receipt.**\n- **Status:** This predates the extension.\n- **Why it matters:** `scenario` is only self-asserted in the manifest, and the specs do not carry it. A skipped `mutate()` would not be detected. For scan operations, nothing checks the small-folder count either, because `report.subtree_entries` is checked only for refresh.\n- **Fix:** Have `mutate()` return the renamed inode, the new size and mtime of `f00001`, and the mtime of `small`. Store that in the manifest and check it in v4.\n\n**P3-7. Test gaps.**\n- No test covers `prepare()` rejecting subtree < 3, subtree > files, or `True`.\n- No test covers the `subtree == files` boundary.\n- No test covers the workflow policy snippet or the shell argv (see P1-1).\n\n## Checked, no findings\n\n- **Shell injection:** None found. Inputs arrive only through `env:`, `GITHUB_OUTPUT` values are whitelisted ints and strings, and shell arguments are quoted.\n- **Default fixture:** Unchanged. It still creates 99 small files and `files \u2212 99` unrelated files, and the progress print matches.\n- **Defaults:** 100 / unchanged / 4096 are preserved, including for push-triggered runs with empty inputs.\n- **File counts:** The total file count stays constant. `expected_entries` counts directories exactly.\n- **Capacity admission:** The inode/byte estimate is still an upper bound, because a larger subtree means fewer unrelated directories.\n- **`mutate`:** Valid for any subtree \u2265 3, rename keeps the count and inode, and fixed past mtimes are unchanged.\n- **Binding:** The v4 marker and metadata are bound manifest \u2192 receipt \u2192 spec \u2192 metric \u2192 `cgroup memory.max`, and deleting the marker makes the run fail.\n- **Ordering:** Changed is refresh-only and whitelisting happens before allocation.\n- **Unchanged areas:** Cleanup, cgroup and no-swap logic are unchanged.\n\n## Unverified contexts\n\n- `scripts/bench-v2-container.py`: argument forwarding (P1-1).\n- `bench_v1_runtime.container`: how it applies `memory_mib` to observers and seeds (P2-1).\n- The external preregistration/publication checker: whether it pins the expected protocol and how it treats v3 vs v4.\n- Other consumers of `bench_v1_summary.PROTOCOL`, such as other `test_bench*.py` files that may build manifests with `PROTOCOL` (now v4) and no case fields. The full suite was not run; CI's build job would fail closed if one breaks.\n- GitHub server-side enforcement of choice inputs.\n- Any real runner, build or large-fixture behavior.\n\nVerdict: not clean. Resolve P1-1 and the P2 items before dispatching new jobs.",
+        "session_id": "2d81bed6-982f-4840-9858-cab455bd77c4",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 52010,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 15494,
+          "output_tokens_details": {
+            "thinking_tokens": 11974
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 52010,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 15494,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 52010,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 52010
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 15494,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 52010,
+            "webSearchRequests": 0,
+            "costUSD": 0.7262668000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 11974,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 52010,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-qualification-harness-followup.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "# Review: W1/W6 qualification harness follow-up\n\nNo P1 or P2 issues found. There is one small P3. This review is based only on the supplied diff, full files and audit text. No GitHub runner coverage is claimed.\n\n## Earlier findings: closed\n\n| Earlier finding | How it is closed | Where |\n|---|---|---|\n| **P1 dispatch** | `--v1-pairs` forwards `sys.argv[2:]` to `bench_v1_pair.main`. The runpy test runs `bench-v2-container.py` as `__main__` with `--subtree-entries`/`--memory` and asserts the exact argv slice and exit code 0. The shell script forwards `--subtree-entries` and `--memory`. The parser accepts both. | Legacy `main()`; `test_bench_v1_runtime.py` `test_shell_argv_dispatch_and_memory_modes`; `bench-representative.sh` v1-pairs call |\n| **Memory: setup and observer** | Seed specs use `memory_mib=4096` and observers use `observer_memory_mib=4096`. Measured workers use `args.memory` (512\u20134096). The manifest records `setup_memory_mib` and `observer_memory_mib`. The v4 summary checks the spec's `observer_memory_mib`, the observer cgroup `memory.max == 4 GiB` with `swap.max == '0'`, and the worker `memory.max` against the spec. 128 and 256 are rejected by argparse, the workflow choice list and `qualification_case`. | `bench_v1_pair.py` `host()`; `bench_v1_runtime.py` `container_memory`/`container`; `bench_v1_summary.py` v4 block and observer-limit check |\n| **Distribution** | `counts` adds up to `files` (tested). With subtree 100, the outer loop range and indices match the old code, so the old shape label stays correct. Non-default subtrees get a new label. `mutate` still needs `f00000` and `f00001`, which the `>= 3` check guarantees. | `bench_v1_fixture.py` `prepare`; `test_qualification_fixture_counts_and_shared_mutation` |\n| **Case forecast** | The ID covers target, io, operations, subtree, scenario and memory, and each part is validated. A blank or mismatched `forecast_case_id` fails closed. Creating `representative-results/` first does not conflict with `mkdir -p` and `mkdir \"$output/<op>\"` in the shell script. | Workflow forecast step; `forecast_case_id` |\n| **Stage, legacy and v4 summary** | `files` now comes from `stage_files` through job outputs. A v3 manifest carrying v4 keys is rejected, and an unknown protocol is rejected. v4 requires every case field with exact `int` types, and requires `mutation_receipt` to be present and null for unchanged runs. `case` appears in the result and the markdown only for v4. | `bench_v1_summary.py` `summarize` and `markdown`; workflow paired step |\n| **Mutation receipt** | Records the inode, size, mtime (ns) and target mtime. All are validated as positive integers. The recipe name `rename-size-mtime` claims only those changes. | `mutate`; v4 block |\n\n## New SOURCE_DATE_EPOCH, cache and metadata logic\n\n**Ref resolution is safe.**\n- The ref is passed as an argv list after `--end-of-options`, with `^{commit}`.\n- The output must match `[0-9a-f]{40,64}`, and the timestamp must be an ASCII decimal string.\n- `fetch-depth: 0` makes abbreviated refs resolvable. An ambiguous or unknown ref fails closed.\n- `git worktree add` now receives the resolved SHA, not raw input. This also removes the earlier risk of an option-like ref.\n\n**Epoch scope is correct.**\n- The epoch is written to `GITHUB_ENV` before the toolchain, cache, test and build steps.\n- Both arms build in the same step, with the same environment, the same epoch and one shared `CARGO_TARGET_DIR`.\n- `GITHUB_ENV` is per job, so nothing leaks into the paired job, which does not build.\n- `flags.SOURCE_DATE_EPOCH` sits inside the `build_keys` equality check in `bench_v1_pair.py`, so mismatched arms are rejected.\n\n**The cache key is sound.**\n- The user key `target-epoch` becomes part of both the primary and fallback restore prefixes, per the supplied audit of `config.ts:63-85,94-121` and `restore.ts:30-53`.\n- Caches from before the change, keyed only by target, cannot prefix-match the new key.\n- `cc`/`libmimalloc-sys` does not declare `rerun-if-env-changed=SOURCE_DATE_EPOCH`. That is harmless here, because every cache under a given key was built with that same epoch.\n- Two residuals are acknowledged, not new findings: the mutable `@v2` tag, and a same-key cache built outside this workflow cannot be ruled out from the code alone.\n\n**Claims stay bounded.** The changes do not alter the application or allocator, do not normalize artifacts, and do not claim runtime equivalence. The Build ID difference follows from the `__TIME__` bytes, which is consistent with the stated 24-byte diff. Whether builds are actually reproducible on the runner remains a future check on the real SHA.\n\n## Findings\n\n**P3: the forecast receipt is not written when `forecast_seconds` is malformed.**\n- In the workflow forecast step, `float(os.environ['FORECAST'])` runs before `json.dump`. A non-numeric input such as `''` or `abc` raises a `ValueError` and leaves no `forecast-admission.json`.\n- The run still fails closed before any allocation, but the stated \"receipt before alloc\" evidence is missing for that path.\n- Separately, `inf` or `nan` input is written as `Infinity`/`NaN`, which is not valid strict JSON.\n- Suggested fix: parse inside a `try` block, record `error` and `success=False` in the receipt, and dump with `allow_nan=False` after converting non-finite values to strings or null.\n\nThe P3 above is the only open item.\n\n## Outstanding gates, not findings\n\n- A GitHub smoke run with the restore key and cache hit inspected.\n- The full Python suite and source gates via `scripts/check.sh`.\n- Determinism verification on the real SHA before using calibration results.\n\nThese should happen before expanding to more cases.",
+        "session_id": "e614afe2-c66b-410f-a2ec-db76497fb16a",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 69188,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 11039,
+          "output_tokens_details": {
+            "thinking_tokens": 8835
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 69188,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 11039,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 69188,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 69188
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 11039,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 69188,
+            "webSearchRequests": 0,
+            "costUSD": 0.7745908,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 8835,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 69188,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-qualification-harness-p3-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "# Final follow-up review: forecast-admission receipt\n\n**NO_FINDINGS.** The earlier P3 is closed, and the change adds no new P1, P2 or P3 issue. This review uses only the supplied workflow, test and admission source. It does not claim any test run or GitHub execution.\n\n## P3 closure, traced per input\n\n| `FORECAST` | Path | Receipt written | `success` | `estimated_seconds` | Exit |\n|---|---|---|---|---|---|\n| `100` (cap 3 min) | `admit_time(180, 100.0)`: 180 \u2265 130, case matches | yes | `true` | `100.0` | 0 |\n| `''`, `abc` | `float()` raises `ValueError`, which is caught | yes, with `error` | `false` | `null` | 1 |\n| `nan`, `inf` | the `isfinite` guard raises `ValueError`, which is caught | yes, with `error` | `false` | `null` | 1 |\n| `1.7e308` | `admit_time` gives `required_seconds = inf` and `success=False`. The post-loop sets it to `null` and sets `error` | yes | `false` | finite | 1 |\n| `0` | `admit_time` rejects it with `error` | yes | `false` | `0.0` | 1 |\n| case `wrong` | admitted, then `case_matches=False`, `success=False`, `error` | yes | `false` | n/a | 1 |\n| `SUBTREE=invalid` | `forecast_case_id` raises after admission, which is caught and resets `success=False` | yes | `false` | n/a | 1 |\n| `STEP_CAP=bad` | `int()` raises `ValueError`, which is caught | yes | `false` | n/a | 1 |\n\n## Checks on the fix\n\n- **Receipt always written.** Every parse and validation step runs inside `try`. The caught set (`KeyError`, `ValueError`, `OverflowError`) covers each path that can raise there. A very large `STEP_CAP` that reaches `math.isfinite(int)` would raise `OverflowError`, which is also caught. `makedirs` and `json.dump` run after the `try`, so they run on every path.\n- **Strict JSON.**\n  - `required_seconds` is the only float `admit_time` can make non-finite, because `estimated_seconds` is checked as finite first.\n  - The post-loop scrub covers all top-level floats.\n  - Nested `case` values are strings or `None`.\n  - `allow_nan=False` therefore cannot raise, and it acts as a backstop.\n- **Valid case is correct.** The receipt has `success` true and `case_matches` true, and the gate `not success or not case_matches` passes it with exit 0. A mismatched case always forces `success=False`, so there is no state where `success` is true but the case does not match.\n- **The test exercises the real step.**\n  - It takes the heredoc body from the YAML. The split on `\\n          PY` stops at the terminator, since no earlier body line starts with `PY` at that indent.\n  - It dedents the body, matching how GitHub strips the literal block indent.\n  - It runs the body with a `scripts` symlink so `sys.path.insert(0,'scripts')` resolves.\n  - `parse_constant=self.fail` rejects `NaN` and `Infinity`.\n  - It checks `success`, the return code and `error` together.\n\n## Residual notes (not findings)\n\n- If the filesystem fails during `makedirs` or the write, the step exits non-zero without a receipt. It still fails closed before allocation.\n- The `scripts/__pycache__/` and `scripts/tests/__pycache__/` directories are untracked and not ignored. The test's symlinked import adds to them. Keep them out of the commit, or add them to `.gitignore`.\n- The open gates from the previous review still apply:\n  - a GitHub smoke run that checks the cache key and restore,\n  - the full `scripts/check.sh` gates,\n  - a determinism check on the real SHA.",
+        "session_id": "a7e082b2-2abb-4264-b6c2-ddc7e6a312bf",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 19432,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 3670,
+          "output_tokens_details": {
+            "thinking_tokens": 2338
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 19432,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 3670,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 19432,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 19432
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 3670,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 19432,
+            "webSearchRequests": 0,
+            "costUSD": 0.2291628,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2338,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 19432,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-qualification-harness-structured-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "3cf850e6-b215-4b77-816d-5cdadf1e785a",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 19586,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 1994,
+          "output_tokens_details": {
+            "thinking_tokens": 1983
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 19586,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 1994,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 19586,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 19586
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1994,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 19586,
+            "webSearchRequests": 0,
+            "costUSD": 0.1968748,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1983,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 19586,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "prospective_policies": [
+    "v1-single-operation-pairs-v4; legacyv3 remains labelled and rejects v4-only fields",
+    "Per-case subtree100/10000/100000, unchanged or rename-size-mtime mutation only, ordinarymemory512/1024/2048/4096; seeds and independent observers4GiB",
+    "Both arms fixed SOURCE_DATE_EPOCH from baseline commit before cache/build, target+epoch cache key; verify actual binary hashes before calibration",
+    "OOM/timeouts/missing receipts remain invalid; no expected-OOM capacity waiver"
+  ],
+  "source_tests": "37 tiny targeted Python tests before final P3;15 admission tests after P3. Full suite and actual behavior require GitHub smoke. Normal hooks required before publish.",
+  "source_revision": "8aa634532097154447b13850331fd577fdf5d029",
+  "final_validation": {
+    "completed": true,
+    "gate": "pass",
+    "result": "NO_FINDINGS",
+    "model": "claude-opus-5-5"
+  }
+}
