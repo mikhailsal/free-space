@@ -39,8 +39,17 @@
       "timeout_minutes": 55,
       "maximum_job_seconds": 5100,
       "forecast_seconds": 2400,
-      "status": "admitted_before_dispatch",
-      "depends_on": "Satisfied reviewed immutable source, normalhooks and baselineMUSLcontrols; source tests onGHbeforemeasurement"
+      "status": "completed",
+      "depends_on": "Satisfied reviewed immutable source, normalhooks and baselineMUSLcontrols; source tests onGHbeforemeasurement",
+      "run_id": 41227699497,
+      "created_at": "2026-10-31T18:05:44Z",
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 1428,
+      "ordinary_receipts_valid": true,
+      "profile_v2_structure_valid": true,
+      "receipt": "v1-combined-sql-screen-2026-10-31.json",
+      "promotion": false
     },
     {
       "comparison": "candidate",
@@ -68,9 +77,9 @@
       ],
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
-      "forecast_seconds": null,
-      "status": "conditional_screen_pending",
-      "depends_on": "Validscreen, targetscan pairedgain>=15pct, no confirmed disk/RAM/refreshregression; measuredwholepairedforecast+30pct andaggregateadmission; no promotionfromonepair"
+      "forecast_seconds": 2952,
+      "status": "admitted_not_dispatched",
+      "depends_on": "Valid screen speedfloor met; H2 no-regression remains inconclusive. Exploratory scale investigation only, not qualification or gate waiver. Forecast+30pct3838s<7200s measured cap and aggregate reservation admitted"
     }
   ],
   "initial_maximum_runner_seconds": 14100,
@@ -90,5 +99,36 @@
     "No blind retries or post-result budget/cache tuning",
     "Full-scale expansion requires screening speedfloor and recordedadmission; onepairnotqualification"
   ],
-  "product_gates": "All accepted four-metric gates unchanged; no exception"
+  "product_gates": "All accepted four-metric gates unchanged; no exception",
+  "screen_disposition": {
+    "scan_median_change_pct": -31.32974404879948,
+    "scan_disk_gate": "inconclusive: +4096B all3pairs; no no-regression pass",
+    "refresh_time_gate": "inconclusive: positive median+.1514135pct; worstpair+.4615113pct exceeds provisional AA",
+    "decision": "No promotion; one preregistered exploratory full scan admitted to test scale only"
+  },
+  "full_time_admission": {
+    "source_run": {
+      "GITHUB_SHA": "d1c9f014ed185d663947590b388b444c08da7fda",
+      "GITHUB_RUN_ID": "41227699497",
+      "GITHUB_RUN_ATTEMPT": "1"
+    },
+    "operation": "scan",
+    "files": 7264383,
+    "expected_entries": 7297076,
+    "pairs": 1,
+    "components": {
+      "fixture_seconds": 452.780233839647,
+      "two_seed_seconds": 623.5815405445957,
+      "two_scan_seconds": 1006.6525983824248,
+      "two_observer_seconds": 410.5337167573789,
+      "two_copy_seconds": 7.733018297531459,
+      "fixed_setup_calibration_cleanup_allowance_seconds": 450
+    },
+    "forecast_seconds": 2952,
+    "with30pctmargin_seconds": 3838,
+    "paired_step_cap_seconds": 7200,
+    "admitted": true,
+    "limits": "Initial linear projection of worst observed screen components, not promised latency; common memory and I/O; no tuning of benefit bars"
+  },
+  "updated_at": "2026-10-31T18:44:42.412930+00:00"
 }

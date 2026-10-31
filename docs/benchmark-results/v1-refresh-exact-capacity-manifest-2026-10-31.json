@@ -71,7 +71,16 @@
       "maximum_job_seconds": 9000,
       "forecast_seconds": 2329,
       "depends_on": "Satisfied valid screen/fullbaseline receipts, positive attributedRAMeffect; H2guardinconclusiveandno promotion; boundedscaleinvestigationperpreregistration",
-      "status": "admitted_exploratory_before_dispatch"
+      "status": "completed",
+      "run_id": 41227692011,
+      "created_at": "2026-10-31T18:05:39Z",
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 2087,
+      "ordinary_receipts_valid": true,
+      "profile_v2_structure_valid": true,
+      "receipt": "v1-refresh-capacity-full-2026-10-31.json",
+      "promotion": false
     }
   ],
   "current_candidate_source_hashes": {
@@ -103,7 +112,7 @@
     "scan_rss_no_regression": "inconclusive: median+48KiB andoneworsepair+112KiB; priorAAidentityprovisional",
     "prior_AA_binary_sha256": "083bde706e142cede8d400b0c5c6639257c1bf1ca36f9d181b5e30180ac966bb",
     "comparison_baseline_binary_sha256": "4c2ad151c828b60050602bb88ec7297b436bdfd817cfb04503156abd8a72a8ca",
-    "artifact_identity_investigation": "ongoing; same recorded source/target/toolchain, differingbinaryhash; withinjobpairedreceiptsvalid",
+    "artifact_identity_investigation": "Read-only ELF audit resolves byte cause as20buildID+4MiMalloc__TIME__digits; no claim of measured runtime equivalence; future SOURCE_DATE_EPOCH and actualSHA check before new calibration",
     "mechanism": "candidateeliminatesnodebuffermoveand~88MiBnodeRSSstepinall3pairs",
     "reason_to_test_full": "Preregistered positive scale-dependent RAM counterfactual; fixedmapping/loaderoverheads dilute1mpercentage. No confirmed productregression claimed or gate waived."
   },
@@ -117,5 +126,14 @@
     "paired_step_cap_seconds": 7200,
     "maximum_aggregate_job_seconds": 9000,
     "success": true
-  }
+  },
+  "full_disposition": {
+    "rss_change_pct": -31.836544953458258,
+    "rss_delta_kib": -575280,
+    "elapsed_change_pct": 0.5348856177769479,
+    "elapsed_delta_seconds": 0.39682192200007194,
+    "decision": "Single exploratory pair meets descriptive RSSfloor but H2 refresh-time inconclusive; no promotion or minimum-memory claim",
+    "remaining": "Matched-artifact controls, repeated confirmations, folder scenarios, minimum tested RAM and both I/O profiles"
+  },
+  "updated_at": "2026-10-31T18:44:42.412930+00:00"
 }
