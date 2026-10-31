@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 import re
 import statistics
+from bench_v1_admission import RUNNER_PREPARATION_POLICY, valid_runner_preparation
 
 LEGACY_PROTOCOL = 'v1-single-operation-pairs-v3'
 PROTOCOL = 'v1-single-operation-pairs-v4'
@@ -65,6 +66,10 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
     issues, pairs = [], []
     manifest = read_json(root / 'manifest.json', issues)
     protocol = manifest.get('measurement_protocol')
+    if ('runner_preparation_policy' in manifest and manifest['runner_preparation_policy'] != RUNNER_PREPARATION_POLICY
+            or manifest.get('runner_preparation_policy') == RUNNER_PREPARATION_POLICY and not valid_runner_preparation(manifest.get('runner_preparation'))
+            or 'runner_preparation' in manifest and not valid_runner_preparation(manifest['runner_preparation'])):
+        issues.append('invalid runner preparation context')
     if protocol == PROTOCOL:
         if (manifest.get('subtree_entries') not in (100, 10000, 100000)
                 or type(manifest.get('subtree_entries')) is not int
