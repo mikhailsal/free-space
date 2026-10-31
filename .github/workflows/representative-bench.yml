@@ -134,8 +134,59 @@ jobs:
       - name: Install musl tools
         if: steps.policy.outputs.target == 'x86_64-unknown-linux-musl'
         run: |
-          sudo timeout 180 apt-get update -q
-          sudo env DEBIAN_FRONTEND=noninteractive timeout 180 apt-get install -yq --no-install-recommends musl-tools
+          sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT python3 - <<'PY'
+          import os
+          import re
+          import stat
+          from contextlib import ExitStack
+          from pathlib import Path
+          if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted':
+              raise RuntimeError('apt source normalization requires a GitHub-hosted runner')
+          sources = [Path('/etc/apt/sources.list'), Path('/etc/apt/sources.list.d/ubuntu.sources')]
+          with ExitStack() as opened:
+              contents = []
+              for path in sources:
+                  try:
+                      parent = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+                  except FileNotFoundError:
+                      continue
+                  opened.callback(os.close, parent)
+                  try:
+                      fd = os.open(path.name, os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
+                  except FileNotFoundError:
+                      continue
+                  stream = opened.enter_context(os.fdopen(fd, 'r+', encoding='utf-8'))
+                  info = os.fstat(stream.fileno())
+                  if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                      raise ValueError(f'apt source is not a uniquely linked regular file: {path}')
+                  contents.append((path, stream, stream.read()))
+              known = r'https?://(?:azure\.archive\.ubuntu\.com|archive\.ubuntu\.com|security\.ubuntu\.com)/ubuntu(?:/|\s|$)|mirror\+file:/etc/apt/apt-mirrors\.txt(?=\s|$)'
+              recognized = sum(len(re.findall(known, content)) for _, _, content in contents)
+              if not recognized:
+                  raise ValueError('no supported Ubuntu archive URL in standard apt sources')
+              updates = []
+              for path, stream, content in contents:
+                  updated = re.sub(r'mirror\+file:/etc/apt/apt-mirrors\.txt(?=\s|$)',
+                                   'https://archive.ubuntu.com/ubuntu/', content)
+                  updated = re.sub(r'https?://(?:azure\.archive\.ubuntu\.com|archive\.ubuntu\.com)(?=/ubuntu(?:/|\s|$))',
+                                   'https://archive.ubuntu.com', updated)
+                  updated = re.sub(r'http://security\.ubuntu\.com(?=/ubuntu(?:/|\s|$))',
+                                   'https://security.ubuntu.com', updated)
+                  active = '\n'.join(line for line in updated.splitlines() if not line.lstrip().startswith('#'))
+                  if 'azure.archive.ubuntu.com' in active or re.search(r'\bmirror(?:\+[a-z]+)?:', active, re.I):
+                      raise ValueError(f'unsupported active Ubuntu mirror in {path}')
+                  updates.append((path, stream, content, updated))
+              print(f'Recognized {recognized} standard Ubuntu archive URL(s)')
+              for path, stream, content, updated in updates:
+                  if updated != content:
+                      stream.seek(0)
+                      stream.write(updated)
+                      stream.truncate()
+                      stream.flush()
+                      print(f'Normalized Ubuntu archive URLs in {path}')
+          PY
+          sudo timeout --kill-after=5s 180s apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 --error-on=any update -q
+          sudo env DEBIAN_FRONTEND=noninteractive timeout --kill-after=5s 180s apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -yq --no-install-recommends musl-tools
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
