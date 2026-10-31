@@ -1,0 +1,103 @@
+{
+  "run": "https://github.com/mikhailsal/free-space/actions/runs/41220168826",
+  "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "binary_sha256": "083bde706e142cede8d400b0c5c6639257c1bf1ca36f9d181b5e30180ac966bb",
+  "target": "x86_64-unknown-linux-musl",
+  "strict_recompute_valid": {
+    "refresh": true,
+    "scan": true
+  },
+  "profile_v2_prerecorded": true,
+  "profile_valid_structure": true,
+  "original_hwm_monotonic_contract_pass": false,
+  "hwm_anomalies": {
+    "p1-baseline-v1": [
+      {
+        "previous_phase": "refresh_before_graft",
+        "phase": "refresh_after_names",
+        "previous_hwm_kib": 276476,
+        "hwm_kib": 276468,
+        "delta_kib": -8
+      },
+      {
+        "previous_phase": "refresh_after_finalize",
+        "phase": "index",
+        "previous_hwm_kib": 376824,
+        "hwm_kib": 376560,
+        "delta_kib": -264
+      }
+    ],
+    "p1-candidate-v1": [
+      {
+        "previous_phase": "refresh_before_graft",
+        "phase": "refresh_after_names",
+        "previous_hwm_kib": 276472,
+        "hwm_kib": 276464,
+        "delta_kib": -8
+      },
+      {
+        "previous_phase": "refresh_after_finalize",
+        "phase": "index",
+        "previous_hwm_kib": 376820,
+        "hwm_kib": 376688,
+        "delta_kib": -132
+      }
+    ],
+    "p2-baseline-v1": [
+      {
+        "previous_phase": "refresh_after_finalize",
+        "phase": "index",
+        "previous_hwm_kib": 376820,
+        "hwm_kib": 376808,
+        "delta_kib": -12
+      }
+    ],
+    "p2-candidate-v1": [
+      {
+        "previous_phase": "refresh_after_finalize",
+        "phase": "index",
+        "previous_hwm_kib": 376824,
+        "hwm_kib": 376808,
+        "delta_kib": -16
+      }
+    ],
+    "p3-baseline-v1": [
+      {
+        "previous_phase": "refresh_before_graft",
+        "phase": "refresh_after_names",
+        "previous_hwm_kib": 276468,
+        "hwm_kib": 276460,
+        "delta_kib": -8
+      }
+    ],
+    "p3-candidate-v1": [
+      {
+        "previous_phase": "refresh_before_graft",
+        "phase": "refresh_after_names",
+        "previous_hwm_kib": 276472,
+        "hwm_kib": 276464,
+        "delta_kib": -8
+      },
+      {
+        "previous_phase": "refresh_after_finalize",
+        "phase": "index",
+        "previous_hwm_kib": 376820,
+        "hwm_kib": 376720,
+        "delta_kib": -100
+      }
+    ]
+  },
+  "rust": {
+    "passed": 307,
+    "failed": 0,
+    "ignored": 1
+  },
+  "python_passed": 82,
+  "runner_seconds": 1163,
+  "campaign_cumulative_seconds": 12855,
+  "original_artifact_files": 256,
+  "archive": "v1-refresh-musl-screen-2026-10-31.tar.gz",
+  "archive_sha256": "0801ef4036ed857ddacd56b43643edf01cd441fcb916f4fe41fecf7973b2ed58",
+  "index_sha256": "e8024ff5f8beaa248da724f109da3e148260a8e662f113a0a95ac753d2b4ee2b",
+  "candidate_promoted": false
+}

@@ -1,0 +1,52 @@
+{
+  "created_at": "2026-10-31T16:52:12.309098+00:00",
+  "evidence": "Read-only exact pinned cached crate source; no application execution",
+  "locked_crates": {
+    "mimalloc": "0.1.52",
+    "libmimalloc-sys": "0.1.49"
+  },
+  "bundled_mimalloc_version": "3.3.2",
+  "source_sha256": {
+    "mimalloc-0.1.52/src/lib.rs": {
+      "sha256": "f2f6e98264507d5cfa836a48e5b0fe220f3bcc3270a8f5fabeb4297898a27201",
+      "line": 65
+    },
+    "mimalloc-0.1.52/Cargo.toml": {
+      "sha256": "1fae15585ec90fe874b90c1652056283727b88f548ec7fb445117e94e66fbf69",
+      "line": 45
+    },
+    "libmimalloc-sys-0.1.49/build.rs": {
+      "sha256": "4917ec3e9a59e216b1b568ce37ea5cb97ba0ba1b9c50789a29d1cd429de9119f",
+      "line": 8
+    },
+    "libmimalloc-sys-0.1.49/c_src/mimalloc/v3/include/mimalloc.h": {
+      "sha256": "869161433ab2d807a75752d0762accf5b68b6b24ce67e417af46bf181b9b6c72",
+      "line": 11
+    },
+    "libmimalloc-sys-0.1.49/c_src/mimalloc/v3/src/alloc.c": {
+      "sha256": "a92d58e47220e5b6d138b83d92498771be4195ee59136a134e4461f6f726b9b8",
+      "line": 361
+    },
+    "libmimalloc-sys-0.1.49/c_src/mimalloc/v3/src/alloc-aligned.c": {
+      "sha256": "70420b4430da4bb6b5197fd27c6c0df485249c53a986bc9536c9fb643fc7613b",
+      "line": 329
+    }
+  },
+  "source_facts": [
+    "CLI global MiMalloc and C allocation override are musl-only; GNU uses the system allocator",
+    "Wrapper GlobalAlloc.realloc calls mi_realloc_aligned; 8-byte node alignment uses ordinary realloc path",
+    "Bundled v3 is default unless v2 feature enabled; repository CLI does not enable v2",
+    "When requested growth does not fit usable size, allocator allocates new block, copies min(newsize,oldusable) then frees old only after success; no remap path in that function"
+  ],
+  "limits": [
+    "Doubled Rust capacity alone does not prove growth beyond allocator usable size",
+    "Runtime musl pointer movement plus this exact active allocator path would support copy-before-free attribution",
+    "Object lifetimes/virtual copied bytes do not quantify resident physical peak; must correlate measured process/cgroup evidence",
+    "No allocation fix or product acceptance inferred from static facts"
+  ],
+  "primary_links": [
+    "https://docs.rs/crate/mimalloc/0.1.52/source/src/lib.rs",
+    "https://docs.rs/crate/libmimalloc-sys/0.1.49/source/build.rs",
+    "https://github.com/microsoft/mimalloc/blob/v3.3.2/src/alloc.c#L361-L404"
+  ]
+}

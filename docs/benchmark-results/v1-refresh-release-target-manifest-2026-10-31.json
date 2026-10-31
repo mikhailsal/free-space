@@ -38,7 +38,16 @@
       "forecast_seconds": 2400,
       "depends_on": "Publish reviewed immutable target-selector and profile-v2 source before dispatch",
       "source_review": "NO_FINDINGS; requestedclaude-opus-5-5",
-      "status": "admitted_before_dispatch"
+      "status": "completed",
+      "run_id": 41220168826,
+      "created_at": "2026-10-31T16:32:26Z",
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 1163,
+      "ordinary_control_valid": true,
+      "profile_v2_structure_valid": true,
+      "original_hwm_monotonic_contract_pass": false,
+      "receipt": "v1-refresh-musl-screen-2026-10-31.json"
     },
     {
       "comparison": "control",
@@ -64,10 +73,10 @@
       ],
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
-      "forecast_seconds": null,
-      "depends_on": "Valid complete musl screening receipts, frozen same source, measured setup/seed/pair/observer forecast with30pct margin fitting120min step and remaining60hcap; no blind retry",
+      "forecast_seconds": 1473,
+      "depends_on": "Satisfied: strict screen receipts, prospective trace structure, measured frozen formula and60h aggregate admission",
       "source_review": "NO_FINDINGS; requestedclaude-opus-5-5",
-      "status": "conditional_forecast_pending"
+      "status": "admitted_before_dispatch"
     }
   ],
   "prospective_diagnostic_policy": {
@@ -91,8 +100,30 @@
     "success": true
   },
   "time_admission_full": {
-    "status": "pending measured musl screening forecast",
-    "success": false
+    "source_run": {
+      "GITHUB_SHA": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "GITHUB_RUN_ID": "41220168826",
+      "GITHUB_RUN_ATTEMPT": "1"
+    },
+    "operation": "refresh",
+    "files": 7264383,
+    "expected_entries": 7297076,
+    "pairs": 1,
+    "components": {
+      "fixture_seconds": 270.5235191764764,
+      "two_seed_scans_seconds": 353.87299913760177,
+      "two_refresh_commands_seconds": 140.42496138861415,
+      "two_observers_seconds": 249.2168979289347,
+      "two_copies_seconds": 8.64342264419717,
+      "fixed_setup_calibration_cleanup_allowance_seconds": 450
+    },
+    "forecast_seconds": 1473,
+    "with_30pct_margin_seconds": 1915,
+    "paired_step_cap_seconds": 7200,
+    "maximum_aggregate_job_seconds": 9000,
+    "admitted": true,
+    "limitations": "Linear entry/file projection of worst observed screen arms; memory pressure, cache and device nonlinearities may exceed it. This is admission, not promised latency; timeout is invalid evidence. Build reserves a separate 1500 seconds; aggregate campaign admission is separate.",
+    "success": true
   },
   "stop_rules": [
     "No blind retries or parameter sweep",
@@ -110,5 +141,13 @@
     "scripts/bench_v1_profile.py": "2c14825392149e51aa6892014d61d1d49fadeec5c360f80403de4a024d362990",
     "scripts/tests/test_bench_v1_profile.py": "a9b584a9f200e5f3297f402c1cdb742f4d01497fb3b20bf043f1ed4f24d0da41",
     "scripts/bench_v1_pair.py": "2fb3626699e446ab3d988b003ee7e82f6ac439feeaa343eef66e7821bfee0203"
-  }
+  },
+  "fullscale_forecast_formula": {
+    "frozen_at": "2026-10-31T16:37:33.097222+00:00",
+    "source": "v1-refresh-release-forecast-formula-2026-10-31.py",
+    "sha256": "58a3dae254e701fbcc80bf1e1bacb3694099734df2d32825be93857196e2f0ec",
+    "rule": "linear file/entry scaling of screen fixture, two slowest seed scans, two slowest refresh commands, two slowest observers, two slowest copies, plus450fixedseconds; then30pctmargin <=7200stepseconds; separate1500build+300joboverhead envelopes",
+    "status": "frozen before screening artifact retrieval and full-scale dispatch"
+  },
+  "screen_completed_aggregate_campaign_seconds": 12855
 }

@@ -17,7 +17,8 @@
     41200958293,
     41206306054,
     41208041797,
-    41216093276
+    41216093276,
+    41220168826
   ],
   "runs": [
     {
@@ -267,13 +268,48 @@
       "completed_job_seconds": 1077.0,
       "purpose": "Diagnostic paired baseline to localize full-tree refresh RAM peak",
       "job_seconds": 1077.0
+    },
+    {
+      "comparison": "control",
+      "branch": "perf/v1-refresh-scale-harness",
+      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
+      "owner_allocation": "D19 continuation under60hours",
+      "id": "refresh-release-target-screen-control",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "depends_on": "Publish reviewed immutable target-selector and profile-v2 source before dispatch",
+      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json",
+      "run_id": 41220168826,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 1163.0,
+      "purpose": "Identical-binary release musl target control, prospectiveprofile-v2, nooptimization",
+      "job_seconds": 1163.0
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-10-31T16:30:43.856856+00:00",
-  "completed_job_seconds": 11692.0,
-  "maximum_committed_seconds": 25792.0,
-  "remaining_unreserved_seconds": 190208.0,
+  "updated_at": "2026-10-31T16:57:28.411303+00:00",
+  "completed_job_seconds": 12855.0,
+  "maximum_committed_seconds": 21855.0,
+  "remaining_unreserved_seconds": 194145.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -312,14 +348,16 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 14100,
+  "planned_reserved_seconds": 9000,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Release-target refresh diagnostic controls",
-    "status": "screen control admitted before dispatch; fullscale conditional on validscreen and measuredforecast",
+    "status": "musl screen complete; full refresh control admitted before dispatch",
     "owner_allocation": "D19",
     "branch": "perf/v1-refresh-scale-harness",
-    "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+    "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "run_id": 41220168826,
+    "receipt": "v1-refresh-musl-screen-2026-10-31.json"
   },
   "candidate_dispositions": {
     "W3": {
@@ -399,35 +437,6 @@
       "measurement_protocol": "v1-single-operation-pairs-v3",
       "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
       "owner_allocation": "D19 continuation under60hours",
-      "id": "refresh-release-target-screen-control",
-      "stage": "screen",
-      "files": 1000000,
-      "expected_entries": 1004499,
-      "pairs_per_operation": 3,
-      "operations": [
-        "scan",
-        "refresh"
-      ],
-      "timeout_minutes": 55,
-      "maximum_job_seconds": 5100,
-      "forecast_seconds": 2400,
-      "depends_on": "Publish reviewed immutable target-selector and profile-v2 source before dispatch",
-      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json"
-    },
-    {
-      "comparison": "control",
-      "branch": "perf/v1-refresh-scale-harness",
-      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
-      "build_target": "x86_64-unknown-linux-musl",
-      "io": "local",
-      "scenario": "unchanged",
-      "refresh_subtree_entries": 100,
-      "memory_mib": 4096,
-      "cpus": 2,
-      "workers": 1,
-      "measurement_protocol": "v1-single-operation-pairs-v3",
-      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
-      "owner_allocation": "D19 continuation under60hours",
       "id": "refresh-release-target-full-control",
       "stage": "local-scale",
       "files": 7264383,
@@ -438,9 +447,10 @@
       ],
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
-      "forecast_seconds": null,
-      "depends_on": "Valid complete musl screening receipts, frozen same source, measured setup/seed/pair/observer forecast with30pct margin fitting120min step and remaining60hcap; no blind retry",
-      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json"
+      "forecast_seconds": 1473,
+      "depends_on": "Satisfied screen/trace structure, frozen formula1915seconds withmargin <=7200, remainingaggregateadmission",
+      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json",
+      "status": "admitted_before_dispatch"
     }
   ]
 }
