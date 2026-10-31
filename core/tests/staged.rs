@@ -142,6 +142,37 @@ fn disk_scan_handles_wide_directories_and_pending_directory_jobs() {
 }
 
 #[test]
+fn disk_scan_matches_deep_wide_tree_with_pending_ancestor_batches() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("tree");
+    fs::create_dir(&root).unwrap();
+    let mut dir = root.clone();
+    for _ in 0..10 {
+        for index in 0..40 {
+            // Long but valid filesystem components, after the next directory.
+            let name = format!("z-{index:02}-{}", "x".repeat(180));
+            fs::write(dir.join(name), b"payload").unwrap();
+        }
+        dir = dir.join("0-next");
+        fs::create_dir(&dir).unwrap();
+    }
+    fs::hard_link(
+        root.join(format!("z-00-{}", "x".repeat(180))),
+        dir.join("hardlink"),
+    )
+    .unwrap();
+    symlink("missing", dir.join("symlink")).unwrap();
+    let fast = SnapshotDir::new(tmp.path().join("fast"));
+    let disk = SnapshotDir::new(tmp.path().join("disk"));
+    assert_eq!(scan(&[&root], &fast, false).entries, 413);
+    assert_eq!(scan(&[&root], &disk, true).entries, 413);
+    assert_equivalent(
+        &Snapshot::open_current(&fast).unwrap(),
+        &Snapshot::open_current(&disk).unwrap(),
+    );
+}
+
+#[test]
 fn disk_snapshots_support_queries_refresh_and_generation_rotation() {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path().join("tree");
@@ -176,6 +207,63 @@ fn disk_snapshots_support_queries_refresh_and_generation_rotation() {
     let next = scan(&[&root], &dir, true);
     assert_eq!(next.generation, 4);
     assert_eq!(next.prev_generation, Some(3));
+}
+
+#[test]
+fn staged_and_fast_seed_refresh_match_nested_links_and_denied() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("tree");
+    let sub = root.join("sub");
+    fs::create_dir_all(sub.join("nested")).unwrap();
+    fs::create_dir(sub.join("denied")).unwrap();
+    fs::write(sub.join("nested/owner"), b"inside owner").unwrap();
+    fs::hard_link(sub.join("nested/owner"), root.join("z-outside")).unwrap();
+    fs::write(root.join("z-owner"), b"outside owner").unwrap();
+    fs::set_permissions(sub.join("denied"), fs::Permissions::from_mode(0o0)).unwrap();
+    let fast = SnapshotDir::new(tmp.path().join("fast"));
+    let disk = SnapshotDir::new(tmp.path().join("disk"));
+    for _ in 0..2 {
+        scan(&[&root], &fast, false);
+        scan(&[&root], &disk, true);
+    }
+    fs::remove_file(sub.join("nested/owner")).unwrap();
+    fs::remove_dir(sub.join("nested")).unwrap();
+    fs::hard_link(root.join("z-owner"), sub.join("new-link")).unwrap();
+    let refresh = |dir: &SnapshotDir| {
+        run_refresh(RefreshRequest {
+            path: sub.as_os_str().as_bytes().to_vec(),
+            workers: 1,
+            dir: dir.clone(),
+            on_progress: None,
+        })
+        .unwrap()
+    };
+    let a = refresh(&fast);
+    let b = refresh(&disk);
+    assert_eq!(
+        (a.generation, a.entries, a.subtree_entries, a.removed),
+        (b.generation, b.entries, b.subtree_entries, b.removed)
+    );
+    assert_eq!(a.generation, 3);
+    assert_eq!(a.denied, b.denied);
+    if unsafe { libc::geteuid() } != 0 {
+        assert_eq!(a.denied.len(), 1);
+    }
+    let fast_current = Snapshot::open_current(&fast).unwrap();
+    let disk_current = Snapshot::open_current(&disk).unwrap();
+    assert_eq!(
+        fast_current.meta.prev_generation,
+        disk_current.meta.prev_generation
+    );
+    assert_eq!(fast_current.meta.prev_generation, Some(1));
+    assert_equivalent(&fast_current, &disk_current);
+    let fast_previous = Snapshot::open(&fast.prev()).unwrap();
+    let disk_previous = Snapshot::open(&disk.prev()).unwrap();
+    assert_eq!(fast_previous.meta.generation, 1);
+    assert_eq!(disk_previous.meta.generation, 1);
+    assert_equivalent(&fast_previous, &disk_previous);
+    fs::set_permissions(sub.join("denied"), fs::Permissions::from_mode(0o700)).unwrap();
 }
 
 #[test]
