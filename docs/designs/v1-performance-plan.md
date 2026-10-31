@@ -1,6 +1,6 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: W1/W3/W4 screening recorded; W3/W4 not promoted; refresh allocation diagnostics in source preparation.
+Date: 2026-10-31. Status: W1/W3/W4 screening recorded; W3/W4 not promoted; D19 refresh diagnostic allocation pending.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
 Source baseline: master `afce6fd`; investigation branch HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
@@ -437,6 +437,14 @@ its two jobs; actual additional use was 2,497 seconds, bringing the campaign to
 10,615 of 21,600 seconds. No full-scale expansion or gate exception was used.
 
 ## W5: improve v1 refresh without recreating v2
+
+Before changing allocation behavior, the separately prepared
+[allocation probe](v1-refresh-allocation-probe.md) can test the observed
+graft/finalize RAM-peak hypothesis. Its diagnostic-only source passes normal
+hooks and Opus review; no probe has run. D19 proposes at most two conditional
+screening jobs within the remaining 10,985 seconds, reserving 10,200 at most.
+This does not cancel D7's staged-refresh research or accept a capacity fix without
+measured cause/benefit. No D19 job starts before the owner's new scope choice.
 
 Current refresh loads the full tree (`core/src/refresh.rs:242`), grafts/refinalizes
 it and writes a full replacement (`:282`). The ~1.1 GiB RSS on the large fixture
@@ -1177,6 +1185,6 @@ is authorized; candidate implementation/qualification and normal repository gate
 remain necessary before declaring any optimization successful.
 
 NO UNRESOLVED OWNER DECISIONS FOR COMPLETED D17/D18. Neither W3 nor W4 is promoted.
-Any new refresh allocation probe requires a new scope allocation; source-only
-diagnostic preparation launches no jobs. The same six-hour cap and metric gates
-remain binding.
+NEXT OWNER DECISION D19: the bounded refresh allocation investigation within the
+existing remainder, or close the initial campaign. Source preparation launches
+no jobs; the same six-hour cap and metric gates remain binding.

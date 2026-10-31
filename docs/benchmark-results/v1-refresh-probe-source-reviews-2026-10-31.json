@@ -1,0 +1,76 @@
+{
+  "created_at": "2026-10-31T14:54:35.599416+00:00",
+  "branch": "perf/v1-refresh-allocation-probe",
+  "source_revision": "274d412169ff344927a554769d8996b6b774b3de",
+  "requested_model": "claude-opus-5-5",
+  "access": "none",
+  "final_source_sha256": {
+    "core/src/scan/profile.rs": "80b7276bb9308244fc4adc929c2bde2a2994ecc3a0aa042ae347a6ef089fc620",
+    "core/src/refresh.rs": "45f6b0464e03cd5517ec6faf6fd2e218bcbd932cec21140b2d53ab3edb365a8b",
+    "scripts/bench_v1_runtime.py": "8c0d17bca7b26b45597265433ae61f0d5a3806ff279c89f6211d182a0731a9ff",
+    "scripts/bench_v1_pair.py": "8e317f1beaf8571340d6d86c31f84a5eae9168980c0be92838c503a0f172c0ba",
+    ".github/workflows/representative-bench.yml": "f95ae671c645b1eb1441274c6bb54500f2bd296db61b205c9ae076c185a323f4",
+    "scripts/bench_v1_summary.py": "1682ceb68c2d20eb4296e02fd71ab8456d93b9c404ca975684e3cec65bae76bd"
+  },
+  "reviews": [
+    {
+      "label": "Initial review",
+      "status": "completed",
+      "result": "**Findings**\n\n**[P2] `refresh_locked` now exceeds Clippy's 80-line limit, so `scripts/check.sh rust` fails.** In `core/src/refresh.rs`, Clippy's `too_many_lines` does not count physical lines. It counts the non-blank, non-comment lines of the body block, and that count includes the `{` line and the closing `}`.\n\n- I count the new function at 90 physical lines: 7 blank, 2 comment-only (the \"Grafting/finalization\u2026\" pair), so **81 counted lines**.\n- The old function had 85 physical lines, or 76 counted. The four new `allocation`/`phase` lines in this function push it over 80.\n- With `-D warnings` this fails the local pre-push gate and the workflow's `scripts/check.sh` step. The build job then stops before `cargo test` and before building either arm.\n- **Fix:** move the graft/finalize span (`Paths::new` through `finalize_seconds`) into a helper that returns `(tree, fin, policy, finalize_seconds)`. Keep the same operation order and leave `loaded.raw_of`/`links` where they are, so the existing drop-before-write sequence is unchanged. Do not raise the limit or add an allow.\n- This premise from the brief is wrong: \"90 physical is not automatically a violation.\" Here it is a violation.\n\n**[P3] The removed-subtree path never emits `refresh_after_names` or `refresh_after_nodes`.** Both markers are inside `replace_subtree`'s `Some(sub)` arm. When the target disappears from disk (`sub == None`), the trace has only `refresh_start`, `refresh_loaded`, `before_graft`, `after_graft` and `after_finalize`.\n\n- The parent's \"complete phases\" check will then reject the trace as incomplete. That is correct-by-rejection, but it is indistinguishable from a broken probe.\n- The current harness targets `/scratch/tree/small`, and I can't see whether `mutate()` in the `changed` scenario ever removes it.\n- **Fix:** either define the required phase set per outcome (`removed` is in the CLI report), or emit both markers in the `None` arm as well. The second option is cheap and adds no per-entry work.\n\n**Verified OK**\n\n- **Disabled path:** `OnceLock` returns before any `/proc` read or JSON build, and the env var is read once as before. `&mut Tree` is reborrowed shared, never cloned.\n- **Pointer state:** `previous_buffers` is updated only by allocation events, so phase events don't reset it. The first event reports `false`/`false`. Moving `loaded.tree` into `tree` keeps the heap pointers, so `after_finalize` compares correctly.\n- **Locking:** the guard is `mut`; a poisoned mutex or failed `/proc` read returns silently. Index-assigning into a `json!` object can't panic. Write errors are ignored, so the command result is unchanged.\n- **Ordering:** fault points, publication and `record_success` order are untouched. `refresh_start` runs after lock acquisition and before `cleanup_tmp`, and only creates a file under `/results`.\n- **Harness gating:**\n  - Seeds set `allocation_diagnostics=False` explicitly, and the observer never receives the env var.\n  - The `is True` check survives the JSON round-trip.\n  - The trace path is unique per arm id, `create_new` rejects reuse, and the file sits outside `/scratch/snapshot`.\n  - `diagnostic_policy` matches the spec. The manifest's `operation == \"refresh\"` gating matches the per-arm specs.\n- **Workflow:** `cargo test --workspace --locked` runs from the repo root, after the other checks, under the default `bash -e`.\n\n**Missing context (not findings)**\n\n- I can't see whether legacy `measured_command` runs any other `freespace` process in the worker container before the measured refresh. If it does, that process would inherit the env, claim the `create_new` file first, and leave the refresh process silently untraced.\n- I can't see whether `summarize`/the pair validator rejects unexpected files in `/results/<id>/` or unexpected manifest keys.\n- The full workspace tests plus two release builds may push the build job past its 25-minute timeout. I can't measure that here.\n\n[P2] refresh_locked has 81 Clippy-counted lines (>80); check.sh rust fails and blocks the build job \u2014 extract the graft/finalize span into a helper.\n[P3] after_names/after_nodes markers are missing when the subtree was removed (sub=None), so those traces fail the complete-phase check as indistinguishable from a probe failure.",
+      "model_usage": {
+        "claude-opus-5-5": {
+          "inputTokens": 2,
+          "outputTokens": 6315,
+          "cacheReadInputTokens": 658,
+          "cacheCreationInputTokens": 32711,
+          "webSearchRequests": 0,
+          "costUSD": 0.3881276,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 128000,
+          "thinkingTokens": 4761,
+          "cacheCreationEphemeral5mInputTokens": 0,
+          "cacheCreationEphemeral1hInputTokens": 32711,
+          "canonicalModel": "claude-opus-5-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "session_id": "3d0c741b-f2a5-41a1-924e-62c932780596"
+    },
+    {
+      "label": "Repaired source review",
+      "status": "completed",
+      "result": "**Findings**\n\nNone at P1, P2 or P3.\n\n**Former P2 resolution**\n\n- `refresh_locked` in `core/src/refresh.rs` now counts **80** Clippy lines: 89 physical lines, minus 7 blank lines, minus the 2-line \"Grafting/finalization\u2026\" comment.\n- `too_many_lines` fires only when the count is strictly greater than the threshold, so 80 passes.\n- It is exactly at the limit. Any future line added to this function needs the graft/finalize extraction first.\n- Moving `refresh_start` to after `_lock` and before `refresh_locked` changes no existing order:\n  - `t_all` still starts inside `refresh_locked`, so `total_seconds` excludes the diagnostic line.\n  - `cleanup_tmp`, the fault points, the drops before `write_snapshot`, publication and `record_success` keep their order.\n  - The `record_error` path is unchanged.\n\n**Timers**\n\n- Every allocation marker sits inside an existing `Instant` span:\n  - `refresh_loaded` is after `load_seconds` is read.\n  - `before_graft`, `after_graft` and `after_finalize` are inside the finalize span.\n  - `after_names` and `after_nodes` are inside `graft`.\n- That diagnostic overhead counts toward `finalize_seconds`. This is only a concern for the measured diagnostic arms, and it applies equally to both arms. It is not a bug, but the contract should not compare `finalize_seconds` against non-diagnostic runs.\n\n**Former P3 disposition**\n\n- With outcome-dependent required phases, the `None` arm needs only the common boundaries.\n- The fixed workload (`expected_subtree_entries=100`) would fail ordinary validation on `removed=True` anyway.\n- Pointer state stays consistent in both arms. In the `None` arm, `after_graft` compares against `before_graft`, so it reports unchanged buffers unless `retain` reallocates, which it does not.\n\n**Pointer fields**\n\n- Only allocation events update `previous_buffers`.\n- The first allocation event (`refresh_loaded`) reports `false`/`false`.\n- Moving `loaded.tree` into `tree` keeps the heap buffers, so `after_finalize` is compared against `after_graft` correctly.\n- Passing `&mut Tree` to `allocation(&Tree)` is an implicit shared reborrow, with no copy.\n\n**File gating**\n\n- The env var is added only when `mode == \"worker\"` and `allocation_diagnostics is True`.\n- Seeds pass an explicit `False`, and observers never get the var.\n- Per your context, `measured_command` launches exactly one `/binary` under `/usr/bin/time`, so no earlier `freespace` process can claim the `create_new` file.\n- The trace lives in the per-arm results directory. `summarize` only rejects unexpected *directories* at the root and nested `spec.json` files, so `allocation-profile.jsonl` does not invalidate a run.\n- Both arms of a pair carry the same `allocation_diagnostics` value, so the pair configuration-equality check holds.\n\n**Scope**\n\n- Only the `screen` stage runs `refresh`, so the smoke and local-scale stages are unaffected.\n- No reserve or optimization code changed.\n\n**Missing context (not findings)**\n\n- I can't see `core/src/scan/mod.rs`. `scan::profile::allocation` must be reachable from `crate::refresh`, and `scan::tree::Node` must be visible to `profile`. The next compile will confirm both.\n- I can't see whether `scan::walk` emits its own `phase` markers during `rescan_subtree`. If it does, they will appear between `refresh_loaded` and `before_graft`. They are harmless, because phase events don't touch `previous_buffers`, but the parent's completeness check should tolerate extra phase names.\n- The 25-minute build-job budget with `cargo test --workspace` plus two release builds is still unmeasured.\n- The workflow's `push` path filter does not include `core/**`, so Rust-only changes will not trigger it automatically. With `workflow_dispatch` that is fine.\n\nNO_FINDINGS",
+      "model_usage": {
+        "claude-opus-5-5": {
+          "inputTokens": 2,
+          "outputTokens": 4239,
+          "cacheReadInputTokens": 1494,
+          "cacheCreationInputTokens": 38081,
+          "webSearchRequests": 0,
+          "costUSD": 0.38973479999999994,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 128000,
+          "thinkingTokens": 2838,
+          "cacheCreationEphemeral5mInputTokens": 0,
+          "cacheCreationEphemeral1hInputTokens": 38081,
+          "canonicalModel": "claude-opus-5-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "session_id": "e725ed78-d495-4827-8352-2d587b8ae549"
+    }
+  ],
+  "verification": {
+    "normal_pre_push": "passed: Rust compilation/Clippy/format, tracked-file size, shell, TypeScript/Biome; no bypass",
+    "python_contract_tests": {
+      "passed": 65,
+      "seconds": 40.72,
+      "execution": "local tiny contract fixtures under50pctCPU/2GiB/60scommandcap; no application scan"
+    },
+    "rust_workspace_execution": "not run for this diagnostic revision; required by futureGHbuild"
+  },
+  "preparation_launch_issue": "One local review launch failed before provider invocation because prompt preparation had not finished; actual review calls completed after the file existed. No coverage was claimed from that failed launch.",
+  "claim_scope": "Source diagnostic only, no capacity fix, no new GH job authorized or executed"
+}

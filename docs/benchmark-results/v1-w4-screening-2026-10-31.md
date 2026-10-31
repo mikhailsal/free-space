@@ -88,7 +88,8 @@ excluded from the durable archives.
 Both SQL experiments remain unqualified on their experiment branches. The next
 useful investigation is the large v1 refresh RAM peak: the
 [allocation note](../designs/v1-refresh-allocation-investigation.md) describes a
-testable vector-growth hypothesis and its uncertainty. A diagnostic source
-variant is being prepared separately; it has no runner allocation under D18.
+testable vector-growth hypothesis and its uncertainty. The separately prepared
+[diagnostic source variant](../designs/v1-refresh-allocation-probe.md) passes
+normal checks and Opus source review; it has no runner allocation under D18.
 This does not replace the approved W5 staged-refresh experiment or claim that
 reserving capacity fixes the peak.
