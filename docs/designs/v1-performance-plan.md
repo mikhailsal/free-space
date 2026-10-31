@@ -1,6 +1,6 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: individual W3/W4 variants not promoted; release-musl controls complete; exact-capacity and combined-SQL candidates under investigation within the owner-extended 60-runner-hour cap.
+Date: 2026-10-31. Status: no candidate promoted; release-musl controls complete, narrow RAM and SQL effects measured, joint configuration and staged refresh under investigation within the owner-extended 60-runner-hour cap.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
 Original source baseline: master `afce6fd`; initial investigation HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
@@ -47,10 +47,25 @@ The release-musl controls now reproduce the large refresh memory peak: the
 refreshes 100 entries among 7,297,076 in about 74.5 s, with approximately
 1.72 GiB process RSS and 2.55 GiB application disk peak. Node growth raises
 boundary RSS from about 1.11 to 1.71 GiB. This is control evidence, not an
-optimization. The [exact-capacity candidate](v1-refresh-exact-capacity.md) is
-being tested against that baseline. A distinct reviewed composition of the W3
-leaf and W4 sibling-query mechanisms is separately preregistered; the historical
-individual variants remain unpromoted. No benefit percentages are added together.
+optimization. The [exact-capacity candidate](v1-refresh-exact-capacity.md) reduced
+full-scale process RSS by 31.84% (about 562 MiB) in one pair, while refresh time
+rose 0.53%; H2 is inconclusive. Cgroup peak changed from 2.44 to 2.26 GiB, and
+minimum required RAM remains unknown. The
+[SQL composition screen](../benchmark-results/v1-combined-sql-screen-2026-10-31.md)
+reduced scan time by a paired median 31.33%, while its disk and refresh guards
+remain inconclusive. Its full-scale scan is still running. No benefit percentages
+are added together.
+
+The [joint configuration](../benchmark-results/v1-joint-manifest-2026-10-31.json)
+combines these mechanisms and removes eager ancestor-batch eviction after source
+review found repeated-read risk on deep trees. Its final requested Opus review
+and normal hooks pass; new GitHub tests and measurements remain necessary.
+Two protocol smokes verify actual binary identity across builds with a fixed
+source epoch. The third stopped before fixture allocation on a different runner
+image with only 14 GiB free against the unchanged 42 GiB admission requirement.
+Its failure receipts are preserved. A separately reviewed prospective runner
+preparation policy is required before retry or larger expansion. This is an
+infrastructure failure, with no large-folder performance or memory result.
 
 Local calibration and the requested `claude-opus-5-5` outside reviews are complete.
 D16 permits test-host backend switching without certifying a production release

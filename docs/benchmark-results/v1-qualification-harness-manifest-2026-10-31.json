@@ -108,9 +108,18 @@
       "memory_mib": 1024,
       "timeout_minutes": 20,
       "maximum_job_seconds": 3000,
-      "status": "admitted_not_dispatched",
+      "status": "completed",
       "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
-      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+      "purpose": "Protocol and determinism verification only, no product-performance qualification",
+      "run_id": 41232072330,
+      "created_at": "2026-10-31T18:59:59Z",
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 240,
+      "ordinary_receipts_valid": true,
+      "profile_v2_structure_valid": true,
+      "actual_binary_identity": true,
+      "receipt": "v1-qualification-smoke-changed-2026-10-31.json"
     },
     {
       "id": "qualification-smoke-large-folder",
@@ -131,9 +140,18 @@
       "memory_mib": 512,
       "timeout_minutes": 20,
       "maximum_job_seconds": 3000,
-      "status": "admitted_not_dispatched",
+      "status": "completed",
       "depends_on": "Reviewed immutable source and normal hooks; first default smoke must pass with actual baseline/candidate binary identity before changed/large-folder expansion",
-      "purpose": "Protocol and determinism verification only, no product-performance qualification"
+      "purpose": "Protocol and determinism verification only, no product-performance qualification",
+      "run_id": 41232507959,
+      "created_at": "2026-10-31T19:05:06Z",
+      "head_sha_verified": true,
+      "conclusion": "failure",
+      "aggregate_job_seconds": 179,
+      "ordinary_receipts_valid": false,
+      "performance_measurement_started": false,
+      "failure_class": "Infrastructure disk admission: 72GiB root/14GiB free below unchanged42GiB requirement; no volume/fixture/arms allocated",
+      "receipt": "v1-qualification-smoke-large-folder-2026-10-31.json"
     }
   ],
   "maximum_runner_seconds": 9000,

@@ -1,0 +1,74 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41232072330",
+  "strict_summary": {
+    "valid": true,
+    "issues": [],
+    "pairs": [
+      {
+        "pair": 1,
+        "elapsed_seconds": {
+          "baseline": 1.1456138409999994,
+          "candidate": 1.1440510890000155,
+          "delta": -0.0015627519999839024
+        },
+        "peak_rss_kib": {
+          "baseline": 72740,
+          "candidate": 72848,
+          "delta": 108
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 36761600,
+          "candidate": 36761600,
+          "delta": 0
+        }
+      }
+    ],
+    "summary": {
+      "elapsed_seconds": {
+        "median_delta": -0.0015627519999839024,
+        "max_abs_delta": 0.0015627519999839024
+      },
+      "peak_rss_kib": {
+        "median_delta": 108,
+        "max_abs_delta": 108
+      },
+      "app_disk_peak_bytes": {
+        "median_delta": 0,
+        "max_abs_delta": 0
+      }
+    },
+    "identical_binaries": true,
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "case": {
+      "case_policy": "qualification-v1",
+      "scenario": "changed",
+      "subtree_entries": 10000,
+      "memory_mib": 1024,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": {
+        "recipe": "rename-size-mtime",
+        "renamed_inode": 850439,
+        "changed_size": 8192,
+        "changed_mtime": 1700000060000000000,
+        "target_mtime": 1700000060000000000
+      }
+    }
+  },
+  "profile": {
+    "valid_structure": true,
+    "original_hwm_monotonic_contract_pass": false
+  },
+  "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "runner_seconds": 240,
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 90
+  },
+  "archive": "v1-qualification-smoke-changed-2026-10-31.tar.gz",
+  "archive_sha256": "240eee002671a029799b5494c350ab7b949fb92eda5ef0d91c0eabb014f42b6d",
+  "index_sha256": "b2d0b777fbd19bc2537a4f4774ea4965acd2d8239a8e758cd25c25def6695759",
+  "original_files": 67
+}

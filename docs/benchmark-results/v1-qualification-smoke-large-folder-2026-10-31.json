@@ -1,0 +1,26 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41232507959",
+  "status": "failure",
+  "failure": "before allocation: runner had insufficient free space for 42 GiB admission",
+  "paired_measurements_produced": false,
+  "strict_summary": "not available",
+  "profile": "not available",
+  "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "binary_hash_verified_both_arms": true,
+  "cache_restore_full_match": true,
+  "runner_seconds": 179,
+  "job_seconds": {
+    "build": 167,
+    "paired": 12
+  },
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 90
+  },
+  "archive": "v1-qualification-smoke-large-folder-2026-10-31.tar.gz",
+  "archive_sha256": "19a30746621b2d9e47e812172052067346cfbb038596bad444e4b77ef2032dd3",
+  "index_sha256": "aecd13f7de092131891e289d7d617859c4866756f8a2b6dc96648e80b0d9db89",
+  "artifact_files": 2
+}

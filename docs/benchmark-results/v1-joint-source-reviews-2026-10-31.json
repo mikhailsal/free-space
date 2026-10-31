@@ -1,0 +1,224 @@
+{
+  "created_at": "2026-10-31T19:07:00.263565+00:00",
+  "scope": "Distinct joint configuration: exact refresh capacity plus leaf fast path and32-row directory batching WITHOUT eager ancestor eviction",
+  "candidate_revision": "2599947cae2c074234bd570955e3dfe565388c79",
+  "product_baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_hashes": {
+    "base_qc": "8aa634532097154447b13850331fd577fdf5d029",
+    "product_baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "files": {
+      "core/src/refresh.rs": "f1f3c7b8ba8fd4d9bf2f0cfad9de536e8347ebf4a69817928b3a9d1096d0f4d8",
+      "core/src/refresh/load.rs": "f0133db05f40e0d9680bcf476d56f9ef5b27c3159c54f72f12fe4dd97fae9b89",
+      "core/src/refresh/load/tests.rs": "4c558f0eed626bc42ede59beb88c3cd046e0cef1d53ffa597a4054f31a96af79",
+      "core/src/scan/staged/write.rs": "dc12b7b4c9deeb9aeb93f285674d0ccb05954ff716d50e2563a76d58798dee04",
+      "core/src/scan/staged/write/batch.rs": "8ec0d43b301403731d27a9f855c156cf90df3392bfaa2fba04543b2c4ad551af",
+      "core/src/scan/staged/write/batch/tests.rs": "1e72bdcb0ad211a763455de76c0f4b61f6ec55458d1aba98351eaa443043d9c4",
+      "core/src/scan/staged/write/tests.rs": "dabf263b2c76b24748aa15ada2e11581563aceab297ac765c1e06c977426161c",
+      "core/tests/staged.rs": "455efb8ba009d64752acf7130b931721b9d7a5e288d200e1d62f3345dd7ad464"
+    }
+  },
+  "requested_model": "claude-opus-5-5",
+  "reviews": [
+    {
+      "file": "freespace-joint-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "[P3] Exhausted, empty, and mount directories can evict ancestor batches for nothing (`core/src/scan/staged/write.rs`, `evict_for_directory` and the `write_root` loop)\n`evict_for_directory` runs before `batch::next` whenever the top frame is not a leaf and has no pending rows. That is also true in three cases where no batch will be fetched:\n- the final `None` lookup of every directory that has used all its children;\n- every empty or denied directory;\n- every `Kind::Mount` frame (`is_leaf` treats Mount as non-leaf, but mounts never have staged children).\n\nWhen `can_prefetch_full_batch()` is false, each of these releases the shallowest ancestors' buffered rows, and those rows are fetched again later from the cursor. The default budget holds about 7\u20138 pending frames (256 slots). In trees deeper than that, a shallow directory whose children are mostly subdirectories can refetch a 32-row batch for each child it consumes. That reads up to 32 times more rows than the base, which used `LIMIT 1` per child.\n\nThe output stays correct, because cursors resume from the last consumed child. The cost is not bounded or tested:\n- No test bounds the select or row-read count under eviction pressure.\n- `disk_scan_matches_deep_wide_tree_with_pending_ancestor_batches` checks parity only.\n\nSuggested fix: skip eviction for `Kind::Mount`, or evict only after the query shows that a refill is needed. Then add a select-count assertion for a deep tree under budget pressure.\n\n[P3] The refresh phase order changed, so profiling evidence from the QC base is not comparable (`core/src/refresh/load.rs`, `prepare_refresh`)\nThe walk now runs before the snapshot load. `profile::allocation(\"refresh_loaded\", \u2026)` now fires after the walk, when the walked subtree (`sub`) is already in memory.\n- The base sequence was load, `refresh_loaded`, walk.\n- `load_seconds` now also includes the separate roots query (`root_seconds`).\n\nThe report fields keep their names but measure a different sequence. Profiling and benchmark consumers added in e826577 and 274d412 may assume the old order or the old peak composition. The joint candidate's refresh evidence must be captured fresh; do not reuse the base's per-phase allocation traces. I could not check whether `bench_v1_profile` parses event order, because its source is not in the supplied material.\n\n[P3] No test covers refresh of a low-memory snapshot in the joint configuration (`core/tests/staged.rs`)\n`disk_snapshots_support_queries_refresh_and_generation_rotation` refreshes a snapshot written by the staged engine, but its tree has no hardlinks, mounts, denied directories, or nested subdirectories.\n\nThe joint candidate changes two things that refresh depends on:\n- how the staged writer emits leaf rows: it skips `UPDATE` for leaves and relies on the `INSERT` values for `errors`, `subtree_end`, `min_scanned_at` and `newest_mtime`;\n- how refresh loads and reserves the tree: walk first, then `load_tree_with_extra`.\n\nNo test refreshes the same tree from a fast-scan snapshot and from a staged snapshot and asserts that the results are equivalent (`assert_equivalent`). Such a test should include a hardlink with one link inside the refreshed subtree and one outside, and a denied directory. These are the paths where T19/OV-11 ownership and own-value subtraction (`subtract_children`) depend on exact stored aggregates.",
+        "session_id": "1ec09d79-03a4-44bf-84c4-a7f607091801",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 81584,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 9335,
+          "output_tokens_details": {
+            "thinking_tokens": 8138
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 81584,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 9335,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 81584,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 81584
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 9335,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 81584,
+            "webSearchRequests": 0,
+            "costUSD": 0.8396788,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 8138,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 81584,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-joint-followup.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**[P2] The refresh profile no longer marks where the walk ends and the load begins, so `refresh_loaded` can be misread as a load-only measurement.**\n`core/src/refresh/load.rs:31-46`: `prepare_refresh` runs `rescan_subtree` before `load_tree_with_extra` and emits only `refresh_loaded` at the end.\n- **What changed:**\n  - The span `refresh_start \u2192 refresh_loaded` (`refresh.rs` `run_refresh`) now contains: roots query, the full filesystem walk, and the snapshot load.\n  - `profile.rs` says the external benchmark samples RSS between markers. Any interval-based attribution keyed on the closing marker will therefore count walk RSS and time as \"load\".\n- **What the `refresh_loaded` sample now includes:**\n  - `rss_kib` includes the resident `sub` tree.\n  - `hwm_kib` includes the walk's peak.\n  - `node_capacity` includes the reserved graft headroom (`n + extra`), not just the loaded rows. Comparing `node_capacity` with `node_len`, or using `node_capacity \u00d7 node_size_bytes`, as \"load allocation\" is now wrong.\n- **Legacy comparison:** in the legacy order, `refresh_loaded` came before the walk, so its RSS/HWM were load-only. Existing evidence, including that recorded by e826577 (`bench_v1_profile`), is not comparable across baselines without remapping.\n- **Fix:** emit a `refresh_walked` marker (`phase` or `allocation` on `sub`) between the walk and the load. Update the benchmark's phase mapping and documentation so `refresh_walked \u2192 refresh_loaded` is the load interval.\n- **Missing context:** the benchmark parser source was not supplied, and neither was whether `scan::walk` emits its own allocation markers. If it does, `node_buffer_changed` at `refresh_loaded` now compares against the `sub` tree's buffers rather than nothing. Confirm before reusing that flag as evidence.\n\n**[P3] Progress reports the walk as finished while the whole snapshot is still loading.**\n`core/src/refresh/load.rs:36-44`: the full `load_tree_with_extra` (every row of `entries`, `hardlinks`, `mounts`) now runs after `seen` has reached about `x.items + 1`. The stage is still the walk stage, and there is no load stage. On large snapshots, CLI and GUI progress will sit near 100% for the whole load. In the legacy order it sat at 0% before the walk started. Consider a distinct progress stage or a note in the documentation.\n\n**[P3] The writer-level test cannot detect a total loss of batching, and the drain-naturally policy limits batching to about 8 nested levels.**\n`core/src/scan/staged/write/tests.rs:36`: `selects <= 821` equals the legacy per-row count exactly (410 child selects + 411 end-of-children selects). The test passes even if `batch::next` always falls back to `single`.\n- **Why depth is limited:** with `ROW_LIMIT = 256` and 32-slot buffers, at most 8 frames can buffer at once. A partly drained ancestor keeps all 32 slots even when it holds one row. So every directory below the top roughly 8 buffering ancestors uses single-row selects.\n- **Status:** this matches the stated design and performance is unmeasured, so it is not a correctness issue.\n- **Suggested tests:**\n  - A strict-lower-bound assertion for a case where batching must engage.\n  - Assertions that the deep frames actually took the fallback path.\n  - Without these, the test name (\"pressure\") overstates what is verified.\n\n**[P3] `batch::next` is at or over the project's 80-line function limit.**\n`core/src/scan/staged/write/batch.rs` `next`: about 86 physical lines including the signature, and about 80 for the body alone. The result depends on how `scripts/check.sh size` and `clippy::too_many_lines` count. No checks were run, so confirm with `scripts/check.sh rust size`. If it fails, split it by responsibility, for example `fill_pending`. Do not add an allowlist entry.",
+        "session_id": "9d83a2eb-0d05-4761-b5f3-b44178293703",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 83413,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 14137,
+          "output_tokens_details": {
+            "thinking_tokens": 12731
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 83413,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 14137,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 83413,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 83413
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 14137,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 83413,
+            "webSearchRequests": 0,
+            "costUSD": 0.9503508,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 12731,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 83413,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-joint-final-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "4861746d-bc91-46f4-b9ea-721bc0e79b2b",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 104687,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 10812,
+          "output_tokens_details": {
+            "thinking_tokens": 10801
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 104687,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 10812,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 104687,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 104687
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 10812,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 104687,
+            "webSearchRequests": 0,
+            "costUSD": 1.0540428,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 10801,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 104687,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "final_validation": {
+    "completed": true,
+    "gate": "pass",
+    "result": "NO_FINDINGS",
+    "model": "claude-opus-5-5",
+    "post_review_mechanical_fix": "Clippy test literal from_mode(0) to from_mode(0o0), same value, hash updated; normal hook then passes",
+    "tests": "GitHub workspace tests required before each measurement; no local Rust tests"
+  },
+  "dispositions": [
+    "Eager ancestor eviction removed after source-confirmed repeated-refetch risk; global256slots64KiB unchanged and single-row fallback under pressure",
+    "Writer-level deep/wide test counts each child row once and requires fewer than per-row baseline SELECTs; batch next split below80lines",
+    "New fast/staged snapshot refresh differential includes nested/cross-boundary links and denied paths plus current/previous generation facts",
+    "Actualprofileparser reviewed: boundaries are point samples only, no load-onlyinterval inference; walkedsub/liveheadroom/chronology explicit. No fake markers or retrospective attribution",
+    "Earlier f04/d1 gains are not summed; the joint variant requires new measurements"
+  ]
+}
