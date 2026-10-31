@@ -1,0 +1,232 @@
+{
+  "created_at": "2026-10-31T23:26:52.898057+00:00",
+  "scope": "Build-only preparation repair after preserved apt timeout; no app or measurement change",
+  "requested_model": "claude-opus-5-5",
+  "failure_run_id": 41251341238,
+  "failure_report": "v1-compact-stage-changed-full-smoke-2026-11-01.json",
+  "cause": "apt update exceeded180s after repeated ignored Azure mirror attempts; exact underlying network cause unconfirmed. Official runner source establishes indirect mirror+file layout; literal-only fix would miss it.",
+  "source_publication": {
+    "primary8": {
+      "head": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+      "parent": "601ce381ac229923d2c791fd8e7c510f7b3f1dfc",
+      "remote": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+      "files_sha256": {
+        ".github/workflows/representative-bench.yml": "b87a29bba8b2d8502673ff6dc614c03c114b2d368f01f879819b67f136065865",
+        "scripts/tests/test_bench_v1_runner_prepare.py": "09bc1aff65734a6d96578ac78f519b5985528d3cff651ba63b127240dba87492"
+      }
+    },
+    "control": {
+      "head": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+      "parent": "5e1a563d871a80a3221999c360d1621a84adcf58",
+      "remote": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+      "files_sha256": {
+        ".github/workflows/representative-bench.yml": "b87a29bba8b2d8502673ff6dc614c03c114b2d368f01f879819b67f136065865",
+        "scripts/tests/test_bench_v1_runner_prepare.py": "09bc1aff65734a6d96578ac78f519b5985528d3cff651ba63b127240dba87492"
+      }
+    }
+  },
+  "full_control_revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+  "full_control_parent": "55d6e3460f34710e2520b77da66e659d410f6c25",
+  "review_history": [
+    {
+      "file": "freespace-apt-fix-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**Findings**\n\n**[P2] The rewrite can silently do nothing, and the step continues as before.**\n- **Where:** `.github/workflows/representative-bench.yml:137-162`\n- **Problem:** The script only edits URIs that appear literally in two fixed files. Some GitHub runner image versions configure apt differently. They use `URIs: mirror+file:/etc/apt/apt-mirrors.txt`, and the Azure URL lives in `/etc/apt/apt-mirrors.txt`. If this image does that, or the Azure URI sits in another file under `sources.list.d`, then:\n  - `updated == content` is true for both files.\n  - Nothing is written and nothing is reported.\n  - The step falls through to the same Azure mirror that failed in run 41251341238. It is now bounded by timeouts, but not repaired.\n- **Evidence gap:** Your failure log shows plain `http://azure.archive.ubuntu.com/ubuntu` items, which suggests literal URIs. I can't confirm the image layout from here.\n- **Fix:**\n  - Print each file that was rewritten.\n  - After the rewrite, fail if any file under `/etc/apt/sources.list`, `/etc/apt/sources.list.d/`, or `/etc/apt/apt-mirrors.txt` still contains `azure.archive.ubuntu.com`. Read these files read-only for this check.\n  - Add a test case where neither file contains an Azure URI and the script must raise.\n\n**[P2] The switch from HTTP to HTTPS for `archive.ubuntu.com` and `security.ubuntu.com` is unverified.**\n- **Where:** `.github/workflows/representative-bench.yml:157-160`\n- **Problem:** The fix changes two things at once: the host (Azure to the official archive) and the scheme (`http` to `https`). The documented failure only needs the host change.\n  - The noble `apt-transport-http(1)` page confirms that HTTPS transport is built in and that `Acquire::https::Timeout` is honored.\n  - It does not confirm that these hosts serve HTTPS with a valid certificate.\n  - If either host doesn't, every `update` fails under `--error-on=any`, and `install` fails too.\n- **Fix:** Either cite evidence that HTTPS works on these hosts (for example a successful run log), or rewrite to `http://archive.ubuntu.com` / `http://security.ubuntu.com`. Package integrity comes from signed `InRelease` files either way.\n\n**[P3] The symlink and regular-file check is separate from the actual read and write.**\n- **Where:** `.github/workflows/representative-bench.yml:148-161`\n- **Problem:** `lstat` is checked first, but `read_text()` and `write_text()` reopen the file by path and follow symlinks. Other issues:\n  - The parent directory `sources.list.d` is not checked for being a symlink.\n  - `S_ISREG` accepts hard links (`st_nlink > 1`), so a write could reach another file.\n  - The write truncates in place and is not atomic.\n- **Risk:** Low, because `/etc/apt` is root-owned on an ephemeral runner.\n- **Fix:** Open with `os.open(path, O_RDWR | O_NOFOLLOW)`, then `fstat` the descriptor and check `S_ISREG` and `st_nlink == 1`. Write to a temp file in the same directory and `os.replace` it.\n\n**[P3] Some cases are not covered by the tests.**\n- **Where:** `scripts/tests/test_bench_v1_runner_prepare.py:36-70`\n- **What is good:** The test runs the real embedded heredoc code. It only uses temporary paths and does not touch real apt.\n- **Missing cases:**\n  - `http://security.ubuntu.com/ubuntu` in deb822 form, including the trailing-slash form `.../ubuntu/` that runner images use.\n  - URIs that are already `https://` must stay unchanged, and an unchanged file must not be written (check the mtime or patch `write_text`).\n  - `/ubuntu-ports` must not be rewritten.\n  - The guard-failure branch only patches `Path.lstat`; it should also patch `Path.read_text` and `Path.write_text`.\n  - Nothing asserts `--preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT`. Without it, the guard would always fail under sudo's `env_reset`.\n\n**Items that checked out**\n- **Heredoc:** After YAML dedent, `PY` sits at column 0, and the quoted delimiter means the shell does not expand anything inside.\n- **Sudo environment:** `--preserve-env=list` works under the hosted runner's `NOPASSWD: ALL` rule, which implies SETENV.\n- **Guard before access:** The environment guard runs before any filesystem access.\n- **Bounded commands:** `update` and `install` are each wrapped in `timeout --kill-after=5s 180s`, with per-fetch timeouts of 20s and `Retries=1`.\n- **Failure on retrieval errors:** `--error-on=any` makes `update` fail on any retrieval error, as the noble `apt-get(8)` page documents. The default `bash -e` shell fails the step if the Python guard raises.\n- **Precise matching:** The regex anchors on scheme plus exact host plus `/ubuntu` followed by `/`, whitespace, or end. It leaves `/custom`, lookalike hosts, and third-party URLs alone.",
+        "session_id": "bca56422-9c41-4dbc-b1e1-2caf7663263e",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 21299,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 6660,
+          "output_tokens_details": {
+            "thinking_tokens": 4801
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 21299,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 6660,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 21299,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 21299
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 6660,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 21299,
+            "webSearchRequests": 0,
+            "costUSD": 0.3038988,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 4801,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 21299,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-apt-fix-closure-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "**[P3] The fail-closed check for unknown mirrors misses some cases, so prior finding 1 is only partly closed.**\n\n- **Where:** `.github/workflows/representative-bench.yml`, at the line `if 'azure.archive.ubuntu.com' in active or (path == sources[1] and 'mirror+file:' in active):`\n- **Problem:**\n  - The `mirror+file:` check only applies to `ubuntu.sources`. An active line such as `deb mirror+file:/etc/apt/other.txt noble main` in `/etc/apt/sources.list` passes. The step then continues as long as any other recognized URL exists.\n  - Only the `mirror+file:` form is caught. Other apt mirror methods (`mirror:`, `mirror+http:`, `mirror+https:`) pass silently in both files. Those lists live outside the scanned files, so the Azure host would never show up in `active`.\n  - The result is the case the prior finding described: the rewrite does nothing and nothing is reported. This contradicts the stated \"unknown active Ubuntu mirror references fail closed\".\n- **Fix:**\n  - Apply the check to both files.\n  - Match any mirror scheme, not just `mirror+file:`. For example, after the rewrite, raise if `re.search(r'(?m)^\\s*(?:deb(?:-src)?\\b.*\\s|URIs:.*\\s?)mirror(?:\\+\\w+)?:', active)` matches. A simpler option is to raise if `re.search(r'\\bmirror(?:\\+[a-z]+)?:', active)` matches.\n- **Tests to add:**\n  - An unknown `mirror+file:` line in `sources.list`, alongside a valid official line, must raise.\n  - A `mirror+https://\u2026` line in `ubuntu.sources`, alongside a security URL, must raise.\n\n**Prior findings that are closed:**\n- **P2 HTTPS:** The successful archive log from GH run 41251341238 and the HEAD 200 from the security host are sufficient.\n- **P3 file handling:** Opening with `O_NOFOLLOW` against a no-follow parent directory descriptor, then checking `fstat` for a regular file with a single link, closes the finding. Not adding atomic replacement is an accepted, documented decision.\n- **P3 tests:** The new tests cover:\n  - deb822 security URIs with a trailing slash\n  - official HTTPS sources left unchanged on a rerun, checked by mtime\n  - `/ubuntu-ports` and lookalike hosts left alone\n  - the guard failing before any `os.open` call\n  - the `--preserve-env` assertion\n  - the symlink and hard-link rejection paths\n  - the \"no supported URL\" branch, with the file left unmodified",
+        "session_id": "ad7cc80c-d481-4f78-a416-5fcd2c30d93b",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 25057,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 2531,
+          "output_tokens_details": {
+            "thinking_tokens": 1610
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 25057,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 2531,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 25057,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 25057
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 2531,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 25057,
+            "webSearchRequests": 0,
+            "costUSD": 0.2513828,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1610,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 25057,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-apt-fix-final-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "d1570341-6b45-409b-974e-b6695b96b0c3",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 23662,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 3759,
+          "output_tokens_details": {
+            "thinking_tokens": 3748
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 23662,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 3759,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 23662,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 23662
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 3759,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 23662,
+            "webSearchRequests": 0,
+            "costUSD": 0.2647828,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 3748,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 23662,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "review_disposition": "Initial completed structured review found mirror-layout and HTTPS-evidence gaps. First closure transport completed but structured formatting failed; no validated verdict attributed to it. Bounded remaining-mirror guard/tests corrected. Final focused result revalidated completed/gate pass, exact NO_FINDINGS on sole actual model claude-opus-5-5.",
+  "behavior": "Only the two standard Ubuntu source files may be changed on a GitHub-hosted runner. Known mirror+file reference and literal official HTTP/Azure URLs become official HTTPS. Suites/components/key text and direct third-party URLs are preserved. Unsupported remaining mirror schemes fail before writes; unchanged supported sources are idempotent. No-follow descriptors verify single-link regular files. In-place writes on trusted ephemeral root-owned files accepted; no general APT framework.",
+  "bounds": "update andinstall each180s plus5s kill-after; Acquire retries1 and HTTP/HTTPS connection/data idle timeout20s; --error-on=any fails update on transient retrieval errors. Existing25min build andstage caps retained.",
+  "parent_verification": "Primary/control changed exactly workflow and prep unit test; full control changed only same apt block, prep test and exact previously reviewed cleanup assertions. All full-control application and ordinary measurement/validator source remains byte-identical55; actual baseline binary must still be observed.",
+  "validation": "Mocked actual-heredoc temporary-file tests passed;10 focused apt+cleanup tests on full control. Normal capped Git hooks passed. No apt commands, app runs or Rust tests locally. GH preparation and actual binaries remain unverified until new cases.",
+  "references": {
+    "runner_layout": "https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh",
+    "apt_update_error": "https://manpages.ubuntu.com/manpages/noble/man8/apt-get.8.html",
+    "apt_transport_timeout": "https://manpages.ubuntu.com/manpages/noble/man1/apt-transport-http.1.html"
+  },
+  "archive": "v1-runner-apt-source-reviews-2026-11-01.tar.gz",
+  "archive_sha256": "11df5fb3d8f5450d2d4cee5d095f4c230b03d6a43b024b23e4e098a5b97a5f9f",
+  "indexed_payload_count": 18,
+  "product_qualification": false
+}

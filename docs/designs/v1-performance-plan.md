@@ -107,7 +107,13 @@ only. The [preregistered next cases](../benchmark-results/v1-compact-stage-manif
 require a real GitHub changed-full smoke and new Rust tests before matched screens.
 The [progress report](../benchmark-results/v1-optimization-progress-2026-10-31.md)
 separates these states and source variants.
-Completed usage is 33,113 runner seconds (9h 11m 53s) of 60 hours. The local
+The first new compact-source smoke failed in apt setup before tests or measurement;
+its receipt is preserved. A focused Opus-reviewed build-only mirror repair and
+[replacement cases](../benchmark-results/v1-compact-stage-https-manifest-2026-11-01.json)
+are frozen separately. An independent full-scale baseline1GiB A/A case has a
+[case-matched forecast](../benchmark-results/v1-fullscan-memory-full-manifest-2026-11-01.json)
+and budget reservation; it is capacity exploration, not a claimed code improvement.
+Completed usage is 33,310 runner seconds (9h 15m 10s) of 60 hours. The local
 `freespace.timer` is temporarily stopped for GitHub-only research; `Persistent=yes`
 can trigger catch-up when restored. Installed backend and configuration remain unchanged.
 D16 permits test-host backend switching without certifying a production release

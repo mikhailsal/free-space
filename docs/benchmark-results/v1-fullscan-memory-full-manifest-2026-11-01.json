@@ -1,0 +1,575 @@
+{
+  "created_at": "2026-10-31T23:27:50.212506+00:00",
+  "status": "preregistered_exploratory_memory_followup",
+  "source_revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+  "original_control_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_review": "v1-runner-apt-source-reviews-2026-11-01.json",
+  "source_changed_paths": [
+    ".github/workflows/representative-bench.yml",
+    "scripts/tests/test_bench_cleanup.py",
+    "scripts/tests/test_bench_v1_runner_prepare.py"
+  ],
+  "production_and_measurement_unchanged": true,
+  "matching_1m_run_id": 41244336962,
+  "matching_1m_paired_job_seconds": 645.0,
+  "forecast": {
+    "raw_sources": {
+      "/tmp/freespace-combined-sql-full/scan/measurements/manifest.json": "35a1d8a46df7a3b095a3ce8776c3a7794d9668b87734ba0e4882ce13ef9acbe8",
+      "/tmp/freespace-combined-sql-full/scan/measurements/p1-baseline-v1/metrics.json": "45816cad7d927304d39b2d3a167794da12d073a963d047f53fee0ba738b8046f",
+      "/tmp/freespace-combined-sql-full/scan/measurements/p1-baseline-v1/observer.json": "a9ea4f73a3c05586032f78cd119bc9958f961ad204a0fcdeac9a7edb5b312744",
+      "/tmp/freespace-combined-sql-full/scan/measurements/p1-baseline-v1/setup.json": "cb88e113bd2aa8be0b2670d14af482e21e8deb4262220016c01721a3167c62db",
+      "/tmp/freespace-combined-sql-full/scan/measurements/p1-candidate-v1/metrics.json": "229962d2fe4a0118ed350d90c26fbe63ae777c63a8cf9edf5037b6410fe9d5b4",
+      "/tmp/freespace-combined-sql-full/scan/measurements/p1-candidate-v1/observer.json": "3221519f132bc2a21cade6cacc4cb45f01e0eee444dfa7d7989d63690b82fcc5",
+      "/tmp/freespace-combined-sql-full/scan/measurements/p1-candidate-v1/setup.json": "e5872f682240ce67417db3c121d338a3e33d594dbb49119288aa48c7117c1de4",
+      "/tmp/freespace-combined-sql-full/scan/measurements-setup/seed-1/metrics.json": "58bc80ea8c24a18523e0b49d8d657dc894f4fd3982a154c8a3c4eaa5793df996",
+      "/tmp/freespace-combined-sql-full/scan/measurements-setup/seed-2/metrics.json": "88cce6e15a53863e7d480c7f6ca0890b27492eca7030b701b279580c9a7ab8f5",
+      "/tmp/freespace-combined-sql-full-github.json": "e5df1ec0b10e5ff6e227ea06272a6a85a30c4558adfb386ed9f38e6981fddb61",
+      "/tmp/freespace-combined-sql-full-validation.json": "2765789be1c74c79deb9fde10e383ff1a0805e869fd1b5df1518d44d12d69fc5",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/manifest.json": "9811a3b95da98220781a67c9656e7fa5fb4be4a90fc5493ad946ad202e9e9a18",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p1-baseline-v1/metrics.json": "fbadb95e29c9ab9aa721064d60202aad5ffb44417a1edd9d68bb766dc0722e2e",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p1-baseline-v1/observer.json": "850670e08b927bf82c4d26315c24cc805365cab65c34c048e4213d10f289ee73",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p1-baseline-v1/setup.json": "91a4d6e4ae9c58d60a920570800c6261beb462fceee594cbc61bfce15ca2bc1b",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p1-candidate-v1/metrics.json": "892c6285d00bfba545de875f8f533e6853e6a2f5fc9a57d02ccee373256494da",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p1-candidate-v1/observer.json": "ef2645f3263809a9852697f594b62084813fc834922908029f56ba0c73a70645",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p1-candidate-v1/setup.json": "e2788967258122fedebd4d38a569c446d15bf178b9e13502c3df53d2b0f78252",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p2-baseline-v1/metrics.json": "975ac8f2acca2177ad76cdee2ca3b7be5fb743f61a996bfac8e002f64cbccfe2",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p2-baseline-v1/observer.json": "92ba241581b2127ad495601be4fe2c239fe4eec581c69ff511b33554c5ea0e94",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p2-baseline-v1/setup.json": "eb93fab325ba1d5158eb3a28da3c570ac2b3f06a2df78b9b8bc607524f447813",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p2-candidate-v1/metrics.json": "60c19c525965df880dbb2ecc7e10022ab074a78ad2d7c5d7efb79a4a0b2207a0",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p2-candidate-v1/observer.json": "726b4becd10c21d1f13a20cf709589d4251b7624187019385f6d2b61ac97ee31",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p2-candidate-v1/setup.json": "1544056dd1b7f9380e1c79740f19867ed8085276789c4ff44347dce281ed6b66",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p3-baseline-v1/metrics.json": "b134fec393113bb33bf2b3f13a46c3fe569dcd011aa1a59b63af017ab5bd8849",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p3-baseline-v1/observer.json": "d464f32f12e2760ae67d71e279347bc215b3fbf5f137b6eb509657f52309a602",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p3-baseline-v1/setup.json": "08f6368f022f80091c4baf341b7d1fd8c2c3ca831344deea417af778c336a876",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p3-candidate-v1/metrics.json": "240d5e1cb10a168710a8ae08850e1e093343fcf252d02eee920186b18c56c897",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p3-candidate-v1/observer.json": "c88988e8aa5e499d787f1c9680dab07b8f3fd0cca00eab78a6deae0cb75ccf5b",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements/p3-candidate-v1/setup.json": "7954f9296a7e5701ad7fe9809a1341a98f504e7880096931ce7935c70693b0c7",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements-setup/seed-1/metrics.json": "8d4534716eb2abd31199b195576e899a5ef07c8265ca2149402f4e42ed246d44",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa/scan/measurements-setup/seed-2/metrics.json": "e521d132e1a6d8d870c2d2d180f7bb6e17b0f80de61ad3e998eb32b2d49cffa1",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa-github.json": "d47b8d0c6613942872d12bef793efdab3a8701aa77a0b1523046ad740a77acf4",
+      "/tmp/freespace-fullscan-memory-repaired-1024-aa-validation.json": "42526a32cb2e90e0c6f45627fa60924ec85062b7f45f4b48a9df9744e88c5b5c"
+    },
+    "source_1m": {
+      "run_id": 41244336962,
+      "manifest": {
+        "measurement_protocol": "v1-single-operation-pairs-v4",
+        "pairs": 3,
+        "files": 1000000,
+        "operation": "scan",
+        "scenario": "unchanged",
+        "fixture_receipt": {
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "directories": 4499,
+          "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+          "fixed_mtime": 1700000000,
+          "payload_block_fraction": 0.01,
+          "distribution": {
+            "small_files": 99,
+            "outer_files": 999901,
+            "payload_files": 10000,
+            "sparse_files": 235,
+            "hardlink_files": 999,
+            "longname_files": 32255
+          },
+          "setup_seconds": 36.66292654
+        },
+        "runner_preparation": {
+          "success": true,
+          "acted": false,
+          "freed_bytes": 0,
+          "duration_seconds": 0.0001278700000000299,
+          "floor_bytes": 45097156608,
+          "target_bytes": 47244640256
+        },
+        "runner_preparation_policy": "sdk-space-v1",
+        "case_policy": "qualification-v1",
+        "subtree_entries": 100,
+        "memory_mib": 1024,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null,
+        "expected_arms": [
+          "p1-baseline-v1",
+          "p1-candidate-v1",
+          "p2-baseline-v1",
+          "p2-candidate-v1",
+          "p3-baseline-v1",
+          "p3-candidate-v1"
+        ],
+        "provenance": {
+          "baseline-v1": {
+            "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+            "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+            "build": {
+              "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+              "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+              "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+              "compiler_host": "x86_64-unknown-linux-gnu",
+              "target": "x86_64-unknown-linux-musl",
+              "profile": "release --locked",
+              "flags": {
+                "RUSTFLAGS": "",
+                "CARGO_ENCODED_RUSTFLAGS": "",
+                "SOURCE_DATE_EPOCH": "1793464183"
+              },
+              "release_profile": {
+                "lto": "thin",
+                "codegen-units": 4,
+                "strip": "debuginfo"
+              },
+              "cargo_config": {},
+              "bun": "1.4.2"
+            }
+          },
+          "candidate-v1": {
+            "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+            "source_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+            "build": {
+              "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+              "source_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+              "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+              "compiler_host": "x86_64-unknown-linux-gnu",
+              "target": "x86_64-unknown-linux-musl",
+              "profile": "release --locked",
+              "flags": {
+                "RUSTFLAGS": "",
+                "CARGO_ENCODED_RUSTFLAGS": "",
+                "SOURCE_DATE_EPOCH": "1793464183"
+              },
+              "release_profile": {
+                "lto": "thin",
+                "codegen-units": 4,
+                "strip": "debuginfo"
+              },
+              "cargo_config": {},
+              "bun": "1.4.2"
+            }
+          }
+        },
+        "seed_sha256": "33f0b7459c308c50becf5b4b90222aa72ee7ac29b6498abb70f2142fcecb702a",
+        "sample_interval_seconds": 0.02,
+        "cache_policy": "cold after seed copy, before single CLI",
+        "observer_policy": "separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+        "diagnostic_policy": {
+          "profile_policy": "profile-v2",
+          "allocation_diagnostics": false,
+          "scope": "measured refresh CLI only; seeds and observers disabled"
+        },
+        "environment": {
+          "kernel": "7.0.0-1017-azure",
+          "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2596.133\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.26\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4509.613\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.26\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2596.133\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.26\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2596.133\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.26\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+          "memory": "MemTotal:       16367524 kB\nMemFree:        12234820 kB\nMemAvailable:   15056328 kB\nBuffers:          382812 kB\nCached:          1460000 kB\nSwapCached:            0 kB\nActive:           932540 kB\nInactive:        1290644 kB\nActive(anon):     437096 kB\nInactive(anon):        0 kB\nActive(file):     495444 kB\nInactive(file):  1290644 kB\nUnevictable:       46728 kB\nMlocked:           43656 kB\nSwapTotal:       3145724 kB\nSwapFree:        3145724 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               776 kB\nWriteback:             0 kB\nAnonPages:        427116 kB\nMapped:           338868 kB\nShmem:             47976 kB\nKReclaimable:    1381348 kB\nSlab:            1638800 kB\nSReclaimable:    1381348 kB\nSUnreclaim:       257452 kB\nKernelStack:        4240 kB\nPageTables:         6648 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    11329484 kB\nCommitted_AS:    2205964 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       38996 kB\nVmallocChunk:          0 kB\nPercpu:             2384 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:         1466368 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:             0 kB\nGPUReclaim:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      124032 kB\nDirectMap2M:     3016704 kB\nDirectMap1G:    15728640 kB\n",
+          "image": [
+            {
+              "Id": "sha256:01265d13c22c7709dca84ec34cf9ebf4b2180fc1d07a25cffe705bc84f300c9b",
+              "RepoTags": [
+                "freespace-pairs:c6c40eac74244c36abd48a078905245d",
+                "representative-calibration:41244336962-paired-local"
+              ],
+              "RepoDigests": [],
+              "Parent": "",
+              "Comment": "buildkit.dockerfile.v0",
+              "Created": "2026-10-31T21:39:14.877154258Z",
+              "DockerVersion": "",
+              "Author": "",
+              "Config": {
+                "Hostname": "",
+                "Domainname": "",
+                "User": "",
+                "AttachStdin": false,
+                "AttachStdout": false,
+                "AttachStderr": false,
+                "Tty": false,
+                "OpenStdin": false,
+                "StdinOnce": false,
+                "Env": [
+                  "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                ],
+                "Cmd": null,
+                "Image": "",
+                "Volumes": null,
+                "WorkingDir": "",
+                "Entrypoint": [
+                  "python3",
+                  "/harness/bench-v2-container.py",
+                  "--inside"
+                ],
+                "OnBuild": null,
+                "Labels": {
+                  "org.opencontainers.image.version": "24.04"
+                }
+              },
+              "Architecture": "amd64",
+              "Os": "linux",
+              "Size": 202779257,
+              "GraphDriver": {
+                "Data": {
+                  "LowerDir": "/var/lib/docker/overlay2/8dc813a257c3ecb53af1c39278556e0216ac517fcacbc746c66e4adc069e4455/diff",
+                  "MergedDir": "/var/lib/docker/overlay2/t9fyfegmwq0fs0vvzklynslx8/merged",
+                  "UpperDir": "/var/lib/docker/overlay2/t9fyfegmwq0fs0vvzklynslx8/diff",
+                  "WorkDir": "/var/lib/docker/overlay2/t9fyfegmwq0fs0vvzklynslx8/work"
+                },
+                "Name": "overlay2"
+              },
+              "RootFS": {
+                "Type": "layers",
+                "Layers": [
+                  "sha256:bec87777bc2fb2edcdf9af11df1531469e7df911309c1413082b18fcb8610278",
+                  "sha256:24db74ee937c6c708dd33afca4809b49a3840f478290b397399331aa1f49eed9"
+                ]
+              },
+              "Metadata": {
+                "LastTagTime": "2026-10-31T21:39:57.65934072Z"
+              }
+            }
+          ]
+        },
+        "filesystem": {
+          "filesystems": [
+            {
+              "target": "/home/runner/work/_temp/representative-volume.Xov6Wd/mount",
+              "source": "/dev/loop0",
+              "fstype": "ext4",
+              "options": "rw,relatime"
+            }
+          ]
+        },
+        "github": {
+          "GITHUB_SHA": "55d6e3460f34710e2520b77da66e659d410f6c25",
+          "GITHUB_RUN_ID": "41244336962",
+          "GITHUB_RUN_ATTEMPT": "1"
+        }
+      },
+      "seed_seconds": [
+        25.351866288999986,
+        26.203399698999988
+      ],
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "worker_seconds": 58.11967876,
+          "observer_seconds": 16.490717141999994,
+          "copy_seconds": 0.20042944499999749
+        },
+        {
+          "id": "p1-candidate-v1",
+          "worker_seconds": 57.357149768,
+          "observer_seconds": 16.547251082999992,
+          "copy_seconds": 0.5807764840000118
+        },
+        {
+          "id": "p2-baseline-v1",
+          "worker_seconds": 63.349416159999976,
+          "observer_seconds": 17.00748432300003,
+          "copy_seconds": 0.5874779669999839
+        },
+        {
+          "id": "p2-candidate-v1",
+          "worker_seconds": 64.23687657099998,
+          "observer_seconds": 16.941022903000032,
+          "copy_seconds": 0.5887210540000183
+        },
+        {
+          "id": "p3-baseline-v1",
+          "worker_seconds": 58.44785979799997,
+          "observer_seconds": 16.68300937799995,
+          "copy_seconds": 0.5925630589999855
+        },
+        {
+          "id": "p3-candidate-v1",
+          "worker_seconds": 60.58865325099998,
+          "observer_seconds": 16.514219936000018,
+          "copy_seconds": 0.5837734799999907
+        }
+      ]
+    },
+    "crosscheck_full_4g": {
+      "run_id": 41230966330,
+      "manifest": {
+        "measurement_protocol": "v1-single-operation-pairs-v3",
+        "pairs": 1,
+        "files": 7264383,
+        "operation": "scan",
+        "scenario": "unchanged",
+        "fixture_receipt": {
+          "files": 7264383,
+          "expected_entries": 7297076,
+          "expected_subtree_entries": 100,
+          "directories": 32693,
+          "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+          "fixed_mtime": 1700000000,
+          "payload_block_fraction": 0.01,
+          "setup_seconds": 458.000774684
+        },
+        "expected_arms": [
+          "p1-baseline-v1",
+          "p1-candidate-v1"
+        ],
+        "provenance": {
+          "baseline-v1": {
+            "sha256": "674faf7ab978502a7d17674599083d575dd57fc9914703a2673154f93d790aa9",
+            "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+            "build": {
+              "sha256": "674faf7ab978502a7d17674599083d575dd57fc9914703a2673154f93d790aa9",
+              "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+              "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+              "compiler_host": "x86_64-unknown-linux-gnu",
+              "target": "x86_64-unknown-linux-musl",
+              "profile": "release --locked",
+              "flags": {
+                "RUSTFLAGS": "",
+                "CARGO_ENCODED_RUSTFLAGS": ""
+              },
+              "release_profile": {
+                "lto": "thin",
+                "codegen-units": 4,
+                "strip": "debuginfo"
+              },
+              "cargo_config": {},
+              "bun": "1.4.2"
+            }
+          },
+          "candidate-v1": {
+            "sha256": "e0302ebce40463283ee94562f706c502f0df3d63eed966a898bf4231603923d1",
+            "source_revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+            "build": {
+              "sha256": "e0302ebce40463283ee94562f706c502f0df3d63eed966a898bf4231603923d1",
+              "source_revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+              "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+              "compiler_host": "x86_64-unknown-linux-gnu",
+              "target": "x86_64-unknown-linux-musl",
+              "profile": "release --locked",
+              "flags": {
+                "RUSTFLAGS": "",
+                "CARGO_ENCODED_RUSTFLAGS": ""
+              },
+              "release_profile": {
+                "lto": "thin",
+                "codegen-units": 4,
+                "strip": "debuginfo"
+              },
+              "cargo_config": {},
+              "bun": "1.4.2"
+            }
+          }
+        },
+        "seed_sha256": "23eca293ffa7932f908f3b876a518a356d1a6aad12f83bb34c5b00741c1661a7",
+        "sample_interval_seconds": 0.02,
+        "cache_policy": "cold after seed copy, before single CLI",
+        "observer_policy": "separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+        "diagnostic_policy": {
+          "profile_policy": "profile-v2",
+          "allocation_diagnostics": false,
+          "scope": "measured refresh CLI only; seeds and observers disabled"
+        },
+        "environment": {
+          "kernel": "7.0.0-1017-azure",
+          "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2445.427\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2445.427\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3244.288\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2445.427\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+          "memory": "MemTotal:       16367524 kB\nMemFree:         1078232 kB\nMemAvailable:   13551480 kB\nBuffers:         2034192 kB\nCached:          2156432 kB\nSwapCached:         3136 kB\nActive:           313080 kB\nInactive:        4791832 kB\nActive(anon):     194152 kB\nInactive(anon):   769696 kB\nActive(file):     118928 kB\nInactive(file):  4022136 kB\nUnevictable:       46780 kB\nMlocked:           43708 kB\nSwapTotal:       3145724 kB\nSwapFree:        3051660 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               908 kB\nWriteback:             0 kB\nAnonPages:        958088 kB\nMapped:           262524 kB\nShmem:             40752 kB\nKReclaimable:    8686304 kB\nSlab:            9964144 kB\nSReclaimable:    8686304 kB\nSUnreclaim:      1277840 kB\nKernelStack:        4192 kB\nPageTables:         7888 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    11329484 kB\nCommitted_AS:    2909076 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       42692 kB\nVmallocChunk:          0 kB\nPercpu:             2384 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    239616 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:           40484 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:             0 kB\nGPUReclaim:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      158848 kB\nDirectMap2M:     4030464 kB\nDirectMap1G:    14680064 kB\n",
+          "image": [
+            {
+              "Id": "sha256:5a36dcd2db14f1fdb34263a1354f5133c7af2b58204aec46d8b7ebcf5eb4fda6",
+              "RepoTags": [
+                "freespace-pairs:64e04346432d4a338ef3ce3107918eb8",
+                "representative-calibration:41230966330-paired-local"
+              ],
+              "RepoDigests": [],
+              "Parent": "",
+              "Comment": "buildkit.dockerfile.v0",
+              "Created": "2026-10-31T18:48:41.401833302Z",
+              "DockerVersion": "",
+              "Author": "",
+              "Config": {
+                "Hostname": "",
+                "Domainname": "",
+                "User": "",
+                "AttachStdin": false,
+                "AttachStdout": false,
+                "AttachStderr": false,
+                "Tty": false,
+                "OpenStdin": false,
+                "StdinOnce": false,
+                "Env": [
+                  "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                ],
+                "Cmd": null,
+                "Image": "",
+                "Volumes": null,
+                "WorkingDir": "",
+                "Entrypoint": [
+                  "python3",
+                  "/harness/bench-v2-container.py",
+                  "--inside"
+                ],
+                "OnBuild": null,
+                "Labels": {
+                  "org.opencontainers.image.version": "24.04"
+                }
+              },
+              "Architecture": "amd64",
+              "Os": "linux",
+              "Size": 202779257,
+              "GraphDriver": {
+                "Data": {
+                  "LowerDir": "/var/lib/docker/overlay2/51e9bfa7c27eb46ebda9dd09af6e66d38b0257e842ca7b0b0796466172d80aae/diff",
+                  "MergedDir": "/var/lib/docker/overlay2/ku0qtwvh0ozitz002nddwmo7b/merged",
+                  "UpperDir": "/var/lib/docker/overlay2/ku0qtwvh0ozitz002nddwmo7b/diff",
+                  "WorkDir": "/var/lib/docker/overlay2/ku0qtwvh0ozitz002nddwmo7b/work"
+                },
+                "Name": "overlay2"
+              },
+              "RootFS": {
+                "Type": "layers",
+                "Layers": [
+                  "sha256:bec87777bc2fb2edcdf9af11df1531469e7df911309c1413082b18fcb8610278",
+                  "sha256:04d6fcbdea5111a5bc51ffb377438e7edafc927969bb9a144b5f1ec96e2b69a9"
+                ]
+              },
+              "Metadata": {
+                "LastTagTime": "2026-10-31T18:49:24.126764782Z"
+              }
+            }
+          ]
+        },
+        "filesystem": {
+          "filesystems": [
+            {
+              "target": "/home/runner/work/_temp/representative-volume.ZyYIqs/mount",
+              "source": "/dev/loop0",
+              "fstype": "ext4",
+              "options": "rw,relatime"
+            }
+          ]
+        },
+        "github": {
+          "GITHUB_SHA": "d1c9f014ed185d663947590b388b444c08da7fda",
+          "GITHUB_RUN_ID": "41230966330",
+          "GITHUB_RUN_ATTEMPT": "1"
+        }
+      },
+      "seed_seconds": [
+        351.524023996,
+        349.14894020200006
+      ],
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "worker_seconds": 639.785248939,
+          "observer_seconds": 214.958543856,
+          "copy_seconds": 5.538380748000009
+        },
+        {
+          "id": "p1-candidate-v1",
+          "worker_seconds": 477.1397663759999,
+          "observer_seconds": 214.63702844199997,
+          "copy_seconds": 6.9900204399996255
+        }
+      ]
+    },
+    "case": {
+      "forecast_case_id": "x86_64-unknown-linux-musl|local|scan|100|unchanged|1024",
+      "control_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+      "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "expected_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "files": 7264383,
+      "entries": 7297076,
+      "pairs": 1,
+      "memory_mib": 1024,
+      "setup_observer_memory_mib": 4096,
+      "cpu": 2,
+      "workers": 1,
+      "swap": 0
+    },
+    "scales": {
+      "files": 7.264383,
+      "entries": 7.26439349367197
+    },
+    "components_seconds": {
+      "fixture_seconds": 459,
+      "two_seed_scans_seconds": 701,
+      "two_workers_seconds": 1280,
+      "two_observers_seconds": 430,
+      "two_copies_seconds": 14,
+      "calibration_setup_cleanup_allowance_seconds": 600,
+      "low_memory_pressure_uncertainty_allowance_seconds": 1500
+    },
+    "forecast_seconds": 4984,
+    "with_margin_seconds": 6479.2,
+    "step_cap_seconds": 7200,
+    "paired_job_cap_seconds": 7800,
+    "build_cap_seconds": 1500,
+    "aggregate_job_cap_seconds": 9300,
+    "planning_cap_fit": true,
+    "admission": "proposed only; pending independent forecast, remaining aggregate budget and dispatch review",
+    "limitations": [
+      "Linear projection plus cross-check and explicit allowances, not a guaranteed bound; full 1GiB memory/IO pressure may be nonlinear.",
+      "1m baseline control 3 pairs used 4GiB seeds/observers; proposed full uses 1 pair, two workers and two observers.",
+      "Old full 4GiB run used other runner and binary hashes and candidate source d1c9; cross-check only.",
+      "Workers have 1800s per-command timeout and OOM/timeout/incomplete invalidates case.",
+      "Full 512MiB conditional only after 1GiB full success, with its own case-matched forecast and admission."
+    ],
+    "parent_review": {
+      "reviewed_at": "2026-10-31T23:17:45.851166+00:00",
+      "raw_sources_rehashed": 34,
+      "component_sum_verified": 4984,
+      "case_matched_1m_source": "55d6e3460f34710e2520b77da66e659d410f6c25",
+      "whole_step_margin_verified": 6479.2,
+      "judgment": "Planning estimate admitted in principle, contingent on frozen build-only apt mirror fix, actual unchanged baseline binary, source/measurement identity and fresh aggregate reservation. Full-scale pressure remains unmeasured; no guaranteed bound, success claim or D11/H2 waiver."
+    }
+  },
+  "plans": [
+    {
+      "id": "fullscan-memory-full-1024-aa",
+      "branch": "perf/v1-fullscan-memory-control-https",
+      "revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "local-scale",
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "pairs_per_operation": 1,
+      "operations": [
+        "scan"
+      ],
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 1024,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "swap_mib": 0,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "timeout_minutes": 120,
+      "command_timeout_seconds": 1800,
+      "maximum_job_seconds": 9300,
+      "forecast_seconds": 4984,
+      "forecast_with_margin_seconds": 6479.2,
+      "forecast_case_id": "x86_64-unknown-linux-musl|local|scan|100|unchanged|1024",
+      "profile_policy": "not_applicable_scan_only",
+      "allocation_diagnostics": false,
+      "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "forecast_source": "v1-fullscan-memory-full-1024-aa-forecast-2026-11-01.json",
+      "campaign_cap_seconds": 216000,
+      "status": "ready_for_admission",
+      "depends_on": "Valid matching1m1024MiB A/A evidence, revalidated raw receipts and hashes. New full-control production and ordinary measurement source byte-identical to55; only reviewed build preparation and tests changed. Fresh source/remote/budget admission required.",
+      "purpose": "Two full-scale baseline scans at1GiB, exploratory capacity/pressure evidence only; no source improvement, exact minimum, D11 or H2 waiver",
+      "artifact_prefix": "/tmp/freespace-fullscan-memory-full-1024-aa"
+    }
+  ],
+  "campaign_cap_seconds": 216000,
+  "stop_rules": [
+    "Any build/worker timeout, OOM, receipt/semantic/integrity/disk admission failure stops the case; no expected-OOM waiver or automatic retry.",
+    "One A/A pair is capacity/pressure exploration, not repeated qualification or a source optimization.",
+    "512MiB full case requires valid1GiB full completion and separately frozen case-matched forecast and admission.",
+    "No scan-only refresh profile-v2 or memory.events.local is claimed. Endpoint memory.stat is not peak decomposition."
+  ]
+}

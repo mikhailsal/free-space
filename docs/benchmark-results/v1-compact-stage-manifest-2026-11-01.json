@@ -1,6 +1,6 @@
 {
   "created_at": "2026-10-31T23:08:12.716420+00:00",
-  "status": "preregistered_research_only",
+  "status": "Stopped after apt update timeout before tests; no measurement. No retry. A bounded official-mirror source fix is under review before separately frozen replacement cases.",
   "candidate_revision": "601ce381ac229923d2c791fd8e7c510f7b3f1dfc",
   "control_revision": "5e1a563d871a80a3221999c360d1621a84adcf58",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -41,10 +41,23 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "must be observed from actual artifact; not borrowed from older joint",
       "campaign_cap_seconds": 216000,
-      "status": "ready_for_admission",
+      "status": "completed",
       "depends_on": "Frozen reviewed source and passed normal hooks. Full GH Python and Rust gates before workers.",
       "purpose": "Real product schema, hardlink ownership, previous-history and changed-full end-to-end proof; no performance qualification",
-      "artifact_prefix": "/tmp/freespace-compact-stage-changed-full-smoke"
+      "artifact_prefix": "/tmp/freespace-compact-stage-changed-full-smoke",
+      "admitted_at": "2026-10-31T23:09:42.843407+00:00",
+      "dispatch_receipt": "/tmp/freespace-compact-stage-changed-full-smoke-dispatch.json",
+      "run_id": 41251341238,
+      "created_at": "2026-10-31T23:09:44Z",
+      "conclusion": "failure",
+      "head_sha_verified": true,
+      "completed_job_seconds": 197.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T23:14:44.423211+00:00",
+      "job_seconds": 197.0,
+      "receipt": "v1-compact-stage-changed-full-smoke-2026-11-01.json",
+      "receipt_validation": "invalid_before_tests_build_apt_update_timeout_no_measurement",
+      "qualification": "no_evidence"
     },
     {
       "id": "compact-stage-matched-control-screen",
@@ -81,10 +94,11 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "must be observed from actual artifact; not borrowed from older joint",
       "campaign_cap_seconds": 216000,
-      "status": "conditional_protocol_smoke",
+      "status": "superseded_build_only_https_repair",
       "depends_on": "Real changed-full smoke valid for canonical baseline and candidate; fresh matched A/A control before candidate comparison. Same frozen harness hashes. No retries after ordinary failure.",
       "purpose": "Fresh matched one-million-file source screen; no full-scale extrapolation or promotion",
-      "artifact_prefix": "/tmp/freespace-compact-stage-matched-control-screen"
+      "artifact_prefix": "/tmp/freespace-compact-stage-matched-control-screen",
+      "superseded_by": "v1-compact-stage-https-manifest-2026-11-01.json"
     },
     {
       "id": "compact-stage-candidate-screen",
@@ -121,10 +135,11 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "must be observed from actual artifact; not borrowed from older joint",
       "campaign_cap_seconds": 216000,
-      "status": "conditional_matched_control",
+      "status": "superseded_build_only_https_repair",
       "depends_on": "Real changed-full smoke valid for canonical baseline and candidate; fresh matched A/A control before candidate comparison. Same frozen harness hashes. No retries after ordinary failure.",
       "purpose": "Fresh matched one-million-file source screen; no full-scale extrapolation or promotion",
-      "artifact_prefix": "/tmp/freespace-compact-stage-candidate-screen"
+      "artifact_prefix": "/tmp/freespace-compact-stage-candidate-screen",
+      "superseded_by": "v1-compact-stage-https-manifest-2026-11-01.json"
     }
   ],
   "forecasts": {
@@ -139,5 +154,6 @@
     "No 4MiB source acceptance without matched8/4 representative-scale wall/phase/I/O/RSS evidence.",
     "Full-scale work requires a separately admitted case-matched forecast and source; old SQL/joint measurements do not qualify compact source."
   ],
-  "local_state": "Installed v2 configuration unchanged; nightly timer temporarily stopped; Persistent catch-up on later restore must be scheduled"
+  "local_state": "Installed v2 configuration unchanged; nightly timer temporarily stopped; Persistent catch-up on later restore must be scheduled",
+  "updated_at": "2026-10-31T23:26:52.899864+00:00"
 }

@@ -1,0 +1,24 @@
+{
+  "run_id": 41251341238,
+  "head": "601ce381ac229923d2c791fd8e7c510f7b3f1dfc",
+  "status": "invalid_before_build_and_measurement",
+  "failure": {
+    "job": "build",
+    "step": "Install musl tools",
+    "command": "sudo timeout 180 apt-get update -q",
+    "exit_code": 124,
+    "evidence": "Repeated Ign responses for azure.archive.ubuntu.com; apt update timed out. Some HTTPS Ubuntu index requests succeeded; underlying network cause is not established."
+  },
+  "jobs_seconds": {
+    "build": 197,
+    "paired_skipped": 0,
+    "total": 197
+  },
+  "artifact_count": 0,
+  "tests_explain_and_measurements": "not run",
+  "binary_identity": "not observed",
+  "candidate_measurement": "none",
+  "archive_sha256": "f8aa2ae2f7abc28d80c59cd4bf03b45a252a9cfd02e697d7610e78bb3574a14b",
+  "index_sha256": "f7e3e9b16203a19cbc94097eefc41e690d2100514cb2e2c8b4abebd1efb031c3",
+  "indexed_payloads": 5
+}
