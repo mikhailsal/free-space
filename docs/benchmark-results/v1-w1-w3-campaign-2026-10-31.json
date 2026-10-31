@@ -1,0 +1,662 @@
+{
+  "archive": "v1-w1-w3-campaign-2026-10-31.tar.gz",
+  "archive_sha256": "bd63e732b9eb7851bcd1055fb05bde53dcdfab7b10576a949b4ee7f87e8b21db",
+  "archive_bytes": 250982,
+  "evidence": [
+    {
+      "label": "smoke-v2",
+      "run_id": 41195761328,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v2",
+      "fixture": {
+        "files": 100000,
+        "expected_entries": 100449,
+        "expected_subtree_entries": 100,
+        "directories": 449,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 3.7438957520000002
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 2.1786843069999975,
+              "candidate": 2.156651449000009,
+              "delta": -0.022032857999988664
+            },
+            "peak_rss_kib": {
+              "baseline": 27416,
+              "candidate": 27404,
+              "delta": -12
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 45314048,
+              "candidate": 45314048,
+              "delta": 0
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -0.022032857999988664,
+            "max_abs_delta": 0.022032857999988664
+          },
+          "peak_rss_kib": {
+            "median_delta": -12,
+            "max_abs_delta": 12
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": 0,
+            "max_abs_delta": 0
+          }
+        },
+        "identical_binaries": true,
+        "measurement_protocol": "v1-single-operation-pairs-v2"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "control-screen-v2",
+      "run_id": 41196033116,
+      "operation": "refresh",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v2",
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 61.61192458300002
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 10.58984948300008,
+              "candidate": 10.628252971000052,
+              "delta": 0.03840348799997173
+            },
+            "peak_rss_kib": {
+              "baseline": 251312,
+              "candidate": 251204,
+              "delta": -108
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 375070720,
+              "candidate": 375070720,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 2,
+            "elapsed_seconds": {
+              "baseline": 10.705960453999978,
+              "candidate": 10.606263097000124,
+              "delta": -0.09969735699985449
+            },
+            "peak_rss_kib": {
+              "baseline": 251316,
+              "candidate": 251068,
+              "delta": -248
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 375070720,
+              "candidate": 375070720,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 3,
+            "elapsed_seconds": {
+              "baseline": 10.623168608000015,
+              "candidate": 10.607863120000047,
+              "delta": -0.015305487999967227
+            },
+            "peak_rss_kib": {
+              "baseline": 250984,
+              "candidate": 251196,
+              "delta": 212
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 375070720,
+              "candidate": 375070720,
+              "delta": 0
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -0.015305487999967227,
+            "max_abs_delta": 0.09969735699985449
+          },
+          "peak_rss_kib": {
+            "median_delta": -108,
+            "max_abs_delta": 248
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": 0,
+            "max_abs_delta": 0
+          }
+        },
+        "identical_binaries": true,
+        "measurement_protocol": "v1-single-operation-pairs-v2"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "control-screen-v2",
+      "run_id": 41196033116,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v2",
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 61.24041945900001
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 62.25318384099998,
+              "candidate": 61.571319603999996,
+              "delta": -0.681864236999985
+            },
+            "peak_rss_kib": {
+              "baseline": 27556,
+              "candidate": 27632,
+              "delta": 76
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 459730944,
+              "candidate": 459730944,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 2,
+            "elapsed_seconds": {
+              "baseline": 61.33524073899997,
+              "candidate": 61.22128612,
+              "delta": -0.11395461899996917
+            },
+            "peak_rss_kib": {
+              "baseline": 27768,
+              "candidate": 27436,
+              "delta": -332
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 459730944,
+              "candidate": 459730944,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 3,
+            "elapsed_seconds": {
+              "baseline": 61.364343986999984,
+              "candidate": 61.24947473599991,
+              "delta": -0.11486925100007284
+            },
+            "peak_rss_kib": {
+              "baseline": 27564,
+              "candidate": 27584,
+              "delta": 20
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 459730944,
+              "candidate": 459730944,
+              "delta": 0
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -0.11486925100007284,
+            "max_abs_delta": 0.681864236999985
+          },
+          "peak_rss_kib": {
+            "median_delta": 20,
+            "max_abs_delta": 332
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": 0,
+            "max_abs_delta": 0
+          }
+        },
+        "identical_binaries": true,
+        "measurement_protocol": "v1-single-operation-pairs-v2"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "control-full-v2",
+      "run_id": 41197635230,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v2",
+      "fixture": {
+        "files": 7264383,
+        "expected_entries": 7297076,
+        "expected_subtree_entries": 100,
+        "directories": 32693,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 274.873833395
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 522.9208909769999,
+              "candidate": 532.228321086,
+              "delta": 9.307430109000165
+            },
+            "peak_rss_kib": {
+              "baseline": 23892,
+              "candidate": 24040,
+              "delta": 148
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 3363876864,
+              "candidate": 3363860480,
+              "delta": -16384
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": 9.307430109000165,
+            "max_abs_delta": 9.307430109000165
+          },
+          "peak_rss_kib": {
+            "median_delta": 148,
+            "max_abs_delta": 148
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": -16384,
+            "max_abs_delta": 16384
+          }
+        },
+        "identical_binaries": true,
+        "measurement_protocol": "v1-single-operation-pairs-v2"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "candidate-screen-v2",
+      "run_id": 41197637087,
+      "operation": "refresh",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v2",
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 62.07139367299999
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 10.633416527999998,
+              "candidate": 10.621168829999988,
+              "delta": -0.012247698000010132
+            },
+            "peak_rss_kib": {
+              "baseline": 251236,
+              "candidate": 251084,
+              "delta": -152
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 375070720,
+              "candidate": 375070720,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 2,
+            "elapsed_seconds": {
+              "baseline": 10.642705718999991,
+              "candidate": 10.586807680999982,
+              "delta": -0.055898038000009365
+            },
+            "peak_rss_kib": {
+              "baseline": 251132,
+              "candidate": 251096,
+              "delta": -36
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 375070720,
+              "candidate": 375070720,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 3,
+            "elapsed_seconds": {
+              "baseline": 10.614876748000142,
+              "candidate": 10.686997381000083,
+              "delta": 0.07212063299994043
+            },
+            "peak_rss_kib": {
+              "baseline": 251256,
+              "candidate": 251352,
+              "delta": 96
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 375070720,
+              "candidate": 375070720,
+              "delta": 0
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -0.012247698000010132,
+            "max_abs_delta": 0.07212063299994043
+          },
+          "peak_rss_kib": {
+            "median_delta": -36,
+            "max_abs_delta": 152
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": 0,
+            "max_abs_delta": 0
+          }
+        },
+        "identical_binaries": false,
+        "measurement_protocol": "v1-single-operation-pairs-v2"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "candidate-screen-v2",
+      "run_id": 41197637087,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v2",
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 62.43526413599999
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 61.95799604999999,
+              "candidate": 53.105599799000004,
+              "delta": -8.852396250999988
+            },
+            "peak_rss_kib": {
+              "baseline": 27556,
+              "candidate": 27700,
+              "delta": 144
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 459714560,
+              "candidate": 459714560,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 2,
+            "elapsed_seconds": {
+              "baseline": 63.17869155200003,
+              "candidate": 53.16293773799998,
+              "delta": -10.01575381400005
+            },
+            "peak_rss_kib": {
+              "baseline": 27288,
+              "candidate": 27568,
+              "delta": 280
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 459714560,
+              "candidate": 459714560,
+              "delta": 0
+            }
+          },
+          {
+            "pair": 3,
+            "elapsed_seconds": {
+              "baseline": 61.47043673099995,
+              "candidate": 53.39913299900002,
+              "delta": -8.071303731999933
+            },
+            "peak_rss_kib": {
+              "baseline": 27340,
+              "candidate": 27376,
+              "delta": 36
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 459714560,
+              "candidate": 459714560,
+              "delta": 0
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -8.852396250999988,
+            "max_abs_delta": 10.01575381400005
+          },
+          "peak_rss_kib": {
+            "median_delta": 144,
+            "max_abs_delta": 280
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": 0,
+            "max_abs_delta": 0
+          }
+        },
+        "identical_binaries": false,
+        "measurement_protocol": "v1-single-operation-pairs-v2"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "candidate-full-v3",
+      "run_id": 41199678638,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v3",
+      "fixture": {
+        "files": 7264383,
+        "expected_entries": 7297076,
+        "expected_subtree_entries": 100,
+        "directories": 32693,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 279.655163805
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 534.609202601,
+              "candidate": 470.89761993499997,
+              "delta": -63.71158266600003
+            },
+            "peak_rss_kib": {
+              "baseline": 23668,
+              "candidate": 23952,
+              "delta": 284
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 3364241408,
+              "candidate": 3364229120,
+              "delta": -12288
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -63.71158266600003,
+            "max_abs_delta": 63.71158266600003
+          },
+          "peak_rss_kib": {
+            "median_delta": 284,
+            "max_abs_delta": 284
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": -12288,
+            "max_abs_delta": 12288
+          }
+        },
+        "identical_binaries": false,
+        "measurement_protocol": "v1-single-operation-pairs-v3"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    },
+    {
+      "label": "smoke-v3",
+      "run_id": 41200958293,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "protocol": "v1-single-operation-pairs-v3",
+      "fixture": {
+        "files": 100000,
+        "expected_entries": 100449,
+        "expected_subtree_entries": 100,
+        "directories": 449,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "setup_seconds": 6.091294514999987
+      },
+      "summary": {
+        "valid": true,
+        "issues": [],
+        "pairs": [
+          {
+            "pair": 1,
+            "elapsed_seconds": {
+              "baseline": 2.7286904300000003,
+              "candidate": 2.727347430000009,
+              "delta": -0.0013429999999914344
+            },
+            "peak_rss_kib": {
+              "baseline": 27524,
+              "candidate": 27372,
+              "delta": -152
+            },
+            "app_disk_peak_bytes": {
+              "baseline": 38154240,
+              "candidate": 45314048,
+              "delta": 7159808
+            }
+          }
+        ],
+        "summary": {
+          "elapsed_seconds": {
+            "median_delta": -0.0013429999999914344,
+            "max_abs_delta": 0.0013429999999914344
+          },
+          "peak_rss_kib": {
+            "median_delta": -152,
+            "max_abs_delta": 152
+          },
+          "app_disk_peak_bytes": {
+            "median_delta": 7159808,
+            "max_abs_delta": 7159808
+          }
+        },
+        "identical_binaries": true,
+        "measurement_protocol": "v1-single-operation-pairs-v3"
+      },
+      "interpretation": "historical protocol validity only; no automatic promotion"
+    }
+  ],
+  "candidate_full_build": {
+    "run_id": 41199678638,
+    "source_revision": "a2ac533fc23ff388f62fa368cb78bc907b146e5a",
+    "rust_passed": 318,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "suite_results": [
+      "2026-10-31T12:07:54.4659079Z test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+      "2026-10-31T12:07:54.9558981Z test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+      "2026-10-31T12:07:55.2621080Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+      "2026-10-31T12:08:09.8532104Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.59s",
+      "2026-10-31T12:08:22.9335484Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.08s",
+      "2026-10-31T12:08:23.2540800Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+      "2026-10-31T12:08:23.7415479Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+      "2026-10-31T12:08:24.2436020Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s",
+      "2026-10-31T12:08:24.6064237Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s",
+      "2026-10-31T12:08:25.3737420Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s",
+      "2026-10-31T12:08:25.4658030Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+      "2026-10-31T12:08:25.7215576Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s",
+      "2026-10-31T12:08:27.7798841Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.06s",
+      "2026-10-31T12:08:28.1788872Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s",
+      "2026-10-31T12:08:31.1157284Z test result: ok. 117 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s",
+      "2026-10-31T12:08:32.0011838Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s",
+      "2026-10-31T12:08:32.1174087Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+      "2026-10-31T12:08:33.0117626Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s",
+      "2026-10-31T12:08:34.5995012Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s",
+      "2026-10-31T12:08:35.5763628Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s",
+      "2026-10-31T12:08:36.5497156Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s",
+      "2026-10-31T12:08:37.1331129Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s",
+      "2026-10-31T12:08:37.3871109Z test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.25s",
+      "2026-10-31T12:08:38.6049467Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s",
+      "2026-10-31T12:08:41.7264046Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.12s",
+      "2026-10-31T12:08:43.1243457Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.40s",
+      "2026-10-31T12:08:43.1296037Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-31T12:08:43.8712578Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s",
+      "2026-10-31T12:08:44.1740316Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ],
+    "targeted_results": [
+      "2026-10-31T12:07:33.7377163Z Ran 62 tests in 0.463s",
+      "2026-10-31T12:08:28.4811208Z test scan::staged::write::tests::stat_error_leaf_is_written_and_folded_into_parent ... ok",
+      "2026-10-31T12:08:43.1374108Z test disk_scan_keeps_rejecting_a_non_directory_root ... ok"
+    ]
+  },
+  "aggregate_runner_seconds": 8118,
+  "aggregate_cap_runner_seconds": 21600,
+  "remaining_runner_seconds": 13482,
+  "disposition": "W3 combined leaf candidate not promoted: observed speed gains below fixed15pct floor; full qualification incomplete. No further W3 dispatch planned."
+}

@@ -169,6 +169,15 @@ PR or require completing all experiments before returning the host to v1.
 
 ## W1: establish a usable v1 comparison and resource budget
 
+Implementation started on the investigation branch. See
+[runner protocol](../v1-benchmark.md), [test-host runbook](../v1-test-host.md) and
+[campaign ledger](../benchmark-results/v1-w1-campaign-2026-10-31.json).
+The first remote campaign completed its planned baseline screening, one large
+control and W3 exploratory measurements. See the
+[campaign report](../benchmark-results/v1-w1-w3-campaign-2026-10-31.md).
+Current protocol-v3 smoke passed; full-scale controls, memory-budget sweeps and
+sampling sensitivity remain incomplete. No engine optimization is promoted.
+
 Use the existing harness rather than rewriting it. Add explicit baseline-v1 and
 candidate-v1 arms; current baseline dispatch is v2-oriented and cannot be assumed
 correct for v1. Freeze source SHA, binary hashes, compiler/target/flags, fixture
@@ -410,7 +419,10 @@ showing a useful stable configuration. SQLite `cache_size` is a suggested page
 cache bound, not a process/RAM guarantee: [SQLite PRAGMA documentation](https://www.sqlite.org/pragma.html#pragma_cache_size).
 
 Only promote mechanisms independently supported by paired evidence. If batching
-fails its memory or speed gates, retain W3 and the current keyset loop. If larger
+fails its memory or speed gates, retain the last qualified product baseline and
+the current keyset loop. W3's combined leaf experiment missed D8 and is not a
+qualified dependency: a batching-only experiment must start from unchanged v1.
+If larger
 caches harm low-memory hosts, keep defaults and publish the sensitivity result.
 
 ## W5: improve v1 refresh without recreating v2
@@ -1024,6 +1036,42 @@ migration, or establishes exact local v2-to-v1 ratios. D1–D15 remain binding.
 | Actual deployment | Not authorized by planning choices | Not authorized | Not authorized |
 | Existing metric gates | D2–D14 | Unchanged | Unchanged |
 
+## W3 candidate preparation and campaign-scope choice
+
+Prepared in isolated worktree `/tmp/free-space-v1-leaf`, published branch
+`perf/v1-leaf-fast-path`, based on W1 revision accfe9d. Commit6b70986 skips child
+queries for known non-directory nodes; commit93b2e2d additionally skips their
+redundant final UPDATE. Directory traversal, hardlink attribution and parent
+aggregation remain unchanged. Differential fixture now asserts leaf time/subtree
+invariants, zero-sized aliases, empty directories and future mtime clamping.
+The candidate passed Rust workspace tests on GitHub (318 passed, 0 failed, one
+existing ignored test) and normal repository gates; added STAT_ERROR and
+non-directory-root cases executed. The
+[Opus implementation review](v1-leaf-implementation-review.md) found no P1/P2.
+Neither source review nor correctness checks constitute performance promotion.
+
+The measured combination is **not promoted**: paired median scan acceleration
+was 14.29% at 1m files and 11.92% in one 7.3m-entry pair, below the fixed 15% D8
+floor. No useful disk/RAM saving was demonstrated. No further W3 confirmation job
+is planned. Independent SELECT-only/UPDATE-only timing and diagnostic statement
+counts were not collected; no separate mechanism is accepted from the combined
+result. W4 preparation compares with unchanged v1, not this rejected combination.
+The [campaign report](../benchmark-results/v1-w1-w3-campaign-2026-10-31.md) records
+all results, protocol refinements, uncertainty and missing qualification.
+
+D17 — First-campaign scope expansion: ACCEPTED A by the owner via asynchronous reply. Candidate tests/measurements may use only the remaining part of the same six aggregate runner-hours after baseline controls succeed. Original alternatives below are history. Recommended A: permit this W3
+candidate's GH tests/measurements after baseline controls succeed, using only the
+remaining part of the same six aggregate runner-hours. Keep all accepted gates;
+if full qualification does not fit, retain preliminary evidence and stop. B:
+finish only W1/harness/baseline within the original allocation; defer candidate
+campaign allocation. This changes campaign scope only, not its time cap or any
+metric/correctness requirement. No candidate job starts before the actual answer.
+
+Execution receipt: D17 was received before W3 dispatch. The completed campaign
+used 8,118 of 21,600 aggregate runner-seconds; 13,482 remain and no job is active.
+Further W4 runner use needs a new explicit scope allocation; preparing its
+already-planned source experiment is reversible work and does not launch jobs.
+
 ## Implementation Tasks
 
 Estimates are planning ranges, not commitments. Human/agent time excludes runner
@@ -1117,4 +1165,6 @@ and successful lower-memory budgets remain unproven. Test-host backend switching
 is authorized; candidate implementation/qualification and normal repository gates
 remain necessary before declaring any optimization successful.
 
-NO UNRESOLVED OWNER DECISIONS
+NO UNRESOLVED OWNER DECISIONS FOR COMPLETED D17 WORK. W3's combined candidate was
+not promoted. Any W4 runner campaign requires a new recorded scope allocation
+within the remaining cap or a separately approved campaign; no new job is started.
