@@ -73,16 +73,39 @@ fn assert_equivalent(a: &Snapshot, b: &Snapshot) {
 }
 
 #[test]
+fn disk_scan_leaf_future_mtime_is_clamped_to_its_own_observation() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("tree");
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("a"), b"future").unwrap();
+    fs::File::open(root.join("a"))
+        .unwrap()
+        .set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(3600))
+        .unwrap();
+    fs::hard_link(root.join("a"), root.join("z")).unwrap();
+    let disk = SnapshotDir::new(tmp.path().join("disk"));
+    scan(&[&root], &disk, true);
+    let snapshot = Snapshot::open_current(&disk).unwrap();
+    let clamped: i64 = snapshot
+        .conn
+        .query_row(
+            "SELECT count(*) FROM entries WHERE kind=0 AND mtime>scanned_at
+         AND newest_mtime=scanned_at AND min_scanned_at=scanned_at
+         AND items=0 AND subtree_end=id",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(clamped, 2);
+}
+
+#[test]
 fn disk_scan_preserves_raw_names_preorder_and_full_path_hardlink_ownership() {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path().join("tree");
     fs::create_dir_all(root.join("a")).unwrap();
     fs::create_dir_all(root.join("empty")).unwrap();
     fs::write(root.join("a/file"), vec![7; 17000]).unwrap();
-    fs::File::open(root.join("a/file"))
-        .unwrap()
-        .set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(3600))
-        .unwrap();
     // '/' sorts after '-', although DFS visits a/file before a-link.
     fs::hard_link(root.join("a/file"), root.join("a-link")).unwrap();
     fs::write(
