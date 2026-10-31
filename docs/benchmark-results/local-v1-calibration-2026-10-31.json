@@ -1,0 +1,115 @@
+{
+  "backend": "v1",
+  "one_scan": true,
+  "first_generation": true,
+  "elapsed_seconds": 1779.09,
+  "exit_code": 0,
+  "peak_process_RSS_MiB_time_v": 27.66015625,
+  "sampled_peak_app_allocation_GiB": 1.8046035766601562,
+  "sampled_peak_cgroup_memory_GiB": 4.790912628173828,
+  "minimum_free_GiB": 20.79593276977539,
+  "device_interval_statistics": {
+    "read_iops": {
+      "median": 1397.5563413077557,
+      "p95": 2205.4326227254596
+    },
+    "write_iops": {
+      "median": 13.752963686941836,
+      "p95": 3543.067606174621
+    },
+    "read_MiB_s": {
+      "median": 7.329933382324323,
+      "p95": 25.767728149681126
+    },
+    "write_MiB_s": {
+      "median": 0.8614988548480519,
+      "p95": 19.736198570996088
+    },
+    "read_await_ms": {
+      "median": 0.4693280384575191,
+      "p95": 0.8250254323499492
+    },
+    "write_await_ms": {
+      "median": 0.6436781609195402,
+      "p95": 1.5437921077959575
+    },
+    "avg_queue_depth": {
+      "median": 0.6910216543280601,
+      "p95": 3.239024421499503
+    }
+  },
+  "scan_report": {
+    "generation": 1,
+    "prev_generation": null,
+    "entries": 7274483,
+    "roots": [
+      "/",
+      "/boot/efi"
+    ],
+    "workers": 1,
+    "walk_seconds": 1150.225836744,
+    "finalize_seconds": 0.0,
+    "insert_seconds": 620.400414602,
+    "index_seconds": 8.156017297,
+    "publish_seconds": 0.003762686,
+    "total_seconds": 1779.079029635,
+    "snapshot_bytes": 1065177088,
+    "snapshot_path": "/var/lib/freespace/calibration-20261031/snapshot.db",
+    "errors": 2,
+    "incomplete": true,
+    "unknown_subtrees": [
+      "/tmp/.mount_CursorFJihdk",
+      "/tmp/RustDesk/cliprdr-server"
+    ]
+  },
+  "limits": [
+    "Single installed-binary observation, source SHA unknown",
+    "No cache flush; not a cold-run comparison",
+    "Device activity includes competing host work; achieved throughput is not a device maximum",
+    "Five-second allocation samples are lower bounds",
+    "First-generation peak excludes retained previous/current generations",
+    "Cgroup memory includes cache; not minimum required RAM",
+    "Incomplete snapshot: see scan_report"
+  ],
+  "manifest": {
+    "command": [
+      "systemd-run",
+      "--unit=freespace-calibration-20261031.service",
+      "--property=Type=exec",
+      "--property=Nice=19",
+      "--property=IOSchedulingClass=idle",
+      "--property=ProtectSystem=strict",
+      "--property=ReadWritePaths=/var/lib/freespace",
+      "--property=NoNewPrivileges=true",
+      "--property=RuntimeMaxSec=7200",
+      "--property=TimeoutStopSec=30",
+      "--property=Conflicts=freespace.service",
+      "--property=MemoryAccounting=true",
+      "--property=IOAccounting=true",
+      "--setenv=FREESPACE_SNAPSHOT_DIR=/var/lib/freespace/calibration-20261031",
+      "--setenv=SQLITE_TMPDIR=/var/lib/freespace/calibration-20261031/sqlite-tmp",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/var/lib/freespace/calibration-20261031/time.txt",
+      "/usr/local/bin/freespace",
+      "--backend",
+      "v1",
+      "scan",
+      "--low-memory",
+      "--workers",
+      "1",
+      "--json"
+    ],
+    "binary_sha256": "32d948fb2981b4829edbcc30304e382cb79f202cfe64fb7524ffe54fa271277a",
+    "config": "# freespace configuration (written by `freespace install-timer`)\nroots = [\"/\", \"/boot/efi\"]\nsnapshot_dir = \"/var/lib/freespace\"\nbackend = \"v2\"\nkeep_previous = true\nlow_memory = true\nport = 0\ninterval = \"daily\"\nat = \"02:00\"\n",
+    "host_meminfo": "MemTotal:       16336140 kB\nMemFree:         1164252 kB\nMemAvailable:    7988592 kB\nBuffers:          378636 kB\nCached:          6298768 kB\nSwapCached:       101332 kB\nActive:          5783016 kB\nInactive:        7802440 kB\nActive(anon):    1024360 kB\nInactive(anon):  6002400 kB\nActive(file):    4758656 kB\nInactive(file):  1800040 kB\nUnevictable:       72952 kB\nMlocked:           72952 kB\nSwapTotal:       2097148 kB\nSwapFree:         210268 kB\nDirty:              1224 kB\nWriteback:             0 kB\nAnonPages:       6880256 kB\nMapped:          1251664 kB\nShmem:            114636 kB\nKReclaimable:     627544 kB\nSlab:             867356 kB\nSReclaimable:     627544 kB\nSUnreclaim:       239812 kB\nKernelStack:       35488 kB\nPageTables:       144784 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    10265216 kB\nCommitted_AS:   30649400 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       92540 kB\nVmallocChunk:          0 kB\nPercpu:           110080 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     3652916 kB\nDirectMap2M:    13123584 kB\nDirectMap1G:     2097152 kB\n",
+    "initial_available_bytes": 24280510464,
+    "max_calibration_bytes": 10737418240,
+    "min_available_bytes": 8589934592,
+    "interval_seconds": 5,
+    "no_cache_flush": true,
+    "observer_separate_cgroup": true,
+    "old_databases_deleted": false
+  }
+}
