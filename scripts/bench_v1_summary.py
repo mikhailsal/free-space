@@ -141,13 +141,17 @@ def summarize(root: Path, require_runner_cleanup=True) -> dict:
         bound = all(k in metric and k in spec and type(metric[k]) is type(spec[k]) and metric[k] == spec[k]
                     for k in bound_keys)
         cg = metric.get('cgroup_after')
+        # refresh's public JSON has no errors counter; it explicitly reports
+        # incomplete and unknown_subtrees instead (cli/src/refresh.rs).
+        report_errors = report.get('errors', 0 if operation == 'refresh' else None)
         limits_ok = (isinstance(cg, dict) and integer(spec.get('memory_mib'), True)
                      and cg.get('memory.max') == str(spec['memory_mib'] * 1024 * 1024)
                      and cg.get('memory.swap.max') == '0')
         if not (bound and limits_ok and metric.get('validated') is True and type(metric.get('exit_code')) is int and metric['exit_code'] == 0
                 and metric.get('timed_out') is False and metric.get('sampler_errors') == []
                 and integer(report.get('entries')) and report.get('entries') == expected
-                and type(report.get('errors')) is int and report.get('errors') == 0 and report.get('incomplete') is False
+                and type(report_errors) is int and report_errors == 0 and report.get('incomplete') is False
+                and report.get('unknown_subtrees') == []
                 and (operation != 'refresh' or (integer(report.get('subtree_entries'))
                      and report['subtree_entries'] == spec.get('expected_subtree_entries')))
                 and number(metric.get('elapsed_seconds'), True) and number(time.get('peak_rss_kib'), True)

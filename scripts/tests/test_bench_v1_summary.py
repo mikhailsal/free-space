@@ -32,7 +32,7 @@ def fixture(root):
                 'files': 10, 'memory_mib': 256, 'expected_entries': 12, 'expected_subtree_entries': 5, 'seed_sha256': sha,
                 'binary_sha256': sha, 'source_revision': 'revision'}
         metric = {**spec, 'validated': True, 'exit_code': 0, 'timed_out': False, 'sampler_errors': [],
-                  'report': {'entries': 12, 'subtree_entries': 5, 'errors': 0, 'incomplete': False}, 'elapsed_seconds': 1 + index,
+                  'report': {'entries': 12, 'subtree_entries': 5, 'incomplete': False, 'unknown_subtrees': []}, 'elapsed_seconds': 1 + index,
                   'time': {'peak_rss_kib': 1024 + index}, 'app_disk_peak_bytes': 1024 ** 3 + index,
                   'memory_peak_scope': MODULE.SCOPE, 'cgroup_after': cg}
         observer = {'validated': True, 'logical_content_unchanged': True, 'semantic_sha256': sha,
