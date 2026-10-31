@@ -46,7 +46,8 @@ fn assert_equivalent(a: &Snapshot, b: &Snapshot) {
         "SELECT entry_id,path,fs_type FROM roots ORDER BY entry_id",
         "SELECT entry_id,path,fs_type FROM mounts ORDER BY entry_id",
         "SELECT * FROM denied ORDER BY entry_id",
-        "SELECT * FROM refreshes ORDER BY path",
+        // Full scans have no refresh history; fresh refresh timestamps are checked separately.
+        "SELECT path,generation FROM refreshes ORDER BY path",
     ] {
         assert_eq!(rows(a, sql), rows(b, sql), "{sql}");
     }
@@ -264,6 +265,71 @@ fn staged_and_fast_seed_refresh_match_nested_links_and_denied() {
     assert_eq!(disk_previous.meta.generation, 1);
     assert_equivalent(&fast_previous, &disk_previous);
     fs::set_permissions(sub.join("denied"), fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+fn age_seed_timestamps(path: &Path, timestamp: i64) {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    conn.execute(
+        "UPDATE entries SET scanned_at=?1,min_scanned_at=?1",
+        [timestamp],
+    )
+    .unwrap();
+    conn.execute("UPDATE meta SET scanned_at=?1", [timestamp])
+        .unwrap();
+}
+
+#[test]
+fn refresh_timestamps_are_bounded_and_untouched_leaves_keep_seed_times() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("tree");
+    let sub = root.join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    fs::write(sub.join("inside"), b"inside").unwrap();
+    fs::write(root.join("outside-a"), b"a").unwrap();
+    fs::write(root.join("outside-b"), b"b").unwrap();
+    let sql = "SELECT name,scanned_at,min_scanned_at FROM entries WHERE name IN \
+               (CAST('outside-a' AS BLOB),CAST('outside-b' AS BLOB)) ORDER BY name";
+    for low_memory in [false, true] {
+        let dir = SnapshotDir::new(tmp.path().join(format!("snap-{low_memory}")));
+        scan(&[&root], &dir, low_memory);
+        scan(&[&root], &dir, low_memory);
+        let seed_time = freespace_core::platform::now_secs() - 60;
+        age_seed_timestamps(&dir.current(), seed_time);
+        age_seed_timestamps(&dir.prev(), seed_time);
+        let previous = fs::read(dir.prev()).unwrap();
+        let before_leaves = rows(&Snapshot::open_current(&dir).unwrap(), sql);
+        assert_eq!(before_leaves.len(), 2);
+        for leaf in &before_leaves {
+            assert_eq!(
+                leaf[1..],
+                [Value::Integer(seed_time), Value::Integer(seed_time)]
+            );
+        }
+        let before = freespace_core::platform::now_secs();
+        let report = run_refresh(RefreshRequest {
+            path: sub.as_os_str().as_bytes().to_vec(),
+            workers: 1,
+            dir: dir.clone(),
+            on_progress: None,
+        })
+        .unwrap();
+        let after = freespace_core::platform::now_secs();
+        let current = Snapshot::open_current(&dir).unwrap();
+        let history = rows(&current, "SELECT path,generation,scanned_at FROM refreshes");
+        assert_eq!(history.len(), 1);
+        assert_eq!(
+            history[0][0],
+            Value::Blob(sub.as_os_str().as_bytes().to_vec())
+        );
+        assert_eq!(history[0][1], Value::Integer(report.generation as i64));
+        let Value::Integer(timestamp) = history[0][2] else {
+            panic!("refresh timestamp is not an integer");
+        };
+        assert!((before..=after).contains(&timestamp));
+        assert!(timestamp > seed_time);
+        assert_eq!(rows(&current, sql), before_leaves);
+        assert_eq!(fs::read(dir.prev()).unwrap(), previous);
+    }
 }
 
 #[test]
