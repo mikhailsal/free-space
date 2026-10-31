@@ -73,18 +73,24 @@ fn assert_equivalent(a: &Snapshot, b: &Snapshot) {
 }
 
 #[test]
-fn disk_scan_preserves_a_non_directory_root() {
+fn disk_scan_keeps_rejecting_a_non_directory_root() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("file");
-    fs::write(&file, vec![7; 17000]).unwrap();
-    let fast = SnapshotDir::new(tmp.path().join("fast"));
-    let disk = SnapshotDir::new(tmp.path().join("disk"));
-    assert_eq!(scan(&[&file], &fast, false).entries, 1);
-    assert_eq!(scan(&[&file], &disk, true).entries, 1);
-    assert_equivalent(
-        &Snapshot::open_current(&fast).unwrap(),
-        &Snapshot::open_current(&disk).unwrap(),
-    );
+    fs::write(&file, b"not a directory").unwrap();
+    for low_memory in [false, true] {
+        let error = run_scan(ScanRequest {
+            roots: vec![file.clone()],
+            one_file_system: true,
+            workers: 1,
+            low_memory,
+            dir: SnapshotDir::new(tmp.path().join(format!("scan-{low_memory}"))),
+            keep_previous: true,
+            on_progress: None,
+        })
+        .err()
+        .expect("file roots must be rejected");
+        assert!(error.to_string().contains("not a directory"));
+    }
 }
 
 #[test]
