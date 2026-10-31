@@ -22,7 +22,13 @@ def run(args):
     output = Path(args.output)
     device_stat = os.stat(args.device)
     device_number = f"{os.major(device_stat.st_rdev)}:{os.minor(device_stat.st_rdev)}"
-    limits = dict(rbps=33554432, wbps=16777216, riops=1000, wiops=500) if args.profile == "limited" else {}
+    profiles = {
+        "native": {},
+        "limited": dict(rbps=33554432, wbps=16777216, riops=1000, wiops=500),
+        # Sensitivity around observed local bursts, not a measured maximum or equivalence.
+        "local": dict(rbps=33554432, wbps=33554432, riops=2200, wiops=3600),
+    }
+    limits = profiles[args.profile]
     name = "freespace-calibration-" + uuid.uuid4().hex
     benchmark_label = "freespace.benchmark=" + (os.environ.get("FREESPACE_BENCHMARK_RUN_TOKEN")
         or os.environ.get("GITHUB_RUN_ID") or uuid.uuid4().hex)
@@ -80,5 +86,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ("image", "device", "directory", "output"):
         parser.add_argument("--" + option, required=True)
-    parser.add_argument("--profile", choices=("native", "limited"), required=True)
+    parser.add_argument("--profile", choices=("native", "limited", "local"), required=True)
     run(parser.parse_args())

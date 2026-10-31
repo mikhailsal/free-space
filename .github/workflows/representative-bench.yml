@@ -10,62 +10,103 @@ on:
       - scripts/bench-representative.sh
       - scripts/bench-v2-container/**
       - scripts/tests/test_bench*.py
-      - core/**
-      - cli/**
-      - Cargo.toml
-      - Cargo.lock
-      - .cargo/**
   workflow_dispatch:
     inputs:
-      full_scale:
-        description: Include the 7202464-entry, five-generation experiments
-        type: boolean
-        default: true
+      stage:
+        description: Admission stage (local-scale requires screening forecast)
+        type: choice
+        options: [smoke, screen, local-scale]
+        default: smoke
+      io:
+        description: Runner I/O sensitivity, not an exact local-disk replica
+        type: choice
+        options: [native, local, limited]
+        default: native
+      comparison:
+        description: Identical baseline controls, or baseline versus candidate
+        type: choice
+        options: [control, candidate]
+        default: control
+      baseline:
+        description: Immutable product baseline revision
+        type: string
+        default: afce6fd
+      forecast_seconds:
+        description: Required measured screening forecast for local-scale, including setup/observers
+        type: string
+        default: '0'
 
 permissions:
   contents: read
 
 concurrency:
-  group: representative-benchmark-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' && inputs.full_scale) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[local-scale]')) }}
+  group: representative-v1-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - name: Check harness and build the measured binary
+      - uses: Swatinem/rust-cache@v2
+      - name: Check benchmark contracts and repository gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_bench*.py'
+          python3 -m compileall -q scripts/bench_v1*.py
+          cd web && bun install --frozen-lockfile
+          cd .. && scripts/check.sh
+      - name: Build both arms with one recorded toolchain
+        env:
+          BASE_REF: ${{ inputs.baseline || 'afce6fd' }}
+          COMPARISON: ${{ inputs.comparison || 'control' }}
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s scripts/tests -p 'test_bench*.py'
           mkdir binaries
           git rev-parse HEAD > binaries/candidate.revision.txt
-          rustc -Vv > binaries/compiler.txt
           cargo build --release --locked -p freespace
           cp target/release/freespace binaries/candidate
-          sha256sum binaries/candidate > binaries/candidate.sha256.txt
-          cargo test --workspace
+          if [[ $COMPARISON == control ]]; then
+            cp binaries/candidate binaries/baseline
+            cp binaries/candidate.revision.txt binaries/baseline.revision.txt
+          else
+            git worktree add --detach "$RUNNER_TEMP/baseline-source" "$BASE_REF"
+            git -C "$RUNNER_TEMP/baseline-source" rev-parse HEAD > binaries/baseline.revision.txt
+            CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target" cargo build --release --locked -p freespace \
+              --manifest-path "$RUNNER_TEMP/baseline-source/Cargo.toml"
+            cp target/release/freespace binaries/baseline
+          fi
+          python3 - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          compiler=subprocess.check_output(['rustc','-Vv'],text=True)
+          target=next(x.split(': ',1)[1] for x in compiler.splitlines() if x.startswith('host: '))
+          for arm in ('baseline','candidate'):
+              p=pathlib.Path('binaries')/arm
+              record={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+                      'source_revision':p.with_name(arm+'.revision.txt').read_text().strip(),
+                      'compiler':compiler,'target':target,'flags':'','profile':'release --locked',
+                      'bun':subprocess.check_output(['bun','--version'],text=True).strip()}
+              p.with_name(arm+'.build.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: representative-binary
           path: binaries/
           retention-days: 7
 
-  pilot:
+  paired:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        io: [native, limited]
+    timeout-minutes: ${{ inputs.stage == 'local-scale' && 125 || inputs.stage == 'screen' && 70 || 35 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,48 +115,39 @@ jobs:
         with:
           name: representative-binary
           path: binaries
-      - name: Verify disk model and run a paired pilot
+      - name: Check time admission before local-scale allocation
+        if: inputs.stage == 'local-scale'
         env:
-          BENCH_IO: ${{ matrix.io }}
-          BENCH_FILES: '100000'
-          BENCH_SCANS: '3'
-          BENCH_REPEATS: '2'
-        run: bash scripts/bench-representative.sh
+          FORECAST: ${{ inputs.forecast_seconds }}
+        run: |
+          python3 - <<'PY'
+          import os,sys
+          sys.path.insert(0,'scripts')
+          from bench_v1_admission import admit_time
+          receipt=admit_time(120*60,float(os.environ['FORECAST']))
+          print(receipt)
+          if not receipt['success']: raise SystemExit('No admissible screening forecast')
+          PY
+      - name: Paired v1 commands with isolated observers
+        timeout-minutes: ${{ inputs.stage == 'local-scale' && 120 || inputs.stage == 'screen' && 65 || 30 }}
+        env:
+          BENCH_PROTOCOL: v1-pairs
+          BENCH_IO: ${{ inputs.io || 'native' }}
+          STAGE: ${{ inputs.stage || 'smoke' }}
+        run: |
+          set -euo pipefail
+          case $STAGE in
+            smoke) export BENCH_FILES=100000 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=600; operations=scan ;;
+            screen) export BENCH_FILES=1000000 BENCH_PAIRS=3 BENCH_COMMAND_TIMEOUT=1200; operations='scan refresh' ;;
+            local-scale) export BENCH_FILES=7264383 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=1800; operations=scan ;;
+          esac
+          for operation in $operations; do
+            BENCH_OPERATION=$operation BENCH_OUTPUT="$PWD/representative-results/$operation" \
+              bash scripts/bench-representative.sh
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: representative-pilot-${{ matrix.io }}
-          path: representative-results/
-          retention-days: 14
-
-  local-scale:
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.full_scale) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[local-scale]')) }}
-    needs: [build, pilot]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 300
-    strategy:
-      fail-fast: false
-      matrix:
-        io: [native, limited]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: representative-binary
-          path: binaries
-      - name: Measure 7202464 entries and five retained generations
-        timeout-minutes: 280
-        env:
-          BENCH_IO: ${{ matrix.io }}
-          BENCH_FILES: '7195248'
-          BENCH_SCANS: '5'
-          BENCH_REPEATS: '1'
-        run: bash scripts/bench-representative.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: representative-local-scale-${{ matrix.io }}
+          name: representative-v1-${{ inputs.stage || 'smoke' }}-${{ inputs.io || 'native' }}
           path: representative-results/
           retention-days: 14

@@ -5,9 +5,11 @@ if [[ ${GITHUB_ACTIONS:-} != true || ${RUNNER_ENVIRONMENT:-} != github-hosted ]]
   echo 'This benchmark requires an ephemeral GitHub-hosted runner.' >&2
   exit 1
 fi
-case ${BENCH_IO:?} in native|limited) ;; *) exit 2 ;; esac
+case ${BENCH_IO:?} in native|limited|local) ;; *) exit 2 ;; esac
+case ${BENCH_PROTOCOL:-v2} in v2|v1-pairs) ;; *) exit 2 ;; esac
 repo=$(pwd)
-output="$repo/representative-results"
+output=${BENCH_OUTPUT:-$repo/representative-results}
+mkdir -p "$(dirname "$output")"
 mkdir "$output"
 volume=$(mktemp -d "$RUNNER_TEMP/representative-volume.XXXXXX")
 mount_dir="$volume/mount"
@@ -22,7 +24,7 @@ fi
 benchmark_label="freespace.benchmark=$FREESPACE_BENCHMARK_RUN_TOKEN"
 cleanup() {
   local status=$?
-  local containers container attempt containers_stopped=true
+  local containers container attempt containers_stopped=true storage_released=true
   trap - EXIT
   printf 'cleanup label=%s initial_status=%s\n' "$benchmark_label" "$status" >> "$output/cleanup.log"
   # Stop the producer before listing containers, so it cannot start another arm.
@@ -69,10 +71,21 @@ cleanup() {
     exit "$status"
   fi
   if mountpoint -q "$mount_dir"; then
-    timeout --kill-after=5s 30s sudo umount "$mount_dir" >> "$output/cleanup.log" 2>&1 || status=1
+    timeout --kill-after=5s 30s sudo umount "$mount_dir" >> "$output/cleanup.log" 2>&1 || { status=1; storage_released=false; }
   fi
-  if [[ -n $loop_device ]] && ! mountpoint -q "$mount_dir"; then
-    timeout --kill-after=5s 15s sudo losetup -d "$loop_device" >> "$output/cleanup.log" 2>&1 || status=1
+  if mountpoint -q "$mount_dir"; then
+    storage_released=false
+    status=1
+  fi
+  if [[ -n $loop_device && $storage_released == true ]]; then
+    timeout --kill-after=5s 15s sudo losetup -d "$loop_device" >> "$output/cleanup.log" 2>&1 || { status=1; storage_released=false; }
+  fi
+  if [[ $storage_released == true ]]; then
+    rm -f -- "$volume/disk.img" || status=1
+    if [[ -d $mount_dir ]]; then rmdir -- "$mount_dir" 2>/dev/null || true; fi
+    rmdir -- "$volume" 2>/dev/null || true
+  else
+    echo 'Unmount or loop detach failed; preserving backing file.' >> "$output/cleanup.log"
   fi
   printf 'cleanup final_status=%s\n' "$status" >> "$output/cleanup.log"
   exit "$status"
@@ -113,13 +126,26 @@ chmod +x binaries/candidate
 extra=()
 if [[ $BENCH_IO == limited ]]; then
   extra=(--io-device "$loop_device" --read-bps 33554432 --write-bps 16777216 --read-iops 1000 --write-iops 500)
+elif [[ $BENCH_IO == local ]]; then
+  # Sensitivity profile around observed local bursts, not local-device equivalence.
+  extra=(--io-device "$loop_device" --read-bps 33554432 --write-bps 33554432 --read-iops 2200 --write-iops 3600)
 fi
 run_owned python3 scripts/bench-disk-calibration.py --image "$image" --device "$loop_device" \
   --directory "$mount_dir" --output "$output" --profile "$BENCH_IO"
 mkdir "$mount_dir/jobs"
 export RUNNER_TEMP="$mount_dir/jobs"
-run_owned python3 scripts/bench-v2-container.py --candidate binaries/candidate --current-backends \
-  --output "$output/measurements" --steps "${BENCH_FILES:?}" --memory 4096 \
-  --workers 1 --cpus 2 --scans "${BENCH_SCANS:?}" --repeats "${BENCH_REPEATS:?}" \
-  --refreshes 3 --scan-profile disk --keep-previous true --timeout-seconds 7200 "${extra[@]}"
-python3 scripts/summarize-v2-container.py "$output/measurements" | tee "$output/summary.md" >> "$GITHUB_STEP_SUMMARY"
+if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then
+  chmod +x binaries/baseline
+  run_owned python3 scripts/bench-v2-container.py --v1-pairs --baseline binaries/baseline \
+    --candidate binaries/candidate --output "$output/measurements" --files "${BENCH_FILES:?}" \
+    --pairs "${BENCH_PAIRS:-1}" --operation "${BENCH_OPERATION:-scan}" \
+    --scenario "${BENCH_SCENARIO:-unchanged}" --memory "${BENCH_MEMORY:-4096}" \
+    --timeout-seconds "${BENCH_COMMAND_TIMEOUT:-1200}" "${extra[@]}"
+  cat "$output/measurements/summary.md" >> "$GITHUB_STEP_SUMMARY"
+else
+  run_owned python3 scripts/bench-v2-container.py --candidate binaries/candidate --current-backends \
+    --output "$output/measurements" --steps "${BENCH_FILES:?}" --memory 4096 \
+    --workers 1 --cpus 2 --scans "${BENCH_SCANS:?}" --repeats "${BENCH_REPEATS:?}" \
+    --refreshes 3 --scan-profile disk --keep-previous true --timeout-seconds 7200 "${extra[@]}"
+  python3 scripts/summarize-v2-container.py "$output/measurements" | tee "$output/summary.md" >> "$GITHUB_STEP_SUMMARY"
+fi

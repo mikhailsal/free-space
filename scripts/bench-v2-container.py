@@ -121,7 +121,7 @@ def cgroup():
 
 def cg_read(folder):
     return {name: (folder / name).read_text().strip() for name in (
-        "memory.current", "memory.peak", "memory.max", "memory.events",
+        "memory.current", "memory.peak", "memory.max", "memory.stat", "memory.events",
         "memory.swap.current", "memory.swap.peak", "memory.swap.max", "memory.pressure",
         "cpu.max", "cpu.stat", "io.max", "io.stat", "io.pressure") if (folder / name).exists()}
 
@@ -144,7 +144,7 @@ def verify_io(metrics, spec):
 
 def measured_command(spec):
     output = Path("/results") / spec["id"]
-    output.mkdir()
+    output.mkdir(exist_ok=spec.get("single_operation", False))
     group = cgroup()
     before = cg_read(group)
     expected_max = str(spec["memory_mib"] * 1024 * 1024)
@@ -170,12 +170,19 @@ def measured_command(spec):
     stopped = threading.Event()
     timed_out = threading.Event()
     sampler_errors = []
+    proc = None
 
     def sample():
         nonlocal sampled_memory, filesystem_used_peak
         try:
             while not stopped.is_set():
                 filesystem_used_peak = max(filesystem_used_peak, filesystem_used("/scratch/snapshot"))
+                available = os.statvfs("/scratch/snapshot")
+                if available.f_bavail * available.f_frsize < spec.get("minimum_free_bytes", 0):
+                    sampler_errors.append("free-space reserve exhausted")
+                    if proc is not None and proc.poll() is None:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    return
                 current = occupancy(Path("/scratch/snapshot"))
                 for name, values in file_occupancy(Path("/scratch/snapshot")).items():
                     prior = file_peaks.setdefault(name, dict(logical_bytes=0, allocated_bytes=0))
@@ -250,7 +257,11 @@ def measured_command(spec):
         "and open unlinked allocated temporary files; includes unrelated activity if "
         "filesystem is not exclusive; sampled peak is a lower bound; incremental "
         "peak is relative to command start, not total snapshot size")
-    row["memory_peak_scope"] = "arm cumulative CLI, helper and prior observations; excludes host fixture generation"
+    row["memory_peak_scope"] = ("single CLI and sampler; observer excluded" if spec.get("single_operation")
+                                else "arm cumulative CLI, helper and prior observations; excludes host fixture generation")
+    if spec.get("single_operation"):
+        row["app_disk_peak_bytes"] = (filesystem_used_peak - filesystem_used_start
+                                      + spec["initial_snapshot_allocated_bytes"])
     row["sampled_memory_peak_scope"] = "current command sampled memory.current; lower bound"
     row["sampled_file_peaks"] = file_peaks
     row["endpoint_files"] = file_occupancy(Path("/scratch/snapshot"))
@@ -260,8 +271,8 @@ def measured_command(spec):
         row["report"] = report
         if report["entries"] != spec["expected_entries"] or report.get("errors") or report.get("incomplete"):
             raise ValueError("incomplete or unexpected full entry count")
-        if spec["operation"] == "refresh" and report["subtree_entries"] != 18:
-            raise ValueError("refresh must rescan exactly 18 entries")
+        if spec["operation"] == "refresh" and report["subtree_entries"] != spec.get("expected_subtree_entries", 18):
+            raise ValueError("refresh rescanned an unexpected number of entries")
         row["validated"] = proc.returncode == 0 and not timed_out.is_set() and not sampler_errors
     except (OSError, ValueError, KeyError) as error:
         row["validation_error"] = str(error)
@@ -577,6 +588,9 @@ def host(args):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--v1-pairs":
+        from bench_v1_pair import main as paired_main
+        return paired_main(sys.argv[2:])
     if len(sys.argv) == 3 and sys.argv[1] == "--inside":
         return inside(Path(sys.argv[2]))
     args = parse_arguments(__doc__)

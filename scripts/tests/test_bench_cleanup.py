@@ -16,7 +16,10 @@ class CleanupTests(unittest.TestCase):
         mocks = r'''
 set -euo pipefail
 output=$TEST_DIRECTORY
-mount_dir=$output/mount
+volume=$output/volume
+mount_dir=$volume/mount
+mkdir -p "$mount_dir"
+touch "$volume/disk.img"
 loop_device=/dev/mock-loop
 child_pid=''
 if [[ $TEST_MODE == producer-stuck || $TEST_MODE == producer-needs-kill ]]; then child_pid=999999; fi
@@ -46,6 +49,8 @@ docker() {
 mountpoint() { [[ -f $output/mounted ]]; }
 sudo() {
   echo "sudo $*" >> "$output/calls"
+  if [[ $1 == umount && $TEST_MODE == umount-fail ]]; then return 1; fi
+  if [[ $1 == losetup && $TEST_MODE == detach-fail ]]; then return 1; fi
   if [[ $1 == umount ]]; then rm "$output/mounted"; fi
 }
 '''
@@ -57,6 +62,11 @@ sudo() {
                 timeout=5)
             calls = (Path(directory) / "calls").read_text().splitlines()
             receipt = (Path(directory) / "cleanup.log").read_text()
+            backing_exists = (Path(directory) / "volume/disk.img").exists()
+            if mode in ("umount-fail", "detach-fail", "list-fail", "remove-fail", "producer-stuck"):
+                self.assertTrue(backing_exists)
+            else:
+                self.assertFalse(backing_exists)
         return result, calls, receipt
 
     def test_owned_containers_removed_before_unmount(self):
@@ -88,6 +98,15 @@ sudo() {
         self.assertEqual(result.returncode, 0)
         self.assertEqual(len(calls), 3)
         self.assertTrue(calls[1].startswith("sudo umount "))
+
+    def test_failed_unmount_or_detach_preserves_backing(self):
+        for mode in ("umount-fail", "detach-fail"):
+            with self.subTest(mode=mode):
+                result, calls, receipt = self.run_cleanup(mode)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("preserving backing file", receipt)
+                if mode == "umount-fail":
+                    self.assertFalse(any("losetup" in call for call in calls))
 
     def test_interruption_status_retained(self):
         result, _, receipt = self.run_cleanup(initial_status=143)

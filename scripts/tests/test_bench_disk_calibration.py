@@ -17,6 +17,7 @@ SPEC = importlib.util.spec_from_file_location(
 CALIBRATION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CALIBRATION)
 LIMITS = "7:0 rbps=33554432 wbps=16777216 riops=1000 wiops=500"
+LOCAL_LIMITS = "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600"
 
 
 class DiskCalibrationTest(unittest.TestCase):
@@ -100,6 +101,16 @@ class DiskCalibrationTest(unittest.TestCase):
                                          bad_mode="write", multiplier=10)
         self.assertEqual(report["requested_limits"], {})
         self.assertFalse(any(part.startswith("--device-") for part in commands[0]))
+
+    def test_local_profile_installs_and_checks_all_limits(self):
+        report, commands = self.exercise(profile="local", installed=LOCAL_LIMITS)
+        self.assertEqual(report["requested_limits"],
+                         dict(rbps=33554432, wbps=33554432, riops=2200, wiops=3600))
+        for value in ("/dev/calibration-test:33554432", "/dev/calibration-test:2200",
+                      "/dev/calibration-test:3600"):
+            self.assertIn(value, commands[0])
+        self.exercise(profile="local", installed=LOCAL_LIMITS.replace("3600", "3601"),
+                      expected_error="did not install")
 
     def test_installed_limit_mismatch_rejected_before_fio(self):
         for installed in ("", LIMITS.replace("500", "501"), LIMITS.replace("7:0", "8:0")):
