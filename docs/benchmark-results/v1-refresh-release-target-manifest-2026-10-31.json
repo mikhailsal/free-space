@@ -1,0 +1,114 @@
+{
+  "created_at": "2026-10-31T16:21:08.970502+00:00",
+  "owner_decision": {
+    "status": "accepted before dispatch",
+    "instruction": "Increase the time budget tenfold and continue",
+    "previous_cap_seconds": 21600,
+    "new_cap_seconds": 216000,
+    "scope": "Continue approved v1 optimization investigation, starting with prepared refresh allocation diagnostics and a conditional narrow fix; retain existing metric and correctness gates"
+  },
+  "series": "release-target-controls",
+  "previous_aggregate_job_seconds": 11692.0,
+  "plans": [
+    {
+      "comparison": "control",
+      "branch": "perf/v1-refresh-scale-harness",
+      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
+      "owner_allocation": "D19 continuation under60hours",
+      "id": "refresh-release-target-screen-control",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "depends_on": "Publish reviewed immutable target-selector and profile-v2 source before dispatch",
+      "source_review": "NO_FINDINGS; requestedclaude-opus-5-5",
+      "status": "admitted_before_dispatch"
+    },
+    {
+      "comparison": "control",
+      "branch": "perf/v1-refresh-scale-harness",
+      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
+      "owner_allocation": "D19 continuation under60hours",
+      "id": "refresh-release-target-full-control",
+      "stage": "local-scale",
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "timeout_minutes": 120,
+      "maximum_job_seconds": 9000,
+      "forecast_seconds": null,
+      "depends_on": "Valid complete musl screening receipts, frozen same source, measured setup/seed/pair/observer forecast with30pct margin fitting120min step and remaining60hcap; no blind retry",
+      "source_review": "NO_FINDINGS; requestedclaude-opus-5-5",
+      "status": "conditional_forecast_pending"
+    }
+  ],
+  "prospective_diagnostic_policy": {
+    "version": "profile-v2",
+    "ordinary_strict_receipts_required": true,
+    "ordered_outcome_dependent_phases": true,
+    "finite_monotonic_elapsed": true,
+    "exact_allocation_scalars_and_node_counts": true,
+    "raw_hwm_unchanged": true,
+    "hwm_decreases_reported_separately": true,
+    "original_hwm_monotonic_contract_exposed": true,
+    "original_failed_diagnostic_unchanged": true,
+    "product_acceptance_gates_unchanged": true,
+    "buffer_movement_proves_copy": false
+  },
+  "maximum_reserved_seconds": 14100,
+  "time_admission_screen": {
+    "forecast_seconds": 2400,
+    "with30pctmargin_seconds": 3120,
+    "measured_step_cap_seconds": 3300,
+    "success": true
+  },
+  "time_admission_full": {
+    "status": "pending measured musl screening forecast",
+    "success": false
+  },
+  "stop_rules": [
+    "No blind retries or parameter sweep",
+    "No capacity fix without actionable root cause",
+    "No promotion from control/descriptive evidence",
+    "No direct cross-target/VM latency benefit claim",
+    "Missing/invalid ordinary receipts or required structure stop expansion"
+  ],
+  "source_review": "v1-refresh-release-source-reviews-2026-10-31.json",
+  "immutable_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_sha256": {
+    ".github/workflows/representative-bench.yml": "e64d59ee91ff312919aed5a5d1b1b772306bacb302c172952773588597acbcd9",
+    "scripts/bench_v1_admission.py": "3d7d8307fc69cc31943917303ce34b0321756f05fb1df849d6dfba006c925956",
+    "scripts/tests/test_bench_v1_admission.py": "4d027b7d44734e66d3b45f9613144c8fa4fbec60a914b76c005cc7d3e1a16991",
+    "scripts/bench_v1_profile.py": "2c14825392149e51aa6892014d61d1d49fadeec5c360f80403de4a024d362990",
+    "scripts/tests/test_bench_v1_profile.py": "a9b584a9f200e5f3297f402c1cdb742f4d01497fb3b20bf043f1ed4f24d0da41",
+    "scripts/bench_v1_pair.py": "2fb3626699e446ab3d988b003ee7e82f6ac439feeaa343eef66e7821bfee0203"
+  }
+}

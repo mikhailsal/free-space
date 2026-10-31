@@ -1,6 +1,6 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: W1/W3/W4 screening recorded; W3/W4 not promoted; D19 refresh diagnostic allocation pending.
+Date: 2026-10-31. Status: W1/W3/W4 screening recorded; W3/W4 not promoted; D19 GNU diagnostics recorded and release-target controls prepared under the owner-extended 60-runner-hour cap.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
 Source baseline: master `afce6fd`; investigation branch HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
@@ -28,18 +28,25 @@ state when asked, not the current approval state. Current accepted rules:
 | D10 disk benefit | At least 25% confirmed peak-allocation reduction |
 | D11 capacity benefit | Alternative: at least 25% lower tested successful budget, with repeated success and baseline OOM proof |
 | D12 local evidence | One immediate measured local v1 scan authorized; old DB deletion only if needed; no fio/cache flush |
-| D13 first GH campaign | Six aggregate runner-hours; time cap, not money—standard public-repo runner compute is free |
+| D13 / latest budget | Initially six aggregate runner-hours; the owner explicitly increased the total tenfold to 60 and instructed continuation |
 | D14 RSS exchange floor | RAM savings justify full-scan slowdown only with both 2:1 percentage gain and at least 256 MiB absolute savings |
 | D15 host refresh | One measured local refresh authorized and completed |
 | D16 test host | Owner identifies this machine as a test host; choose/switch backend as useful for testing without another cutover approval |
+| D19 continuation | Prepared refresh diagnostic and conditional narrow fix authorized; continue the approved optimization program within the expanded 60-hour total |
 
-Initial-campaign time cap is not a cap covering every future candidate. No GH
-campaign has started. Local scan and refresh calibration completed; the owner-requested external review
-with `claude-opus-5-5` completed with findings (see v1-performance-opus-review.md). No product optimization has been implemented. D16 permits backend switching on
-this test host; it does not certify a production release or authorize unlimited
-local load tests. New substantive findings will be discussed
-before changing accepted contracts. Source/binary equivalence and proposed gains
-still require evidence.
+W1 controls and the W3/W4 screening campaigns have completed. Both SQL candidates
+remain unpromoted; their receipts and failed benefit gates are recorded below.
+The owner's latest instruction increases the total budget from 21,600 to 216,000
+aggregate runner-seconds and authorizes continuation. Old six-hour allocations
+and remaining-time figures in historical briefs/receipts retain their original
+meaning; the current [ledger](../benchmark-results/v1-w1-campaign-2026-10-31.json)
+is authoritative for new admission. Before D19, 10,615 seconds were used.
+
+Local calibration and the requested `claude-opus-5-5` outside reviews are complete.
+D16 permits test-host backend switching without certifying a production release
+or unlimited local load. Continue the accepted investigation and conditional
+qualification with immutable preregistered workloads, bounded jobs and recorded
+admission; existing correctness/metric gates and stop rules remain binding.
 
 ## Owner direction and proposed constraints
 
@@ -441,10 +448,17 @@ its two jobs; actual additional use was 2,497 seconds, bringing the campaign to
 Before changing allocation behavior, the separately prepared
 [allocation probe](v1-refresh-allocation-probe.md) can test the observed
 graft/finalize RAM-peak hypothesis. Its diagnostic-only source passes normal
-hooks and Opus review; no probe has run. D19 proposes at most two conditional
-screening jobs within the remaining 10,985 seconds, reserving 10,200 at most.
+hooks and Opus review. D19 is accepted with a tenfold total-budget extension.
+The first diagnostic control [completed](../benchmark-results/v1-refresh-allocation-control-2026-10-31.md)
+in 1,077 runner-seconds. Its ordinary scan/refresh pairs pass; its original
+diagnostic is invalid because all six refresh traces contain decreasing VmHWM
+samples. No allocation fix is inferred. Source inspection also shows that GNU
+controls use the system allocator while the distribution musl target selects
+mimalloc. A separately reviewed prospective descriptive policy and release-target
+controls address this mismatch before any capacity counterfactual. The current
+ledger records exact reservations within the 216,000-second campaign cap.
 This does not cancel D7's staged-refresh research or accept a capacity fix without
-measured cause/benefit. No D19 job starts before the owner's new scope choice.
+measured cause/benefit. The scope/budget instruction was received before dispatch.
 
 Current refresh loads the full tree (`core/src/refresh.rs:242`), grafts/refinalizes
 it and writes a full replacement (`:282`). The ~1.1 GiB RSS on the large fixture
@@ -666,8 +680,8 @@ experiments are recorded above. Local scan/refresh receipts and external Opus
 review are available; findings have dispositions below. Backend switching on the
 test host is authorized by D16, with concrete capacity/path checks at execution.
 No gain is claimed until candidate qualification; a planning review is not a
-production-release certification. The initial GH campaign remains capped at six
-aggregate runner-hours, despite free standard runner compute.
+production-release certification. The original six-hour cap was subsequently
+increased to 60 aggregate runner-hours by the owner's explicit continuation.
 
 ## Interactive decisions (resumed)
 
@@ -956,7 +970,7 @@ External receipt: [Opus review](v1-performance-opus-review.md). The external
 review is evidence, not approval. D14 resolves its absolute-RSS exchange concern;
 D15 authorizes the host refresh measurement but does not approve cutover.
 
-- H1: six aggregate runner-hours covers initial W1/harness/baseline evidence only,
+- H1 (historical initial allocation, superseded by D19's 60-hour total): six aggregate runner-hours covers initial W1/harness/baseline evidence only,
   not all six waves. Allocate at most 60 minutes to build/smoke, 120 minutes to
   baseline/base calibration on the selected native profile at screening scale,
   150 minutes to an admitted local-scale baseline pair, and 30 minutes contingency.
@@ -1184,7 +1198,8 @@ and successful lower-memory budgets remain unproven. Test-host backend switching
 is authorized; candidate implementation/qualification and normal repository gates
 remain necessary before declaring any optimization successful.
 
-NO UNRESOLVED OWNER DECISIONS FOR COMPLETED D17/D18. Neither W3 nor W4 is promoted.
-NEXT OWNER DECISION D19: the bounded refresh allocation investigation within the
-existing remainder, or close the initial campaign. Source preparation launches
-no jobs; the same six-hour cap and metric gates remain binding.
+NO UNRESOLVED OWNER DECISIONS FOR D17–D19. Neither W3 nor W4 is promoted. D19's
+explicit tenfold budget extension and continuation authorize the prepared refresh
+investigation and continued accepted-plan work under 60 aggregate runner-hours.
+Preregister each conditional stage and retain the existing metric/correctness
+gates; new substantive contract or architecture choices still require review.

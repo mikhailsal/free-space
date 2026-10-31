@@ -1,0 +1,42 @@
+{
+  "github_run": "https://github.com/mikhailsal/free-space/actions/runs/41216093276",
+  "source_revision": "274d412169ff344927a554769d8996b6b774b3de",
+  "binary_sha256": "e3bcab6f1bd3ade13ccec7351ece9cf932b985a1a90e67b2386bd7123b3bdd71",
+  "ordinary_control": {
+    "valid": true,
+    "scan_pairs": 3,
+    "refresh_pairs": 3,
+    "identical_binaries": true
+  },
+  "diagnostic_original": {
+    "valid_diagnostic": false,
+    "issues": [
+      "p1-baseline-v1: nonmonotonic elapsed/HWM",
+      "p1-candidate-v1: nonmonotonic elapsed/HWM",
+      "p2-baseline-v1: nonmonotonic elapsed/HWM",
+      "p2-candidate-v1: nonmonotonic elapsed/HWM",
+      "p3-baseline-v1: nonmonotonic elapsed/HWM",
+      "p3-candidate-v1: nonmonotonic elapsed/HWM"
+    ],
+    "run": {
+      "GITHUB_SHA": "274d412169ff344927a554769d8996b6b774b3de",
+      "GITHUB_RUN_ID": "41216093276",
+      "GITHUB_RUN_ATTEMPT": "1"
+    },
+    "arms": [],
+    "interpretation": "Boundary RSS samples and cumulative HWM; buffer movement alone does not prove copying. No automatic optimization acceptance."
+  },
+  "rust_tests": {
+    "passed": 315,
+    "failed": 0,
+    "ignored": 1
+  },
+  "python_tests_passed": 65,
+  "runner_seconds": 1077,
+  "archive": "v1-refresh-allocation-control-2026-10-31.tar.gz",
+  "archive_sha256": "0c55a87f61ecd3b94577c274ad9b4ceda51785919aeaa0848d1f099c3d8a0436",
+  "original_artifact_files": 256,
+  "index": "v1-refresh-allocation-control-2026-10-31.sha256",
+  "index_sha256": "725e638e722494c79719b190cfc7bbb1911cdd2c5651f61cff384c05be533b46",
+  "candidate_promoted": false
+}

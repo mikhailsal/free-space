@@ -19,6 +19,18 @@ selected measured-step cap (at most 120 minutes). `timeout_minutes` may lower th
 cap before dispatch. Source and fixture counts are recorded; mixed directory structure
 means total entries exceed the requested file count.
 
+The reviewed extension on `perf/v1-refresh-scale-harness` adds
+`operation=auto|scan|refresh`. `auto` preserves the defaults above; explicit
+`refresh` enables one full-scale refresh pair. It also adds an explicit
+`target=x86_64-unknown-linux-gnu|x86_64-unknown-linux-musl` selector, defaulting to
+GNU. Both builds and workspace tests use the selected target. Build manifests
+record the actual target separately from the compiler host, and result artifact
+names include it. The release musl target enables the CLI's mimalloc override;
+GNU uses the system allocator. These are separate control series. Explicit GNU
+`--target` builds also start a new binary series relative to older host builds;
+do not infer a regression from a changed binary hash or compare across VMs as a
+paired speed result.
+
 `comparison=control` uses byte-identical binaries for both arms. It estimates
 observed variability, not a population confidence interval. `comparison=candidate`
 builds the specified immutable baseline and head with the same recorded compiler,
@@ -60,7 +72,17 @@ or semantic hashes differ, a writer/observer fails, OOM occurs, or cleanup fails
 `scripts/bench_v1_summary.py` writes descriptive `summary.json` and Markdown and
 returns nonzero for invalid evidence. It never promotes a candidate automatically.
 
-The initial campaign has six aggregate runner-hours, including builds, setup,
+For newly declared diagnostic runs, the `profile-v2` descriptor additionally
+requires its policy in the manifest before measurement. It recomputes the
+ordinary summary and checks the source-specific trace structure/counts while
+retaining all raw RSS/HWM readings and flagging decreasing HWM values. Its
+structural result is separate from the original monotonic-HWM contract and from
+product acceptance. Old runs without that declaration cannot pass profile-v2.
+The original failed GNU allocation diagnostic remains
+[archived as failed](benchmark-results/v1-refresh-allocation-control-2026-10-31.md).
+
+The current owner-authorized campaign has **60 aggregate runner-hours**, increased
+explicitly tenfold from its original six-hour cap, including builds, setup,
 failures and concurrent jobs. This is an experiment-duration cap: standard hosted
 compute for this public repository is free. The operator records each run's job
 usage before another dispatch. No automatic retry or complete Cartesian sweep is
@@ -78,6 +100,7 @@ fixed 15% floor. No new runner campaign is implied by unused time.
 Current limitations: changed-refresh is supported by the entry point but is not
 part of the initial workflow dispatch; the 100-entry folder and 4 GiB budget are
 initial scenarios. Other folder sizes, memory-budget sweeps and repeated full-scale
-confirmation require explicit later campaign allocation. Neither a smoke pass nor
+confirmation require preregistered scenarios, bounded job envelopes and renewed
+admission within the expanded allocation. Neither a smoke pass nor
 one full-scale pair is optimization qualification. Owner gates and future tests
 are in `docs/designs/v1-performance-plan.md`.

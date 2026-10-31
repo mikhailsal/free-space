@@ -1,0 +1,11 @@
+# V1 refresh allocation control — 2026-10-31
+
+The [control run](https://github.com/mikhailsal/free-space/actions/runs/41216093276) completed three scan pairs and three refresh pairs with valid ordinary control results. Both arms used source `274d412169ff344927a554769d8996b6b774b3de` and binary SHA-256 `e3bcab6f1bd3ade13ccec7351ece9cf932b985a1a90e67b2386bd7123b3bdd71`. The fixture had 1,004,499 entries and a 100-entry refresh subtree. The jobs consumed 1,077 runner-seconds. Repository checks reported 315 Rust tests passed, zero failed and one ignored, and 65 Python tests passed.
+
+**The original allocation diagnostic is invalid.** Its unchanged validator returned `valid_diagnostic: false`, with `nonmonotonic elapsed/HWM` for every one of the six refresh arms. Each trace has one VmHWM decrease of 208–336 KiB between finalize and index. The raw traces show node capacity growing from 1,004,499 to 2,008,998 with a pointer move in all six arms, and RSS rising 128–136 KiB at the nodes boundary while HWM was unchanged; names capacity was unchanged. These are observations from rejected traces, not a validated allocation peak or evidence of copying. No candidate is promoted.
+
+The [Linux proc status manual](https://man7.org/linux/man-pages/man5/proc_pid_status.5.html) describes VmHWM as inaccurate. This merits review of a diagnostic policy for a future run; it does not explain the observed decreases conclusively or waive the existing validator retrospectively. Product gates remain unchanged.
+
+Allocator context matters: `cli/src/main.rs` selects MiMalloc only for `target_env = "musl"`, and its dependency is musl-only in `cli/Cargo.toml`. The GitHub GNU control uses the system allocator, not MiMalloc. The separately inspected installed static binary contains `mi_malloc` and `mi_realloc` symbols, but its exact source is unknown. The GNU observations do not establish a copy peak and cannot be extrapolated to that installed binary.
+
+The [receipt](v1-refresh-allocation-control-2026-10-31.json), [archive](v1-refresh-allocation-control-2026-10-31.tar.gz), and [SHA-256 index](v1-refresh-allocation-control-2026-10-31.sha256) preserve all 256 original artifact files unchanged, the original validator and its failed output, the control description, GitHub metadata, test summary and job log. The archive includes the same index as `SHA256SUMS`.

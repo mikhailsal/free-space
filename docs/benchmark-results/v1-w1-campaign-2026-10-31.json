@@ -1,7 +1,7 @@
 {
   "campaign": "v1-w1-baseline-20261031",
-  "aggregate_cap_runner_seconds": 21600,
-  "scope": "initial W1 controls plus W3 leaf SQL (D17) and two bounded W4 child-batch screening jobs (D18); unchanged six-hour total cap",
+  "aggregate_cap_runner_seconds": 216000,
+  "scope": "approved v1 optimization investigation and conditional qualification under the owner-extended60aggregate runner-hour cap; current D19 refresh allocation probe",
   "paid_compute": false,
   "run_ids": [
     41194616353,
@@ -16,7 +16,8 @@
     41199678638,
     41200958293,
     41206306054,
-    41208041797
+    41208041797,
+    41216093276
   ],
   "runs": [
     {
@@ -233,13 +234,46 @@
       "owner_allocation": "D18",
       "purpose": "One fixed child-batch candidate after valid current-observer control",
       "job_seconds": 1249.0
+    },
+    {
+      "stage": "screen",
+      "io": "local",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "owner_allocation": "D19",
+      "allocation_diagnostics": "measured refresh only; untraced seed/full scans and observers",
+      "id": "refresh-allocation-diagnostic-control",
+      "comparison": "control",
+      "branch": "perf/v1-refresh-allocation-probe",
+      "revision": "274d412169ff344927a554769d8996b6b774b3de",
+      "baseline_product_revision": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
+      "run_id": 41216093276,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 1077.0,
+      "purpose": "Diagnostic paired baseline to localize full-tree refresh RAM peak",
+      "job_seconds": 1077.0
     }
   ],
-  "accounting": "Sum all job started-to-completed durations, including setup, failures and concurrent jobs. Queued jobs reserved by timeout envelope. Do not treat six hours as money or free-minute quota.",
-  "updated_at": "2026-10-31T14:22:34.405987+00:00",
-  "completed_job_seconds": 10615.0,
-  "maximum_committed_seconds": 10615.0,
-  "remaining_unreserved_seconds": 10985.0,
+  "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
+  "updated_at": "2026-10-31T16:30:43.856856+00:00",
+  "completed_job_seconds": 11692.0,
+  "maximum_committed_seconds": 25792.0,
+  "remaining_unreserved_seconds": 190208.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -263,7 +297,6 @@
       "limitations": "Initial linear projection; memory/cache/device nonlinearities can exceed it. Timeout is invalid evidence, not a successful shortened workload."
     }
   ],
-  "planned_next_dispatches": [],
   "candidate_disposition": {
     "decision": "not_promoted",
     "reason": "1m paired median gain 14.2877%; exploratory 7.3m pair gain 11.9174%; both below fixed 15% speed-only floor. No disk or RAM benefit route demonstrated.",
@@ -279,15 +312,14 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 0,
+  "planned_reserved_seconds": 14100,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
-    "name": "W4 child batches",
-    "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
-    "status": "completed",
-    "owner_allocation": "D18",
-    "run_id": 41208041797,
-    "disposition": "not_promoted"
+    "name": "Release-target refresh diagnostic controls",
+    "status": "screen control admitted before dispatch; fullscale conditional on validscreen and measuredforecast",
+    "owner_allocation": "D19",
+    "branch": "perf/v1-refresh-scale-harness",
+    "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
   },
   "candidate_dispositions": {
     "W3": {
@@ -311,5 +343,104 @@
       "further_w4_dispatches": 0
     }
   },
-  "D18_completed": true
+  "D18_completed": true,
+  "previous_aggregate_cap_runner_seconds": 21600,
+  "owner_D19": {
+    "status": "accepted before dispatch",
+    "instruction": "Increase the time budget tenfold and continue",
+    "previous_cap_seconds": 21600,
+    "new_cap_seconds": 216000,
+    "scope": "Continue approved v1 optimization investigation, starting with prepared refresh allocation diagnostics and a conditional narrow fix; retain existing metric and correctness gates"
+  },
+  "stopped_planned_dispatches": [
+    {
+      "stage": "screen",
+      "io": "local",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "owner_allocation": "D19",
+      "allocation_diagnostics": "measured refresh only; untraced seed/full scans and observers",
+      "id": "refresh-allocation-conditional-candidate",
+      "comparison": "candidate",
+      "branch": null,
+      "revision": null,
+      "baseline": "274d412169ff344927a554769d8996b6b774b3de",
+      "depends_on": "valid complete traces support actionable cause; prepare/review narrow fix and freeze immutable revision before dispatch",
+      "status": "stopped_before_preparation",
+      "reason": "Original control diagnostic invalid and actionable cause not established; release-target controls first"
+    }
+  ],
+  "planned_next_dispatches": [
+    {
+      "comparison": "control",
+      "branch": "perf/v1-refresh-scale-harness",
+      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
+      "owner_allocation": "D19 continuation under60hours",
+      "id": "refresh-release-target-screen-control",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "depends_on": "Publish reviewed immutable target-selector and profile-v2 source before dispatch",
+      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json"
+    },
+    {
+      "comparison": "control",
+      "branch": "perf/v1-refresh-scale-harness",
+      "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2 descriptive only; raw HWM anomalies preserved",
+      "owner_allocation": "D19 continuation under60hours",
+      "id": "refresh-release-target-full-control",
+      "stage": "local-scale",
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "pairs_per_operation": 1,
+      "operations": [
+        "refresh"
+      ],
+      "timeout_minutes": 120,
+      "maximum_job_seconds": 9000,
+      "forecast_seconds": null,
+      "depends_on": "Valid complete musl screening receipts, frozen same source, measured setup/seed/pair/observer forecast with30pct margin fitting120min step and remaining60hcap; no blind retry",
+      "source_review": "v1-refresh-release-source-reviews-2026-10-31.json"
+    }
+  ]
 }

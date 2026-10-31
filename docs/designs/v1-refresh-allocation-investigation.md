@@ -30,8 +30,10 @@ Sparse process samples cannot assign the peak to one allocation. See the
 
 Source references: `core/src/refresh/load.rs::load_nodes`,
 `core/src/refresh.rs::{graft,replace_subtree,refresh_locked}` and
-`core/src/scan/tree.rs::{push_name,build_preorder}`. The CLI selects mimalloc;
-assuming plain musl/system-malloc behavior would be unsupported.
+`core/src/scan/tree.rs::{push_name,build_preorder}`. The CLI selects mimalloc
+**only for musl targets**, including its C allocator override. GNU builds use the
+system allocator. The first diagnostic control recorded a GNU target, so its
+allocation behavior cannot establish the release target's behavior.
 
 ## Hypothesis, not a confirmed root cause
 
@@ -47,6 +49,22 @@ loading or reserving only the exact additional capacity are candidate diagnostic
 counterfactuals, not established fixes. Reserving too much may retain more memory
 into finalization. Neither a capacity counter nor allocated-byte arithmetic
 establishes physical RSS or the minimum successful cgroup budget.
+
+## Diagnostic control and target correction
+
+The [completed GNU control](../benchmark-results/v1-refresh-allocation-control-2026-10-31.md)
+has valid ordinary benchmark receipts but fails its original diagnostic contract:
+all six traces contain a decreasing VmHWM sample. Its original validator and
+failed result are preserved. The observed node-capacity doubling and pointer
+movement did not coincide with a boundary RSS/HWM jump on that target; this does
+not establish copying or exclude a shorter transient.
+
+Read-only inspection of the installed static binary found `mi_malloc` and
+`mi_realloc` symbols, without establishing its source revision. This strengthens
+the need for a release-target control before proposing a capacity fix. A new
+prospective descriptive policy must preserve raw counter anomalies and retain
+the old failed verdict; it cannot silently turn those traces into a successful
+original diagnostic or relax product acceptance.
 
 ## Bounded future falsification probe
 
