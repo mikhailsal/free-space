@@ -68,7 +68,10 @@
       "depends_on": "valid w4-control-v3-screen plus renewed time admission",
       "run_id": 41208041797,
       "dispatched_revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
-      "status": "in_progress"
+      "status": "completed",
+      "conclusion": "success",
+      "valid": true,
+      "aggregate_job_seconds": 1249
     }
   ],
   "stop_rules": [
@@ -208,5 +211,18 @@
         }
       }
     }
+  },
+  "execution_result": {
+    "candidate": "W4 child batching only",
+    "disposition": "not_promoted",
+    "reason": "paired median full-command scan gain7.7104457pct misses fixed15pct floor; scanRSS positive inallpairs; no disk/RAM benefit route",
+    "semantic_receipts": "pass",
+    "speed_floor": "fail",
+    "scan_rss_no_regression": "not established; positive median and2of3pairs exceed empiricalcontrolband",
+    "refresh_no_regression": "inconclusive underH2: positive median0.1394pct insidecontrolspread, not a confirmed slowdown",
+    "disk_parity": "no saving; onepair+4096bytes, sampledlowerbounds",
+    "minimum_successful_ram": "not measured; ordinaryspeedcases succeedat4GiB only",
+    "full_scale_confirmation": "not run after failedscreen; notauthorizedbyD18",
+    "further_w4_dispatches": 0
   }
 }

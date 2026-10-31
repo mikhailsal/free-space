@@ -1,14 +1,17 @@
 # W4: one bounded child-query batching experiment
 
-Status: source candidate prepared in `perf/v1-child-batches`, based on d8b6046.
-No W4 Rust tests, GH jobs, timing or resource improvements are claimed. Runner
-allocation is accepted by owner D18=A; D17 authorized W3 only. The candidate does not include the
-rejected W3 leaf SELECT/UPDATE changes.
+Status: D18 screening complete; candidate **not promoted**. See the
+[results](../benchmark-results/v1-w4-screening-2026-10-31.md): paired scan gain
+7.7104% misses the fixed 15% floor; scan RSS grows and no useful disk/RAM gain is
+demonstrated. The source remains in `perf/v1-child-batches`, based on d8b6046,
+without the rejected W3 leaf SELECT/UPDATE changes.
 
 Normal pre-push checks passed after fixing a test-function length violation:
 Rust compilation/Clippy/format, tracked-file size, shell, TypeScript and Biome.
 No hook was bypassed. These checks compile the prepared Rust tests; they do not
-execute them. The final Opus source review reports no findings; see
+execute them. The later GitHub build executed 322 Rust tests successfully, with
+zero failures and one existing ignored test, plus 65 Python contract tests.
+The final Opus source review reports no findings; see
 [review history](v1-child-batch-implementation-review.md).
 
 ## Problem and selected treatment
@@ -55,8 +58,8 @@ differential tests. This is one candidate with fixed internal limits, not a swee
 ## Prepared verification
 
 Private tests compare actual child-query counts on 75 synthetic raw-name rows:
-the expected result is four batch queries versus 76 original fallback queries,
-including terminal empty queries. This expectation has not yet been executed.
+the result is four batch queries versus 76 original fallback queries,
+including terminal empty queries. The assertion passed on GitHub.
 Other tests cover the shared slot limit at many active depths, capacity release,
 byte exhaustion inside equal-name/id tie groups, discarded-prefetch recovery,
 an oversized row and shallowest-ancestor eviction with cursor resumption.
@@ -72,12 +75,15 @@ before any performance interpretation. A source review cannot replace execution.
 
 ## Runner allocation — D18 accepted
 
-Use only the unused portion of the same initial six aggregate runner-hours:
+The preregistered allocation used only the unused portion of the same initial six aggregate runner-hours:
 13,482 seconds remain after W1/W3. Reserve **two screening jobs, 5,700 aggregate
 runner-seconds each** (25-minute build plus 65-minute measured step and 5-minute
 paired-job margin). Maximum additional reservation is 11,400 seconds; total
 committed campaign time would be 19,518 seconds, leaving 2,082 seconds contingency.
 Every build, observer, failure and cleanup counts. No paid/larger runner is used.
+Actual use was 1,248 seconds for control and 1,249 for candidate. The complete
+campaign has 10,985 seconds remaining after its 10,615-second actual total; no
+job is active and D18 authorizes no further dispatch.
 
 1. Current-observer baseline/base control: protocol v3, `local` I/O, 1m files,
    three unchanged scan pairs and three unchanged 100-entry-folder refresh pairs.

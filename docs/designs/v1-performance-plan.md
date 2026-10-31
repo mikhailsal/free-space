@@ -1,6 +1,6 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: W1/W3 campaign recorded; W3 not promoted; W4 source reviewed; D18 bounded screening accepted.
+Date: 2026-10-31. Status: W1/W3/W4 screening recorded; W3/W4 not promoted; refresh allocation diagnostics in source preparation.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
 Source baseline: master `afce6fd`; investigation branch HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
@@ -425,15 +425,16 @@ qualified dependency: a batching-only experiment must start from unchanged v1.
 If larger
 caches harm low-memory hosts, keep defaults and publish the sensitivity result.
 
-Prepared experiment: [bounded child batches](v1-child-batch-experiment.md), branch
-`perf/v1-child-batches`. Normal pre-push checks compile the tests and pass; the
-[Opus source review](v1-child-batch-implementation-review.md) closes its P2 findings
-with a final no-findings verdict. Rust test execution and W4 timings remain
-unmeasured at allocation time. D18=A is accepted: two 1m screening dispatches (current-observer control,
-then candidate only after a valid control) would reserve at most11,400 aggregate
-runner-seconds from the remaining13,482, within the same21,600-second cap. No W4
-job starts before the owner's allocation choice, which was received before dispatch. No full-scale expansion or
-threshold exception is included.
+Completed experiment: [bounded child batches](v1-child-batch-experiment.md), branch
+`perf/v1-child-batches`. The [Opus source review](v1-child-batch-implementation-review.md)
+closed its P2 findings; GitHub passed 65 Python contract tests and 322 Rust tests
+(zero failures, one existing ignored test). The
+[D18 report](../benchmark-results/v1-w4-screening-2026-10-31.md) records complete
+three-pair scan/refresh controls and candidate results. Paired scan gain 7.7104%
+misses D8's 15% floor; scan RSS increases and no useful disk/RAM benefit is shown.
+W4 is not promoted, with no further W4 dispatch planned. D18 was accepted before
+its two jobs; actual additional use was 2,497 seconds, bringing the campaign to
+10,615 of 21,600 seconds. No full-scale expansion or gate exception was used.
 
 ## W5: improve v1 refresh without recreating v2
 
@@ -1175,7 +1176,7 @@ and successful lower-memory budgets remain unproven. Test-host backend switching
 is authorized; candidate implementation/qualification and normal repository gates
 remain necessary before declaring any optimization successful.
 
-NO UNRESOLVED OWNER DECISIONS FOR D17/D18. W3's combined candidate was not promoted.
-D18=A authorizes two bounded W4 screening jobs within the existing remainder,
-control first and candidate only after valid control/admission. No automatic retry
-or full-scale expansion; the same six-hour cap and metric gates remain binding.
+NO UNRESOLVED OWNER DECISIONS FOR COMPLETED D17/D18. Neither W3 nor W4 is promoted.
+Any new refresh allocation probe requires a new scope allocation; source-only
+diagnostic preparation launches no jobs. The same six-hour cap and metric gates
+remain binding.

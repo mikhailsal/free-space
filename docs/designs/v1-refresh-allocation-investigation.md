@@ -65,3 +65,25 @@ provide stronger evidence of simultaneous live allocations, if available.
 Only measured semantic parity plus the existing four-metric gates can justify a
 later optimization. No RAM saving, latency gain or release suitability is claimed
 by this note, and no such workload is authorized by D18.
+
+## Phase-accounting limit from the D18 control
+
+The separate 1m-entry control adds an accounting observation without attributing
+the RAM peak. Subtracting each refresh arm's own six phase fields from its own
+core total leaves 3.8284, 3.8319, 3.8380, 3.8349, 3.8369 and 3.8344 seconds.
+These are per-arm differences; they were not obtained by summing separate medians.
+The local receipt's corresponding core residual is 0.6567 seconds, with different
+hardware and unknown exact installed source correspondence.
+
+Current source leaves these regions outside the named phase timers: initial
+cleanup/snapshot open/resolve/progress startup; denied-path/precheck/metadata work;
+writer connection setup; post-index connection close and snapshot fsync; and
+post-publish progress join/state writing. CLI JSON serialization occurs after the
+core total was captured and cannot explain that internal residual. Source review
+does not apportion the roughly 3.83 seconds among those regions.
+
+The in-memory refresh writer and staged scan writer also place close/fsync work
+under different phase labels. Compare complete command wall time for acceptance,
+not an apparent saving obtained by moving work outside a named timer. D18 already
+measures complete CLI time. Any later diagnostic probe should time the uncovered
+regions directly; this observation does not authorize removing durability work.

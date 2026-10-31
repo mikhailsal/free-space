@@ -227,18 +227,19 @@
       "depends_on": "valid w4-control-v3-screen plus renewed time admission",
       "run_id": 41208041797,
       "baseline": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
-      "status": "in_progress",
-      "conclusion": "",
-      "completed_job_seconds": 0,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 1249.0,
       "owner_allocation": "D18",
-      "purpose": "One fixed child-batch candidate after valid current-observer control"
+      "purpose": "One fixed child-batch candidate after valid current-observer control",
+      "job_seconds": 1249.0
     }
   ],
   "accounting": "Sum all job started-to-completed durations, including setup, failures and concurrent jobs. Queued jobs reserved by timeout envelope. Do not treat six hours as money or free-minute quota.",
-  "updated_at": "2026-10-31T14:00:33.343912+00:00",
-  "completed_job_seconds": 9366.0,
-  "maximum_committed_seconds": 15066.0,
-  "remaining_unreserved_seconds": 6534.0,
+  "updated_at": "2026-10-31T14:22:34.405987+00:00",
+  "completed_job_seconds": 10615.0,
+  "maximum_committed_seconds": 10615.0,
+  "remaining_unreserved_seconds": 10985.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -283,8 +284,32 @@
   "current_candidate": {
     "name": "W4 child batches",
     "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
-    "status": "in_progress",
+    "status": "completed",
     "owner_allocation": "D18",
-    "run_id": 41208041797
-  }
+    "run_id": 41208041797,
+    "disposition": "not_promoted"
+  },
+  "candidate_dispositions": {
+    "W3": {
+      "decision": "not_promoted",
+      "reason": "1m paired median gain 14.2877%; exploratory 7.3m pair gain 11.9174%; both below fixed 15% speed-only floor. No disk or RAM benefit route demonstrated.",
+      "further_W3_dispatches": 0,
+      "full_qualification": false,
+      "candidate": "W3 combined leaf SQL"
+    },
+    "W4": {
+      "candidate": "W4 child batching only",
+      "disposition": "not_promoted",
+      "reason": "paired median full-command scan gain7.7104457pct misses fixed15pct floor; scanRSS positive inallpairs; no disk/RAM benefit route",
+      "semantic_receipts": "pass",
+      "speed_floor": "fail",
+      "scan_rss_no_regression": "not established; positive median and2of3pairs exceed empiricalcontrolband",
+      "refresh_no_regression": "inconclusive underH2: positive median0.1394pct insidecontrolspread, not a confirmed slowdown",
+      "disk_parity": "no saving; onepair+4096bytes, sampledlowerbounds",
+      "minimum_successful_ram": "not measured; ordinaryspeedcases succeedat4GiB only",
+      "full_scale_confirmation": "not run after failedscreen; notauthorizedbyD18",
+      "further_w4_dispatches": 0
+    }
+  },
+  "D18_completed": true
 }
