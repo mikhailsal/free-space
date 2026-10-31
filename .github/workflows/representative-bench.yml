@@ -17,6 +17,11 @@ on:
         type: choice
         options: [smoke, screen, local-scale]
         default: smoke
+      operation:
+        description: Benchmark operation (auto uses stage defaults)
+        type: choice
+        options: [auto, scan, refresh]
+        default: auto
       io:
         description: Runner I/O sensitivity, not an exact local-disk replica
         type: choice
@@ -55,6 +60,7 @@ jobs:
       paired_job_minutes: ${{ steps.policy.outputs.job_minutes }}
       paired_step_minutes: ${{ steps.policy.outputs.step_minutes }}
       maximum_runner_minutes: ${{ steps.policy.outputs.maximum_runner_minutes }}
+      operations: ${{ steps.policy.outputs.operations }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,12 +71,14 @@ jobs:
         env:
           STAGE: ${{ inputs.stage || 'smoke' }}
           REQUESTED_MINUTES: ${{ inputs.timeout_minutes }}
+          OPERATION: ${{ inputs.operation || 'auto' }}
         run: |
           python3 - <<'PY'
           import os,sys
           sys.path.insert(0,'scripts')
-          from bench_v1_admission import stage_timeouts
+          from bench_v1_admission import stage_operations,stage_timeouts
           policy=stage_timeouts(os.environ['STAGE'],os.environ.get('REQUESTED_MINUTES'))
+          policy['operations']=' '.join(stage_operations(os.environ['STAGE'],os.environ['OPERATION']))
           with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
               stream.write(''.join(f'{key}={value}\n' for key,value in policy.items()))
           print(policy)
@@ -152,12 +160,14 @@ jobs:
         env:
           FORECAST: ${{ inputs.forecast_seconds }}
           STEP_CAP: ${{ needs.build.outputs.paired_step_minutes }}
+          OPERATIONS: ${{ needs.build.outputs.operations }}
         run: |
           python3 - <<'PY'
           import os,sys
           sys.path.insert(0,'scripts')
           from bench_v1_admission import admit_time
           receipt=admit_time(int(os.environ['STEP_CAP'])*60,float(os.environ['FORECAST']))
+          receipt['operations']=os.environ['OPERATIONS']
           print(receipt)
           if not receipt['success']: raise SystemExit('No admissible screening forecast')
           PY
@@ -167,14 +177,19 @@ jobs:
           BENCH_PROTOCOL: v1-pairs
           BENCH_IO: ${{ inputs.io || 'native' }}
           STAGE: ${{ inputs.stage || 'smoke' }}
+          OPERATIONS: ${{ needs.build.outputs.operations }}
         run: |
           set -euo pipefail
-          case $STAGE in
-            smoke) export BENCH_FILES=100000 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=600; operations=scan ;;
-            screen) export BENCH_FILES=1000000 BENCH_PAIRS=3 BENCH_COMMAND_TIMEOUT=1200; operations='scan refresh' ;;
-            local-scale) export BENCH_FILES=7264383 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=1800; operations=scan ;;
+          case "$OPERATIONS" in
+            scan|refresh|'scan refresh') ;;
+            *) echo 'Invalid benchmark operations' >&2; exit 1 ;;
           esac
-          for operation in $operations; do
+          case $STAGE in
+            smoke) export BENCH_FILES=100000 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=600 ;;
+            screen) export BENCH_FILES=1000000 BENCH_PAIRS=3 BENCH_COMMAND_TIMEOUT=1200 ;;
+            local-scale) export BENCH_FILES=7264383 BENCH_PAIRS=1 BENCH_COMMAND_TIMEOUT=1800 ;;
+          esac
+          for operation in $OPERATIONS; do
             BENCH_OPERATION=$operation BENCH_OUTPUT="$PWD/representative-results/$operation" \
               bash scripts/bench-representative.sh
           done

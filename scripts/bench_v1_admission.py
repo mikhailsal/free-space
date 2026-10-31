@@ -93,6 +93,16 @@ def admit_time(remaining_seconds, estimated_seconds, margin=0.3) -> dict:
     return receipt
 
 
+def stage_operations(stage, requested='auto') -> list:
+    """Return the validated, ordered operations for a campaign stage."""
+    defaults = {"smoke": ["scan"], "screen": ["scan", "refresh"], "local-scale": ["scan"]}
+    if not isinstance(stage, str) or stage not in defaults:
+        raise ValueError("unknown benchmark stage")
+    if not isinstance(requested, str) or requested not in ("auto", "scan", "refresh"):
+        raise ValueError("unknown benchmark operation selector")
+    return defaults[stage] if requested == "auto" else [requested]
+
+
 def stage_timeouts(stage, requested_minutes=None) -> dict:
     """Return bounded step, job and total runner budgets for a campaign stage."""
     caps = {"smoke": 30, "screen": 65, "local-scale": 120}

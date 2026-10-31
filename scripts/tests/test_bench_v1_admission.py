@@ -48,6 +48,20 @@ class CapacityTests(unittest.TestCase):
 
 
 class TimeTests(unittest.TestCase):
+    def test_stage_operations(self):
+        for stage, expected in (("smoke", ["scan"]), ("screen", ["scan", "refresh"]),
+                                ("local-scale", ["scan"])):
+            with self.subTest(stage=stage):
+                self.assertEqual(ADMISSION.stage_operations(stage), expected)
+        self.assertEqual(ADMISSION.stage_operations("local-scale", "refresh"), ["refresh"])
+        self.assertEqual(ADMISSION.stage_operations("screen", "scan"), ["scan"])
+
+    def test_stage_operations_rejects_invalid_inputs(self):
+        for stage, requested in (("unknown", "auto"), (None, "scan"), ("smoke", None), ("smoke", "unknown"),
+                                 ("screen", "scan refresh")):
+            with self.subTest(stage=stage, requested=requested), self.assertRaises(ValueError):
+                ADMISSION.stage_operations(stage, requested)
+
     def test_stage_defaults_and_bounded_override(self):
         for stage, cap in (("smoke", 30), ("screen", 65), ("local-scale", 120)):
             for requested in (None, "", cap, str(cap)):
