@@ -79,6 +79,10 @@ fn disk_scan_preserves_raw_names_preorder_and_full_path_hardlink_ownership() {
     fs::create_dir_all(root.join("a")).unwrap();
     fs::create_dir_all(root.join("empty")).unwrap();
     fs::write(root.join("a/file"), vec![7; 17000]).unwrap();
+    fs::File::open(root.join("a/file"))
+        .unwrap()
+        .set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(3600))
+        .unwrap();
     // '/' sorts after '-', although DFS visits a/file before a-link.
     fs::hard_link(root.join("a/file"), root.join("a-link")).unwrap();
     fs::write(
@@ -95,10 +99,36 @@ fn disk_scan_preserves_raw_names_preorder_and_full_path_hardlink_ownership() {
     assert_eq!(old.entries, new.entries);
     assert_eq!(old.errors, new.errors);
     assert!(!disk.path.join("snapshot.stage.tmp").exists());
-    assert_equivalent(
-        &Snapshot::open_current(&fast).unwrap(),
-        &Snapshot::open_current(&disk).unwrap(),
-    );
+    let old = Snapshot::open_current(&fast).unwrap();
+    let new = Snapshot::open_current(&disk).unwrap();
+    assert_equivalent(&old, &new);
+    // Leaves are complete on insertion, including file time clamping and
+    // non-file sentinel conversion, even for zero-sized hardlink aliases.
+    let invalid_leaves: i64 = new
+        .conn
+        .query_row(
+            "SELECT count(*) FROM entries WHERE kind != 1 AND (items != 0 OR subtree_end != id
+         OR min_scanned_at != scanned_at OR newest_mtime !=
+         CASE WHEN kind = 0 THEN min(mtime, scanned_at) ELSE 0 END)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(invalid_leaves, 0);
+    let aliases: i64 = new.conn.query_row(
+        "SELECT count(*) FROM entries WHERE (flags & 2) != 0 AND allocated = 0 AND apparent = 0",
+        [], |r| r.get(0),
+    ).unwrap();
+    assert_eq!(aliases, 2);
+    let empty: (i64, i64) = new
+        .conn
+        .query_row(
+            "SELECT items, subtree_end - id FROM entries WHERE name = ?1 AND kind = 1",
+            [b"empty".as_slice()],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(empty, (0, 0));
 }
 
 #[test]

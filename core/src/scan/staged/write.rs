@@ -12,6 +12,7 @@ struct Raw {
 struct Frame {
     raw: u64,
     id: u64,
+    kind: Kind,
     cursor: Option<(Vec<u8>, u64)>,
     path_len: usize,
     agg: SubtreeAgg,
@@ -143,7 +144,12 @@ impl StagedTree {
         loop {
             guard.tick()?;
             let parent = stack.last_mut().unwrap();
-            if let Some(raw) = self.next_child(parent)? {
+            let child = if parent.kind == Kind::Dir {
+                self.next_child(parent)?
+            } else {
+                None
+            };
+            if let Some(raw) = child {
                 parent.cursor = Some((raw.name.clone(), raw.id));
                 path.truncate(parent.path_len);
                 push_component(&mut path, &raw.name);
@@ -236,6 +242,7 @@ impl StagedTree {
         Ok(Frame {
             raw: raw.id,
             id,
+            kind: node.kind(),
             cursor: None,
             path_len: path.len(),
             agg,
