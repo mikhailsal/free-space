@@ -48,6 +48,10 @@ impl Raw {
 }
 const RAW_COLS: &str = "id,name,kind,flags,allocated,apparent,mtime,nlink,errors,scanned_at";
 
+const WRITE_LINK_SQL: &str = "SELECT l.dev,l.ino,
+            (SELECT o.id FROM links o WHERE o.dev=l.dev AND o.ino=l.ino ORDER BY o.path,o.root,o.id LIMIT 1)
+            FROM links l WHERE l.id=?1";
+
 impl StagedTree {
     /// Finalization and row insertion happen together; no permutation or rank
     /// vector is allocated. The caller publishes only after this closes/fsyncs.
@@ -257,11 +261,7 @@ impl StagedTree {
         // Tree keeps the first DFS occurrence, so ties follow original root order.
         let link: Option<(i64, i64, i64)> = self
             .conn
-            .prepare_cached(
-                "SELECT l.dev,l.ino,
-            (SELECT o.id FROM links o WHERE o.dev=l.dev AND o.ino=l.ino ORDER BY o.path,o.root,o.id LIMIT 1)
-            FROM links l WHERE l.id=?1",
-            )?
+            .prepare_cached(WRITE_LINK_SQL)?
             .query_row([raw as i64], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
             .optional()?;
         if let Some((dev, ino, owner)) = link {

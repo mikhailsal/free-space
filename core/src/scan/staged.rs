@@ -22,6 +22,39 @@ mod write;
 /// Cache target per connection. Two connections are open during final writing.
 const CACHE_KIB: u64 = 8192;
 
+const STAGE_SCHEMA: &str = "BEGIN;
+            CREATE TABLE raw(id INTEGER PRIMARY KEY, parent INTEGER, name BLOB NOT NULL,
+              kind INTEGER NOT NULL, flags INTEGER NOT NULL, allocated INTEGER NOT NULL,
+              apparent INTEGER NOT NULL, mtime INTEGER NOT NULL, nlink INTEGER NOT NULL,
+              errors INTEGER NOT NULL, scanned_at INTEGER NOT NULL);
+            CREATE INDEX raw_children ON raw(parent,name);
+            CREATE TABLE jobs(id INTEGER PRIMARY KEY, root INTEGER NOT NULL, path BLOB NOT NULL);
+            CREATE TABLE links(id INTEGER PRIMARY KEY, dev INTEGER NOT NULL, ino INTEGER NOT NULL,
+              path BLOB NOT NULL, root INTEGER NOT NULL);
+            CREATE INDEX links_owner ON links(dev,ino,path,root);
+            CREATE TABLE mount_info(id INTEGER PRIMARY KEY, path BLOB NOT NULL, fs_type TEXT NOT NULL,
+              fs_used INTEGER, fs_total INTEGER);";
+
+#[cfg(test)]
+fn assert_index_plan(conn: &Connection, sql: &str, values: &[rusqlite::types::Value], index: &str) {
+    let mut stmt = conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
+    let detail: Vec<String> = stmt
+        .query_map(rusqlite::params_from_iter(values), |row| row.get(3))
+        .unwrap()
+        .map(|row| row.unwrap())
+        .collect();
+    assert!(
+        detail
+            .iter()
+            .any(|s| s.contains("SEARCH") && s.contains(index)),
+        "{detail:?}"
+    );
+    assert!(
+        !detail.iter().any(|s| s.contains("USE TEMP B-TREE")),
+        "{detail:?}"
+    );
+}
+
 pub struct StagedTree {
     conn: Connection,
     path: PathBuf,
@@ -155,18 +188,7 @@ impl StagedTree {
         } else {
             connect_database(path)?
         };
-        conn.execute_batch("BEGIN;
-            CREATE TABLE raw(id INTEGER PRIMARY KEY, parent INTEGER, name BLOB NOT NULL,
-              kind INTEGER NOT NULL, flags INTEGER NOT NULL, allocated INTEGER NOT NULL,
-              apparent INTEGER NOT NULL, mtime INTEGER NOT NULL, nlink INTEGER NOT NULL,
-              errors INTEGER NOT NULL, scanned_at INTEGER NOT NULL);
-            CREATE INDEX raw_children ON raw(parent,name,id);
-            CREATE TABLE jobs(id INTEGER PRIMARY KEY, root INTEGER NOT NULL, path BLOB NOT NULL);
-            CREATE TABLE links(id INTEGER PRIMARY KEY, dev INTEGER NOT NULL, ino INTEGER NOT NULL,
-              path BLOB NOT NULL, root INTEGER NOT NULL);
-            CREATE INDEX links_owner ON links(dev,ino,path,root,id);
-            CREATE TABLE mount_info(id INTEGER PRIMARY KEY, path BLOB NOT NULL, fs_type TEXT NOT NULL,
-              fs_used INTEGER, fs_total INTEGER);")?;
+        conn.execute_batch(STAGE_SCHEMA)?;
         let count = roots.nodes.len() as u64;
         let mut tree = Self {
             conn,

@@ -88,6 +88,16 @@ fn name_bytes(row: &Raw) -> usize {
     }
 }
 
+fn child_sql(cursor: bool, limit: usize) -> String {
+    if cursor {
+        format!(
+            "SELECT {RAW_COLS} FROM raw WHERE parent=?1 AND (name,id)>(?2,?3) ORDER BY name,id LIMIT {limit}"
+        )
+    } else {
+        format!("SELECT {RAW_COLS} FROM raw WHERE parent=?1 ORDER BY name,id LIMIT {limit}")
+    }
+}
+
 // The budget covers extra pending buffers across all active DFS frames, not
 // baseline cursors, paths, SQLite memory, an in-flight row, or process RSS.
 pub(super) fn next(
@@ -107,13 +117,7 @@ pub(super) fn next(
     {
         budget.selects += 1;
     }
-    let sql = if cursor.is_some() {
-        format!(
-            "SELECT {RAW_COLS} FROM raw WHERE parent=?1 AND (name,id)>(?2,?3) ORDER BY name,id LIMIT {BATCH}"
-        )
-    } else {
-        format!("SELECT {RAW_COLS} FROM raw WHERE parent=?1 ORDER BY name,id LIMIT {BATCH}")
-    };
+    let sql = child_sql(cursor.is_some(), BATCH);
     let mut stmt = conn.prepare_cached(&sql)?;
     let mut rows = if let Some((name, id)) = cursor {
         stmt.query(params![raw as i64, name, *id as i64])?
@@ -197,15 +201,13 @@ fn single(
     }
     #[cfg(not(test))]
     let _ = budget;
+    let sql = child_sql(cursor.is_some(), 1);
+    let mut stmt = conn.prepare_cached(&sql)?;
     let row = if let Some((name, id)) = cursor {
-        conn.prepare_cached(&format!("SELECT {RAW_COLS} FROM raw WHERE parent=?1 AND (name,id)>(?2,?3) ORDER BY name,id LIMIT 1"))?
-            .query_row(params![raw as i64, name, *id as i64], Raw::from_sql).optional()?
+        stmt.query_row(params![raw as i64, name, *id as i64], Raw::from_sql)
+            .optional()?
     } else {
-        conn.prepare_cached(&format!(
-            "SELECT {RAW_COLS} FROM raw WHERE parent=?1 ORDER BY name,id LIMIT 1"
-        ))?
-        .query_row([raw as i64], Raw::from_sql)
-        .optional()?
+        stmt.query_row([raw as i64], Raw::from_sql).optional()?
     };
     #[cfg(test)]
     {

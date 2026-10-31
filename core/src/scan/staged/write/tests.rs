@@ -2,6 +2,18 @@ use super::*;
 use crate::scan::walk::WalkOptions;
 
 #[test]
+fn production_writer_owner_query_uses_compact_index() {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(STAGE_SCHEMA).unwrap();
+    assert_index_plan(
+        &conn,
+        WRITE_LINK_SQL,
+        &[rusqlite::types::Value::Integer(7)],
+        "links_owner",
+    );
+}
+
+#[test]
 fn writer_deep_wide_pressure_never_refetches_buffered_rows() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("root");

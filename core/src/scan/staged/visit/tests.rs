@@ -60,11 +60,7 @@ fn fixture() -> Tree {
 }
 fn staged(tree: &Tree, path: &Path) -> StagedTree {
     let conn = open_database(path).unwrap();
-    conn.execute_batch("CREATE TABLE raw(id INTEGER PRIMARY KEY,parent,name,kind,flags,allocated,apparent,mtime,nlink,errors,scanned_at);
-        CREATE INDEX raw_children ON raw(parent,name,id);
-        CREATE TABLE links(id INTEGER PRIMARY KEY,dev,ino,path,root);
-        CREATE INDEX links_owner ON links(dev,ino,path,root,id);
-        CREATE TABLE mount_info(id INTEGER PRIMARY KEY,path,fs_type,fs_used,fs_total);").unwrap();
+    conn.execute_batch(STAGE_SCHEMA).unwrap();
     let staged = StagedTree {
         conn,
         path: path.to_owned(),
@@ -109,8 +105,58 @@ fn staged(tree: &Tree, path: &Path) -> StagedTree {
             [b"/data/mount".as_slice()],
         )
         .unwrap();
+    staged.conn.execute_batch("COMMIT").unwrap();
     staged
 }
+
+#[test]
+fn production_visitor_queries_use_compact_indexes() {
+    use rusqlite::types::Value;
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(STAGE_SCHEMA).unwrap();
+    for cursor in [false, true] {
+        let values = if cursor {
+            vec![
+                Value::Integer(9),
+                Value::Blob(b"same-\xff\0name".to_vec()),
+                Value::Integer(32),
+            ]
+        } else {
+            vec![Value::Integer(9)]
+        };
+        assert_index_plan(&conn, &visit_child_sql(cursor), &values, "raw_children");
+    }
+    assert_index_plan(&conn, VISIT_LINK_SQL, &[Value::Integer(7)], "links_owner");
+}
+
+#[test]
+fn compact_link_index_preserves_owner_order_for_tied_blob_paths() {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(STAGE_SCHEMA).unwrap();
+    for (id, path, root) in [
+        (9, b"a\xff".as_slice(), 1),
+        (7, b"a\xff".as_slice(), 1),
+        (4, b"a\xff".as_slice(), 2),
+        (2, b"b".as_slice(), 0),
+    ] {
+        conn.execute(
+            "INSERT INTO links VALUES(?1,7,9,?2,?3)",
+            params![id, path, root],
+        )
+        .unwrap();
+    }
+    let ids: Vec<i64> = conn
+        .prepare("SELECT id FROM links WHERE dev=7 AND ino=9 ORDER BY path,root,id")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .map(|row| row.unwrap())
+        .collect();
+    assert_eq!(ids, [7, 9, 4, 2]);
+    let owner: i64 = conn.query_row("SELECT o.id FROM links o WHERE o.dev=7 AND o.ino=9 ORDER BY o.path,o.root,o.id LIMIT 1", [], |r| r.get(0)).unwrap();
+    assert_eq!(owner, 7);
+}
+
 #[test]
 fn raw_visitor_preserves_scoped_alias_mount_denied_and_unsaturated_own_values() {
     let tmp = tempfile::tempdir().unwrap();

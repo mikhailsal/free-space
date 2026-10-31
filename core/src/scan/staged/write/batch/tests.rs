@@ -2,8 +2,31 @@ use super::*;
 
 fn db() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
-    conn.execute_batch("CREATE TABLE raw(id INTEGER PRIMARY KEY,parent INTEGER,name BLOB NOT NULL,kind INTEGER,flags INTEGER,allocated INTEGER,apparent INTEGER,mtime INTEGER,nlink INTEGER,errors INTEGER,scanned_at INTEGER); CREATE INDEX raw_children ON raw(parent,name,id);").unwrap();
+    conn.execute_batch(STAGE_SCHEMA).unwrap();
     conn
+}
+
+#[test]
+fn production_child_queries_use_compact_index() {
+    use rusqlite::types::Value;
+    let conn = db();
+    for id in 1..=75 {
+        insert(&conn, id, 9, b"same-\xff\0name");
+    }
+    for limit in [1, BATCH] {
+        for cursor in [false, true] {
+            let values = if cursor {
+                vec![
+                    Value::Integer(9),
+                    Value::Blob(b"same-\xff\0name".to_vec()),
+                    Value::Integer(32),
+                ]
+            } else {
+                vec![Value::Integer(9)]
+            };
+            assert_index_plan(&conn, &child_sql(cursor, limit), &values, "raw_children");
+        }
+    }
 }
 
 fn insert(conn: &Connection, id: u64, parent: u64, name: &[u8]) {
@@ -69,6 +92,26 @@ fn wide_raw_names_keep_cursor_order_and_reduce_selects() {
     assert_eq!(fallback, expected);
     assert_eq!(baseline.selects, 76);
     assert_eq!((budget.slots, budget.bytes), (0, 0));
+}
+
+#[test]
+fn tied_blob_names_paginate_across_batches_by_rowid() {
+    let conn = db();
+    let name = b"same-\xff\0name";
+    for id in (1..=75).rev() {
+        insert(&conn, id, 9, name);
+    }
+    insert(&conn, 100, 10, name);
+    let mut budget = Budget::default();
+    let mut pending = Pending::default();
+    let mut cursor = None;
+    let mut ids = Vec::new();
+    while let Some(row) = take(&conn, 9, &mut cursor, &mut pending, &mut budget) {
+        assert_eq!(row.name, name);
+        ids.push(row.id);
+    }
+    assert_eq!(ids, (1..=75).collect::<Vec<_>>());
+    assert_eq!(budget.selects, 4);
 }
 
 fn populate_nested_wide(conn: &Connection) -> Vec<u64> {

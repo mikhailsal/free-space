@@ -42,6 +42,18 @@ struct Frame<S> {
     state: S,
 }
 const COLUMNS: &str = "id,name,kind,flags,allocated,apparent,mtime,nlink,errors,scanned_at";
+const VISIT_LINK_SQL: &str = "SELECT l.dev,l.ino,l.id=(SELECT o.id FROM links o WHERE o.dev=l.dev AND o.ino=l.ino ORDER BY o.path,o.root,o.id LIMIT 1) FROM links l WHERE l.id=?1";
+
+fn visit_child_sql(cursor: bool) -> String {
+    if cursor {
+        format!(
+            "SELECT {COLUMNS} FROM raw WHERE parent=?1 AND (name,id)>(?2,?3) ORDER BY name,id LIMIT 1"
+        )
+    } else {
+        format!("SELECT {COLUMNS} FROM raw WHERE parent=?1 ORDER BY name,id LIMIT 1")
+    }
+}
+
 impl Raw {
     fn read(r: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -112,16 +124,13 @@ impl StagedTree {
         Ok(count)
     }
     fn visit_child<S>(&self, frame: &Frame<S>) -> Result<Option<Raw>> {
+        let sql = visit_child_sql(frame.cursor.is_some());
+        let mut stmt = self.conn.prepare_cached(&sql)?;
         Ok(if let Some((name, id)) = &frame.cursor {
-            self.conn.prepare_cached(&format!("SELECT {COLUMNS} FROM raw WHERE parent=?1 AND (name,id)>(?2,?3) ORDER BY name,id LIMIT 1"))?
-                .query_row(params![frame.raw, name, id], Raw::read).optional()?
-        } else {
-            self.conn
-                .prepare_cached(&format!(
-                    "SELECT {COLUMNS} FROM raw WHERE parent=?1 ORDER BY name,id LIMIT 1"
-                ))?
-                .query_row([frame.raw], Raw::read)
+            stmt.query_row(params![frame.raw, name, id], Raw::read)
                 .optional()?
+        } else {
+            stmt.query_row([frame.raw], Raw::read).optional()?
         })
     }
     fn visit_enter<V: Visitor>(
@@ -133,8 +142,16 @@ impl StagedTree {
         parent: Option<&V::State>,
     ) -> Result<Frame<V::State>> {
         let link = if raw.node.kind() != Kind::Dir && raw.node.nlink > 1 {
-            self.conn.prepare_cached("SELECT l.dev,l.ino,l.id=(SELECT o.id FROM links o WHERE o.dev=l.dev AND o.ino=l.ino ORDER BY o.path,o.root,o.id LIMIT 1) FROM links l WHERE l.id=?1")?
-                .query_row([raw.id], |r| Ok(Link {dev:r.get(0)?,ino:r.get(1)?,owner:r.get(2)?})).optional()?
+            self.conn
+                .prepare_cached(VISIT_LINK_SQL)?
+                .query_row([raw.id], |r| {
+                    Ok(Link {
+                        dev: r.get(0)?,
+                        ino: r.get(1)?,
+                        owner: r.get(2)?,
+                    })
+                })
+                .optional()?
         } else {
             None
         };
