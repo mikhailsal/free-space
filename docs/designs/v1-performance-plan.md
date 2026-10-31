@@ -1,6 +1,6 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: reviewed execution plan with D1–D16 resolved; optimization results remain unproven.
+Date: 2026-10-31. Status: W1/W3 campaign recorded; W3 not promoted; W4 source reviewed; D18 runner allocation pending.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
 Source baseline: master `afce6fd`; investigation branch HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
