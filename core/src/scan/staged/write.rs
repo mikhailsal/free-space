@@ -4,6 +4,9 @@ use std::os::unix::ffi::OsStrExt;
 use crate::scan::tree::{path_hash, push_component};
 use crate::snapshot::schema::{CREATE_INDEXES, CREATE_TABLES};
 
+#[cfg(test)]
+mod tests;
+
 struct Raw {
     id: u64,
     name: Vec<u8>,

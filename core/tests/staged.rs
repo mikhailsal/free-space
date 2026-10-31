@@ -87,8 +87,7 @@ fn disk_scan_keeps_rejecting_a_non_directory_root() {
             keep_previous: true,
             on_progress: None,
         })
-        .err()
-        .expect("file roots must be rejected");
+        .expect_err("file roots must be rejected");
         assert!(error.to_string().contains("not a directory"));
     }
 }
