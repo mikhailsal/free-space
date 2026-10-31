@@ -32,7 +32,16 @@
       "maximum_job_seconds": 5100,
       "forecast_seconds": 2400,
       "depends_on": "Final requested Opus source review, normal hooks, immutable candidate revision and pre-dispatch budget admission",
-      "status": "admitted_before_dispatch"
+      "status": "completed",
+      "run_id": 41223904260,
+      "created_at": "2026-10-31T17:18:42Z",
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 1483,
+      "ordinary_receipts_valid": true,
+      "profile_v2_structure_valid": true,
+      "receipt": "v1-refresh-capacity-screen-2026-10-31.json",
+      "promotion": false
     },
     {
       "comparison": "candidate",
@@ -60,9 +69,9 @@
       ],
       "timeout_minutes": 120,
       "maximum_job_seconds": 9000,
-      "forecast_seconds": null,
-      "depends_on": "Valid candidate screen and full baseline receipts; positive attributable RAM effect; no confirmed disk/RAM/refresh regression; immutable same candidate and renewed measured forecast+30pct margin; this pair alone cannot promote",
-      "status": "conditional_candidate_screen_pending"
+      "forecast_seconds": 2329,
+      "depends_on": "Satisfied valid screen/fullbaseline receipts, positive attributedRAMeffect; H2guardinconclusiveandno promotion; boundedscaleinvestigationperpreregistration",
+      "status": "admitted_exploratory_before_dispatch"
     }
   ],
   "current_candidate_source_hashes": {
@@ -86,5 +95,27 @@
   ],
   "product_gates": "All accepted plan thresholds and required scenarios/repeated confirmations remain unchanged",
   "candidate_revision": "f04a109124c3747d937547e4fc1f6d37ad59392a",
-  "source_review": "v1-refresh-exact-capacity-source-reviews-2026-10-31.json"
+  "source_review": "v1-refresh-exact-capacity-source-reviews-2026-10-31.json",
+  "screen_disposition": {
+    "decision": "not promoted; exploratory scale test admitted only",
+    "refresh_rss_median_change_pct": -23.882413964664906,
+    "rss_floor_25pct": "not met at1m",
+    "scan_rss_no_regression": "inconclusive: median+48KiB andoneworsepair+112KiB; priorAAidentityprovisional",
+    "prior_AA_binary_sha256": "083bde706e142cede8d400b0c5c6639257c1bf1ca36f9d181b5e30180ac966bb",
+    "comparison_baseline_binary_sha256": "4c2ad151c828b60050602bb88ec7297b436bdfd817cfb04503156abd8a72a8ca",
+    "artifact_identity_investigation": "ongoing; same recorded source/target/toolchain, differingbinaryhash; withinjobpairedreceiptsvalid",
+    "mechanism": "candidateeliminatesnodebuffermoveand~88MiBnodeRSSstepinall3pairs",
+    "reason_to_test_full": "Preregistered positive scale-dependent RAM counterfactual; fixedmapping/loaderoverheads dilute1mpercentage. No confirmed productregression claimed or gate waived."
+  },
+  "full_time_admission": {
+    "baseline_full_paired_job_seconds": 1760,
+    "control_screen_paired_job_seconds": 925,
+    "candidate_screen_paired_job_seconds": 1224,
+    "formula": "ceil(fullcontrol * max(1,candidatescreen/controlscreen)); admission planning only, not crossVM performance effect",
+    "forecast_seconds": 2329,
+    "with30pctmargin_seconds": 3028,
+    "paired_step_cap_seconds": 7200,
+    "maximum_aggregate_job_seconds": 9000,
+    "success": true
+  }
 }

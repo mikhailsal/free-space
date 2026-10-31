@@ -1,0 +1,94 @@
+{
+  "created_at": "2026-10-31T17:41:45.825085+00:00",
+  "scope": "Distinct W3 leaf fast path plus bounded W4 directory batching; individual historical candidates remain unpromoted",
+  "candidate_revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+  "source_sha256": {
+    "core/src/scan/staged/write.rs": "19918e628e0c5ca46a3126896f2521fa91426bdafaf4f611100bbe3d7ae52b31",
+    "core/src/scan/staged/write/batch.rs": "63b91c0e0eaad2f8f254eaec3f95a03a2c88e99ce8274d40608be599412c1c19",
+    "core/src/scan/staged/write/batch/tests.rs": "a3529bc7a49cecce4063e3c300ec68f4a01ca407ea0ff362675701965eb89a6e",
+    "core/src/scan/staged/write/tests.rs": "74d507c5bc420271765f3af50a2a62ce26ffde3b5898b8740318ab1e53cae3c8",
+    "core/tests/staged.rs": "192f50e3ebddda4a0fef5aa217de464dd2bfeaa74fed4314c97e5c2b72a21e8a"
+  },
+  "source_review": "v1-combined-sql-source-reviews-2026-10-31.json",
+  "plans": [
+    {
+      "comparison": "candidate",
+      "branch": "perf/v1-combined-sql",
+      "revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2",
+      "owner_allocation": "D19 accepted scanner work under60hours; distinct composition of W3/W4 mechanisms",
+      "source_review": "v1-combined-sql-source-reviews-2026-10-31.json",
+      "id": "combined-sql-screen",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5100,
+      "forecast_seconds": 2400,
+      "status": "admitted_before_dispatch",
+      "depends_on": "Satisfied reviewed immutable source, normalhooks and baselineMUSLcontrols; source tests onGHbeforemeasurement"
+    },
+    {
+      "comparison": "candidate",
+      "branch": "perf/v1-combined-sql",
+      "revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "build_target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "profile_policy": "profile-v2",
+      "owner_allocation": "D19 accepted scanner work under60hours; distinct composition of W3/W4 mechanisms",
+      "source_review": "v1-combined-sql-source-reviews-2026-10-31.json",
+      "id": "combined-sql-full-exploratory",
+      "stage": "local-scale",
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "pairs_per_operation": 1,
+      "operations": [
+        "scan"
+      ],
+      "timeout_minutes": 120,
+      "maximum_job_seconds": 9000,
+      "forecast_seconds": null,
+      "status": "conditional_screen_pending",
+      "depends_on": "Validscreen, targetscan pairedgain>=15pct, no confirmed disk/RAM/refreshregression; measuredwholepairedforecast+30pct andaggregateadmission; no promotionfromonepair"
+    }
+  ],
+  "initial_maximum_runner_seconds": 14100,
+  "campaign_cap_seconds": 216000,
+  "maximum_committed_seconds": 42929.0,
+  "remaining_unreserved_seconds": 173071.0,
+  "time_admission_screen": {
+    "forecast_seconds": 2400,
+    "with30pctmargin_seconds": 3120,
+    "paired_step_cap_seconds": 3300,
+    "success": true
+  },
+  "stop_rules": [
+    "No sum of historical gain percentages",
+    "No promotion of earlier failed individual variants",
+    "Stop on semantics/source/receiptsfailure orconfirmedresource/refreshregression",
+    "No blind retries or post-result budget/cache tuning",
+    "Full-scale expansion requires screening speedfloor and recordedadmission; onepairnotqualification"
+  ],
+  "product_gates": "All accepted four-metric gates unchanged; no exception"
+}

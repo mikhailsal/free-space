@@ -76,10 +76,16 @@
       "forecast_seconds": 1473,
       "depends_on": "Satisfied: strict screen receipts, prospective trace structure, measured frozen formula and60h aggregate admission",
       "source_review": "NO_FINDINGS; requestedclaude-opus-5-5",
-      "status": "in_progress",
+      "status": "completed",
       "run_id": 41222190491,
       "created_at": "2026-10-31T16:58:02Z",
-      "head_sha_verified": true
+      "head_sha_verified": true,
+      "conclusion": "success",
+      "aggregate_job_seconds": 1874,
+      "ordinary_control_valid": true,
+      "profile_v2_structure_valid": true,
+      "original_hwm_monotonic_contract_pass": false,
+      "receipt": "v1-refresh-musl-full-2026-10-31.json"
     }
   ],
   "prospective_diagnostic_policy": {

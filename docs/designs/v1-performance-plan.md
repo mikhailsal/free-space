@@ -1,8 +1,8 @@
 # V1-first performance plan
 
-Date: 2026-10-31. Status: W1/W3/W4 screening recorded; W3/W4 not promoted; D19 GNU diagnostics recorded and release-target controls prepared under the owner-extended 60-runner-hour cap.
+Date: 2026-10-31. Status: individual W3/W4 variants not promoted; release-musl controls complete; exact-capacity and combined-SQL candidates under investigation within the owner-extended 60-runner-hour cap.
 Target and report destination: `docs/designs/v1-performance-plan.md`.
-Source baseline: master `afce6fd`; investigation branch HEAD `c28bc7f`.
+Original source baseline: master `afce6fd`; initial investigation HEAD `c28bc7f`.
 Owner request: optimize peak disk, RAM, full scan and folder refresh on v1;
 use GitHub runners for expensive work. Snapshot contents are disposable: the
 owner explicitly prioritizes having enough disk space over retaining history.
@@ -41,6 +41,16 @@ aggregate runner-seconds and authorizes continuation. Old six-hour allocations
 and remaining-time figures in historical briefs/receipts retain their original
 meaning; the current [ledger](../benchmark-results/v1-w1-campaign-2026-10-31.json)
 is authoritative for new admission. Before D19, 10,615 seconds were used.
+
+The release-musl controls now reproduce the large refresh memory peak: the
+[full-size control](../benchmark-results/v1-refresh-musl-full-2026-10-31.md)
+refreshes 100 entries among 7,297,076 in about 74.5 s, with approximately
+1.72 GiB process RSS and 2.55 GiB application disk peak. Node growth raises
+boundary RSS from about 1.11 to 1.71 GiB. This is control evidence, not an
+optimization. The [exact-capacity candidate](v1-refresh-exact-capacity.md) is
+being tested against that baseline. A distinct reviewed composition of the W3
+leaf and W4 sibling-query mechanisms is separately preregistered; the historical
+individual variants remain unpromoted. No benefit percentages are added together.
 
 Local calibration and the requested `claude-opus-5-5` outside reviews are complete.
 D16 permits test-host backend switching without certifying a production release
@@ -443,6 +453,16 @@ W4 is not promoted, with no further W4 dispatch planned. D18 was accepted before
 its two jobs; actual additional use was 2,497 seconds, bringing the campaign to
 10,615 of 21,600 seconds. No full-scale expansion or gate exception was used.
 
+That paragraph closes D18's individual batching experiment. Under D19's expanded
+continuation, a [new composition experiment](../benchmark-results/v1-combined-sql-manifest-2026-10-31.json)
+combines leaf work elimination with directory sibling batching on musl. Its
+[source review](../benchmark-results/v1-combined-sql-source-reviews-2026-10-31.json)
+closes with `NO_FINDINGS`; normal hooks pass, and workspace tests precede any
+measurement on GitHub. Known File/Symlink/Other leaves take the shortcut; Mount
+keeps the baseline path and has a deterministic test. The same 256-slot/64 KiB
+pending budget remains. This is a new bounded hypothesis, not a promotion or a
+retry of an unchanged rejected variant.
+
 ## W5: improve v1 refresh without recreating v2
 
 Before changing allocation behavior, the separately prepared
@@ -457,6 +477,12 @@ controls use the system allocator while the distribution musl target selects
 mimalloc. A separately reviewed prospective descriptive policy and release-target
 controls address this mismatch before any capacity counterfactual. The current
 ledger records exact reservations within the 216,000-second campaign cap.
+The [musl screen](../benchmark-results/v1-refresh-musl-screen-2026-10-31.md) and
+full-size control pass ordinary receipts and the new declared trace structure,
+while retaining every raw HWM anomaly. They support a preallocation experiment;
+[candidate f04a109](v1-refresh-exact-capacity.md) is published, reviewed and running
+paired screening after its GitHub workspace tests. Folder observation occurs
+earlier relative to publication; progress stays under the existing 99% clamp.
 This does not cancel D7's staged-refresh research or accept a capacity fix without
 measured cause/benefit. The scope/budget instruction was received before dispatch.
 
@@ -1175,8 +1201,9 @@ REALITY: perf-table finding historical one-repeat limitation; versioned interlea
 
 - QA plan: `/home/tass/.gstack/projects/mikhailsal-free-space/tass-perf-representative-gh-bench-eng-review-test-plan-20261031-114936.md`.
 - Flat task JSONL: `/home/tass/.gstack/projects/mikhailsal-free-space/tasks-eng-review-20261031-114936.jsonl`.
-- Both are planning artifacts. The owner-authorized local scan and refresh were
-  completed and archived; no candidate optimization or GH campaign was executed.
+- Both are historical planning-stage artifacts. At that checkpoint the
+  owner-authorized local scan and refresh were archived, and no candidate GH
+  campaign had yet run. Later campaign receipts and current status appear above.
 
 ## GSTACK REVIEW REPORT
 

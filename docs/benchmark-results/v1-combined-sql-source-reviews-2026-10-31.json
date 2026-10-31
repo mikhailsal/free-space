@@ -1,0 +1,146 @@
+{
+  "created_at": "2026-10-31T17:41:45.823556+00:00",
+  "candidate_revision": "d1c9f014ed185d663947590b388b444c08da7fda",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_sha256": {
+    "core/src/scan/staged/write.rs": "19918e628e0c5ca46a3126896f2521fa91426bdafaf4f611100bbe3d7ae52b31",
+    "core/src/scan/staged/write/batch.rs": "63b91c0e0eaad2f8f254eaec3f95a03a2c88e99ce8274d40608be599412c1c19",
+    "core/src/scan/staged/write/batch/tests.rs": "a3529bc7a49cecce4063e3c300ec68f4a01ca407ea0ff362675701965eb89a6e",
+    "core/src/scan/staged/write/tests.rs": "74d507c5bc420271765f3af50a2a62ce26ffde3b5898b8740318ab1e53cae3c8",
+    "core/tests/staged.rs": "192f50e3ebddda4a0fef5aa217de464dd2bfeaa74fed4314c97e5c2b72a21e8a"
+  },
+  "provider": "claude-code",
+  "requested_model": "claude-opus-5-5",
+  "final_verdict": "NO_FINDINGS",
+  "strict_outside_review_validation": {
+    "completed": true,
+    "gate": "pass"
+  },
+  "normal_pre_push": "rust,size,shell,tsc,biome passed; newfiles staged forsizecheck; CPU50%Memory2G180s; nohookbypass",
+  "tests": "Compiled bynormalhook; newRusttestsnotrunlocally; GHworkspacebeforemeasurement",
+  "limits": [
+    "Historical W3/W4 GNU individual results do not establish composition gain on musl",
+    "Empty/exhausted frame ancestor eviction remains a measured performance uncertainty; no third optimization introduced",
+    "Pending-row budget is not a total process RSS bound"
+  ],
+  "reviews": [
+    {
+      "status": "completed",
+      "provider": "claude-code",
+      "result": "# Adversarial review: W3 leaf fast path composed with W4 bounded sibling batching (on e8265778)\n\nAll findings below come from reading the supplied source. Nothing was built or run.\n\n## Findings\n\n### P2: W3 uses `kind == Kind::Dir` to mean \"has children and needs a final UPDATE\", which leaves `Kind::Mount` unproven\n\n**Where:** `core/src/scan/staged/write.rs`. The same predicate appears in three places:\n- the `parent.kind == Kind::Dir` gate before `batch::next`\n- the `frame.kind == Kind::Dir` gate around the `UPDATE entries`\n- the `current.kind != Kind::Dir` check in `evict_for_directory`\n\n**Why:** The baseline runs the child SELECT and the UPDATE for every kind. The composition drops both for any kind other than `Dir`. That is safe for File, Symlink and Other: the stat-error test checks the inserted leaf columns (`subtree_end`, `min_scanned_at`, `errors`), and the differential tests cover real sizes. Two things are not shown by the supplied code:\n\n1. **Mount children.** If the walker stores raw children under a `Kind::Mount` node (crossed mounts with `one_file_system: false`), those subtrees are never visited. `next_id != self.count` then aborts every such low-memory scan or refresh with \"staging traversal did not visit every entry\". The failure is loud, not silent, but it would be a P1 regression.\n2. **Kind-dependent aggregates.** `SubtreeAgg::leaf` takes `node.kind()` as its first argument. If it transforms `allocated`, `apparent`, `items` or `errors` for some non-Dir kind, the skipped UPDATE used to overwrite the INSERT values with `agg.*`. Without it, the stored row diverges from Tree. The INSERT writes `node.allocated` and `node.apparent`, not `agg.*`.\n\n**Coverage gap:** The only test that reaches Mount is `disk_hardlink_path_ties_follow_root_order_across_overlapping_mounts`. It silently returns on hosts where `/dev` and `/dev/shm` share a device.\n\n**Fix:** Replace the denylist with a single allowlist helper, for example `fn is_leaf(k: Kind) -> bool { matches!(k, Kind::File | Kind::Symlink | Kind::Other) }`. Use it for all three gates. Mount (and any future kind) then keeps the baseline SELECT + UPDATE path. Mounts are rare, so the fast path loses nothing measurable.\n\n### P3: Mount coverage is host-conditional\n\n**Where:** `core/tests/staged.rs`, `disk_hardlink_path_ties_follow_root_order_across_overlapping_mounts`.\n\n**Why:** On a host without the overlap, the test returns early and still shows as passed, so a W3 regression on mounts could go green.\n\n**Fix (pick one or both):**\n- When `CI` is set, assert the cross-device precondition instead of returning.\n- Add a write-level unit test in `write/tests.rs` in the style of the stat-error test: walk, rewrite one raw row to `Kind::Mount`, add its `mount_info` row, write, and assert the entry, `mounts` and parent aggregate rows.\n\n### P3: Eviction runs for directories that will turn out exhausted or empty (pre-existing W4 behavior)\n\n**Where:** `evict_for_directory`, its condition `current.kind == Dir && current.pending.is_empty()`.\n\n**Why:** This is also true for:\n- an empty directory,\n- a denied directory,\n- a directory whose last batch is drained and whose next SELECT will return `None`.\n\nUnder budget pressure, every directory exit can therefore release shallow ancestor buffers. Each released ancestor later re-SELECTs up to 32 rows to consume possibly one. This is a read-amplification and RSS-churn risk for the deep and wide case, and it bears on W4's history of worse RSS. I'm not claiming any magnitude; the existing metrics will show it.\n\n**Possible follow-up (separate candidate, not this composition):** Record in `Pending` whether SQLite's last batch returned fewer than `LIMIT` rows. Use the SQL row count, not the buffered count, because the byte break discards rows. When that flag is set, skip both the eviction and the final SELECT.\n\n## Checked and found consistent\n\n- **Cursor resumption.** Whenever an ancestor holds pending rows, its cursor is `Some` and equals the last consumed `(name,id)`. Release followed by `(name,id) > cursor` therefore yields no duplicates and no drops.\n- **Early returns and byte-limit break.** The early `return Ok(Some(first))` paths and the byte-limit `break` keep the cursor before any discarded row. Equal-name ties resume by `id`, which the tie test covers.\n- **Budget accounting.**\n  - `slots` equals the actual `VecDeque` capacity.\n  - `pop` and `release` keep `pending` and `budget` byte counts symmetric.\n  - Frames are popped only with empty pending: Dir frames because `next` returned `None`, leaf frames because they never fetch. So the budget is zero at the end of each `write_root`.\n  - The release-build `-=` cannot underflow under this accounting.\n- **Budget scope.** The budget is per `write_root`, and roots run sequentially, so \"global\" means across active frames, as documented. The in-flight row and the oversized first row are excluded from the budget, also as documented.\n- **Guard cadence.** Leaf frames still take exactly one loop iteration (tick, then pop), so `tick()` counts match the baseline.\n- **Parent aggregates.** The parent merge and the u32 re-store are unchanged, and leaf `agg` is identical with or without the UPDATE.\n- **Open statements.** No `self.conn` statement stays open across `enter()`, `attribute_link`, or the `mount_info` query.\n- **New deep/wide test.**\n  - The count of 413 is right: 400 files + 10 `0-next` dirs + root + hardlink + symlink.\n  - Root and levels 1\u20139 each keep 31 pending rows, which makes 10 buffers. That is more than the 8 the slot limit allows (256 / 32), so the eviction or fallback path is forced regardless of `size_of::<Raw>()`.\n  - `0-next` sorts first in both DFS and path order, so hardlink ownership is consistent with Tree.\n- **Non-dir root.** The frame skips the SELECT and the UPDATE and returns `agg.errors`. It is equivalent to the baseline provided leaf `agg` equals the inserted columns (see the P2 item for the Mount caveat).\n\n## Missing context that live GitHub runs resolve\n\n- **Mount semantics.** Whether raw rows can have children under `Kind::Mount`, and the body of `SubtreeAgg::leaf`. The overlapping-mount test resolves both only if the runner has distinct devices for `/dev` and `/dev/shm`; it returns early otherwise.\n- **Test compilation in the hook.** Whether `scripts/check.sh rust` runs clippy with `--all-targets`/`--tests`. If it doesn't, `write/tests.rs`, `write/batch/tests.rs` and the private-glob imports they rely on (`Reserve`, `WriteMeta`, `Kind`, `SubtreeAgg`, `Frame` fields) compile for the first time on GitHub.\n- **Untracked files.** All of `core/src/scan/staged/write/` is untracked (`batch.rs`, `batch/tests.rs`, `tests.rs`). It has to be committed, or `mod batch;` fails to compile and the size check, which counts only tracked files, never sees those files.\n- **Test outcomes.** Every test outcome above is unverified until the selected MUSL workspace tests run on GitHub.",
+      "session_id": "fcc1a819-2f2e-4fa1-94c8-da72e854983f",
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 27953,
+        "cache_read_input_tokens": 1494,
+        "output_tokens": 13853,
+        "output_tokens_details": {
+          "thinking_tokens": 11178
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 27953,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 13853,
+            "cache_read_input_tokens": 1494,
+            "cache_creation_input_tokens": 27953,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 27953
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5-5": {
+          "inputTokens": 2,
+          "outputTokens": 13853,
+          "cacheReadInputTokens": 1494,
+          "cacheCreationInputTokens": 27953,
+          "webSearchRequests": 0,
+          "costUSD": 0.5009908000000001,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 128000,
+          "thinkingTokens": 11178,
+          "cacheCreationEphemeral5mInputTokens": 0,
+          "cacheCreationEphemeral1hInputTokens": 27953,
+          "canonicalModel": "claude-opus-5-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "exit_code": 0
+    },
+    {
+      "status": "completed",
+      "provider": "claude-code",
+      "result": "# Follow-up review: composed W3/W4 candidate\n\nThis review covers only the diff and the five files supplied. I ran nothing; the new tests remain unrun, as you stated.\n\n## Previous findings\n\n**P2 (Mount semantics unproven): closed.**\n- `is_leaf` (`core/src/scan/staged/write.rs:26`) allows only `File`, `Symlink` and `Other`. `Mount`, `Dir` and any other kind keep the baseline path: child SELECT, final UPDATE, and taking part in eviction.\n- Skipping the UPDATE for leaves changes no rows. `enter` already inserts the same values the UPDATE would write:\n  - `items=0` and `subtree_end=id`, because `agg.items` is 0.\n  - `allocated` and `apparent` after alias zeroing, because `agg` is built after `attribute_link`.\n  - `errors`, `min_scanned_at=scanned_at`, and `stored_newest_mtime()`.\n- `stat_error_leaf_is_written_and_folded_into_parent` checks this for all three leaf kinds.\n- `mount_row_is_written_and_folded_into_parent` (`write/tests.rs`) is deterministic and needs no cross-device host. It covers:\n  - the entry row (kind, zero sizes, errors, `subtree_end`)\n  - the `mounts` row joined from `mount_info`\n  - the parent's error aggregate\n- The `mount_info` column order matches the insert in `walk.rs`.\n- Raw id 1 is the root's only child, which follows from the walk's count order.\n\n**P3 (host-conditional Mount coverage): closed.** The `/dev/shm` test is now extra coverage, not the only Mount coverage.\n\n## New code\n\n- **Batch path (`batch.rs`):**\n  - The cursor is set only when a row is consumed.\n  - Rows dropped at the byte limit, or released by eviction, all sort after that cursor, so the next SELECT from the cursor fetches them again. Equal-name ties resume by `id`.\n  - Byte accounting balances: `pending.bytes` is buffer bytes plus name bytes, and `pop` subtracts each name from both counters.\n  - Empty releases return the budget to (0, 0), and the unit tests assert this.\n- **`evict_for_directory`:**\n  - It skips leaf frames and frames with rows still pending.\n  - It frees the shallowest ancestors first and stops as soon as a full batch fits.\n  - Both eviction unit tests check that a released root resumes at id 2.\n- **Deep/wide integration test:**\n  - The expected count of 413 is right: 1 root, plus 10 \u00d7 (40 files + 1 subdirectory), plus a hardlink and a symlink.\n  - `0-next` sorts before the `z-\u2026` names, so each ancestor keeps about 31 rows of ~250 accounted bytes pending while the walk descends. That should exhaust the 64 KiB budget around depth 5 and exercise eviction.\n  - The test does not assert that eviction happened. Only the unit tests prove that, and the integration test proves the output still matches the fast scan.\n- **Module visibility:** `use super::super::{Frame, evict_for_directory}` from `batch::tests` resolves, since private items are visible to child modules. The `OsStrExt` import reaches `write/tests.rs` through `use super::*`.\n- **Limits:**\n  - `write.rs` is about 300 lines, `batch.rs` about 210, and `staged.rs` about 380, all within limits.\n  - `write_root` is about 65 lines, under the 80-line limit.\n  - Nesting stays within 4 levels.\n  - No exceptions were added.\n\n## Gate note (not a finding)\n\n`core/src/scan/staged/write/` is untracked. `scripts/check.sh size` counts only tracked files, so `batch.rs`, `batch/tests.rs` and `write/tests.rs` are not size-checked, and won't reach the hook or CI, until they are `git add`ed.\n\n## Known limitations (to measure, not to fix before testing)\n\n- **Empty-directory ancestor eviction is unchanged from the reviewed W4 design.** An empty or exhausted directory frame can still release ancestor buffers, which are then fetched again. Mount frames also cause eviction, because they keep the W4 path. This is a performance cost, not a correctness problem, and its size is unknown.\n- **The composed MUSL build has not been measured.** W3 and W4 each measured below the 15% floor on GNU. Nothing here supports a performance claim until the source RSS gate and the deep/wide gates pass on GitHub.\n- **No new tests have been run locally.**\n\nNO_FINDINGS",
+      "session_id": "a6d5f485-42a4-470e-b484-d276db0a4822",
+      "usage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 28058,
+        "cache_read_input_tokens": 1494,
+        "output_tokens": 5490,
+        "output_tokens_details": {
+          "thinking_tokens": 3914
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 28058,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 5490,
+            "cache_read_input_tokens": 1494,
+            "cache_creation_input_tokens": 28058,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 28058
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5-5": {
+          "inputTokens": 2,
+          "outputTokens": 5490,
+          "cacheReadInputTokens": 1494,
+          "cacheCreationInputTokens": 28058,
+          "webSearchRequests": 0,
+          "costUSD": 0.3345708,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 128000,
+          "thinkingTokens": 3914,
+          "cacheCreationEphemeral5mInputTokens": 0,
+          "cacheCreationEphemeral1hInputTokens": 28058,
+          "canonicalModel": "claude-opus-5-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "exit_code": 0
+    }
+  ]
+}

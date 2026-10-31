@@ -1,0 +1,422 @@
+{
+  "archive": "v1-refresh-musl-full-2026-10-31.tar.gz",
+  "archive_sha256": "b4d089d8d937f9bbad05f532f7befb5dd53b3ef8e732bbda098ea2dc06e68a40",
+  "archive_files": 72,
+  "github": {
+    "url": "https://github.com/mikhailsal/free-space/actions/runs/41222190491",
+    "sha": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "conclusion": "success",
+    "job_seconds": {
+      "build": 114.0,
+      "paired": 1760.0
+    }
+  },
+  "tests": {
+    "python_passed": 82,
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1
+  },
+  "description": {
+    "operation": "refresh",
+    "protocol": "v1-single-operation-pairs-v3",
+    "github": {
+      "GITHUB_SHA": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "GITHUB_RUN_ID": "41222190491",
+      "GITHUB_RUN_ATTEMPT": "1"
+    },
+    "fixture": {
+      "files": 7264383,
+      "expected_entries": 7297076,
+      "expected_subtree_entries": 100,
+      "directories": 32693,
+      "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+      "fixed_mtime": 1700000000,
+      "payload_block_fraction": 0.01,
+      "setup_seconds": 446.446695059
+    },
+    "identical_binaries": true,
+    "valid": true,
+    "issues": [],
+    "metrics": {
+      "elapsed_seconds": {
+        "baseline_median": 74.62968341400006,
+        "candidate_median": 74.3785301580001,
+        "paired_deltas": [
+          -0.2511532559999523
+        ],
+        "paired_percent_changes": [
+          -0.3365326563248394
+        ],
+        "median_paired_percent_change": -0.3365326563248394,
+        "max_abs_percent_change": 0.3365326563248394,
+        "max_abs_delta": 0.2511532559999523
+      },
+      "peak_rss_kib": {
+        "baseline_median": 1807064,
+        "candidate_median": 1806996,
+        "paired_deltas": [
+          -68
+        ],
+        "paired_percent_changes": [
+          -0.003763010053881022
+        ],
+        "median_paired_percent_change": -0.003763010053881022,
+        "max_abs_percent_change": 0.003763010053881022,
+        "max_abs_delta": 68
+      },
+      "app_disk_peak_bytes": {
+        "baseline_median": 2743390208,
+        "candidate_median": 2743386112,
+        "paired_deltas": [
+          -4096
+        ],
+        "paired_percent_changes": [
+          -0.00014930431653237264
+        ],
+        "median_paired_percent_change": -0.00014930431653237264,
+        "max_abs_percent_change": 0.00014930431653237264,
+        "max_abs_delta": 4096
+      }
+    },
+    "arms": [
+      {
+        "id": "p1-baseline-v1",
+        "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+        "binary_sha256": "083bde706e142cede8d400b0c5c6639257c1bf1ca36f9d181b5e30180ac966bb",
+        "elapsed_seconds": 74.62968341400006,
+        "rss_kib": 1807064,
+        "app_disk_peak_bytes": 2743390208,
+        "cgroup_peak_bytes": 2616336384,
+        "cgroup_cap_bytes": 4294967296,
+        "memory_endpoint": {
+          "anon": 8548352,
+          "file": 895811584,
+          "kernel": 27222016,
+          "slab_reclaimable": 26673432
+        },
+        "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "phases": {
+          "load_seconds": 37.992610382,
+          "walk_seconds": 0.002673233,
+          "finalize_seconds": 0.474165499,
+          "insert_seconds": 7.676769968,
+          "index_seconds": 13.184482618,
+          "publish_seconds": 0.102050277,
+          "total_seconds": 74.60924993
+        }
+      },
+      {
+        "id": "p1-candidate-v1",
+        "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+        "binary_sha256": "083bde706e142cede8d400b0c5c6639257c1bf1ca36f9d181b5e30180ac966bb",
+        "elapsed_seconds": 74.3785301580001,
+        "rss_kib": 1806996,
+        "app_disk_peak_bytes": 2743386112,
+        "cgroup_peak_bytes": 2618187776,
+        "cgroup_cap_bytes": 4294967296,
+        "memory_endpoint": {
+          "anon": 8548352,
+          "file": 895791104,
+          "kernel": 27234304,
+          "slab_reclaimable": 26669168
+        },
+        "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "phases": {
+          "load_seconds": 37.9628326,
+          "walk_seconds": 0.002529812,
+          "finalize_seconds": 0.473329926,
+          "insert_seconds": 7.622221249,
+          "index_seconds": 13.222379222,
+          "publish_seconds": 0.102905165,
+          "total_seconds": 74.35807489
+        }
+      }
+    ]
+  },
+  "profile": {
+    "policy": "profile-v2",
+    "valid_structure": true,
+    "issues": [],
+    "strict_summary": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 74.62968341400006,
+            "candidate": 74.3785301580001,
+            "delta": -0.2511532559999523
+          },
+          "peak_rss_kib": {
+            "baseline": 1807064,
+            "candidate": 1806996,
+            "delta": -68
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 2743390208,
+            "candidate": 2743386112,
+            "delta": -4096
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": -0.2511532559999523,
+          "max_abs_delta": 0.2511532559999523
+        },
+        "peak_rss_kib": {
+          "median_delta": -68,
+          "max_abs_delta": 68
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": -4096,
+          "max_abs_delta": 4096
+        }
+      },
+      "identical_binaries": true,
+      "measurement_protocol": "v1-single-operation-pairs-v3"
+    },
+    "original_hwm_monotonic_contract_pass": false,
+    "arms": {
+      "p1-baseline-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 1807268,
+            "hwm_kib": 1807064,
+            "delta_kib": -204
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [
+          {
+            "previous_phase": "refresh_after_names",
+            "phase": "refresh_after_nodes",
+            "before": 7297076,
+            "after": 14594152,
+            "buffer_changed": true
+          }
+        ],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000157514,
+            "hwm_kib": 7808,
+            "phase": "refresh_start",
+            "rss_kib": 7808
+          },
+          {
+            "elapsed_seconds": 38.211738638,
+            "hwm_kib": 1211744,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91593426,
+            "node_buffer_changed": false,
+            "node_capacity": 7297076,
+            "node_len": 7297076,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 1165268
+          },
+          {
+            "elapsed_seconds": 38.214623337,
+            "hwm_kib": 1211744,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91593426,
+            "node_buffer_changed": false,
+            "node_capacity": 7297076,
+            "node_len": 7297076,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 1165332
+          },
+          {
+            "elapsed_seconds": 38.215029426,
+            "hwm_kib": 1211744,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": false,
+            "node_capacity": 7297076,
+            "node_len": 7297076,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 1165332
+          },
+          {
+            "elapsed_seconds": 38.274353284,
+            "hwm_kib": 1798168,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": true,
+            "node_capacity": 14594152,
+            "node_len": 7297175,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 1798168
+          },
+          {
+            "elapsed_seconds": 38.277316419,
+            "hwm_kib": 1802756,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": false,
+            "node_capacity": 14594152,
+            "node_len": 7297175,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 1802756
+          },
+          {
+            "elapsed_seconds": 38.688578453,
+            "hwm_kib": 1807268,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": false,
+            "node_capacity": 14594152,
+            "node_len": 7297175,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 1807268
+          },
+          {
+            "elapsed_seconds": 46.381595801,
+            "hwm_kib": 1807064,
+            "phase": "index",
+            "rss_kib": 943728
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 1807064
+      },
+      "p1-candidate-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 1807264,
+            "hwm_kib": 1806996,
+            "delta_kib": -268
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [
+          {
+            "previous_phase": "refresh_after_names",
+            "phase": "refresh_after_nodes",
+            "before": 7297076,
+            "after": 14594152,
+            "buffer_changed": true
+          }
+        ],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000152615,
+            "hwm_kib": 7808,
+            "phase": "refresh_start",
+            "rss_kib": 7808
+          },
+          {
+            "elapsed_seconds": 38.179054813,
+            "hwm_kib": 1211548,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91593426,
+            "node_buffer_changed": false,
+            "node_capacity": 7297076,
+            "node_len": 7297076,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 1165264
+          },
+          {
+            "elapsed_seconds": 38.181822028,
+            "hwm_kib": 1211548,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91593426,
+            "node_buffer_changed": false,
+            "node_capacity": 7297076,
+            "node_len": 7297076,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 1165328
+          },
+          {
+            "elapsed_seconds": 38.182287106,
+            "hwm_kib": 1211548,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": false,
+            "node_capacity": 7297076,
+            "node_len": 7297076,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 1165328
+          },
+          {
+            "elapsed_seconds": 38.240804592,
+            "hwm_kib": 1798164,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": true,
+            "node_capacity": 14594152,
+            "node_len": 7297175,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 1798164
+          },
+          {
+            "elapsed_seconds": 38.243757544,
+            "hwm_kib": 1802752,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": false,
+            "node_capacity": 14594152,
+            "node_len": 7297175,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 1802752
+          },
+          {
+            "elapsed_seconds": 38.654932725,
+            "hwm_kib": 1807264,
+            "name_buffer_changed": false,
+            "name_capacity": 109051904,
+            "name_len": 91594039,
+            "node_buffer_changed": false,
+            "node_capacity": 14594152,
+            "node_len": 7297175,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 1807264
+          },
+          {
+            "elapsed_seconds": 46.293149451,
+            "hwm_kib": 1806996,
+            "phase": "index",
+            "rss_kib": 943492
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 1806996
+      }
+    },
+    "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate."
+  }
+}
