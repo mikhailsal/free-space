@@ -1,0 +1,85 @@
+{
+  "created_at": "2026-10-31T13:36:02.127298+00:00",
+  "owner_decision": "D18=A, actual user reply before dispatch",
+  "total_campaign_cap_runner_seconds": 21600,
+  "previous_completed_job_seconds": 8118,
+  "maximum_additional_runner_seconds": 11400,
+  "maximum_committed_including_plans_seconds": 19518,
+  "minimum_unreserved_seconds": 2082,
+  "source_scope": "one32-row child-batch candidate, global256slots/64KiB charged pending capacity; no W3 leaf shortcuts or larger SQLite cache",
+  "plans": [
+    {
+      "stage": "screen",
+      "io": "local",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "workers": 1,
+      "cpus": 2,
+      "maximum_job_seconds": 5700,
+      "timeout_minutes": 65,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "cache_policy": "cold after seed copy; AB/BA alternating; isolated read-only observers",
+      "baseline_product_revision": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
+      "id": "w4-control-v3-screen",
+      "comparison": "control",
+      "branch": "perf/representative-gh-bench",
+      "revision": "a48ba0d828d6441697482cbfb9d06d96086fd182",
+      "forecast_seconds": 1800,
+      "run_id": 41206306054,
+      "dispatched_revision": "a48ba0d828d6441697482cbfb9d06d96086fd182",
+      "status": "in_progress"
+    },
+    {
+      "stage": "screen",
+      "io": "local",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "workers": 1,
+      "cpus": 2,
+      "maximum_job_seconds": 5700,
+      "timeout_minutes": 65,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "cache_policy": "cold after seed copy; AB/BA alternating; isolated read-only observers",
+      "baseline_product_revision": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
+      "id": "w4-candidate-v3-screen",
+      "comparison": "candidate",
+      "branch": "perf/v1-child-batches",
+      "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
+      "forecast_seconds": 2400,
+      "depends_on": "valid w4-control-v3-screen plus renewed time admission"
+    }
+  ],
+  "stop_rules": [
+    "No retries or full-scale expansion",
+    "Control must be valid before candidate dispatch",
+    "All setup/build/observer/failure job time counts",
+    "Invalid control or time admission failure stops candidate dispatch",
+    "No promotion from screening; fixed15pct speed/no-regression gates unchanged"
+  ],
+  "forecast_basis": {
+    "control_run": 41196033116,
+    "control_job_seconds": 1166,
+    "candidate_reference_run": 41197637087,
+    "candidate_reference_job_seconds": 1282,
+    "forecast_method": "Conservative whole-job allowances1800/2400s for stronger observer and full Rust test/build overhead; plus30pct must fit65min measured cap",
+    "control_with_margin_seconds": 2340,
+    "candidate_with_margin_seconds": 3120,
+    "measured_step_cap_seconds": 3900
+  }
+}

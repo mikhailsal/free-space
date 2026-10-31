@@ -2,7 +2,7 @@
 
 Status: source candidate prepared in `perf/v1-child-batches`, based on d8b6046.
 No W4 Rust tests, GH jobs, timing or resource improvements are claimed. Runner
-allocation is pending; D17 authorized W3 only. The candidate does not include the
+allocation is accepted by owner D18=A; D17 authorized W3 only. The candidate does not include the
 rejected W3 leaf SELECT/UPDATE changes.
 
 Normal pre-push checks passed after fixing a test-function length violation:
@@ -70,7 +70,7 @@ staged tests retain raw-name, hardlink, root-order, denied/mount and reserve-fai
 coverage. Full Rust workspace tests and normal repository gates must pass on GH
 before any performance interpretation. A source review cannot replace execution.
 
-## Proposed runner allocation — not dispatched
+## Runner allocation — D18 accepted
 
 Use only the unused portion of the same initial six aggregate runner-hours:
 13,482 seconds remain after W1/W3. Reserve **two screening jobs, 5,700 aggregate
@@ -95,10 +95,12 @@ cannot qualify release: full-scale controls/confirmation, resource-budget sweeps
 changed/large refresh guards and sampling sensitivity remain separate obligations.
 Do not pool the two source candidates' hashes or move acceptance thresholds.
 
-## Owner decision D18 — pending
+## Owner decision D18 — accepted A
 
-The only new owner choice is scope allocation: permit these two bounded W4
-screening jobs within the existing remainder, or stop the first campaign after
-W3. Internal batch limits and fallback mechanics are reviewable implementation
+The owner chose A before dispatch: permit these two bounded W4 screening jobs
+within the existing remainder. The alternative was to stop after W3. Exact
+revisions and time envelopes are frozen in the
+[screening manifest](../benchmark-results/v1-w4-screening-manifest-2026-10-31.json).
+Internal batch limits and fallback mechanics are reviewable implementation
 choices within approved W4 scope. This proposal does not request a larger total
 time cap or any relaxation of the 15% benefit/no-regression gates.

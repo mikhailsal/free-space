@@ -1,7 +1,7 @@
 {
   "campaign": "v1-w1-baseline-20261031",
   "aggregate_cap_runner_seconds": 21600,
-  "scope": "initial harness/baseline controls plus prepared W3 leaf SQL candidate (owner D17), unchanged total cap",
+  "scope": "initial W1 controls plus W3 leaf SQL (D17) and two bounded W4 child-batch screening jobs (D18); unchanged six-hour total cap",
   "paid_compute": false,
   "run_ids": [
     41194616353,
@@ -14,7 +14,8 @@
     41197635230,
     41197637087,
     41199678638,
-    41200958293
+    41200958293,
+    41206306054
   ],
   "runs": [
     {
@@ -163,14 +164,46 @@
       "conclusion": "success",
       "completed_job_seconds": 141.0,
       "job_seconds": 141.0
+    },
+    {
+      "stage": "screen",
+      "io": "local",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "workers": 1,
+      "cpus": 2,
+      "maximum_job_seconds": 5700,
+      "timeout_minutes": 65,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "cache_policy": "cold after seed copy; AB/BA alternating; isolated read-only observers",
+      "baseline_product_revision": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
+      "id": "w4-control-v3-screen",
+      "comparison": "control",
+      "branch": "perf/representative-gh-bench",
+      "revision": "a48ba0d828d6441697482cbfb9d06d96086fd182",
+      "forecast_seconds": 1800,
+      "run_id": 41206306054,
+      "status": "in_progress",
+      "conclusion": "",
+      "completed_job_seconds": 60.0,
+      "owner_allocation": "D18",
+      "purpose": "Current-observer 1m same-binary control before child-batch candidate"
     }
   ],
   "accounting": "Sum all job started-to-completed durations, including setup, failures and concurrent jobs. Queued jobs reserved by timeout envelope. Do not treat six hours as money or free-minute quota.",
-  "updated_at": "2026-10-31T12:48:03.436375+00:00",
-  "completed_job_seconds": 8118.0,
-  "maximum_committed_seconds": 8118.0,
-  "remaining_unreserved_seconds": 13482.0,
-  "candidate_branch": "perf/v1-leaf-fast-path",
+  "updated_at": "2026-10-31T13:38:06.953590+00:00",
+  "completed_job_seconds": 8178.0,
+  "maximum_committed_seconds": 19518.0,
+  "remaining_unreserved_seconds": 2082.0,
+  "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
       "screening_run_id": 41196033116,
@@ -193,11 +226,56 @@
       "limitations": "Initial linear projection; memory/cache/device nonlinearities can exceed it. Timeout is invalid evidence, not a successful shortened workload."
     }
   ],
-  "planned_next_dispatches": [],
+  "planned_next_dispatches": [
+    {
+      "stage": "screen",
+      "io": "local",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "scenario": "unchanged",
+      "refresh_subtree_entries": 100,
+      "memory_mib": 4096,
+      "workers": 1,
+      "cpus": 2,
+      "maximum_job_seconds": 5700,
+      "timeout_minutes": 65,
+      "measurement_protocol": "v1-single-operation-pairs-v3",
+      "cache_policy": "cold after seed copy; AB/BA alternating; isolated read-only observers",
+      "baseline_product_revision": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
+      "id": "w4-candidate-v3-screen",
+      "comparison": "candidate",
+      "branch": "perf/v1-child-batches",
+      "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
+      "forecast_seconds": 2400,
+      "depends_on": "valid w4-control-v3-screen plus renewed time admission"
+    }
+  ],
   "candidate_disposition": {
     "decision": "not_promoted",
     "reason": "1m paired median gain 14.2877%; exploratory 7.3m pair gain 11.9174%; both below fixed 15% speed-only floor. No disk or RAM benefit route demonstrated.",
     "further_W3_dispatches": 0,
-    "full_qualification": false
+    "full_qualification": false,
+    "candidate": "W3 combined leaf SQL"
+  },
+  "owner_D18": {
+    "answer": "A",
+    "status": "accepted before dispatch",
+    "maximum_new_jobs": 2,
+    "maximum_additional_seconds": 11400,
+    "automatic_retry": false,
+    "full_scale_expansion": false
+  },
+  "planned_reserved_seconds": 5700,
+  "previous_candidate_branch": "perf/v1-leaf-fast-path",
+  "current_candidate": {
+    "name": "W4 child batches",
+    "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
+    "status": "awaiting current-observer control before candidate dispatch",
+    "owner_allocation": "D18"
   }
 }
