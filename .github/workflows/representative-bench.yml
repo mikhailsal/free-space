@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/representative-bench.yml
       - scripts/bench*.py
+      - scripts/summarize-v2-container.py
       - scripts/bench-representative.sh
       - scripts/bench-v2-container/**
       - scripts/tests/test_bench*.py
