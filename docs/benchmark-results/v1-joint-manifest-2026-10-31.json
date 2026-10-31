@@ -1,6 +1,6 @@
 {
   "created_at": "2026-10-31T19:07:00.263565+00:00",
-  "candidate_revision": "2599947cae2c074234bd570955e3dfe565388c79",
+  "candidate_revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
   "product_baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
   "source_review": "v1-joint-source-reviews-2026-10-31.json",
   "plans": [
@@ -19,8 +19,8 @@
       "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "campaign_cap_seconds": 216000,
       "id": "joint-matched-control-screen",
-      "branch": "perf/v1-qualification-harness",
-      "revision": "8aa634532097154447b13850331fd577fdf5d029",
+      "branch": "perf/v1-runner-disk-prep",
+      "revision": "e0669801ef5dc0fb8cf3bef89f72aaec06489bf7",
       "stage": "screen",
       "files": 1000000,
       "expected_entries": 1004499,
@@ -30,11 +30,12 @@
         "refresh"
       ],
       "timeout_minutes": 55,
-      "maximum_job_seconds": 5100,
+      "maximum_job_seconds": 5400,
       "forecast_seconds": 2400,
-      "status": "conditional_runner_preparation_fix",
-      "depends_on": "All three protocol cases must pass strict/profile validation. The third stopped before allocation for insufficient host disk. A reviewed prospective SDK cleanup policy and newly admitted source/case are required before expansion; no blind retry.",
-      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization"
+      "status": "admitted_not_dispatched",
+      "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
+      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization",
+      "runner_preparation_policy": "sdk-space-v1"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -52,7 +53,7 @@
       "campaign_cap_seconds": 216000,
       "id": "joint-candidate-screen",
       "branch": "perf/v1-joint-qualification",
-      "revision": "2599947cae2c074234bd570955e3dfe565388c79",
+      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
       "stage": "screen",
       "files": 1000000,
       "expected_entries": 1004499,
@@ -62,11 +63,12 @@
         "refresh"
       ],
       "timeout_minutes": 55,
-      "maximum_job_seconds": 5100,
+      "maximum_job_seconds": 5400,
       "forecast_seconds": 2400,
-      "status": "conditional_runner_preparation_fix",
-      "depends_on": "All three protocol cases must pass strict/profile validation. The third stopped before allocation for insufficient host disk. A reviewed prospective SDK cleanup policy and newly admitted source/case are required before expansion; no blind retry.",
-      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization"
+      "status": "admitted_not_dispatched",
+      "depends_on": "All protocol smoke cases validated, actual baseline artifact identity verified, reviewed current source and normal hooks pass. Full workspace tests run before measurement on GitHub.",
+      "purpose": "Fresh three-pair screen; control is source-equivalent rebuilt binaries, not optimization",
+      "runner_preparation_policy": "sdk-space-v1"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -84,7 +86,7 @@
       "campaign_cap_seconds": 216000,
       "id": "joint-full-scan-exploratory",
       "branch": "perf/v1-joint-qualification",
-      "revision": "2599947cae2c074234bd570955e3dfe565388c79",
+      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
       "stage": "local-scale",
       "files": 7264383,
       "expected_entries": 7297076,
@@ -93,11 +95,12 @@
         "scan"
       ],
       "timeout_minutes": 120,
-      "maximum_job_seconds": 9000,
+      "maximum_job_seconds": 9300,
       "forecast_seconds": null,
-      "status": "conditional_screen_pending",
-      "depends_on": "Valid matched controls and joint screening with at least 15% scan gain and attributed refresh RSS reduction, without a confirmed regression in the four metrics. An inconclusive H2 guard permits only this bounded scale investigation. Before dispatch, freeze a complete-step case forecast plus 30% margin within 7200 seconds and recheck the aggregate budget.",
-      "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification"
+      "status": "conditional_screen_and_memory_priority",
+      "depends_on": "Valid matched controls and joint screen with useful gain and no confirmed regression. Prioritize the accepted full-scan memory ladder before more full-scale work. Freeze the matching whole-step forecast plus 30% margin within 7200 seconds and recheck aggregate admission before dispatch. One pair is exploratory only.",
+      "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification",
+      "runner_preparation_policy": "sdk-space-v1"
     },
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -115,7 +118,7 @@
       "campaign_cap_seconds": 216000,
       "id": "joint-full-refresh-exploratory",
       "branch": "perf/v1-joint-qualification",
-      "revision": "2599947cae2c074234bd570955e3dfe565388c79",
+      "revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
       "stage": "local-scale",
       "files": 7264383,
       "expected_entries": 7297076,
@@ -124,14 +127,15 @@
         "refresh"
       ],
       "timeout_minutes": 120,
-      "maximum_job_seconds": 9000,
+      "maximum_job_seconds": 9300,
       "forecast_seconds": null,
-      "status": "conditional_screen_pending",
-      "depends_on": "Valid matched controls and joint screening with at least 15% scan gain and attributed refresh RSS reduction, without a confirmed regression in the four metrics. An inconclusive H2 guard permits only this bounded scale investigation. Before dispatch, freeze a complete-step case forecast plus 30% margin within 7200 seconds and recheck the aggregate budget.",
-      "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification"
+      "status": "conditional_screen_and_memory_priority",
+      "depends_on": "Valid matched controls and joint screen with useful gain and no confirmed regression. Prioritize the accepted full-scan memory ladder before more full-scale work. Freeze the matching whole-step forecast plus 30% margin within 7200 seconds and recheck aggregate admission before dispatch. One pair is exploratory only.",
+      "purpose": "Single full-scale exploratory pair, insufficient for three-pair qualification",
+      "runner_preparation_policy": "sdk-space-v1"
     }
   ],
-  "maximum_runner_seconds": 28200,
+  "maximum_runner_seconds": 29400,
   "campaign_cap_seconds": 216000,
   "stop_rules": [
     "No promotion from screen/onefullpair orhistoricalgains",
@@ -139,5 +143,8 @@
     "Actual baselineSHA mustmatch freshSDEcontrols; no artifactnormalization orruntimeequivalenceassumption",
     "Freeze measuredcaseforecast andrenewaggregateadmission beforeeachfullrun",
     "Remaining requiredfoldercases, comprehensivechanged scenario, I/Oprofile andsuccessfulmemorybudgets remain separate prospectivequalification, no blind sweep"
-  ]
+  ],
+  "previous_source_revision": "2599947cae2c074234bd570955e3dfe565388c79",
+  "integration_source_review": "v1-joint-source-reviews-2026-10-31.json",
+  "updated_at": "2026-10-31T20:08:26.122633+00:00"
 }

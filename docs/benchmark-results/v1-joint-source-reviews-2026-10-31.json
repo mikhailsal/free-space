@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-31T19:07:00.263565+00:00",
   "scope": "Distinct joint configuration: exact refresh capacity plus leaf fast path and32-row directory batching WITHOUT eager ancestor eviction",
-  "candidate_revision": "2599947cae2c074234bd570955e3dfe565388c79",
+  "candidate_revision": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
   "product_baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
   "source_hashes": {
     "base_qc": "8aa634532097154447b13850331fd577fdf5d029",
@@ -14,7 +14,7 @@
       "core/src/scan/staged/write/batch.rs": "8ec0d43b301403731d27a9f855c156cf90df3392bfaa2fba04543b2c4ad551af",
       "core/src/scan/staged/write/batch/tests.rs": "1e72bdcb0ad211a763455de76c0f4b61f6ec55458d1aba98351eaa443043d9c4",
       "core/src/scan/staged/write/tests.rs": "dabf263b2c76b24748aa15ada2e11581563aceab297ac765c1e06c977426161c",
-      "core/tests/staged.rs": "455efb8ba009d64752acf7130b931721b9d7a5e288d200e1d62f3345dd7ad464"
+      "core/tests/staged.rs": "2b3561d12a76050f463625897e1558739326fc61a5d30ad7a2d3038ba90c8058"
     }
   },
   "requested_model": "claude-opus-5-5",
@@ -220,5 +220,173 @@
     "New fast/staged snapshot refresh differential includes nested/cross-boundary links and denied paths plus current/previous generation facts",
     "Actualprofileparser reviewed: boundaries are point samples only, no load-onlyinterval inference; walkedsub/liveheadroom/chronology explicit. No fake markers or retrospective attribution",
     "Earlier f04/d1 gains are not summed; the joint variant requires new measurements"
-  ]
+  ],
+  "previous_source_freeze": {
+    "revision": "2599947cae2c074234bd570955e3dfe565388c79",
+    "source_hashes": {
+      "base_qc": "8aa634532097154447b13850331fd577fdf5d029",
+      "product_baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "files": {
+        "core/src/refresh.rs": "f1f3c7b8ba8fd4d9bf2f0cfad9de536e8347ebf4a69817928b3a9d1096d0f4d8",
+        "core/src/refresh/load.rs": "f0133db05f40e0d9680bcf476d56f9ef5b27c3159c54f72f12fe4dd97fae9b89",
+        "core/src/refresh/load/tests.rs": "4c558f0eed626bc42ede59beb88c3cd046e0cef1d53ffa597a4054f31a96af79",
+        "core/src/scan/staged/write.rs": "dc12b7b4c9deeb9aeb93f285674d0ccb05954ff716d50e2563a76d58798dee04",
+        "core/src/scan/staged/write/batch.rs": "8ec0d43b301403731d27a9f855c156cf90df3392bfaa2fba04543b2c4ad551af",
+        "core/src/scan/staged/write/batch/tests.rs": "1e72bdcb0ad211a763455de76c0f4b61f6ec55458d1aba98351eaa443043d9c4",
+        "core/src/scan/staged/write/tests.rs": "dabf263b2c76b24748aa15ada2e11581563aceab297ac765c1e06c977426161c",
+        "core/tests/staged.rs": "455efb8ba009d64752acf7130b931721b9d7a5e288d200e1d62f3345dd7ad464"
+      }
+    }
+  },
+  "integration_hashes": {
+    "head": "4591856f7e1f66a00a8ef70874fb1046fa8c428d",
+    "files": {
+      ".github/workflows/representative-bench.yml": "a22259f1adfbb0e4f72e3c7e2d56eb7396e3d772d3add44ddadb8e97fca7044d",
+      "core/src/refresh.rs": "f1f3c7b8ba8fd4d9bf2f0cfad9de536e8347ebf4a69817928b3a9d1096d0f4d8",
+      "core/src/refresh/load.rs": "f0133db05f40e0d9680bcf476d56f9ef5b27c3159c54f72f12fe4dd97fae9b89",
+      "core/src/refresh/load/tests.rs": "4c558f0eed626bc42ede59beb88c3cd046e0cef1d53ffa597a4054f31a96af79",
+      "core/src/scan/staged/write.rs": "dc12b7b4c9deeb9aeb93f285674d0ccb05954ff716d50e2563a76d58798dee04",
+      "core/src/scan/staged/write/batch.rs": "8ec0d43b301403731d27a9f855c156cf90df3392bfaa2fba04543b2c4ad551af",
+      "core/src/scan/staged/write/batch/tests.rs": "1e72bdcb0ad211a763455de76c0f4b61f6ec55458d1aba98351eaa443043d9c4",
+      "core/src/scan/staged/write/tests.rs": "dabf263b2c76b24748aa15ada2e11581563aceab297ac765c1e06c977426161c",
+      "core/tests/staged.rs": "2b3561d12a76050f463625897e1558739326fc61a5d30ad7a2d3038ba90c8058",
+      "scripts/bench-representative.sh": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+      "scripts/bench_v1_admission.py": "a9841c7ec8f15e75dd5fe454a2837fb6bd385f42e2ad38833d66d83be4de0d64",
+      "scripts/bench_v1_pair.py": "a350488a8b52a6548aa5e147456f8654891097245398d01a84b06ef0e8f02bcb",
+      "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+      "scripts/bench_v1_summary.py": "2ad0a6de273ee28d89df9364db35a3481f0a4878783667f21add8ddb7c70e153",
+      "scripts/tests/test_bench_v1_admission.py": "bc0c3668ab997cd259ac352d2b5859d1426b51ffa4c2b65ccdaed0d926ba9be2",
+      "scripts/tests/test_bench_v1_runner_prepare.py": "6edc0654184977c7072b0a37934d3cbfa5035f2de9e66fef86fd99fe2aab2759",
+      "scripts/tests/test_bench_v1_runtime.py": "f956b3eabf4b1d828774a1044c38ac1fb325be764b5e3548d0c769d0c9046ded",
+      "scripts/tests/test_bench_v1_summary.py": "cb7ad979eeaffb45bd78ad787ff6614cb38f3d606c2bd1a51bd78684e111d838"
+    }
+  },
+  "runner_preparation_review": "v1-runner-preparation-source-reviews-2026-10-31.json",
+  "timestamp_review_chain": [
+    {
+      "file": "freespace-joint-timestamp-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "# Review: test-only refresh timestamp fix (`core/tests/staged.rs`)\n\n**Verdict: no blocking defects. One medium finding: the \"untouched leaves keep seed times\" assertion is mostly vacuous.** Nothing was compiled or run; the compile notes below come from reading the code.\n\n## Finding\n\n### 1. The leaf-preservation assertion rarely tests anything (medium, meaningful assertions)\n\nIn `refresh_timestamps_are_bounded_and_untouched_leaves_keep_seed_times`, these steps usually all happen within the same wall-clock second:\n\n- the second `scan`\n- capturing `before_leaves`\n- `run_refresh`\n\n`now_secs()` truncates to whole seconds, so the timestamps will match even if the code is broken. Suppose a regression made refresh restamp every loaded node with `started`, or recompute `min_scanned_at` from `now`. Then `assert_eq!(rows(&current, sql), before_leaves)` would still pass on almost every run. It would only fail when a second boundary happens to fall between the scan and the refresh.\n\nSo the test name promises more than the test reliably checks. The bounded-timestamp half of the test does not have this problem.\n\n**Suggested fix:** before calling `run_refresh`, wait until `platform::now_secs()` is greater than the largest `scanned_at` in `before_leaves`. For example, sleep 50 ms in a loop until it is. This costs at most about 1 s per loop iteration, so about 2 s in total. After that, a restamping regression would fail every time.\n\nIt would also help to assert that the refresh-row `timestamp` is greater than each leaf's `scanned_at`. That proves the two values are actually distinguishable in the run.\n\n## Checked and fine\n\n- **`assert_equivalent` change is correct and removes a real flake.** `staged_and_fast_seed_refresh_match_nested_links_and_denied` runs the fast refresh and the disk refresh one after the other. `refreshes.scanned_at` is set from `started = platform::now_secs()` in `refresh_locked`. With the old `SELECT *`, the test failed whenever the two refreshes landed on opposite sides of a second boundary. Comparing only `path,generation` keeps the structural check. The timestamp is now covered by the new test instead.\n- **Bounded timestamp check is sound.** `started` is captured inside `refresh_locked`, after the lock and snapshot open. That is strictly between the test's `before` and `after` calls, and all three use the same `now_secs()`. The only way this flakes is a backward wall-clock step, such as an NTP step, mid-test. That is negligible.\n- **History row assertions.** The test checks for exactly one row, the path as `Value::Blob` of the raw bytes, and `generation == report.generation`. These match `refresh_meta`: the seed snapshot comes from a full scan, so it has no prior refresh rows, and exactly one row is pushed. The missing `ORDER BY` doesn't matter with a single row.\n- **The `prev` byte-equality check is meaningful.** It verifies that refresh does not rotate `prev`, as the `run_refresh` module docs state. Nothing in the refresh path touches `dir.prev()`.\n- **`before_leaves.len() == 2` guards the BLOB `CAST` filter.** If `name` were stored as TEXT, the query would match nothing, and this assertion would catch it instead of the test passing on two empty vectors.\n- **Compile:** `let Value::Integer(timestamp) = history[0][2] else { ... }` only binds a `Copy` `i64` from an indexed place, so nothing is moved and this is fine. `report.generation as i64` and `RangeInclusive<i64>::contains` are fine too. **One thing I could not confirm:** that `platform` is a `pub mod` of `freespace_core`. The source shown only uses it as `crate::platform`. If it is crate-private, the new test will not compile.\n- **Limits:** the file is about 420 lines, under the 1000-line test limit. The new test function is about 44 lines, under 80. Its nesting is fine, and the formatting looks rustfmt-clean.\n- **No new regressions:** each `low_memory` iteration uses its own snapshot dir. The tree is not modified between iterations. Snapshots are dropped before `run_refresh`, so there is no lock or mapping interference.",
+        "session_id": "a0d0ef02-c595-4429-b342-0190f269e725",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 26077,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 3817,
+          "output_tokens_details": {
+            "thinking_tokens": 2352
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 26077,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 3817,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 26077,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 26077
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 3817,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 26077,
+            "webSearchRequests": 0,
+            "costUSD": 0.2852628,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 2352,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 26077,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    },
+    {
+      "file": "freespace-joint-timestamp-final-review.json",
+      "response": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "NO_FINDINGS",
+        "session_id": "024cc725-825a-4030-a501-657f11be1db5",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 28622,
+          "cache_read_input_tokens": 1494,
+          "output_tokens": 1250,
+          "output_tokens_details": {
+            "thinking_tokens": 1239
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 28622,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 1250,
+              "cache_read_input_tokens": 1494,
+              "cache_creation_input_tokens": 28622,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 28622
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1250,
+            "cacheReadInputTokens": 1494,
+            "cacheCreationInputTokens": 28622,
+            "webSearchRequests": 0,
+            "costUSD": 0.25428280000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1239,
+            "cacheCreationEphemeral5mInputTokens": 0,
+            "cacheCreationEphemeral1hInputTokens": 28622,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      }
+    }
+  ],
+  "timestamp_disposition": "Input snapshots are aged coherently before refresh. Untouched stored times remain exact, new refresh times are bounded, and previous bytes remain unchanged. Final requested Opus review NO_FINDINGS; normal hooks and 59 Python integration tests passed; no Rust tests executed locally."
 }

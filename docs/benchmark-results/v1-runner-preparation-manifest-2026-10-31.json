@@ -31,9 +31,18 @@
       "preparation_target_gib": 44,
       "dedicated_volume_gib": 40,
       "actual_expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "status": "admitted_not_dispatched",
+      "status": "completed",
       "depends_on": "Published reviewed immutable preparation source, mechanical final diagnostic fix and normal hooks completed. Precheck still refuses insufficient bytes; no repeat of the failed old source.",
-      "purpose": "Prospective infrastructure and large-folder protocol verification. Application source unchanged; no optimization or minimum full-scale RAM claim."
+      "purpose": "Prospective infrastructure and large-folder protocol verification. Application source unchanged; no optimization or minimum full-scale RAM claim.",
+      "run_id": 41236396792,
+      "conclusion": "success",
+      "created_at": "2026-10-31T19:54:37Z",
+      "head_sha_verified": true,
+      "receipt_validation": "Valid strict summary and profile-v2 structure",
+      "aggregate_job_seconds": 365,
+      "actual_binary_identity": true,
+      "receipt": "v1-runner-preparation-smoke-2026-10-31.json",
+      "sdk_deletion_exercised": false
     }
   ],
   "campaign_cap_seconds": 216000,
@@ -44,5 +53,6 @@
     "Strict ordinary success, observer, profile and actual baseline artifact identity required before expanding",
     "Record acted/duration/available-byte delta and host filesystem. Compare arms within the sameVM; crossVM setup time is only an admission forecast",
     "Full scan total memory is the next resource priority. RSS-only refresh savings do not establish lower memory requirements for scan"
-  ]
+  ],
+  "smoke_disposition": "Protocol passed on a runner already above target. SDK deletion and its duration remain unmeasured; every later runner still has to pass the live floor."
 }

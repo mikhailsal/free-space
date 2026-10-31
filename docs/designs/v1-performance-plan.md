@@ -64,11 +64,23 @@ combines these mechanisms and removes eager ancestor-batch eviction after source
 review found repeated-read risk on deep trees. Its final requested Opus review
 and normal hooks pass; new GitHub tests and measurements remain necessary.
 Two protocol smokes verify actual binary identity across builds with a fixed
-source epoch. The third stopped before fixture allocation on a different runner
-image with only 14 GiB free against the unchanged 42 GiB admission requirement.
-Its failure receipts are preserved. A separately reviewed prospective runner
-preparation policy is required before retry or larger expansion. This is an
-infrastructure failure, with no large-folder performance or memory result.
+source epoch. The original third case stopped before fixture allocation on a
+different runner image with only 14 GiB free against the unchanged 42 GiB floor;
+its failure receipts are preserved. The reviewed preparation policy and
+[revised smoke](../benchmark-results/v1-runner-preparation-smoke-2026-10-31.md)
+pass strict receipts and actual binary identity. That runner already had
+85.55 GiB free, so SDK deletion and its duration remain untested. Every later
+runner must still pass live admission.
+
+The owner explicitly clarified that total RAM during full scan is a priority,
+separate from refresh RSS. The [memory audit](../benchmark-results/v1-fullscan-total-memory-audit-2026-10-31.md)
+records both 4 GiB ceiling-censored peaks, approximately 34 MiB CLI RSS and exact
+post-command file/kernel counters without pretending they decompose the earlier
+peak. The [preregistered ladder](../benchmark-results/v1-fullscan-memory-grid-manifest-2026-10-31.json)
+uses fresh matched controls and the joint source at 4 GiB, then conditionally
+2 GiB, 1 GiB and 512 MiB on the 1m fixture. A lower cap alone is a pressure
+experiment; a genuine memory optimization needs matched source and capacity
+evidence. No minimum requirement or full-scan RAM improvement is claimed yet.
 
 Local calibration and the requested `claude-opus-5-5` outside reviews are complete.
 D16 permits test-host backend switching without certifying a production release
