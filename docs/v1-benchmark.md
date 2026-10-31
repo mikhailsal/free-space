@@ -1,7 +1,11 @@
 # Paired v1 benchmark protocol
 
-Protocol `v1-single-operation-pairs-v2` includes the mandatory outer-runner
-cleanup receipt. Early v1-protocol runs remain pre-hardening evidence only.
+Protocol `v1-single-operation-pairs-v3` includes the mandatory outer-runner
+cleanup receipt and uses the maximum stored seed observation time as its
+normalization cutoff. The later d8b6046 observer also asserts streaming subtree,
+freshness-minimum and newest-file invariants before normalization. Record source
+SHA as well as protocol: older runs did not execute later observer assertions.
+Protocol-v2 results and early pre-hardening evidence remain separately labelled.
 
 W1 extends the existing GitHub-hosted representative runner. Run it only on an
 ephemeral standard Ubuntu VM. The guard rejects local execution, including host
@@ -10,8 +14,9 @@ cache flushing, fixture generation and Docker measurements.
 The `Representative scanner benchmark` workflow defaults to a 100k-file smoke
 control on push. Manual stages are `smoke`, `screen` (1m files, three pairs each
 for scan and refresh), and `local-scale` (~7.3m entries, one scan pair). Large runs
-require a positive screening-based whole-job forecast that fits 120 minutes with
-30% margin. Source and fixture counts are recorded; mixed directory structure
+require a positive screening-based whole-job forecast plus 30% margin within the
+selected measured-step cap (at most 120 minutes). `timeout_minutes` may lower the
+cap before dispatch. Source and fixture counts are recorded; mixed directory structure
 means total entries exceed the requested file count.
 
 `comparison=control` uses byte-identical binaries for both arms. It estimates
@@ -29,7 +34,8 @@ memory/I/O/time. Full-file hashes check observer immutability. SQLite quick chec
 row counts and streaming semantic hashes compare current and previous generations.
 Generated snapshot IDs/timing and changing filesystem-capacity observations are normalized;
 untouched timestamps, generations, IDs, hardlink records and content stay exact.
-New observation timestamps are normalized relative to the seed timestamp. This is
+New observation timestamps are normalized above the maximum seed timestamp,
+after checking exact untouched observations and aggregate relationships. This is
 a baseline-v1-refresh oracle, not a fresh-full-scan replacement for refresh policy.
 
 Application peak disk includes case current/previous/output/staging/temp allocation.
@@ -58,9 +64,16 @@ The initial campaign has six aggregate runner-hours, including builds, setup,
 failures and concurrent jobs. This is an experiment-duration cap: standard hosted
 compute for this public repository is free. The operator records each run's job
 usage before another dispatch. No automatic retry or complete Cartesian sweep is
-allowed. Smoke, screen and one local-scale dispatch have maximum job envelopes
-of 60, 95 and 150 minutes respectively; repeated/failed runs consume that same cap.
+allowed. Default smoke, screen and one local-scale dispatch have maximum aggregate
+job envelopes of 60, 95 and 150 minutes respectively, including a 25-minute build
+and five minutes around the measured step. A lower dispatch cap bounds both the
+paired step and job. Repeated/failed runs consume that same campaign cap.
 If no remaining admissible budget exists, retain the evidence and stop.
+
+The [first campaign](benchmark-results/v1-w1-w3-campaign-2026-10-31.md) used
+2 h 15 min 18 s, including the D17 leaf SQL candidate. That candidate was not
+promoted: 14.29% screening and 11.92% exploratory full-scale scan gains missed the
+fixed 15% floor. No new runner campaign is implied by unused time.
 
 Current limitations: changed-refresh is supported by the entry point but is not
 part of the initial workflow dispatch; the 100-entry folder and 4 GiB budget are
