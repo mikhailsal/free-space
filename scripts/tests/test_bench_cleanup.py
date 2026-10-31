@@ -26,7 +26,15 @@ if [[ $TEST_MODE == producer-stuck || $TEST_MODE == producer-needs-kill ]]; then
 producer_killed=false
 benchmark_label=freespace.benchmark=test-owned-run
 touch "$output/mounted"
-timeout() { shift 2; "$@"; }
+timeout() {
+  if [[ $3 == sync ]]; then echo "timeout $*" >> "$output/calls"; fi
+  shift 2
+  "$@"
+}
+sync() {
+  echo "sync $*" >> "$output/calls"
+  [[ ! -e $volume/disk.img && $TEST_MODE != sync-fail ]]
+}
 sleep() { :; }
 kill() {
   if [[ $1 == -0 ]]; then
@@ -75,9 +83,12 @@ sudo() {
         self.assertEqual(calls[:3], [
             "docker ps -aq --filter label=freespace.benchmark=test-owned-run",
             "docker rm -f owned-a", "docker rm -f owned-b"])
-        self.assertEqual(len(calls), 5)
+        self.assertEqual(len(calls), 7)
         self.assertTrue(calls[3].startswith("sudo umount "))
         self.assertEqual(calls[4], "sudo losetup -d /dev/mock-loop")
+        self.assertTrue(calls[5].startswith("timeout --kill-after=2s 15s sync -f -- "))
+        self.assertTrue(calls[6].startswith("sync -f -- "))
+        self.assertEqual(calls[5].removeprefix("timeout --kill-after=2s 15s "), calls[6])
         self.assertIn("cleanup final_status=0", receipt)
 
     def test_list_failure_preserves_volume(self):
@@ -96,8 +107,16 @@ sudo() {
     def test_normal_empty_cleanup_still_unmounts(self):
         result, calls, _ = self.run_cleanup("empty")
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 5)
         self.assertTrue(calls[1].startswith("sudo umount "))
+
+    def test_sync_failure_reports_failure_after_storage_release(self):
+        result, calls, receipt = self.run_cleanup("sync-fail")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(calls[4], "sudo losetup -d /dev/mock-loop")
+        self.assertTrue(calls[5].startswith("timeout --kill-after=2s 15s sync -f -- "))
+        self.assertTrue(calls[6].startswith("sync -f -- "))
+        self.assertIn("cleanup final_status=1", receipt)
 
     def test_failed_unmount_or_detach_preserves_backing(self):
         for mode in ("umount-fail", "detach-fail"):
