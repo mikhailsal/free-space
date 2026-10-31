@@ -58,6 +58,54 @@ def normalize(table, columns, row, cutoff):
     return result
 
 
+class EntryValidator:
+    """Validate preorder intervals and aggregate extrema using O(depth) state."""
+    def __init__(self, columns):
+        self.index = {name: columns.index(name) for name in (
+            "id", "parent_id", "kind", "items", "subtree_end", "scanned_at",
+            "min_scanned_at", "mtime", "newest_mtime")}
+        self.stack = []
+        self.next_id = 0
+
+    def close(self, last_id):
+        frame = self.stack.pop()
+        if frame["end"] != last_id or frame["items"] != frame["end"] - frame["id"]:
+            raise ValueError("invalid subtree interval or items")
+        if frame["stored_min"] != frame["minimum"]:
+            raise ValueError("invalid freshness minimum")
+        newest = frame["newest"]
+        if frame["stored_newest"] != (0 if newest is None or newest == -(1 << 63) else newest):
+            raise ValueError("invalid newest file mtime")
+        if self.stack:
+            parent = self.stack[-1]
+            parent["minimum"] = min(parent["minimum"], frame["minimum"])
+            if newest is not None:
+                parent["newest"] = newest if parent["newest"] is None else max(parent["newest"], newest)
+
+    def add(self, row):
+        v = {name: row[index] for name, index in self.index.items()}
+        ident = v["id"]
+        if ident != self.next_id:
+            raise ValueError("entry ids are not dense")
+        while self.stack and self.stack[-1]["end"] < ident:
+            self.close(ident - 1)
+        if v["parent_id"] != (self.stack[-1]["id"] if self.stack else None):
+            raise ValueError("invalid parent or subtree interval")
+        if v["kind"] not in (0, 1, 2, 3, 4) or v["subtree_end"] < ident:
+            raise ValueError("invalid entry kind or subtree interval")
+        if v["kind"] != 1 and v["subtree_end"] != ident:
+            raise ValueError("non-directory has descendants")
+        self.stack.append(dict(id=ident, end=v["subtree_end"], items=v["items"],
+                               stored_min=v["min_scanned_at"], stored_newest=v["newest_mtime"],
+                               minimum=v["scanned_at"],
+                               newest=min(v["mtime"], v["scanned_at"]) if v["kind"] == 0 else None))
+        self.next_id += 1
+
+    def finish(self):
+        while self.stack:
+            self.close(self.next_id - 1)
+
+
 def observe_database(path, cutoff, deadline):
     wal = path.with_name(path.name + "-wal")
     if wal.exists() and wal.stat().st_size:
@@ -79,9 +127,14 @@ def observe_database(path, cutoff, deadline):
             primary = "id" if table == "entries" else "entry_id" if "entry_id" in columns else columns[0]
             order = [primary] + [name for name in columns if name != primary]
             ordering = ",".join('"' + name.replace('"', '""') + '"' for name in order)
+            validator = EntryValidator(columns) if table == "entries" else None
             for row in db.execute(f'SELECT * FROM "{table}" ORDER BY {ordering}'):
+                if validator:
+                    validator.add(row)
                 digest.update(json.dumps([table, normalize(table, columns, row, cutoff)], separators=(",", ":")).encode())
                 digest.update(b"\n")
+            if validator:
+                validator.finish()
         return entries, digest.hexdigest()
 
 

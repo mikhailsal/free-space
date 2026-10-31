@@ -24,11 +24,15 @@ class OracleTests(unittest.TestCase):
         with sqlite3.connect(path) as db:
             db.executescript('''
                 CREATE TABLE meta(generation INTEGER, snapshot_id TEXT, scan_seconds REAL);
-                CREATE TABLE entries(id INTEGER PRIMARY KEY, scanned_at INTEGER, min_scanned_at INTEGER);
+                CREATE TABLE entries(id INTEGER PRIMARY KEY, parent_id INTEGER, kind INTEGER, items INTEGER,
+                    subtree_end INTEGER, scanned_at INTEGER, min_scanned_at INTEGER, mtime INTEGER, newest_mtime INTEGER);
                 CREATE TABLE roots(entry_id INTEGER, path BLOB, fs_used INTEGER);
             ''')
             db.execute('INSERT INTO meta VALUES(?,?,?)', (generation, name, 1.2))
-            db.executemany('INSERT INTO entries VALUES(?,?,?)', [(1, old_time, old_time), (2, new_time, new_time)])
+            db.executemany('INSERT INTO entries VALUES(?,?,?,?,?,?,?,?,?)', [
+                (0, None, 1, 2, 2, 50, min(50, old_time, new_time), 0, 10),
+                (1, 0, 0, 0, 1, old_time, old_time, 10, 10),
+                (2, 0, 0, 0, 2, new_time, new_time, 10, 10)])
             db.execute('INSERT INTO roots VALUES(1,?,?)', (b'/scratch/tree', 123 if name == 'a.db' else 987))
         return path
 
@@ -52,6 +56,38 @@ class OracleTests(unittest.TestCase):
             db.execute('UPDATE entries SET min_scanned_at=scanned_at+1 WHERE id=1')
         with self.assertRaisesRegex(ValueError, 'freshness'):
             self.digest(path)
+
+    def test_normalized_new_freshness_still_checks_ancestor_minimum(self):
+        path = self.database('a.db', old_time=300, new_time=400)
+        with sqlite3.connect(path) as db:
+            db.execute('UPDATE entries SET scanned_at=500, min_scanned_at=350 WHERE id=0')
+        with self.assertRaisesRegex(ValueError, 'freshness minimum'):
+            self.digest(path)
+
+    def test_empty_directory_does_not_mask_negative_file_mtime(self):
+        path = self.database('a.db')
+        with sqlite3.connect(path) as db:
+            db.execute('UPDATE entries SET kind=1, mtime=0, newest_mtime=0 WHERE id=1')
+            db.execute('UPDATE entries SET mtime=-10, newest_mtime=-10 WHERE id=2')
+            db.execute('UPDATE entries SET newest_mtime=-10 WHERE id=0')
+        self.digest(path)
+        with sqlite3.connect(path) as db:
+            db.execute('UPDATE entries SET newest_mtime=0 WHERE id=0')
+        with self.assertRaisesRegex(ValueError, 'newest file mtime'):
+            self.digest(path)
+
+    def test_invalid_preorder_structure_rejected(self):
+        for mutation in ('UPDATE entries SET id=3 WHERE id=2',
+                         'UPDATE entries SET parent_id=NULL WHERE id=2',
+                         'UPDATE entries SET subtree_end=2 WHERE id=1',
+                         'UPDATE entries SET items=1 WHERE id=0'):
+            with self.subTest(mutation=mutation):
+                path = self.database('structure.db')
+                with sqlite3.connect(path) as db:
+                    db.execute(mutation)
+                with self.assertRaises(ValueError):
+                    self.digest(path)
+                path.unlink()
 
     def test_nonempty_wal_rejected(self):
         path = self.database('a.db')
