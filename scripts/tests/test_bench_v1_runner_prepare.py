@@ -33,6 +33,69 @@ def invoke(**kwargs):
 
 
 class RunnerPreparationTests(unittest.TestCase):
+    def test_workflow_apt_sources_guard_rewrite_and_symlink(self):
+        workflow = (Path(__file__).resolve().parents[2] / '.github/workflows/representative-bench.yml').read_text()
+        step = workflow.split('      - name: Install musl tools\n', 1)[1].split('      - uses:', 1)[0]
+        code = textwrap.dedent(step.split("python3 - <<'PY'\n", 1)[1].split('          PY\n', 1)[0])
+        self.assertEqual(step.count('timeout --kill-after=5s 180s apt-get'), 2)
+        self.assertIn('sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT python3', step)
+        self.assertEqual(step.count('-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20'), 2)
+        self.assertIn('--error-on=any update -q', step)
+        with patch.dict(os.environ, {}, clear=True), patch('os.open', side_effect=AssertionError('filesystem touched')):
+            with self.assertRaisesRegex(RuntimeError, 'GitHub-hosted'):
+                exec(code, {})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / 'sources.list'
+            deb822 = root / 'ubuntu.sources'
+            mapped = code.replace('/etc/apt/sources.list.d/ubuntu.sources', str(deb822)).replace('/etc/apt/sources.list', str(source))
+            source.write_text('deb http://azure.archive.ubuntu.com/ubuntu noble main\n'
+                              'deb http://security.ubuntu.com/ubuntu noble-security main\n'
+                              'deb http://thirdparty.example/ubuntu noble main\n'
+                              'deb http://archive.ubuntu.com/custom noble main\n'
+                              'deb http://archive.ubuntu.com/ubuntu-ports noble main\n'
+                              'deb http://archive.ubuntu.com.thirdparty.example/ubuntu noble main\n')
+            deb822.write_text('Types: deb\nURIs: mirror+file:/etc/apt/apt-mirrors.txt http://security.ubuntu.com/ubuntu/\nSuites: noble-updates\nSigned-By: /key\n')
+            with patch.dict(os.environ, ENV, clear=True):
+                exec(mapped, {})
+            self.assertEqual(source.read_text(), 'deb https://archive.ubuntu.com/ubuntu noble main\n'
+                             'deb https://security.ubuntu.com/ubuntu noble-security main\n'
+                             'deb http://thirdparty.example/ubuntu noble main\n'
+                             'deb http://archive.ubuntu.com/custom noble main\n'
+                             'deb http://archive.ubuntu.com/ubuntu-ports noble main\n'
+                             'deb http://archive.ubuntu.com.thirdparty.example/ubuntu noble main\n')
+            self.assertEqual(deb822.read_text(), 'Types: deb\nURIs: https://archive.ubuntu.com/ubuntu/ https://security.ubuntu.com/ubuntu/\nSuites: noble-updates\nSigned-By: /key\n')
+            before_times = (source.stat().st_mtime_ns, deb822.stat().st_mtime_ns)
+            with patch.dict(os.environ, ENV, clear=True):
+                exec(mapped, {})
+            self.assertEqual(before_times, (source.stat().st_mtime_ns, deb822.stat().st_mtime_ns))
+            original_source, original_deb822 = source.read_bytes(), deb822.read_bytes()
+            for path, extra in ((source, 'deb mirror+file:/etc/apt/unknown.txt noble main\n'),
+                                (deb822, 'URIs: mirror+https://thirdparty.example/list\n')):
+                path.write_text(path.read_text() + extra)
+                before_failure = (source.read_bytes(), deb822.read_bytes())
+                with patch.dict(os.environ, ENV, clear=True), self.assertRaisesRegex(ValueError, 'unsupported active Ubuntu mirror'):
+                    exec(mapped, {})
+                self.assertEqual(before_failure, (source.read_bytes(), deb822.read_bytes()))
+                source.write_bytes(original_source)
+                deb822.write_bytes(original_deb822)
+            deb822.unlink()
+            deb822.symlink_to(source)
+            before = source.read_bytes()
+            with patch.dict(os.environ, ENV, clear=True), self.assertRaises(OSError):
+                exec(mapped, {})
+            self.assertEqual(source.read_bytes(), before)
+            deb822.unlink()
+            os.link(source, deb822)
+            with patch.dict(os.environ, ENV, clear=True), self.assertRaisesRegex(ValueError, 'uniquely linked'):
+                exec(mapped, {})
+            deb822.unlink()
+            source.write_text('deb http://thirdparty.example/ubuntu noble main\n')
+            with patch.dict(os.environ, ENV, clear=True), self.assertRaisesRegex(ValueError, 'no supported Ubuntu'):
+                exec(mapped, {})
+            self.assertEqual(source.read_text(), 'deb http://thirdparty.example/ubuntu noble main\n')
+
+
     def test_sufficient_space_never_checks_mounts_or_deletes(self):
         mounts, safe, run = Mock(), Mock(), Mock()
         result = invoke(read_disk=lambda _: space(MODULE.TARGET), read_mounts=mounts, safe=safe, run=run)
