@@ -7,10 +7,10 @@ staged-refresh experiment, change its order or allocate runner time.
 ## Observed symptom and attribution limit
 
 The authorized local calibration refreshed a two-entry subtree in a
-7,274,483-entry snapshot. It took66.61s and reached1,866,100KiB process VmHWM
-(1,822.36MiB). Load took16.155s; the6.636s finalize timer includes grafting and
-`finalize_with`, not just aggregate folding. The1Hz samples first show that HWM
-between17.3 and18.3 seconds, inside this combined phase. The result reported two
+7,274,483-entry snapshot. It took 66.61 s and reached 1,866,100 KiB process VmHWM
+(1,822.36 MiB). Load took 16.155 s; the 6.636 s finalize timer includes grafting and
+`finalize_with`, not just aggregate folding. The 1 Hz samples first show that HWM
+between 17.3 and 18.3 seconds, inside this combined phase. The result reported two
 inaccessible temporary subtrees and is not a clean completeness pass.
 
 The installed binary's exact source correspondence remains unknown. Matching
@@ -22,11 +22,11 @@ Sparse process samples cannot assign the peak to one allocation. See the
 
 | Allocation | Loader/graft behavior | Consequence |
 | --- | --- | --- |
-| `Tree.nodes: Vec<Node>` | `refresh/load.rs::load_nodes` resizes an initially empty vector toN. `graft` marks old descendants REMOVED; `replace_subtree` appends each new descendant except the reused root. | For a two-entry rescan, exactly one node is appended to theN stored nodes. Old removed slots remain allocated. Capacity is at leastN, but its actual value was not measured. |
+| `Tree.nodes: Vec<Node>` | `refresh/load.rs::load_nodes` resizes an initially empty vector to N. `graft` marks old descendants REMOVED; `replace_subtree` appends each new descendant except the reused root. | For a two-entry rescan, exactly one node is appended to the N stored nodes. Old removed slots remain allocated. Capacity is at least N, but its actual value was not measured. |
 | `Tree.names: Vec<u8>` | Loader calls `push_name` for each name without recording capacity. Graft appends all `sub.names`, including the reused root's stored name. | Old name bytes remain. The names vector can also grow if spare capacity is insufficient; the trace does not reveal that capacity. |
 | Layout vectors | Loader constructs parent/child-count/block-start/fill/raw-id vectors. Only `raw_of` is returned with the loaded tree. | Several O(N) u32 buffers coexist during loading; some are gone before graft. `raw_of` remains through finalization. |
 | Finalization vectors | `build_preorder` takesN from `nodes.len()` and allocates order/rank/path hashes; hardlink structures and path stacks also coexist. | Removed slots still contribute to allocation bounds even when omitted from final output. Their allocation can overlap graft buffers. |
-| Refresh-only link/mapping data | `loaded.raw_of`, `loaded.links`, policy and snapshot are dropped after finalization and before SQLite writing. | Moving these drops could reduce overlap, but source inspection alone cannot establish25% savings. |
+| Refresh-only link/mapping data | `loaded.raw_of`, `loaded.links`, policy and snapshot are dropped after finalization and before SQLite writing. | Moving these drops could reduce overlap, but source inspection alone cannot establish 25% savings. |
 
 Source references: `core/src/refresh/load.rs::load_nodes`,
 `core/src/refresh.rs::{graft,replace_subtree,refresh_locked}` and
@@ -35,9 +35,9 @@ assuming plain musl/system-malloc behavior would be unsupported.
 
 ## Hypothesis, not a confirmed root cause
 
-If the loaded node vector has capacityN, appending one new descendant requires
+If the loaded node vector has capacity N, appending one new descendant requires
 growth. Depending on the actual Rust/allocator behavior, a larger allocation and
-copy could overlap the oldN-element buffer. Name-vector growth is a second
+copy could overlap the old N-element buffer. Name-vector growth is a second
 possible contributor. Current source neither records exact capacities nor proves
 a doubling factor, copying, in-place growth, retained allocator pages or which
 allocation establishes process HWM.

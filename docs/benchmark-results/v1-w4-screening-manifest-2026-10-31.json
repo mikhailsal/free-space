@@ -35,7 +35,10 @@
       "forecast_seconds": 1800,
       "run_id": 41206306054,
       "dispatched_revision": "a48ba0d828d6441697482cbfb9d06d96086fd182",
-      "status": "in_progress"
+      "status": "completed",
+      "conclusion": "success",
+      "valid": true,
+      "aggregate_job_seconds": 1248
     },
     {
       "stage": "screen",
@@ -62,7 +65,10 @@
       "branch": "perf/v1-child-batches",
       "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
       "forecast_seconds": 2400,
-      "depends_on": "valid w4-control-v3-screen plus renewed time admission"
+      "depends_on": "valid w4-control-v3-screen plus renewed time admission",
+      "run_id": 41208041797,
+      "dispatched_revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
+      "status": "in_progress"
     }
   ],
   "stop_rules": [
@@ -81,5 +87,126 @@
     "control_with_margin_seconds": 2340,
     "candidate_with_margin_seconds": 3120,
     "measured_step_cap_seconds": 3900
+  },
+  "candidate_admission": {
+    "created_at": "2026-10-31T13:59:38.635614+00:00",
+    "control_run_id": 41206306054,
+    "control_valid": true,
+    "control_aggregate_job_seconds": 1248,
+    "completed_campaign_job_seconds": 9366,
+    "remaining_campaign_seconds": 12234,
+    "candidate_maximum_job_seconds": 5700,
+    "candidate_forecast_seconds": 2400,
+    "forecast_with_30pct_margin_seconds": 3120,
+    "measured_step_cap_seconds": 3900,
+    "success": true,
+    "observed_control": {
+      "refresh": {
+        "elapsed_seconds": {
+          "baseline_median": 10.741943185000082,
+          "candidate_median": 10.742497178000008,
+          "paired_deltas": [
+            0.08283793299995068,
+            -0.0685076229999595,
+            -0.0006323449999854347
+          ],
+          "paired_percent_changes": [
+            0.7771161450475628,
+            -0.6313974716107729,
+            -0.005886690974765685
+          ],
+          "median_paired_percent_change": -0.005886690974765685,
+          "max_abs_percent_change": 0.7771161450475628,
+          "max_abs_delta": 0.08283793299995068
+        },
+        "peak_rss_kib": {
+          "baseline_median": 251168,
+          "candidate_median": 251212,
+          "paired_deltas": [
+            204,
+            -80,
+            44
+          ],
+          "paired_percent_changes": [
+            0.08122959305567612,
+            -0.031845612470737805,
+            0.017518155179008232
+          ],
+          "median_paired_percent_change": 0.017518155179008232,
+          "max_abs_percent_change": 0.08122959305567612,
+          "max_abs_delta": 204
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 375078912,
+          "candidate_median": 375078912,
+          "paired_deltas": [
+            0,
+            0,
+            0
+          ],
+          "paired_percent_changes": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "median_paired_percent_change": 0.0,
+          "max_abs_percent_change": 0.0,
+          "max_abs_delta": 0
+        }
+      },
+      "scan": {
+        "elapsed_seconds": {
+          "baseline_median": 62.283649120000064,
+          "candidate_median": 61.639475859000015,
+          "paired_deltas": [
+            0.27394711499997015,
+            -0.7061404510000102,
+            0.19389908199991623
+          ],
+          "paired_percent_changes": [
+            0.44675685618429384,
+            -1.1326224565475163,
+            0.3113161876985293
+          ],
+          "median_paired_percent_change": 0.3113161876985293,
+          "max_abs_percent_change": 1.1326224565475163,
+          "max_abs_delta": 0.7061404510000102
+        },
+        "peak_rss_kib": {
+          "baseline_median": 27436,
+          "candidate_median": 27336,
+          "paired_deltas": [
+            -188,
+            176,
+            -108
+          ],
+          "paired_percent_changes": [
+            -0.683040255776779,
+            0.6414929289983995,
+            -0.3937007874015741
+          ],
+          "median_paired_percent_change": -0.3937007874015741,
+          "max_abs_percent_change": 0.683040255776779,
+          "max_abs_delta": 188
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 459763712,
+          "candidate_median": 459763712,
+          "paired_deltas": [
+            0,
+            0,
+            0
+          ],
+          "paired_percent_changes": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "median_paired_percent_change": 0.0,
+          "max_abs_percent_change": 0.0,
+          "max_abs_delta": 0
+        }
+      }
+    }
   }
 }

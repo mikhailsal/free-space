@@ -15,7 +15,8 @@
     41197637087,
     41199678638,
     41200958293,
-    41206306054
+    41206306054,
+    41208041797
   ],
   "runs": [
     {
@@ -191,42 +192,13 @@
       "revision": "a48ba0d828d6441697482cbfb9d06d96086fd182",
       "forecast_seconds": 1800,
       "run_id": 41206306054,
-      "status": "in_progress",
-      "conclusion": "",
-      "completed_job_seconds": 60.0,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 1248.0,
       "owner_allocation": "D18",
-      "purpose": "Current-observer 1m same-binary control before child-batch candidate"
-    }
-  ],
-  "accounting": "Sum all job started-to-completed durations, including setup, failures and concurrent jobs. Queued jobs reserved by timeout envelope. Do not treat six hours as money or free-minute quota.",
-  "updated_at": "2026-10-31T13:38:06.953590+00:00",
-  "completed_job_seconds": 8178.0,
-  "maximum_committed_seconds": 19518.0,
-  "remaining_unreserved_seconds": 2082.0,
-  "candidate_branch": "perf/v1-child-batches",
-  "forecasts": [
-    {
-      "screening_run_id": 41196033116,
-      "profile": "local",
-      "operation": "scan",
-      "files": 7264383,
-      "pairs": 1,
-      "source_revision": "a85c4b7928afa21d5de4e596713ddb600946cdf4",
-      "ratio": 7.264383,
-      "screening_fixture_seconds": 61.24041945900001,
-      "screening_seed_seconds": 67.00445239999999,
-      "screening_pair_command_seconds": 124.50636768199996,
-      "screening_pair_observer_seconds": 46.108828700000004,
-      "screening_pair_copy_seconds": 1.0399710240000104,
-      "fixed_overhead_allowance_seconds": 450,
-      "forecast_seconds": 2629,
-      "with_30pct_margin_seconds": 3417.165371016798,
-      "paired_step_cap_seconds": 7200,
-      "admitted": true,
-      "limitations": "Initial linear projection; memory/cache/device nonlinearities can exceed it. Timeout is invalid evidence, not a successful shortened workload."
-    }
-  ],
-  "planned_next_dispatches": [
+      "purpose": "Current-observer 1m same-binary control before child-batch candidate",
+      "job_seconds": 1248.0
+    },
     {
       "stage": "screen",
       "io": "local",
@@ -252,9 +224,45 @@
       "branch": "perf/v1-child-batches",
       "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
       "forecast_seconds": 2400,
-      "depends_on": "valid w4-control-v3-screen plus renewed time admission"
+      "depends_on": "valid w4-control-v3-screen plus renewed time admission",
+      "run_id": 41208041797,
+      "baseline": "d8b60464b4c8ec8ba7a9c09821d12775556db1a9",
+      "status": "in_progress",
+      "conclusion": "",
+      "completed_job_seconds": 0,
+      "owner_allocation": "D18",
+      "purpose": "One fixed child-batch candidate after valid current-observer control"
     }
   ],
+  "accounting": "Sum all job started-to-completed durations, including setup, failures and concurrent jobs. Queued jobs reserved by timeout envelope. Do not treat six hours as money or free-minute quota.",
+  "updated_at": "2026-10-31T14:00:33.343912+00:00",
+  "completed_job_seconds": 9366.0,
+  "maximum_committed_seconds": 15066.0,
+  "remaining_unreserved_seconds": 6534.0,
+  "candidate_branch": "perf/v1-child-batches",
+  "forecasts": [
+    {
+      "screening_run_id": 41196033116,
+      "profile": "local",
+      "operation": "scan",
+      "files": 7264383,
+      "pairs": 1,
+      "source_revision": "a85c4b7928afa21d5de4e596713ddb600946cdf4",
+      "ratio": 7.264383,
+      "screening_fixture_seconds": 61.24041945900001,
+      "screening_seed_seconds": 67.00445239999999,
+      "screening_pair_command_seconds": 124.50636768199996,
+      "screening_pair_observer_seconds": 46.108828700000004,
+      "screening_pair_copy_seconds": 1.0399710240000104,
+      "fixed_overhead_allowance_seconds": 450,
+      "forecast_seconds": 2629,
+      "with_30pct_margin_seconds": 3417.165371016798,
+      "paired_step_cap_seconds": 7200,
+      "admitted": true,
+      "limitations": "Initial linear projection; memory/cache/device nonlinearities can exceed it. Timeout is invalid evidence, not a successful shortened workload."
+    }
+  ],
+  "planned_next_dispatches": [],
   "candidate_disposition": {
     "decision": "not_promoted",
     "reason": "1m paired median gain 14.2877%; exploratory 7.3m pair gain 11.9174%; both below fixed 15% speed-only floor. No disk or RAM benefit route demonstrated.",
@@ -270,12 +278,13 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 5700,
+  "planned_reserved_seconds": 0,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "W4 child batches",
     "revision": "147fa290c05ab3af307e62ab7cbebb709d4447d5",
-    "status": "awaiting current-observer control before candidate dispatch",
-    "owner_allocation": "D18"
+    "status": "in_progress",
+    "owner_allocation": "D18",
+    "run_id": 41208041797
   }
 }
