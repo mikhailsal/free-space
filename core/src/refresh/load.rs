@@ -2,11 +2,54 @@
 
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::time::Instant;
 
+use super::rescan_subtree;
 use crate::error::{Error, Result};
 use crate::platform::FsStats;
+use crate::queries::common::Row;
+use crate::scan::profile;
 use crate::scan::{MountRow, NO_PARENT, Node, RootInfo, Tree, flags};
 use crate::snapshot::reader::Snapshot;
+
+pub(super) struct PreparedRefresh {
+    pub(super) loaded: Loaded,
+    pub(super) sub: Option<Tree>,
+    pub(super) load_seconds: f64,
+    pub(super) walk_seconds: f64,
+}
+
+pub(super) fn prepare_refresh(
+    snap: &Snapshot,
+    x: &Row,
+    xpath: &[u8],
+    workers: usize,
+    seen: Arc<AtomicU64>,
+    label: &str,
+) -> Result<PreparedRefresh> {
+    let t = Instant::now();
+    let roots = roots(snap)?;
+    let root_seconds = t.elapsed().as_secs_f64();
+    let t = Instant::now();
+    let sub = rescan_subtree(snap, &roots, x, xpath, workers, seen, label)?;
+    let walk_seconds = t.elapsed().as_secs_f64();
+    drop(roots);
+    let extra = sub
+        .as_ref()
+        .map_or(0, |tree| tree.nodes.len().saturating_sub(1));
+    let t = Instant::now();
+    let loaded = load_tree_with_extra(snap, extra)?;
+    let load_seconds = root_seconds + t.elapsed().as_secs_f64();
+    profile::allocation("refresh_loaded", &loaded.tree);
+    Ok(PreparedRefresh {
+        loaded,
+        sub,
+        load_seconds,
+        walk_seconds,
+    })
+}
 
 /// Old hardlink row: (raw id, dev, ino, allocated, apparent, was_owner).
 pub(super) type OldLink = (u32, u64, u64, u64, u64, bool);
@@ -21,14 +64,19 @@ pub struct Loaded {
 /// Load a published snapshot into a walker-shaped tree (contiguous, name-ordered
 /// child ranges) with own values per node.
 pub fn load_tree(snap: &Snapshot) -> Result<Loaded> {
+    load_tree_with_extra(snap, 0)
+}
+
+pub(super) fn load_tree_with_extra(snap: &Snapshot, extra: usize) -> Result<Loaded> {
     let conn = &snap.conn;
     let n = entry_count(conn)?;
+    let capacity = checked_capacity(n, extra)?;
     let (parent, child_count) = load_parents(conn, n)?;
     let (block_start, raw_of) = make_layout(&parent, &child_count);
     let mut tree = load_nodes(
         conn,
         snap.meta.scanned_at,
-        n,
+        capacity,
         &parent,
         &child_count,
         &block_start,
@@ -43,6 +91,18 @@ pub fn load_tree(snap: &Snapshot) -> Result<Loaded> {
         raw_of,
         links,
     })
+}
+
+fn checked_capacity(n: usize, extra: usize) -> Result<usize> {
+    n.checked_add(extra)
+        .filter(|&total| total <= u32::MAX as usize)
+        .ok_or_else(|| Error::generic("refresh node count exceeds raw ID capacity"))
+}
+
+pub(super) fn roots(snap: &Snapshot) -> Result<Vec<RootInfo>> {
+    let mut tree = Tree::default();
+    load_roots(&snap.conn, &mut tree)?;
+    Ok(tree.roots)
 }
 
 fn entry_count(conn: &rusqlite::Connection) -> Result<usize> {
@@ -102,7 +162,7 @@ fn make_layout(parent: &[u32], child_count: &[u32]) -> (Vec<u32>, Vec<u32>) {
 fn load_nodes(
     conn: &rusqlite::Connection,
     started_at: i64,
-    n: usize,
+    capacity: usize,
     parent: &[u32],
     child_count: &[u32],
     block_start: &[u32],
@@ -112,7 +172,12 @@ fn load_nodes(
         started_at,
         ..Default::default()
     };
-    tree.nodes.resize(n, Node::default());
+    if capacity > parent.len() {
+        tree.nodes
+            .try_reserve_exact(capacity)
+            .map_err(|e| Error::generic(format!("reserve refresh nodes: {e}")))?;
+    }
+    tree.nodes.resize(parent.len(), Node::default());
     let mut st = conn.prepare("SELECT id, name, kind, flags, allocated, apparent, mtime, nlink, errors, scanned_at FROM entries ORDER BY id")?;
     let mut rows = st.query([])?;
     while let Some(r) = rows.next()? {
@@ -233,3 +298,7 @@ fn load_mounts(conn: &rusqlite::Connection, raw_of: &[u32], tree: &mut Tree) -> 
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "load/tests.rs"]
+mod tests;

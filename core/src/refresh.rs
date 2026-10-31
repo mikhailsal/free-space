@@ -241,22 +241,10 @@ fn refresh_locked(req: RefreshRequest, path: Vec<u8>, label: &str) -> Result<Ref
         req.on_progress,
     );
 
-    let t = Instant::now();
-    let mut loaded = load_tree(&snap)?;
-    let load_seconds = t.elapsed().as_secs_f64();
-    scan::profile::allocation("refresh_loaded", &loaded.tree);
-
-    let t = Instant::now();
-    let sub = rescan_subtree(
-        &snap,
-        &loaded.tree.roots,
-        &x,
-        &xpath,
-        req.workers,
-        seen,
-        label,
-    )?;
-    let walk_seconds = t.elapsed().as_secs_f64();
+    let prepared = load::prepare_refresh(&snap, &x, &xpath, req.workers, seen, label)?;
+    let (mut loaded, sub) = (prepared.loaded, prepared.sub);
+    let load_seconds = prepared.load_seconds;
+    let walk_seconds = prepared.walk_seconds;
     let removed = sub.is_none();
     let subtree_entries = sub.as_ref().map(|t| t.nodes.len() as u64).unwrap_or(0);
 
