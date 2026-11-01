@@ -6,7 +6,7 @@
   "source_review": "v1-refresh-root-reuse-source-reviews-2026-11-01.json",
   "prerequisite_aa_run": 41253374855,
   "benchmark_equivalence": "all tracked scripts/ and .github/workflows/ byte-identical to 471c4d14",
-  "candidate_binary_sha256": null,
+  "candidate_binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
   "baseline_source_epoch": 1793464183,
   "campaign_cap_seconds": 216000,
   "maximum_reservation_seconds": 8700,
@@ -45,11 +45,26 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "unknown until valid smoke; freeze actual hash before screen",
       "campaign_cap_seconds": 216000,
-      "status": "planned",
+      "status": "completed",
       "depends_on": "Frozen reviewed source and normal hooks; valid fresh A/A 41253374855 with same benchmark/workflow. Screen also requires valid registered smoke and frozen actual candidate binary.",
       "purpose": "Real product schema, hardlink ownership, previous-history and changed-full end-to-end proof; no performance qualification",
       "artifact_prefix": "/tmp/freespace-root-reuse-changed-full-smoke",
-      "swap": "disabled"
+      "swap": "disabled",
+      "run_id": 41259537703,
+      "created_at": "2026-11-01T01:04:55Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 390.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T01:14:55.569779+00:00",
+      "job_seconds": 390.0,
+      "receipt": "v1-root-reuse-changed-full-smoke-2026-11-01.json",
+      "receipt_validation": "strict_valid_changed_full_current_previous_hardlink_facts_and_new_root_query_test",
+      "actual_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "actual_candidate_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+      "profile_structure": "valid",
+      "profile_original_hwm_contract": false,
+      "qualification": "protocol_smoke_only_not_promoted"
     },
     {
       "id": "root-reuse-candidate-screen",
@@ -84,14 +99,125 @@
       "profile_policy": "profile-v2",
       "allocation_diagnostics": true,
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "candidate_binary_sha256": "unknown until valid smoke; freeze actual hash before screen",
+      "candidate_binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
       "campaign_cap_seconds": 216000,
-      "status": "planned",
+      "status": "completed",
       "depends_on": "Frozen reviewed source and normal hooks; valid fresh A/A 41253374855 with same benchmark/workflow. Screen also requires valid registered smoke and frozen actual candidate binary.",
       "purpose": "Fresh matched one-million-file source screen; no full-scale extrapolation or promotion",
       "artifact_prefix": "/tmp/freespace-root-reuse-candidate-screen",
-      "expected_binary_basis": "Observed and frozen from this source\u2019s successful changed-full smoke; no historical binary borrowed.",
-      "swap": "disabled"
+      "expected_binary_basis": "Observed successful canonical-epoch musl root-reuse smoke41259537703, frozen before screen; source63 unchanged",
+      "swap": "disabled",
+      "run_id": 41260421846,
+      "created_at": "2026-11-01T01:16:48Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 1379.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T01:41:42.521626+00:00",
+      "strict_valid": true,
+      "strict_equal_raw": true,
+      "root_independent_validation": true,
+      "actual_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "actual_candidate_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+      "result_json": "docs/benchmark-results/v1-root-reuse-candidate-screen-2026-11-01.json",
+      "result_md": "docs/benchmark-results/v1-root-reuse-candidate-screen-2026-11-01.md",
+      "measured_paired_metrics": {
+        "scan": {
+          "elapsed_seconds": {
+            "paired_delta": [
+              -22.770417829999985,
+              -22.344989301,
+              -22.200461488999963
+            ],
+            "median_delta": -22.344989301,
+            "median_pct": -32.20201905209801
+          },
+          "rss_kib": {
+            "paired_delta": [
+              1648,
+              1568,
+              1772
+            ],
+            "median_delta": 1648,
+            "median_pct": 4.606955160460702
+          },
+          "disk_bytes": {
+            "paired_delta": [
+              -4534272,
+              -4534272,
+              -4534272
+            ],
+            "median_delta": -4534272,
+            "median_pct": -0.986367281475542
+          },
+          "cgroup_peak_bytes": {
+            "paired_delta": [
+              -2695168,
+              -2535424,
+              -2088960
+            ],
+            "median_delta": -2535424,
+            "median_pct": -0.13059953414576997
+          }
+        },
+        "refresh": {
+          "elapsed_seconds": {
+            "paired_delta": [
+              -0.03765429099996709,
+              -0.018012272000078156,
+              -0.14297696500011625
+            ],
+            "median_delta": -0.03765429099996709,
+            "median_pct": -0.35402303838582005
+          },
+          "rss_kib": {
+            "paired_delta": [
+              -90104,
+              -90184,
+              -90148
+            ],
+            "median_delta": -90148,
+            "median_pct": -23.85221090955274
+          },
+          "disk_bytes": {
+            "paired_delta": [
+              0,
+              0,
+              0
+            ],
+            "median_delta": 0,
+            "median_pct": 0.0
+          },
+          "cgroup_peak_bytes": {
+            "paired_delta": [
+              -15249408,
+              -15736832,
+              -7917568
+            ],
+            "median_delta": -15249408,
+            "median_pct": -3.3138696526801126
+          }
+        }
+      },
+      "h2_disposition": "inconclusive_scan_process_rss_increase",
+      "qualification": "not_promoted_no_qualification_progression",
+      "h2_basis": {
+        "positive_scan_rss_median_kib": 1648,
+        "positive_scan_rss_median_pct": 4.606955160460702,
+        "paired_rss_delta_kib": [
+          1648,
+          1568,
+          1772
+        ],
+        "matched_aa_max_abs_rss_kib": 192,
+        "matched_aa_max_abs_rss_pct": 0.5112365534135632,
+        "all_pairs_exceed_fresh_aa": true,
+        "refresh_rss_benefit_pct": 23.85221090955274,
+        "refresh_rss_floor_pct": 25,
+        "cgroup_peak_not_process_rss": true
+      },
+      "profile_structure": "valid",
+      "profile_original_hwm_contract": false
     }
   ],
   "stop_rules": [
@@ -103,5 +229,7 @@
   "created_at": "2026-11-01T00:57:52.266134+00:00",
   "source_hash_manifest_sha256": "b3214d9dcc7a52303941df4b7601a60f961ed7d82e7213c7a5f6a8f7208e297c",
   "admission_helper_sha256": "3280ebb27f05a51ff7a863d735eed59de18629bdae7cedfbbe49336e6a26f090",
-  "parent_disposition": "Single new-source experiment after confirmed redundant query removal; fresh identical benchmark controls reused. Smoke and actual new test must pass before screen. No guard relaxed and no source/timing benefit assumed."
+  "parent_disposition": "Single new-source experiment after confirmed redundant query removal; fresh identical benchmark controls reused. Smoke and actual new test must pass before screen. No guard relaxed and no source/timing benefit assumed.",
+  "updated_at": "2026-11-01T01:44:57.601918+00:00",
+  "progress_status": "Screen strict-valid and all12 observers valid; scanRSS increase leaves H2inconclusive; no promotion or qualification progression. Separate RAM attribution diagnostic is unregistered/unrun."
 }

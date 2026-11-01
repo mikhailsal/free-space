@@ -1,0 +1,2481 @@
+{
+  "run_id": 41260421846,
+  "head": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+  "strict_equal_raw_valid": true,
+  "description": [
+    {
+      "operation": "refresh",
+      "protocol": "v1-single-operation-pairs-v4",
+      "github": {
+        "GITHUB_SHA": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+        "GITHUB_RUN_ID": "41260421846",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 999901,
+          "payload_files": 10000,
+          "sparse_files": 235,
+          "hardlink_files": 999,
+          "longname_files": 32255
+        },
+        "setup_seconds": 62.108850753999945
+      },
+      "identical_binaries": false,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 10.649707282999998,
+          "candidate_median": 10.598458875999995,
+          "paired_deltas": [
+            -0.03765429099996709,
+            -0.018012272000078156,
+            -0.14297696500011625
+          ],
+          "paired_percent_changes": [
+            -0.35402303838582005,
+            -0.16913396322949525,
+            -1.3353298625260468
+          ],
+          "median_paired_percent_change": -0.35402303838582005,
+          "max_abs_percent_change": 1.3353298625260468,
+          "max_abs_delta": 0.14297696500011625
+        },
+        "peak_rss_kib": {
+          "baseline_median": 377944,
+          "candidate_median": 287800,
+          "paired_deltas": [
+            -90104,
+            -90184,
+            -90148
+          ],
+          "paired_percent_changes": [
+            -23.843092425589564,
+            -23.85845352860877,
+            -23.85221090955274
+          ],
+          "median_paired_percent_change": -23.85221090955274,
+          "max_abs_percent_change": 23.85845352860877,
+          "max_abs_delta": 90184
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 375070720,
+          "candidate_median": 375070720,
+          "paired_deltas": [
+            0,
+            0,
+            0
+          ],
+          "paired_percent_changes": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "median_paired_percent_change": 0.0,
+          "max_abs_percent_change": 0.0,
+          "max_abs_delta": 0
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.636113166999962,
+          "rss_kib": 377904,
+          "app_disk_peak_bytes": 375070720,
+          "cgroup_peak_bytes": 460169216,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8794112,
+            "file": 143347712,
+            "kernel": 4931584,
+            "slab_reclaimable": 4365640
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.132176238,
+            "walk_seconds": 0.002680756,
+            "finalize_seconds": 0.068881913,
+            "insert_seconds": 0.988999146,
+            "index_seconds": 1.589656684,
+            "publish_seconds": 0.015679263,
+            "total_seconds": 10.617785335
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "elapsed_seconds": 10.598458875999995,
+          "rss_kib": 287800,
+          "app_disk_peak_bytes": 375070720,
+          "cgroup_peak_bytes": 444919808,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8794112,
+            "file": 143384576,
+            "kernel": 4911104,
+            "slab_reclaimable": 4367936
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.021080088,
+            "walk_seconds": 0.098529948,
+            "finalize_seconds": 0.060239681,
+            "insert_seconds": 0.972206549,
+            "index_seconds": 1.588898905,
+            "publish_seconds": 0.014391935,
+            "total_seconds": 10.580818989
+          }
+        },
+        {
+          "id": "p2-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.649707282999998,
+          "rss_kib": 377996,
+          "app_disk_peak_bytes": 375070720,
+          "cgroup_peak_bytes": 459964416,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 143331328,
+            "kernel": 4927488,
+            "slab_reclaimable": 4361112
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.137470917,
+            "walk_seconds": 0.002541307,
+            "finalize_seconds": 0.067957067,
+            "insert_seconds": 0.988584897,
+            "index_seconds": 1.596797631,
+            "publish_seconds": 0.013917411,
+            "total_seconds": 10.631467071
+          }
+        },
+        {
+          "id": "p2-candidate-v1",
+          "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "elapsed_seconds": 10.63169501099992,
+          "rss_kib": 287812,
+          "app_disk_peak_bytes": 375070720,
+          "cgroup_peak_bytes": 444227584,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8802304,
+            "file": 143331328,
+            "kernel": 4919296,
+            "slab_reclaimable": 4361728
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.031623198999999,
+            "walk_seconds": 0.095370606,
+            "finalize_seconds": 0.060049783,
+            "insert_seconds": 0.985064917,
+            "index_seconds": 1.6006496609999998,
+            "publish_seconds": 0.013577617,
+            "total_seconds": 10.610692335
+          }
+        },
+        {
+          "id": "p3-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.707239388000062,
+          "rss_kib": 377944,
+          "app_disk_peak_bytes": 375070720,
+          "cgroup_peak_bytes": 452354048,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 143327232,
+            "kernel": 4919296,
+            "slab_reclaimable": 4364688
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.120642765,
+            "walk_seconds": 0.00298941,
+            "finalize_seconds": 0.067544477,
+            "insert_seconds": 1.033202393,
+            "index_seconds": 1.6228176520000002,
+            "publish_seconds": 0.013529297,
+            "total_seconds": 10.689451019
+          }
+        },
+        {
+          "id": "p3-candidate-v1",
+          "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "elapsed_seconds": 10.564262422999946,
+          "rss_kib": 287796,
+          "app_disk_peak_bytes": 375070720,
+          "cgroup_peak_bytes": 444436480,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8798208,
+            "file": 143441920,
+            "kernel": 4923392,
+            "slab_reclaimable": 4364240
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.019171669,
+            "walk_seconds": 0.095358002,
+            "finalize_seconds": 0.058943183,
+            "insert_seconds": 0.956881785,
+            "index_seconds": 1.575695072,
+            "publish_seconds": 0.01346655,
+            "total_seconds": 10.545456865
+          }
+        }
+      ]
+    },
+    {
+      "operation": "scan",
+      "protocol": "v1-single-operation-pairs-v4",
+      "github": {
+        "GITHUB_SHA": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+        "GITHUB_RUN_ID": "41260421846",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 999901,
+          "payload_files": 10000,
+          "sparse_files": 235,
+          "hardlink_files": 999,
+          "longname_files": 32255
+        },
+        "setup_seconds": 61.55250863500001
+      },
+      "identical_binaries": false,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 69.39002571499998,
+          "candidate_median": 47.024094889000025,
+          "paired_deltas": [
+            -22.770417829999985,
+            -22.344989301,
+            -22.200461488999963
+          ],
+          "paired_percent_changes": [
+            -32.74487086505786,
+            -32.20201905209801,
+            -32.070211281347284
+          ],
+          "median_paired_percent_change": -32.20201905209801,
+          "max_abs_percent_change": 32.74487086505786,
+          "max_abs_delta": 22.770417829999985
+        },
+        "peak_rss_kib": {
+          "baseline_median": 35792,
+          "candidate_median": 37420,
+          "paired_deltas": [
+            1648,
+            1568,
+            1772
+          ],
+          "paired_percent_changes": [
+            4.606955160460702,
+            4.380867232901209,
+            4.945852405939499
+          ],
+          "median_paired_percent_change": 4.606955160460702,
+          "max_abs_percent_change": 4.945852405939499,
+          "max_abs_delta": 1772
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 459694080,
+          "candidate_median": 455159808,
+          "paired_deltas": [
+            -4534272,
+            -4534272,
+            -4534272
+          ],
+          "paired_percent_changes": [
+            -0.986367281475542,
+            -0.986367281475542,
+            -0.986367281475542
+          ],
+          "median_paired_percent_change": -0.986367281475542,
+          "max_abs_percent_change": 0.986367281475542,
+          "max_abs_delta": 4534272
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 69.538884193,
+          "rss_kib": 35772,
+          "app_disk_peak_bytes": 459694080,
+          "cgroup_peak_bytes": 1941430272,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8802304,
+            "file": 463368192,
+            "kernel": 1359437824,
+            "slab_reclaimable": 1358909616
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.196135972,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 31.382036936,
+            "index_seconds": 3.839702083,
+            "publish_seconds": 0.000737465,
+            "total_seconds": 69.522604659
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "elapsed_seconds": 46.768466363000016,
+          "rss_kib": 37420,
+          "app_disk_peak_bytes": 455159808,
+          "cgroup_peak_bytes": 1938735104,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8802304,
+            "file": 463364096,
+            "kernel": 1359433728,
+            "slab_reclaimable": 1358912216
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.196017234,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 8.609756863,
+            "index_seconds": 3.839874081,
+            "publish_seconds": 0.000749637,
+            "total_seconds": 46.750310873
+          }
+        },
+        {
+          "id": "p2-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 69.39002571499998,
+          "rss_kib": 35792,
+          "app_disk_peak_bytes": 459694080,
+          "cgroup_peak_bytes": 1941372928,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8794112,
+            "file": 463364096,
+            "kernel": 1359437824,
+            "slab_reclaimable": 1358908968
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.195065268,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 31.359449669,
+            "index_seconds": 3.712920721,
+            "publish_seconds": 0.000583327,
+            "total_seconds": 69.371996043
+          }
+        },
+        {
+          "id": "p2-candidate-v1",
+          "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "elapsed_seconds": 47.04503641399998,
+          "rss_kib": 37360,
+          "app_disk_peak_bytes": 455159808,
+          "cgroup_peak_bytes": 1938837504,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8798208,
+            "file": 463368192,
+            "kernel": 1359429632,
+            "slab_reclaimable": 1358911280
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.198165581,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 8.879729891,
+            "index_seconds": 3.840408894,
+            "publish_seconds": 0.000778061,
+            "total_seconds": 47.023300926
+          }
+        },
+        {
+          "id": "p3-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 69.22455637799999,
+          "rss_kib": 35828,
+          "app_disk_peak_bytes": 459694080,
+          "cgroup_peak_bytes": 1941229568,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8785920,
+            "file": 463245312,
+            "kernel": 1359429632,
+            "slab_reclaimable": 1358910568
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.196995956,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 31.095763459,
+            "index_seconds": 3.809813335,
+            "publish_seconds": 0.000593796,
+            "total_seconds": 69.207476214
+          }
+        },
+        {
+          "id": "p3-candidate-v1",
+          "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "elapsed_seconds": 47.024094889000025,
+          "rss_kib": 37600,
+          "app_disk_peak_bytes": 455159808,
+          "cgroup_peak_bytes": 1939140608,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 463400960,
+            "kernel": 1359421440,
+            "slab_reclaimable": 1358910824
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.19723703,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 8.854719913,
+            "index_seconds": 3.84532782,
+            "publish_seconds": 0.000615296,
+            "total_seconds": 47.001731874
+          }
+        }
+      ]
+    }
+  ],
+  "fresh_aa_run_id": 41253374855,
+  "fresh_aa_description": [
+    {
+      "operation": "refresh",
+      "protocol": "v1-single-operation-pairs-v4",
+      "github": {
+        "GITHUB_SHA": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+        "GITHUB_RUN_ID": "41253374855",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 999901,
+          "payload_files": 10000,
+          "sparse_files": 235,
+          "hardlink_files": 999,
+          "longname_files": 32255
+        },
+        "setup_seconds": 62.4583655240001
+      },
+      "identical_binaries": true,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 10.616890244999922,
+          "candidate_median": 10.641113615999984,
+          "paired_deltas": [
+            -0.007208513000023231,
+            0.035233164999908695,
+            0.02422337100006189
+          ],
+          "paired_percent_changes": [
+            -0.06792977253960997,
+            0.3318184989288264,
+            0.22815881525637405
+          ],
+          "median_paired_percent_change": 0.22815881525637405,
+          "max_abs_percent_change": 0.3318184989288264,
+          "max_abs_delta": 0.035233164999908695
+        },
+        "peak_rss_kib": {
+          "baseline_median": 377924,
+          "candidate_median": 377912,
+          "paired_deltas": [
+            -12,
+            -44,
+            80
+          ],
+          "paired_percent_changes": [
+            -0.00317524158296445,
+            -0.011641813159479764,
+            0.021170069755371834
+          ],
+          "median_paired_percent_change": -0.00317524158296445,
+          "max_abs_percent_change": 0.021170069755371834,
+          "max_abs_delta": 80
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 375078912,
+          "candidate_median": 375078912,
+          "paired_deltas": [
+            0,
+            0,
+            4096
+          ],
+          "paired_percent_changes": [
+            0.0,
+            0.0,
+            0.0010920368671563097
+          ],
+          "median_paired_percent_change": 0.0,
+          "max_abs_percent_change": 0.0010920368671563097,
+          "max_abs_delta": 4096
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.611713731000009,
+          "rss_kib": 377924,
+          "app_disk_peak_bytes": 375078912,
+          "cgroup_peak_bytes": 460333056,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8785920,
+            "file": 143364096,
+            "kernel": 4927488,
+            "slab_reclaimable": 4366664
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.118213879,
+            "walk_seconds": 0.002521901,
+            "finalize_seconds": 0.066399656,
+            "insert_seconds": 0.98573573,
+            "index_seconds": 1.585386063,
+            "publish_seconds": 0.013924491,
+            "total_seconds": 10.593730807
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.604505217999986,
+          "rss_kib": 377912,
+          "app_disk_peak_bytes": 375078912,
+          "cgroup_peak_bytes": 460050432,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 143351808,
+            "kernel": 4972544,
+            "slab_reclaimable": 4364120
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.113806948,
+            "walk_seconds": 0.002648478,
+            "finalize_seconds": 0.06699299,
+            "insert_seconds": 0.987192042,
+            "index_seconds": 1.576178986,
+            "publish_seconds": 0.013849559,
+            "total_seconds": 10.585047182
+          }
+        },
+        {
+          "id": "p2-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.618203962000052,
+          "rss_kib": 377948,
+          "app_disk_peak_bytes": 375078912,
+          "cgroup_peak_bytes": 459841536,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 143331328,
+            "kernel": 4898816,
+            "slab_reclaimable": 4364968
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.118755584,
+            "walk_seconds": 0.002674778,
+            "finalize_seconds": 0.068128565,
+            "insert_seconds": 0.973560392,
+            "index_seconds": 1.5988834490000001,
+            "publish_seconds": 0.014957913,
+            "total_seconds": 10.59939544
+          }
+        },
+        {
+          "id": "p2-candidate-v1",
+          "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.653437126999961,
+          "rss_kib": 377904,
+          "app_disk_peak_bytes": 375078912,
+          "cgroup_peak_bytes": 460402688,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8798208,
+            "file": 143343616,
+            "kernel": 4923392,
+            "slab_reclaimable": 4362168
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.112956407,
+            "walk_seconds": 0.002972951,
+            "finalize_seconds": 0.068233451,
+            "insert_seconds": 0.993257674,
+            "index_seconds": 1.617164209,
+            "publish_seconds": 0.014647637,
+            "total_seconds": 10.630797298
+          }
+        },
+        {
+          "id": "p3-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.616890244999922,
+          "rss_kib": 377892,
+          "app_disk_peak_bytes": 375078912,
+          "cgroup_peak_bytes": 460967936,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 143343616,
+            "kernel": 4919296,
+            "slab_reclaimable": 4364752
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.117302782,
+            "walk_seconds": 0.002873679,
+            "finalize_seconds": 0.067379467,
+            "insert_seconds": 0.985666796,
+            "index_seconds": 1.587930186,
+            "publish_seconds": 0.017159203,
+            "total_seconds": 10.597992224
+          }
+        },
+        {
+          "id": "p3-candidate-v1",
+          "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 10.641113615999984,
+          "rss_kib": 377972,
+          "app_disk_peak_bytes": 375083008,
+          "cgroup_peak_bytes": 459808768,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8802304,
+            "file": 143327232,
+            "kernel": 4927488,
+            "slab_reclaimable": 4363984
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "load_seconds": 4.11874431,
+            "walk_seconds": 0.002582067,
+            "finalize_seconds": 0.068079809,
+            "insert_seconds": 1.003466435,
+            "index_seconds": 1.587529488,
+            "publish_seconds": 0.014133543,
+            "total_seconds": 10.622269819
+          }
+        }
+      ]
+    },
+    {
+      "operation": "scan",
+      "protocol": "v1-single-operation-pairs-v4",
+      "github": {
+        "GITHUB_SHA": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+        "GITHUB_RUN_ID": "41253374855",
+        "GITHUB_RUN_ATTEMPT": "1"
+      },
+      "fixture": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 999901,
+          "payload_files": 10000,
+          "sparse_files": 235,
+          "hardlink_files": 999,
+          "longname_files": 32255
+        },
+        "setup_seconds": 62.151827242000024
+      },
+      "identical_binaries": true,
+      "valid": true,
+      "issues": [],
+      "metrics": {
+        "elapsed_seconds": {
+          "baseline_median": 68.59525745999997,
+          "candidate_median": 68.61733985299998,
+          "paired_deltas": [
+            0.22647541999992882,
+            0.024254021000047032,
+            -0.1555960570001389
+          ],
+          "paired_percent_changes": [
+            0.33114864372243424,
+            0.03535816016755344,
+            -0.2266465806456508
+          ],
+          "median_paired_percent_change": 0.03535816016755344,
+          "max_abs_percent_change": 0.33114864372243424,
+          "max_abs_delta": 0.22647541999992882
+        },
+        "peak_rss_kib": {
+          "baseline_median": 37556,
+          "candidate_median": 37476,
+          "paired_deltas": [
+            -188,
+            -28,
+            192
+          ],
+          "paired_percent_changes": [
+            -0.4992564265986821,
+            -0.07465870307167277,
+            0.5112365534135632
+          ],
+          "median_paired_percent_change": -0.07465870307167277,
+          "max_abs_percent_change": 0.5112365534135632,
+          "max_abs_delta": 192
+        },
+        "app_disk_peak_bytes": {
+          "baseline_median": 460505088,
+          "candidate_median": 460505088,
+          "paired_deltas": [
+            0,
+            0,
+            0
+          ],
+          "paired_percent_changes": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "median_paired_percent_change": 0.0,
+          "max_abs_percent_change": 0.0,
+          "max_abs_delta": 0
+        }
+      },
+      "arms": [
+        {
+          "id": "p1-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 68.39086443300005,
+          "rss_kib": 37656,
+          "app_disk_peak_bytes": 460505088,
+          "cgroup_peak_bytes": 1943830528,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8798208,
+            "file": 463585280,
+            "kernel": 1359446016,
+            "slab_reclaimable": 1358923848
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.188179329,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 30.228649877,
+            "index_seconds": 3.848857937,
+            "publish_seconds": 0.000682003,
+            "total_seconds": 68.373679896
+          }
+        },
+        {
+          "id": "p1-candidate-v1",
+          "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 68.61733985299998,
+          "rss_kib": 37468,
+          "app_disk_peak_bytes": 460505088,
+          "cgroup_peak_bytes": 1943949312,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8794112,
+            "file": 463593472,
+            "kernel": 1359470592,
+            "slab_reclaimable": 1358921648
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.187969272,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 30.495695141,
+            "index_seconds": 3.810985955,
+            "publish_seconds": 0.000714955,
+            "total_seconds": 68.599322013
+          }
+        },
+        {
+          "id": "p2-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 68.59525745999997,
+          "rss_kib": 37504,
+          "app_disk_peak_bytes": 460505088,
+          "cgroup_peak_bytes": 1943457792,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8790016,
+            "file": 463478784,
+            "kernel": 1359437824,
+            "slab_reclaimable": 1358922464
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.186352945,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 30.438947594,
+            "index_seconds": 3.846899168,
+            "publish_seconds": 0.000742567,
+            "total_seconds": 68.576934913
+          }
+        },
+        {
+          "id": "p2-candidate-v1",
+          "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 68.61951148100002,
+          "rss_kib": 37476,
+          "app_disk_peak_bytes": 460505088,
+          "cgroup_peak_bytes": 1944035328,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8798208,
+            "file": 463605760,
+            "kernel": 1359446016,
+            "slab_reclaimable": 1358921504
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.190011462,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 30.453953252,
+            "index_seconds": 3.853666514,
+            "publish_seconds": 0.000790817,
+            "total_seconds": 68.602003108
+          }
+        },
+        {
+          "id": "p3-baseline-v1",
+          "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 68.65140279500008,
+          "rss_kib": 37556,
+          "app_disk_peak_bytes": 460505088,
+          "cgroup_peak_bytes": 1943830528,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8802304,
+            "file": 463581184,
+            "kernel": 1359441920,
+            "slab_reclaimable": 1358923976
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.188635272,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 30.615264291,
+            "index_seconds": 3.724042496,
+            "publish_seconds": 0.000721237,
+            "total_seconds": 68.632067138
+          }
+        },
+        {
+          "id": "p3-candidate-v1",
+          "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "elapsed_seconds": 68.49580673799994,
+          "rss_kib": 37748,
+          "app_disk_peak_bytes": 460505088,
+          "cgroup_peak_bytes": 1943973888,
+          "cgroup_cap_bytes": 4294967296,
+          "memory_endpoint": {
+            "anon": 8785920,
+            "file": 463593472,
+            "kernel": 1359458304,
+            "slab_reclaimable": 1358920600
+          },
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "phases": {
+            "walk_seconds": 34.186719097,
+            "finalize_seconds": 0.0,
+            "insert_seconds": 30.337276924,
+            "index_seconds": 3.849773763,
+            "publish_seconds": 0.000895783,
+            "total_seconds": 68.478465436
+          }
+        }
+      ]
+    }
+  ],
+  "profile": {
+    "policy": "profile-v2",
+    "valid_structure": true,
+    "issues": [],
+    "strict_summary": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 10.636113166999962,
+            "candidate": 10.598458875999995,
+            "delta": -0.03765429099996709
+          },
+          "peak_rss_kib": {
+            "baseline": 377904,
+            "candidate": 287800,
+            "delta": -90104
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 375070720,
+            "candidate": 375070720,
+            "delta": 0
+          }
+        },
+        {
+          "pair": 2,
+          "elapsed_seconds": {
+            "baseline": 10.649707282999998,
+            "candidate": 10.63169501099992,
+            "delta": -0.018012272000078156
+          },
+          "peak_rss_kib": {
+            "baseline": 377996,
+            "candidate": 287812,
+            "delta": -90184
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 375070720,
+            "candidate": 375070720,
+            "delta": 0
+          }
+        },
+        {
+          "pair": 3,
+          "elapsed_seconds": {
+            "baseline": 10.707239388000062,
+            "candidate": 10.564262422999946,
+            "delta": -0.14297696500011625
+          },
+          "peak_rss_kib": {
+            "baseline": 377944,
+            "candidate": 287796,
+            "delta": -90148
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 375070720,
+            "candidate": 375070720,
+            "delta": 0
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": -0.03765429099996709,
+          "max_abs_delta": 0.14297696500011625
+        },
+        "peak_rss_kib": {
+          "median_delta": -90148,
+          "max_abs_delta": 90184
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": 0,
+          "max_abs_delta": 0
+        }
+      },
+      "identical_binaries": false,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "unchanged",
+        "subtree_entries": 100,
+        "memory_mib": 4096,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null
+      }
+    },
+    "original_hwm_monotonic_contract_pass": false,
+    "arms": {
+      "p1-baseline-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 378004,
+            "hwm_kib": 377904,
+            "delta_kib": -100
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [
+          {
+            "previous_phase": "refresh_after_names",
+            "phase": "refresh_after_nodes",
+            "before": 1004499,
+            "after": 2008998,
+            "buffer_changed": true
+          }
+        ],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000173723,
+            "hwm_kib": 7808,
+            "phase": "refresh_start",
+            "rss_kib": 7808
+          },
+          {
+            "elapsed_seconds": 4.351286512,
+            "hwm_kib": 277648,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 277648
+          },
+          {
+            "elapsed_seconds": 4.354108472,
+            "hwm_kib": 277648,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 277648
+          },
+          {
+            "elapsed_seconds": 4.35426859,
+            "hwm_kib": 277648,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 277648
+          },
+          {
+            "elapsed_seconds": 4.362966072,
+            "hwm_kib": 367764,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": true,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 367764
+          },
+          {
+            "elapsed_seconds": 4.363413576,
+            "hwm_kib": 367764,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 367764
+          },
+          {
+            "elapsed_seconds": 4.422852739,
+            "hwm_kib": 378004,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 378004
+          },
+          {
+            "elapsed_seconds": 5.419636164,
+            "hwm_kib": 377904,
+            "phase": "index",
+            "rss_kib": 222956
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 377904
+      },
+      "p1-candidate-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 287816,
+            "hwm_kib": 287800,
+            "delta_kib": -16
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000167813,
+            "hwm_kib": 7832,
+            "phase": "refresh_start",
+            "rss_kib": 7832
+          },
+          {
+            "elapsed_seconds": 4.337670425,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.337803222,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.33794695,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.338050974,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.338460227,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.397912792,
+            "hwm_kib": 287816,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 287816
+          },
+          {
+            "elapsed_seconds": 5.378030597,
+            "hwm_kib": 287800,
+            "phase": "index",
+            "rss_kib": 218884
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 287800
+      },
+      "p2-baseline-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 378004,
+            "hwm_kib": 377996,
+            "delta_kib": -8
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [
+          {
+            "previous_phase": "refresh_after_names",
+            "phase": "refresh_after_nodes",
+            "before": 1004499,
+            "after": 2008998,
+            "buffer_changed": true
+          }
+        ],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000161541,
+            "hwm_kib": 7808,
+            "phase": "refresh_start",
+            "rss_kib": 7808
+          },
+          {
+            "elapsed_seconds": 4.356472578,
+            "hwm_kib": 277652,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 277652
+          },
+          {
+            "elapsed_seconds": 4.359152914,
+            "hwm_kib": 277652,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 277652
+          },
+          {
+            "elapsed_seconds": 4.359307592,
+            "hwm_kib": 277652,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 277652
+          },
+          {
+            "elapsed_seconds": 4.368576248,
+            "hwm_kib": 367764,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": true,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 367764
+          },
+          {
+            "elapsed_seconds": 4.369031517,
+            "hwm_kib": 367764,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 367764
+          },
+          {
+            "elapsed_seconds": 4.426973636,
+            "hwm_kib": 378004,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 378004
+          },
+          {
+            "elapsed_seconds": 5.423221075,
+            "hwm_kib": 377996,
+            "phase": "index",
+            "rss_kib": 222968
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 377996
+      },
+      "p2-candidate-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [],
+        "original_hwm_monotonic_contract_pass": true,
+        "node_capacity_changes": [],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000182189,
+            "hwm_kib": 7952,
+            "phase": "refresh_start",
+            "rss_kib": 7952
+          },
+          {
+            "elapsed_seconds": 4.345038323,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.345169528,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.345327562,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.345432328,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.345876565,
+            "hwm_kib": 277572,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 277572
+          },
+          {
+            "elapsed_seconds": 4.405082085,
+            "hwm_kib": 287812,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 287812
+          },
+          {
+            "elapsed_seconds": 5.399676844,
+            "hwm_kib": 287812,
+            "phase": "index",
+            "rss_kib": 218912
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 287812
+      },
+      "p3-baseline-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 378008,
+            "hwm_kib": 377944,
+            "delta_kib": -64
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [
+          {
+            "previous_phase": "refresh_after_names",
+            "phase": "refresh_after_nodes",
+            "before": 1004499,
+            "after": 2008998,
+            "buffer_changed": true
+          }
+        ],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000172622,
+            "hwm_kib": 7812,
+            "phase": "refresh_start",
+            "rss_kib": 7812
+          },
+          {
+            "elapsed_seconds": 4.339241833,
+            "hwm_kib": 277652,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 277652
+          },
+          {
+            "elapsed_seconds": 4.342419293,
+            "hwm_kib": 277652,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 277652
+          },
+          {
+            "elapsed_seconds": 4.342583008,
+            "hwm_kib": 277652,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004499,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 277652
+          },
+          {
+            "elapsed_seconds": 4.351513404,
+            "hwm_kib": 367768,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": true,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 367768
+          },
+          {
+            "elapsed_seconds": 4.351959395,
+            "hwm_kib": 367768,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 367768
+          },
+          {
+            "elapsed_seconds": 4.4098136,
+            "hwm_kib": 378008,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 2008998,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 378008
+          },
+          {
+            "elapsed_seconds": 5.450298477,
+            "hwm_kib": 377944,
+            "phase": "index",
+            "rss_kib": 222960
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 377944
+      },
+      "p3-candidate-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 287816,
+            "hwm_kib": 287796,
+            "delta_kib": -20
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000165569,
+            "hwm_kib": 7832,
+            "phase": "refresh_start",
+            "rss_kib": 7832
+          },
+          {
+            "elapsed_seconds": 4.332681572,
+            "hwm_kib": 277576,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 277576
+          },
+          {
+            "elapsed_seconds": 4.332815342,
+            "hwm_kib": 277576,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608007,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 277576
+          },
+          {
+            "elapsed_seconds": 4.332958238,
+            "hwm_kib": 277576,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004499,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 277576
+          },
+          {
+            "elapsed_seconds": 4.333062743,
+            "hwm_kib": 277576,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 277576
+          },
+          {
+            "elapsed_seconds": 4.333472096,
+            "hwm_kib": 277576,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 277576
+          },
+          {
+            "elapsed_seconds": 4.391630136,
+            "hwm_kib": 287816,
+            "name_buffer_changed": false,
+            "name_capacity": 13631488,
+            "name_len": 12608620,
+            "node_buffer_changed": false,
+            "node_capacity": 1004598,
+            "node_len": 1004598,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 287816
+          },
+          {
+            "elapsed_seconds": 5.355732014,
+            "hwm_kib": 287796,
+            "phase": "index",
+            "rss_kib": 218900
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 287796
+      }
+    },
+    "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate."
+  },
+  "context": {
+    "scan": {
+      "specs": [
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p1-baseline-v1",
+          "arm": "baseline-v1",
+          "pair": 1,
+          "operation": "scan",
+          "allocation_diagnostics": false,
+          "target": "/scratch/tree",
+          "seed_sha256": "e9a941fcb6d8720b9832246e6433891c7c591cdb5a5c97b31cb6017622458769",
+          "seed_timestamp": 1793496168,
+          "initial_snapshot_allocated_bytes": 256028672,
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p1-candidate-v1",
+          "arm": "candidate-v1",
+          "pair": 1,
+          "operation": "scan",
+          "allocation_diagnostics": false,
+          "target": "/scratch/tree",
+          "seed_sha256": "e9a941fcb6d8720b9832246e6433891c7c591cdb5a5c97b31cb6017622458769",
+          "seed_timestamp": 1793496168,
+          "initial_snapshot_allocated_bytes": 256028672,
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p2-baseline-v1",
+          "arm": "baseline-v1",
+          "pair": 2,
+          "operation": "scan",
+          "allocation_diagnostics": false,
+          "target": "/scratch/tree",
+          "seed_sha256": "e9a941fcb6d8720b9832246e6433891c7c591cdb5a5c97b31cb6017622458769",
+          "seed_timestamp": 1793496168,
+          "initial_snapshot_allocated_bytes": 256028672,
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p2-candidate-v1",
+          "arm": "candidate-v1",
+          "pair": 2,
+          "operation": "scan",
+          "allocation_diagnostics": false,
+          "target": "/scratch/tree",
+          "seed_sha256": "e9a941fcb6d8720b9832246e6433891c7c591cdb5a5c97b31cb6017622458769",
+          "seed_timestamp": 1793496168,
+          "initial_snapshot_allocated_bytes": 256028672,
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p3-baseline-v1",
+          "arm": "baseline-v1",
+          "pair": 3,
+          "operation": "scan",
+          "allocation_diagnostics": false,
+          "target": "/scratch/tree",
+          "seed_sha256": "e9a941fcb6d8720b9832246e6433891c7c591cdb5a5c97b31cb6017622458769",
+          "seed_timestamp": 1793496168,
+          "initial_snapshot_allocated_bytes": 256028672,
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p3-candidate-v1",
+          "arm": "candidate-v1",
+          "pair": 3,
+          "operation": "scan",
+          "allocation_diagnostics": false,
+          "target": "/scratch/tree",
+          "seed_sha256": "e9a941fcb6d8720b9832246e6433891c7c591cdb5a5c97b31cb6017622458769",
+          "seed_timestamp": 1793496168,
+          "initial_snapshot_allocated_bytes": 256028672,
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26"
+        }
+      ],
+      "worker_cgroup_end": {
+        "p1-baseline-v1": {
+          "memory.current": "1832288256",
+          "memory.peak": "1941430272",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8802304\nfile 463368192\nkernel 1359437824\nkernel_stack 16384\npagetables 245760\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10825728\nfile_dirty 24576\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8802304\ninactive_file 439369728\nactive_file 23953408\nunevictable 0\nslab_reclaimable 1358909616\nslab_unreclaimable 236144\nslab 1359145760\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5553\npgmajfault 288\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 14\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 49738472\nuser_usec 22034369\nsystem_usec 27704102\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 697\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=310779904 wbytes=203988992 rios=75233 wios=552 dbytes=0 dios=0\n8:0 rbytes=335261696 wbytes=203997184 rios=19346 wios=548 dbytes=0 dios=0",
+          "io.pressure": "some avg10=18.39 avg60=14.27 avg300=5.46 total=20595405\nfull avg10=18.39 avg60=14.26 avg300=5.46 total=20572266"
+        },
+        "p1-candidate-v1": {
+          "memory.current": "1832280064",
+          "memory.peak": "1938735104",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8802304\nfile 463364096\nkernel 1359433728\nkernel_stack 16384\npagetables 237568\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10567680\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8802304\ninactive_file 439377920\nactive_file 23920640\nunevictable 0\nslab_reclaimable 1358912216\nslab_unreclaimable 238064\nslab 1359150280\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5080\npgmajfault 294\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 25331803\nuser_usec 10811054\nsystem_usec 14520749\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 469\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=310788096 wbytes=180543488 rios=75235 wios=422 dbytes=0 dios=0\n8:0 rbytes=335253504 wbytes=180551680 rios=19349 wios=420 dbytes=0 dios=0",
+          "io.pressure": "some avg10=32.64 avg60=20.90 avg300=6.23 total=21163719\nfull avg10=32.64 avg60=20.90 avg300=6.23 total=21143398"
+        },
+        "p2-baseline-v1": {
+          "memory.current": "1832046592",
+          "memory.peak": "1941372928",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8794112\nfile 463364096\nkernel 1359437824\nkernel_stack 16384\npagetables 237568\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10502144\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8794112\ninactive_file 439365632\nactive_file 23932928\nunevictable 0\nslab_reclaimable 1358908968\nslab_unreclaimable 242712\nslab 1359151680\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5480\npgmajfault 288\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 14\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 49595585\nuser_usec 21918314\nsystem_usec 27677271\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 696\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=310788096 wbytes=203988992 rios=75235 wios=547 dbytes=0 dios=0\n8:0 rbytes=335253504 wbytes=203997184 rios=19349 wios=542 dbytes=0 dios=0",
+          "io.pressure": "some avg10=15.80 avg60=14.09 avg300=5.51 total=20437443\nfull avg10=15.79 avg60=13.93 avg300=5.44 total=20185830"
+        },
+        "p2-candidate-v1": {
+          "memory.current": "1832030208",
+          "memory.peak": "1938837504",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8798208\nfile 463368192\nkernel 1359429632\nkernel_stack 16384\npagetables 237568\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10752000\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8798208\ninactive_file 439377920\nactive_file 23924736\nunevictable 0\nslab_reclaimable 1358911280\nslab_unreclaimable 242712\nslab 1359153992\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5143\npgmajfault 290\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 25941946\nuser_usec 10953824\nsystem_usec 14988121\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 472\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=310784000 wbytes=180006912 rios=75234 wios=422 dbytes=0 dios=0\n8:0 rbytes=335257600 wbytes=180015104 rios=19358 wios=419 dbytes=0 dios=0",
+          "io.pressure": "some avg10=31.65 avg60=21.08 avg300=6.32 total=21383877\nfull avg10=30.29 avg60=20.39 avg300=6.15 total=20871255"
+        },
+        "p3-baseline-v1": {
+          "memory.current": "1832169472",
+          "memory.peak": "1941229568",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8785920\nfile 463245312\nkernel 1359429632\nkernel_stack 16384\npagetables 237568\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10551296\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8785920\ninactive_file 439230464\nactive_file 23932928\nunevictable 0\nslab_reclaimable 1358910568\nslab_unreclaimable 238864\nslab 1359149432\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5598\npgmajfault 288\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 14\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 49198667\nuser_usec 21646892\nsystem_usec 27551775\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 694\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=310788096 wbytes=203988992 rios=75235 wios=543 dbytes=0 dios=0\n8:0 rbytes=335138816 wbytes=203997184 rios=19322 wios=538 dbytes=0 dios=0",
+          "io.pressure": "some avg10=18.49 avg60=14.34 avg300=5.50 total=20519173\nfull avg10=18.49 avg60=14.34 avg300=5.50 total=20486727"
+        },
+        "p3-candidate-v1": {
+          "memory.current": "1832271872",
+          "memory.peak": "1939140608",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8790016\nfile 463400960\nkernel 1359421440\nkernel_stack 16384\npagetables 233472\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10829824\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8790016\ninactive_file 439386112\nactive_file 23949312\nunevictable 0\nslab_reclaimable 1358910824\nslab_unreclaimable 238552\nslab 1359149376\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5146\npgmajfault 294\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 25787236\nuser_usec 10793186\nsystem_usec 14994049\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 471\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=310784000 wbytes=180629504 rios=75234 wios=423 dbytes=0 dios=0\n8:0 rbytes=335273984 wbytes=180637696 rios=19354 wios=421 dbytes=0 dios=0",
+          "io.pressure": "some avg10=31.02 avg60=20.95 avg300=6.29 total=21576617\nfull avg10=30.97 avg60=20.85 avg300=6.26 total=21478437"
+        }
+      },
+      "observers": [
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "812cd021f7571246362095370b991e1536e4cf2b83ac54372b3214fa42dcbbfc",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "812cd021f7571246362095370b991e1536e4cf2b83ac54372b3214fa42dcbbfc",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "812cd021f7571246362095370b991e1536e4cf2b83ac54372b3214fa42dcbbfc",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "812cd021f7571246362095370b991e1536e4cf2b83ac54372b3214fa42dcbbfc",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "812cd021f7571246362095370b991e1536e4cf2b83ac54372b3214fa42dcbbfc",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "812cd021f7571246362095370b991e1536e4cf2b83ac54372b3214fa42dcbbfc",
+          "previous_sha256": null
+        }
+      ]
+    },
+    "refresh": {
+      "specs": [
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p1-baseline-v1",
+          "arm": "baseline-v1",
+          "pair": 1,
+          "operation": "refresh",
+          "allocation_diagnostics": true,
+          "target": "/scratch/tree/small",
+          "seed_sha256": "5733bb46f6964b1ebaa2c320a3894531241cb3b9b12b9313ff139ccae65683bb",
+          "seed_timestamp": 1793496903,
+          "initial_snapshot_allocated_bytes": 256020480,
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p1-candidate-v1",
+          "arm": "candidate-v1",
+          "pair": 1,
+          "operation": "refresh",
+          "allocation_diagnostics": true,
+          "target": "/scratch/tree/small",
+          "seed_sha256": "5733bb46f6964b1ebaa2c320a3894531241cb3b9b12b9313ff139ccae65683bb",
+          "seed_timestamp": 1793496903,
+          "initial_snapshot_allocated_bytes": 256020480,
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p2-baseline-v1",
+          "arm": "baseline-v1",
+          "pair": 2,
+          "operation": "refresh",
+          "allocation_diagnostics": true,
+          "target": "/scratch/tree/small",
+          "seed_sha256": "5733bb46f6964b1ebaa2c320a3894531241cb3b9b12b9313ff139ccae65683bb",
+          "seed_timestamp": 1793496903,
+          "initial_snapshot_allocated_bytes": 256020480,
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p2-candidate-v1",
+          "arm": "candidate-v1",
+          "pair": 2,
+          "operation": "refresh",
+          "allocation_diagnostics": true,
+          "target": "/scratch/tree/small",
+          "seed_sha256": "5733bb46f6964b1ebaa2c320a3894531241cb3b9b12b9313ff139ccae65683bb",
+          "seed_timestamp": 1793496903,
+          "initial_snapshot_allocated_bytes": 256020480,
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p3-baseline-v1",
+          "arm": "baseline-v1",
+          "pair": 3,
+          "operation": "refresh",
+          "allocation_diagnostics": true,
+          "target": "/scratch/tree/small",
+          "seed_sha256": "5733bb46f6964b1ebaa2c320a3894531241cb3b9b12b9313ff139ccae65683bb",
+          "seed_timestamp": 1793496903,
+          "initial_snapshot_allocated_bytes": 256020480,
+          "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5"
+        },
+        {
+          "backend": "v1",
+          "single_operation": true,
+          "files": 1000000,
+          "expected_entries": 1004499,
+          "expected_subtree_entries": 100,
+          "memory_mib": 4096,
+          "observer_memory_mib": 4096,
+          "scenario": "unchanged",
+          "workers": 1,
+          "cpus": 2,
+          "keep_previous": true,
+          "scan_profile": "disk",
+          "timeout_seconds": 1200,
+          "io_limits": {
+            "rbps": 33554432,
+            "wbps": 33554432,
+            "riops": 2200,
+            "wiops": 3600
+          },
+          "io_device": "/dev/loop0",
+          "io_device_number": "7:0",
+          "minimum_free_bytes": 2147483648,
+          "id": "p3-candidate-v1",
+          "arm": "candidate-v1",
+          "pair": 3,
+          "operation": "refresh",
+          "allocation_diagnostics": true,
+          "target": "/scratch/tree/small",
+          "seed_sha256": "5733bb46f6964b1ebaa2c320a3894531241cb3b9b12b9313ff139ccae65683bb",
+          "seed_timestamp": 1793496903,
+          "initial_snapshot_allocated_bytes": 256020480,
+          "binary_sha256": "3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac",
+          "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26"
+        }
+      ],
+      "worker_cgroup_end": {
+        "p1-baseline-v1": {
+          "memory.current": "157478912",
+          "memory.peak": "460169216",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8794112\nfile 143347712\nkernel 4931584\nkernel_stack 16384\npagetables 278528\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10829824\nfile_dirty 49152\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8794112\ninactive_file 122232832\nactive_file 21049344\nunevictable 0\nslab_reclaimable 4365640\nslab_unreclaimable 238664\nslab 4604304\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 7734\npgmajfault 352\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 166\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 3814002\nuser_usec 3365709\nsystem_usec 448293\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 108\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=128155648 wbytes=119074816 rios=259 wios=136 dbytes=0 dios=0\n8:0 rbytes=152215552 wbytes=119074816 rios=884 wios=135 dbytes=0 dios=0",
+          "io.pressure": "some avg10=39.72 avg60=9.68 avg300=2.13 total=6872529\nfull avg10=39.72 avg60=9.68 avg300=2.13 total=6869301"
+        },
+        "p1-candidate-v1": {
+          "memory.current": "157908992",
+          "memory.peak": "444919808",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8794112\nfile 143384576\nkernel 4911104\nkernel_stack 16384\npagetables 262144\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10752000\nfile_dirty 49152\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8794112\ninactive_file 122241024\nactive_file 21078016\nunevictable 0\nslab_reclaimable 4367936\nslab_unreclaimable 238400\nslab 4606336\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 7369\npgmajfault 354\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 129\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 3773176\nuser_usec 3352589\nsystem_usec 420586\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 107\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=128159744 wbytes=119074816 rios=238 wios=132 dbytes=0 dios=0\n8:0 rbytes=152248320 wbytes=119074816 rios=866 wios=131 dbytes=0 dios=0",
+          "io.pressure": "some avg10=35.52 avg60=8.54 avg300=1.88 total=6221078\nfull avg10=35.52 avg60=8.54 avg300=1.88 total=6219072"
+        },
+        "p2-baseline-v1": {
+          "memory.current": "157687808",
+          "memory.peak": "459964416",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8790016\nfile 143331328\nkernel 4927488\nkernel_stack 16384\npagetables 278528\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10821632\nfile_dirty 32768\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8790016\ninactive_file 122200064\nactive_file 21065728\nunevictable 0\nslab_reclaimable 4361112\nslab_unreclaimable 238264\nslab 4599376\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 7595\npgmajfault 353\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 166\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 3828016\nuser_usec 3383576\nsystem_usec 444440\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 108\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=128155648 wbytes=119074816 rios=245 wios=131 dbytes=0 dios=0\n8:0 rbytes=152227840 wbytes=119074816 rios=870 wios=129 dbytes=0 dios=0",
+          "io.pressure": "some avg10=39.14 avg60=9.52 avg300=2.10 total=7021273\nfull avg10=39.14 avg60=9.52 avg300=2.10 total=7020490"
+        },
+        "p2-candidate-v1": {
+          "memory.current": "157392896",
+          "memory.peak": "444227584",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8802304\nfile 143331328\nkernel 4919296\nkernel_stack 16384\npagetables 270336\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10829824\nfile_dirty 36864\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8802304\ninactive_file 122204160\nactive_file 21061632\nunevictable 0\nslab_reclaimable 4361728\nslab_unreclaimable 238880\nslab 4600608\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 7280\npgmajfault 352\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 129\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 3830402\nuser_usec 3386080\nsystem_usec 444322\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 108\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=128155648 wbytes=119074816 rios=238 wios=131 dbytes=0 dios=0\n8:0 rbytes=152223744 wbytes=119074816 rios=860 wios=131 dbytes=0 dios=0",
+          "io.pressure": "some avg10=38.77 avg60=9.36 avg300=2.06 total=6749131\nfull avg10=38.59 avg60=9.32 avg300=2.05 total=6733053"
+        },
+        "p3-baseline-v1": {
+          "memory.current": "157724672",
+          "memory.peak": "452354048",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8790016\nfile 143327232\nkernel 4919296\nkernel_stack 16384\npagetables 274432\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10366976\nfile_dirty 36864\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8790016\ninactive_file 122212352\nactive_file 21049344\nunevictable 0\nslab_reclaimable 4364688\nslab_unreclaimable 242696\nslab 4607384\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 7746\npgmajfault 352\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 166\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 3874850\nuser_usec 3442182\nsystem_usec 432668\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 108\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=128159744 wbytes=119074816 rios=235 wios=131 dbytes=0 dios=0\n8:0 rbytes=152215552 wbytes=119074816 rios=859 wios=131 dbytes=0 dios=0",
+          "io.pressure": "some avg10=37.41 avg60=9.17 avg300=2.02 total=6602836\nfull avg10=37.05 avg60=9.11 avg300=2.01 total=6565173"
+        },
+        "p3-candidate-v1": {
+          "memory.current": "157786112",
+          "memory.peak": "444436480",
+          "memory.max": "4294967296",
+          "memory.stat": "anon 8798208\nfile 143441920\nkernel 4923392\nkernel_stack 16384\npagetables 278528\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10821632\nfile_dirty 32768\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8798208\ninactive_file 122200064\nactive_file 21176320\nunevictable 0\nslab_reclaimable 4364240\nslab_unreclaimable 237880\nslab 4602120\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 7236\npgmajfault 355\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 129\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+          "memory.swap.current": "0",
+          "memory.swap.peak": "0",
+          "memory.swap.max": "0",
+          "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+          "cpu.max": "200000 100000",
+          "cpu.stat": "usage_usec 3733953\nuser_usec 3291418\nsystem_usec 442535\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 107\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+          "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+          "io.stat": "7:0 rbytes=128155648 wbytes=119074816 rios=234 wios=127 dbytes=0 dios=0\n8:0 rbytes=152338432 wbytes=119074816 rios=863 wios=128 dbytes=0 dios=0",
+          "io.pressure": "some avg10=38.97 avg60=9.42 avg300=2.07 total=6852826\nfull avg10=38.97 avg60=9.42 avg300=2.07 total=6852826"
+        }
+      },
+      "observers": [
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "c220440d1e2aad8eec46e07d3aa4b89c3a27732a7c4c938d9210143852247b6f",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "c220440d1e2aad8eec46e07d3aa4b89c3a27732a7c4c938d9210143852247b6f",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "c220440d1e2aad8eec46e07d3aa4b89c3a27732a7c4c938d9210143852247b6f",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "c220440d1e2aad8eec46e07d3aa4b89c3a27732a7c4c938d9210143852247b6f",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "c220440d1e2aad8eec46e07d3aa4b89c3a27732a7c4c938d9210143852247b6f",
+          "previous_sha256": null
+        },
+        {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "semantic_sha256": "c220440d1e2aad8eec46e07d3aa4b89c3a27732a7c4c938d9210143852247b6f",
+          "previous_sha256": null
+        }
+      ]
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 2049,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020613632,
+      "available_bytes": 91856797696
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020613632,
+      "available_bytes": 91856797696
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.0002022970000012947
+  },
+  "job_seconds": {
+    "build": 176,
+    "paired": 1203,
+    "total": 1379
+  },
+  "tests": {
+    "rust_passed": 326,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 121
+  },
+  "original_artifact_files": 257,
+  "indexed_payload_files": 274,
+  "archive_sha256": "b55841caa6e12fce2671eef711820f758849f7b8082c36cdd9735bc2a9f17e8a",
+  "index_sha256": "6b0db250b23a76934f4c8ae81c88abdccb4e97b30136cb1870cc1e727f3eaf15"
+}

@@ -1,6 +1,6 @@
 # V1 optimization: measured progress
 
-The current compact candidate is `471c4d14ed4881106ce1d0b6cd5d6361839b2bc8`, with actual binary `2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b`, compared with the unchanged v1 engine at `e8265778ef78ec4acd9da1375eedb0be37a123f5`. All measurements below use musl and disk staging (`low_memory=true`), one worker, two cgroup CPUs, no swap and the calibrated local I/O envelope. Ordinary in-memory scans are outside this evidence.
+The latest completed one-million-file candidate screen measured `63d98cc8ff88a54ab9687c5fb93fffd930e33d26`, with actual binary `3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac`, against the unchanged v1 engine at `e8265778ef78ec4acd9da1375eedb0be37a123f5`. All measurements below use musl and disk staging (`low_memory=true`), one worker, two cgroup CPUs, no swap and the calibrated local I/O envelope. Ordinary in-memory scans are outside this evidence.
 
 ## Earlier joint candidate: one-million-file screen
 
@@ -40,7 +40,7 @@ The [SQL-only full-scale pair](v1-combined-sql-full-2026-10-31.md) reduced scan 
 
 ## Remaining work
 
-The [compact-source scan memory ladder](v1-compact-stage-scan-memory-manifest-2026-11-01.json) separately preregisters fresh controls and the new `2d2fd14f` binary at 1 GiB and 512 MiB on one million files. Older `f0c25acd` success at 512 MiB does not establish the new source's tested capacity. Candidate progression remains conditional on its screen and the preceding successful rung; ordinary failure stops descent. These cases reserve at most six additional aggregate runner-hours within the unchanged 60-hour campaign cap, and do not establish a minimum, code RAM benefit or promotion by themselves.
+The [compact-source scan memory ladder](v1-compact-stage-scan-memory-manifest-2026-11-01.json) separately preregisters fresh controls and the new `2d2fd14f` binary at 1 GiB and 512 MiB on one million files. Older `f0c25acd` success at 512 MiB does not establish the new source's tested capacity. Candidate qualification progression is held by the inconclusive screen; any later admitted rung also requires the preceding successful rung; ordinary failure stops descent. These cases reserve at most six additional aggregate runner-hours within the unchanged 60-hour campaign cap, and do not establish a minimum, code RAM benefit or promotion by themselves.
 
 Separately admit selected full-scale memory cases using matching forecasts. Resolve no-regression findings and run the required changed-folder and scale confirmations before promotion. The [new 8 MiB default candidate](v1-compact-stage-source-reviews-2026-11-01.md), `601ce381ac229923d2c791fd8e7c510f7b3f1dfc`, has compact temporary indexes and the comprehensive mutation harness. The 4 MiB variant remains a controlled experiment only. Old joint measurements do not qualify this new source.
 
@@ -58,7 +58,13 @@ The fresh [1m 1 GiB A/A control](v1-compact-scan-memory-1024-aa-2026-11-01.md) p
 
 The [preregistered full-scale 1 GiB A/A case](v1-fullscan-memory-full-manifest-2026-11-01.json) concerns unchanged baseline capacity, not compact-source qualification. Its [forecast](v1-fullscan-memory-full-1024-aa-forecast-2026-11-01.md) totaled 4,984 seconds, or 6,479.2 seconds with 30% margin inside the 7,200-second step cap. Source `e0299a6385e27fef4f78b682e7a5d25b969a02a1` changes only build setup and tests from the matching 1m control; ordinary app and measurement source remains unchanged.
 
-A separate root-reuse63 source experiment reuses root data to remove a confirmed redundant roots query. Its exact Opus review returned `NO_FINDINGS` and normal hooks passed, but the new Rust test has not yet executed and timing benefit is unproven. Its next tests are being preregistered.
+The separate root-reuse63 source experiment reuses root data to remove a confirmed redundant roots query. Its [source review](v1-refresh-root-reuse-source-reviews-2026-11-01.json) returned exact Opus `NO_FINDINGS` and normal hooks passed. The [changed-full smoke](v1-root-reuse-changed-full-smoke-2026-11-01.md), run 41259537703, passed strict validation for one 100k-file/10k-entry refresh pair, including current/previous snapshots and hardlink semantics. The new multi-root, one-roots-query Rust test passed on GitHub; 326 Rust tests passed with one ignored, and 121 Python tests passed. Profile structure was valid, while the original HWM monotonic contract was false. The smoke is not performance proof.
+
+The [root-reuse screen](v1-root-reuse-candidate-screen-2026-11-01.md), run 41260421846, completed strict validation and all 12 current/previous observers. Median paired scan changes were −32.202019% time, +1,648 KiB (+4.606955%) process RSS, −4,534,272 bytes (−0.986367%) sampled app disk and −2,535,424 bytes (about −2.418 MiB, −0.1305995%) total worker-cgroup peak. The small total-memory change is not a material full-scan RAM gain. All scan RSS pairs increased 1,568–1,772 KiB, exceeding the fresh A/A maxima of 192 KiB and 0.5112%; the positive median leaves H2 inconclusive. There is no promotion or qualification progression.
+
+Median paired refresh changes were −0.354023% time, −90,148 KiB (−23.85221%) process RSS, zero sampled disk and −15,249,408 bytes (−3.31387%) total cgroup peak. Refresh RSS remains below the 25% benefit floor. Profile-v2 structure passed, while the original HWM monotonic contract was false. The earlier `471c4d` results were measured on a different VM; neither their differences nor the root-query removal establish an attribution for the earlier timing gap.
+
+A bounded, default-off cgroup composition trace is under implementation and review for W1 root-cause investigation. It is unrun and unregistered; it does not demonstrate a source gain or lower-cap success.
 
 The separate [staged-refresh prototype](v1-staged-refresh-isolated-smoke-2026-10-31.md) completed a valid 100k-file smoke after its two preserved invalid attempts. In one pair it reduced process RSS by 39.49%, increased total worker-cgroup peak by 3.94%, increased complete refresh time by 130.22% and increased sampled app disk by 47.90%. This bounded experiment is rejected; its conditional one-million-file screen was cancelled. The result does not qualify the prototype or characterize all disk-backed designs.
 

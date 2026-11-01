@@ -151,9 +151,18 @@ minimum or code gain. Full-scale 512 MiB was not admitted: 6,340 seconds plus
 30% is 8,242 seconds, above the 7,200-second cap.
 
 The separate root-reuse63 source experiment removes a confirmed redundant roots
-query by reusing root data. Its exact Opus review returned `NO_FINDINGS` and normal
-hooks passed; its new Rust test has not executed and timing benefit is unproven.
-Next tests are being preregistered. The campaign ledger is authoritative for
+query by reusing root data. Its [source review](../benchmark-results/v1-refresh-root-reuse-source-reviews-2026-11-01.json)
+returned exact Opus `NO_FINDINGS` and normal hooks passed. Its [changed-full smoke](../benchmark-results/v1-root-reuse-changed-full-smoke-2026-11-01.md),
+run 41259537703, passed strict validation for a 100k-file/10k-entry refresh pair,
+including current/previous and hardlink semantics. The new multi-root,
+one-roots-query Rust test passed on GitHub; 326 Rust tests passed with one
+ignored, and 121 Python tests passed. Profile structure was valid while the
+original HWM monotonic contract was false. This smoke is not performance proof.
+The [root-reuse screen](../benchmark-results/v1-root-reuse-candidate-screen-2026-11-01.md), run 41260421846, completed strict validation and all 12 current/previous observers. For source `63d98cc8ff88a54ab9687c5fb93fffd930e33d26` and observed candidate binary `3b96c71434f981cfef9c23dd77f41136c18ac04c59e3f6211a437721b3cf35ac`, median scan changes were −32.202019% time, +1,648 KiB (+4.606955%) process RSS, −4,534,272 bytes (−0.986367%) sampled app disk and −2,535,424 bytes (about −2.418 MiB, −0.1305995%) total worker-cgroup peak. All scan RSS pairs increased 1,568–1,772 KiB, above the fresh A/A maxima of 192 KiB and 0.5112%. The positive median leaves H2 inconclusive; no promotion or qualification progression follows. The small total-memory change is not a material full-scan RAM gain.
+
+Median refresh changes were −0.354023% time, −90,148 KiB (−23.85221%) RSS, zero sampled disk and −15,249,408 bytes (−3.31387%) total cgroup peak. The RSS result is below the 25% benefit floor. Profile-v2 structure passed, while the original HWM monotonic contract was false. The `471c4d` screen remains a separate historical result on another VM; the timing difference does not attribute the earlier gap to root-query removal.
+
+A bounded, default-off W1 cgroup composition trace is under implementation and review to investigate full-scan memory composition. It is unrun and unregistered, and does not establish a source gain or a lower-cap success. The campaign ledger is authoritative for
 runner time under the unchanged 60-hour limit. The local `freespace.timer` remains
 stopped; `Persistent=yes` can trigger catch-up on restoration. No install, master
 merge or backend switch has been made.
