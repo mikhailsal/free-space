@@ -51,7 +51,8 @@
     41260421846,
     41265785702,
     41268681360,
-    41269627684
+    41269627684,
+    41271696304
   ],
   "runs": [
     {
@@ -1925,13 +1926,63 @@
         0,
         0
       ]
+    },
+    {
+      "id": "cache4-mechanism-63-aa",
+      "branch": "perf/v1-refresh-root-reuse",
+      "revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+      "baseline": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+      "comparison": "candidate",
+      "stage": "screen",
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "swap_mib": 0,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 1950,
+      "forecast_with_margin_seconds": 2535,
+      "research_only": true,
+      "artifact_prefix": "/tmp/freespace-cache4-mechanism-63-aa",
+      "binary_artifact_prefix": "/tmp/freespace-cache4-mechanism-63-aa-binaries",
+      "status": "in_progress",
+      "source_epoch": "1793493808",
+      "cgroup_trace": "off",
+      "expected_baseline_binary_sha256": null,
+      "expected_candidate_binary_sha256": null,
+      "depends_on": "Exact source and separate admission-helper Opus review; immutable source/epoch/helper freeze; current aggregate admission",
+      "case_kind": "same-source63-vs63A/A with independent baseline rebuild",
+      "run_id": 41271696304,
+      "created_at": "2026-11-01T04:05:26Z",
+      "conclusion": null,
+      "head_sha_verified": true,
+      "completed_job_seconds": 0.0,
+      "running_job_seconds_observed": 208.007833,
+      "usage_observed_at": "2026-11-01T04:08:58.007833+00:00",
+      "measurement_validation": "unverified"
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-01T03:52:59.112994+00:00",
+  "updated_at": "2026-11-01T04:08:58.007833+00:00",
   "completed_job_seconds": 45348.0,
-  "maximum_committed_seconds": 80148.0,
-  "remaining_unreserved_seconds": 135852.0,
+  "maximum_committed_seconds": 90948.0,
+  "remaining_unreserved_seconds": 125052.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -1970,7 +2021,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 34800,
+  "planned_reserved_seconds": 40200,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Joint SQL plus exact refresh capacity",
@@ -2263,6 +2314,48 @@
       "profile_policy": "not_applicable_scan_only",
       "allocation_diagnostics": false,
       "forecast_method": "max(initial2156,completed prior paired seconds+900),30%margin strictly below3300; fixed caps"
+    },
+    {
+      "id": "cache4-mechanism-4-vs-8",
+      "branch": "perf/v1-root-reuse-cache4",
+      "revision": "1af549a8f1d834fb292e78a6cbd48ad9d12252cd",
+      "baseline": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+      "comparison": "candidate",
+      "stage": "screen",
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "swap_mib": 0,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 1950,
+      "forecast_with_margin_seconds": 2535,
+      "research_only": true,
+      "artifact_prefix": "/tmp/freespace-cache4-mechanism-4-vs-8",
+      "binary_artifact_prefix": "/tmp/freespace-cache4-mechanism-4-vs-8-binaries",
+      "status": "planned",
+      "source_epoch": "1793493808",
+      "cgroup_trace": "off",
+      "expected_baseline_binary_sha256": null,
+      "expected_candidate_binary_sha256": null,
+      "depends_on": "Exact source and separate admission-helper Opus review; immutable source/epoch/helper freeze; current aggregate admission; completed valid same-source63A/A with actualobserved binary hash and strict/profile/semantic proof",
+      "case_kind": "one-line4MiB-vs8MiBmechanism"
     }
   ],
   "parallel_candidates": {
@@ -2280,8 +2373,8 @@
       "status": "Historical4711mscreenvalidbutrefreshH2hold; source63rootreuse1mscreenvalidbutscanRSSH2hold; no promotion"
     }
   },
-  "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 45348.0,
+  "running_job_seconds_observed": 208.007833,
+  "used_runner_seconds_observed": 45556.007833,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -2512,7 +2605,7 @@
     }
   ],
   "current_research_direction": {
-    "status": "calibration_complete_whole_memory_composition_observed",
+    "status": "calibration_complete_cache4_mechanism_registered_not_dispatched",
     "source_revision": "d64f94369a97a35a644010e19c98de5992c06185",
     "purpose": "Whole-fullscan RAM trace calibration; same binary off/on, no source RAM gain/product qualification",
     "prior_invalid_run_preserved": 41265785702,
@@ -2527,13 +2620,20 @@
     "calibration_run": 41269627684,
     "calibration_decision": "pass all8frozenbars",
     "composition_receipt": "v1-fullscan-memory-composition-2026-11-01.json",
-    "next": "4MiBcachemechanism sourcepublishedbutunmeasured; separateadmissionhelperreviewpending, noreservation/dispatch"
+    "next": "4MiBcachemechanism sourcepublishedbutunmeasured; separateadmissionhelperreviewpending, noreservation/dispatch",
+    "cache_manifest": "v1-cache4-mechanism-manifest-2026-11-01.json",
+    "cache_review_model": "claude-opus-5-5",
+    "cache_helper_closure": "actual completed NO_FINDINGS, frozen private bytes",
+    "cache_case_ids": [
+      "cache4-mechanism-63-aa",
+      "cache4-mechanism-4-vs-8"
+    ]
   },
   "current_research_candidate": {
     "name": "4MiBsharedstagedcachemechanism",
     "revision": "1af549a8f1d834fb292e78a6cbd48ad9d12252cd",
     "baseline": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
-    "status": "published, unmeasured; pendingprivatehelperclosurebeforeanyreservation",
+    "status": "published research; exacthelperclosureNO_FINDINGS, two boundedcasesregistered butunrun; only valid63A/A permits4MiBcase",
     "product_qualification": false,
     "scope": "v1 measurements; sharedconstant alsoaffectsv2diskstaging unmeasured"
   }

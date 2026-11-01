@@ -1,0 +1,59 @@
+{
+  "status": "admission review completed; scientific comparisons pending",
+  "final_review_sha256": "2b03b8603da06cf28daba9f0a0aa7ad8e1b2d95bd8d6ddbf68bdcbcb69d24c62",
+  "helper_sha256": "a4cb5ed585988d28ed6f77c4e5931f7a2f0a97fdad1b103461f4791cc532198d",
+  "test_sha256": "cec760d5bacea87e85f7a76019b1e21b9c3dfd9c2fd4a69b69f0e3305f405389",
+  "source_freeze_sha256": "5c9ef535b2e2636969b5c66f0eb22bbbc8542dc0605ec04154c60b966559afd0",
+  "preregistration": {
+    "registered_at": "2026-11-01T04:05:05.330183+00:00",
+    "manifest_path": "/home/tass/myprojects/corp_v2/free-space/docs/benchmark-results/v1-cache4-mechanism-manifest-2026-11-01.json",
+    "manifest_sha256": "795e5923583da0bcc8a7b4a37a32aa58ba8f42052b7c69631c85c7c11458eee8",
+    "prior_ledger_sha256": "b57db09e265729fcad0e53cd4b70d891395eac01baf1506c0b81a16456865c2e",
+    "registered_ledger_sha256": "0e5db45c186f097b162cf3929c81bf5471389011490de80d94d457075deaaccd",
+    "source_freeze_sha256": "5c9ef535b2e2636969b5c66f0eb22bbbc8542dc0605ec04154c60b966559afd0",
+    "helper_sha256": "a4cb5ed585988d28ed6f77c4e5931f7a2f0a97fdad1b103461f4791cc532198d",
+    "outside_review_raw_sha256": "2b03b8603da06cf28daba9f0a0aa7ad8e1b2d95bd8d6ddbf68bdcbcb69d24c62",
+    "new_reserved_seconds": 10800,
+    "completed_runner_seconds": 45348.0,
+    "all_planned_reserved_seconds": 45600,
+    "maximum_committed_seconds": 90948.0,
+    "unreserved_seconds": 125052.0,
+    "status": "registered before any cache workflow; no product qualification"
+  },
+  "review_input_map": {
+    "prompt_sha256": "93319822edfbb0d109de6075f8e2d98a5eff6fa3c91e9e23bfd8e9e069ffa290",
+    "private_file_sha256": {
+      "/tmp/freespace-admit-cache4-mechanism.py": "a4cb5ed585988d28ed6f77c4e5931f7a2f0a97fdad1b103461f4791cc532198d",
+      "/tmp/test-freespace-cache4-mechanism-admission.py": "cec760d5bacea87e85f7a76019b1e21b9c3dfd9c2fd4a69b69f0e3305f405389",
+      "/tmp/freespace-cache4-mechanism-final-draft-manifest.json": "6077d5ae54f6966ada005b287c2e01d1e78b0d5d9fbb0cf882808fe2f3d96fd9",
+      "/tmp/freespace-cache4-mechanism-prereg-audit-20261101.json": "a9e1317ca2cfed6de11f8d1d2a0f88ce268c0dcbc7c487aa97aba19dfa61fcb7"
+    },
+    "context_file_sha256": {
+      "/tmp/free-space-v1-refresh-root-reuse/.github/workflows/representative-bench.yml": "b87a29bba8b2d8502673ff6dc614c03c114b2d368f01f879819b67f136065865",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench_v1_summary.py": "4192090e14f397ba34559026d200f0c21e21a9f801c05beae059ead5de5fd358",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench_v1_profile.py": "2c14825392149e51aa6892014d61d1d49fadeec5c360f80403de4a024d362990",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench_v1_pair.py": "060dba1cb9d312ea0712ca0ca5e0e65283c1c729f6165edeac73091a3ab79dbd",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench_v1_admission.py": "cdc563be0cc39d88e4e3a3fcd921bd81ce9e47cb71dd8d5d53d5645b80cedf3e",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench_v2_config.py": "098f0321d9a0f828ec9cb6321749fe6b7346db05c3fc47ec2dc5f9f68fde840d",
+      "/tmp/freespace-root-cache4-source-review-disposition.json": "092e7f645644cb82953b0cbcbc56d43233ed78b4591cee27793b693f4a8f2196",
+      "/tmp/freespace-root-cache4-source-closure-validation.json": "48d9177d931c9edff5819f7b0273e988e8a2ef1ebf338f1a607c8e67e31b7ca6",
+      "/tmp/freespace-root-cache4-source-publication.json": "b6e6467d1bcc72fdddd86405addb0bd5ed8b37ac8f9d94d7ed76c1cd3c9339a0",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench-representative.sh": "7f1a5311ab6314d72c6ce6301907eac3bf36a4f059cc43e1505a4625a428b0e5",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench_v1_runtime.py": "7e0941635fb6253eee414e6e7be4e9be420a25988525a301f7868a66ba525542",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench-v2-container.py": "63cb2d7a9f219bcefceb02f23df7e560ab1ff96071f12f30880257d9459fd20c",
+      "/tmp/free-space-v1-refresh-root-reuse/scripts/bench-v2-seed.py": "bff67028da8da624242f1b3707e270daa8fc7bea886813ae17b9ce9aead72654",
+      "/tmp/freespace-cache4-ghlog-producer-audit-20261101.md": "8ae8521e9d905c1cbb9572d01784801fb18cf02fc09bda8489c6b67b131b8484",
+      "/tmp/freespace-cache4-ghlog-producer-audit-20261101.json": "f9232d195f12a8defc557174c866ca0842a85e9655887b3dfa796e3e5a94156b",
+      "/tmp/freespace-cache4-mechanism-final-mocked-tests.log": "3aa5af17d7c5b14fa2e3929ea4f42bad6498b48dae3c981fe095dda8114302de"
+    },
+    "previous_review_sha256": "7b9ac987dd61f06594fd07f70f73b122096bec3d083fab73ad27f31a7a56fcc8"
+  },
+  "mock_tests": "21 passed; see indexed log",
+  "review_chain": "initial findings, first closure findings, final exact Opus NO_FINDINGS",
+  "known_mock_test_mistake": "An intermediate test unexpectedly attempted a read-only gh run view 123 --log; it failed without mutation; subsequent tests guard unmocked non-Git subprocesses.",
+  "scope": "4 MiB vs 8 MiB mechanism research, no product promotion; source P3 v2 scope remains unmeasured",
+  "candidate_comparison": "both cases comparison=candidate; independent baseline 63, common SOURCE_DATE_EPOCH 1793493808; actual binary hashes unknown until downloaded",
+  "indexed_payloads": 38,
+  "archive_sha256": "5d1253a077c0ce646e254d4510d1bec3706e6ba789f786a211693cf0a7c93bef",
+  "index_sha256": "c1298a9888ca2e0dacc686a4b1f10fd6c83b99a7f8740d104addfb971c9084b5"
+}
