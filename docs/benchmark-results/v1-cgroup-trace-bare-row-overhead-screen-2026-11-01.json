@@ -1,0 +1,407 @@
+{
+  "run_id": 41269627684,
+  "head": "d64f94369a97a35a644010e19c98de5992c06185",
+  "status": "valid_instrumentation_calibration",
+  "ordinary_equal_raw_valid": true,
+  "diagnostic_equal_raw_valid": true,
+  "diagnostic": {
+    "valid": true,
+    "issues": [],
+    "policy": "contrast",
+    "diagnostic_arms": [
+      {
+        "id": "p1-candidate-v1",
+        "devices": {
+          "output_st_dev": 2049,
+          "snapshot_st_dev": 1792
+        },
+        "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage",
+        "samples": 15,
+        "bytes": 33225,
+        "missed": 0,
+        "max_record_bytes": 2209,
+        "coverage_ns": 66819682960,
+        "sampled_current_max": 1945415680,
+        "final_memory_peak": 1945415680,
+        "sampling_wall_ns": 7180035,
+        "sampling_thread_cpu_ns": 7169961,
+        "setup_wall_ns": 95128,
+        "setup_thread_cpu_ns": 94366,
+        "finalize_wall_ns": 716324,
+        "finalize_thread_cpu_ns": 716047
+      },
+      {
+        "id": "p2-candidate-v1",
+        "devices": {
+          "output_st_dev": 2049,
+          "snapshot_st_dev": 1792
+        },
+        "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage",
+        "samples": 15,
+        "bytes": 33225,
+        "missed": 0,
+        "max_record_bytes": 2208,
+        "coverage_ns": 67035063660,
+        "sampled_current_max": 1945448448,
+        "final_memory_peak": 1945452544,
+        "sampling_wall_ns": 7375825,
+        "sampling_thread_cpu_ns": 7366104,
+        "setup_wall_ns": 97754,
+        "setup_thread_cpu_ns": 96801,
+        "finalize_wall_ns": 658164,
+        "finalize_thread_cpu_ns": 657488
+      },
+      {
+        "id": "p3-candidate-v1",
+        "devices": {
+          "output_st_dev": 2049,
+          "snapshot_st_dev": 1792
+        },
+        "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage",
+        "samples": 15,
+        "bytes": 33225,
+        "missed": 0,
+        "max_record_bytes": 2208,
+        "coverage_ns": 66965906997,
+        "sampled_current_max": 1945280512,
+        "final_memory_peak": 1945542656,
+        "sampling_wall_ns": 7170484,
+        "sampling_thread_cpu_ns": 7184348,
+        "setup_wall_ns": 95389,
+        "setup_thread_cpu_ns": 94957,
+        "finalize_wall_ns": 673093,
+        "finalize_thread_cpu_ns": 672866
+      }
+    ],
+    "cgroup_peak_bytes": [
+      {
+        "pair": 1,
+        "off": 1943605248,
+        "on": 1945415680,
+        "delta": 1810432
+      },
+      {
+        "pair": 2,
+        "off": 1943437312,
+        "on": 1945452544,
+        "delta": 2015232
+      },
+      {
+        "pair": 3,
+        "off": 1943547904,
+        "on": 1945542656,
+        "delta": 1994752
+      }
+    ],
+    "ordinary_summary": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 66.78884388900002,
+            "candidate": 66.81818627299998,
+            "delta": 0.029342383999960475
+          },
+          "peak_rss_kib": {
+            "baseline": 37632,
+            "candidate": 37848,
+            "delta": 216
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459702272,
+            "candidate": 459702272,
+            "delta": 0
+          }
+        },
+        {
+          "pair": 2,
+          "elapsed_seconds": {
+            "baseline": 67.12611727399997,
+            "candidate": 67.03371415700002,
+            "delta": -0.09240311699994663
+          },
+          "peak_rss_kib": {
+            "baseline": 37848,
+            "candidate": 37732,
+            "delta": -116
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459702272,
+            "candidate": 459702272,
+            "delta": 0
+          }
+        },
+        {
+          "pair": 3,
+          "elapsed_seconds": {
+            "baseline": 66.67040314799999,
+            "candidate": 66.964490651,
+            "delta": 0.2940875030000143
+          },
+          "peak_rss_kib": {
+            "baseline": 37848,
+            "candidate": 37940,
+            "delta": 92
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459702272,
+            "candidate": 459702272,
+            "delta": 0
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": 0.029342383999960475,
+          "max_abs_delta": 0.2940875030000143
+        },
+        "peak_rss_kib": {
+          "median_delta": 92,
+          "max_abs_delta": 216
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": 0,
+          "max_abs_delta": 0
+        }
+      },
+      "identical_binaries": true,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "unchanged",
+        "subtree_entries": 100,
+        "memory_mib": 4096,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null
+      }
+    },
+    "interpretation": "Instrumentation contrast, not a noise band or product optimization. Cgroup reads, JSON encoding and cache writes are cocharged to the worker. The shared 20ms sampler can delay disk sampling and free-space reserve checks. Output and snapshot devices can share a physical disk. Five-second points are non-atomic; they provide no phase attribution or peak decomposition."
+  },
+  "evaluation": {
+    "decision": "pass",
+    "checks": {
+      "time_median": true,
+      "time_worst": true,
+      "rss_median": true,
+      "rss_worst": true,
+      "cgroup_median": true,
+      "cgroup_worst": true,
+      "disk_median": true,
+      "disk_worst": true
+    },
+    "signed_pairs": [
+      {
+        "pair": 1,
+        "time_percent": "146711919999800/3339442194450001",
+        "rss_kib": 216,
+        "cgroup_bytes": 1810432,
+        "disk_bytes": 0
+      },
+      {
+        "pair": 2,
+        "time_percent": "-924031169999500/6712611727399997",
+        "rss_kib": -116,
+        "cgroup_bytes": 2015232,
+        "disk_bytes": 0
+      },
+      {
+        "pair": 3,
+        "time_percent": "2940875030000100/6667040314799999",
+        "rss_kib": 92,
+        "cgroup_bytes": 1994752,
+        "disk_bytes": 0
+      }
+    ],
+    "metric_sources": {
+      "time": "metrics.json.elapsed_seconds (not time.elapsed_seconds)",
+      "rss": "metrics.json.time.peak_rss_kib",
+      "total_cgroup": "metrics.json.cgroup_after[\"memory.peak\"]: ASCII decimal string parsed to integer bytes",
+      "app_disk": "metrics.json.app_disk_peak_bytes (not incremental filesystem usage)"
+    },
+    "interpretation": "instrumentation contrast only; no product gain or H2 waiver"
+  },
+  "trace_receipts": {
+    "p1-candidate-v1": {
+      "valid": true,
+      "started_ns": 330536477625,
+      "ended_ns": 397356160585,
+      "interval_ns": 5000000000,
+      "samples": 15,
+      "attempted": 15,
+      "missed": 0,
+      "late": 1,
+      "max_lateness_ns": 20579836,
+      "final_covers_due_tick": false,
+      "final_covered_deadline_ns": null,
+      "late_tolerance_ns": 20000000,
+      "errors": 0,
+      "missing": 0,
+      "truncated": false,
+      "bytes": 33225,
+      "wall_ns": 7180035,
+      "thread_cpu_ns": 7169961,
+      "cli_start_ns": 330537213826,
+      "cli_end_ns": 397355400099,
+      "devices": {
+        "output_st_dev": 2049,
+        "snapshot_st_dev": 1792
+      },
+      "error": null,
+      "sha256": "63cbdc5f248e45a99d3b3d9ef63a6e6fe87b1e913ae307614c1a1fd33f2190f4",
+      "setup_wall_ns": 95128,
+      "setup_thread_cpu_ns": 94366,
+      "finalize_wall_ns": 716324,
+      "finalize_thread_cpu_ns": 716047,
+      "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage"
+    },
+    "p3-candidate-v1": {
+      "valid": true,
+      "started_ns": 728237802117,
+      "ended_ns": 795203709114,
+      "interval_ns": 5000000000,
+      "samples": 15,
+      "attempted": 15,
+      "missed": 0,
+      "late": 0,
+      "max_lateness_ns": 19256198,
+      "final_covers_due_tick": false,
+      "final_covered_deadline_ns": null,
+      "late_tolerance_ns": 20000000,
+      "errors": 0,
+      "missing": 0,
+      "truncated": false,
+      "bytes": 33225,
+      "wall_ns": 7170484,
+      "thread_cpu_ns": 7184348,
+      "cli_start_ns": 728238531345,
+      "cli_end_ns": 795203021996,
+      "devices": {
+        "output_st_dev": 2049,
+        "snapshot_st_dev": 1792
+      },
+      "error": null,
+      "sha256": "db3d2b6ca84dc30dec73b9df7b3c9691a56aa915fad3c240fd3a65f42de6e30d",
+      "setup_wall_ns": 95389,
+      "setup_thread_cpu_ns": 94957,
+      "finalize_wall_ns": 673093,
+      "finalize_thread_cpu_ns": 672866,
+      "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage"
+    },
+    "p2-candidate-v1": {
+      "valid": true,
+      "started_ns": 429888589230,
+      "ended_ns": 496923652890,
+      "interval_ns": 5000000000,
+      "samples": 15,
+      "attempted": 15,
+      "missed": 0,
+      "late": 1,
+      "max_lateness_ns": 20239417,
+      "final_covers_due_tick": false,
+      "final_covered_deadline_ns": null,
+      "late_tolerance_ns": 20000000,
+      "errors": 0,
+      "missing": 0,
+      "truncated": false,
+      "bytes": 33225,
+      "wall_ns": 7375825,
+      "thread_cpu_ns": 7366104,
+      "cli_start_ns": 429889218703,
+      "cli_end_ns": 496922932860,
+      "devices": {
+        "output_st_dev": 2049,
+        "snapshot_st_dev": 1792
+      },
+      "error": null,
+      "sha256": "080a8b7098075171f7d8803e79d00f177b79247cf1525b1781e34129e5fc97f5",
+      "setup_wall_ns": 97754,
+      "setup_thread_cpu_ns": 96801,
+      "finalize_wall_ns": 658164,
+      "finalize_thread_cpu_ns": 657488,
+      "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage"
+    }
+  },
+  "observers": {
+    "p1-candidate-v1": {
+      "validated": true,
+      "current_entries": 1004499,
+      "previous_entries": 1004499,
+      "semantic_sha256": "769a4636394e0cd2876996103e5407a7086bd60f54cfe7d498112d7e5dc68d9d",
+      "previous_sha256": null
+    },
+    "p3-baseline-v1": {
+      "validated": true,
+      "current_entries": 1004499,
+      "previous_entries": 1004499,
+      "semantic_sha256": "769a4636394e0cd2876996103e5407a7086bd60f54cfe7d498112d7e5dc68d9d",
+      "previous_sha256": null
+    },
+    "p3-candidate-v1": {
+      "validated": true,
+      "current_entries": 1004499,
+      "previous_entries": 1004499,
+      "semantic_sha256": "769a4636394e0cd2876996103e5407a7086bd60f54cfe7d498112d7e5dc68d9d",
+      "previous_sha256": null
+    },
+    "p1-baseline-v1": {
+      "validated": true,
+      "current_entries": 1004499,
+      "previous_entries": 1004499,
+      "semantic_sha256": "769a4636394e0cd2876996103e5407a7086bd60f54cfe7d498112d7e5dc68d9d",
+      "previous_sha256": null
+    },
+    "p2-baseline-v1": {
+      "validated": true,
+      "current_entries": 1004499,
+      "previous_entries": 1004499,
+      "semantic_sha256": "769a4636394e0cd2876996103e5407a7086bd60f54cfe7d498112d7e5dc68d9d",
+      "previous_sha256": null
+    },
+    "p2-candidate-v1": {
+      "validated": true,
+      "current_entries": 1004499,
+      "previous_entries": 1004499,
+      "semantic_sha256": "769a4636394e0cd2876996103e5407a7086bd60f54cfe7d498112d7e5dc68d9d",
+      "previous_sha256": null
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 2049,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020625920,
+      "available_bytes": 91856785408
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020625920,
+      "available_bytes": 91856785408
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.0002174450000005379
+  },
+  "job_seconds": {
+    "build": 155,
+    "paired": 810,
+    "total": 965
+  },
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 151
+  },
+  "both_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "original_artifact_files": 131,
+  "indexed_payload_files": 152,
+  "archive_sha256": "352f6f406024d7f5e11afb73a9525df6122bbf7e25ddce44c5b9b3d159d666a7",
+  "index_sha256": "7bd3d51f89cb08e26a02873e173e2a9893d941981018454ac77b07e6eded0593"
+}

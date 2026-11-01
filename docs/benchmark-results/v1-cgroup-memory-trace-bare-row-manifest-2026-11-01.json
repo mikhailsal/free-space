@@ -63,7 +63,10 @@
       "completed_job_seconds": 318.0,
       "running_job_seconds_observed": 0,
       "usage_observed_at": "2026-11-01T03:26:26.050464+00:00",
-      "job_seconds": 318.0
+      "job_seconds": 318.0,
+      "receipt_validation": "strict ordinary+diagnostic raw recomputation equal andvalid; both observers valid",
+      "receipt": "v1-cgroup-trace-bare-row-protocol-smoke-2026-11-01.json",
+      "interpretation": "100k onepair protocolvalidity only; no numeric calibration/productgain"
     },
     {
       "branch": "perf/v1-cgroup-memory-trace-bare-row",
@@ -89,7 +92,7 @@
       "research_only": true,
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "status": "in_progress",
+      "status": "completed",
       "id": "cgroup-trace-bare-row-overhead-screen",
       "files": 1000000,
       "expected_entries": 1004499,
@@ -104,11 +107,26 @@
       "swap_mib": 0,
       "run_id": 41269627684,
       "created_at": "2026-11-01T03:33:07Z",
-      "conclusion": null,
+      "conclusion": "success",
       "head_sha_verified": true,
-      "completed_job_seconds": 155.0,
-      "running_job_seconds_observed": 214.949426,
-      "usage_observed_at": "2026-11-01T03:39:22.949426+00:00"
+      "completed_job_seconds": 965.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T03:49:49.518481+00:00",
+      "job_seconds": 965.0,
+      "receipt_validation": "strict ordinary+diagnostic raw recomputation equal andvalid; sixobservers valid",
+      "receipt": "v1-cgroup-trace-bare-row-overhead-screen-2026-11-01.json",
+      "calibration_decision": "pass_all_eight_frozen_bars",
+      "interpretation": "1m3-pair4GiB same-binaryinstrumentationonly; no productgain/H2waiver; no automaticfullscale/lowercapoverhead claim",
+      "late_ticks": [
+        1,
+        1,
+        0
+      ],
+      "missed_ticks": [
+        0,
+        0,
+        0
+      ]
     }
   ],
   "prerequisites": [
@@ -136,7 +154,7 @@
     "pairing": "Match on and off within the same pair."
   },
   "created_at": "2026-11-01T03:18:15.877766+00:00",
-  "progress_status": "Corrected protocol smoke41268681360 valid; same-binary1m3-pair overhead calibration41269627684 in progress; no calibration or product gain claim yet",
+  "progress_status": "Corrected100kprotocolsmokevalid;1m3-pair4GiBsame-binarycalibrationPASS all8frozenbars;compositiondata archived; no productRAMgain/promotion",
   "review_model": "claude-opus-5-5",
-  "updated_at": "2026-11-01T03:39:22.949426+00:00"
+  "updated_at": "2026-11-01T03:52:59.112994+00:00"
 }

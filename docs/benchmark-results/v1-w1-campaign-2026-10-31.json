@@ -1861,7 +1861,10 @@
       "completed_job_seconds": 318.0,
       "running_job_seconds_observed": 0,
       "usage_observed_at": "2026-11-01T03:26:26.050464+00:00",
-      "job_seconds": 318.0
+      "job_seconds": 318.0,
+      "receipt_validation": "strict ordinary+diagnostic raw recomputation equal andvalid; both observers valid",
+      "receipt": "v1-cgroup-trace-bare-row-protocol-smoke-2026-11-01.json",
+      "interpretation": "100k onepair protocolvalidity only; no numeric calibration/productgain"
     },
     {
       "branch": "perf/v1-cgroup-memory-trace-bare-row",
@@ -1887,7 +1890,7 @@
       "research_only": true,
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "status": "in_progress",
+      "status": "completed",
       "id": "cgroup-trace-bare-row-overhead-screen",
       "files": 1000000,
       "expected_entries": 1004499,
@@ -1902,18 +1905,33 @@
       "swap_mib": 0,
       "run_id": 41269627684,
       "created_at": "2026-11-01T03:33:07Z",
-      "conclusion": null,
+      "conclusion": "success",
       "head_sha_verified": true,
-      "completed_job_seconds": 155.0,
-      "running_job_seconds_observed": 214.949426,
-      "usage_observed_at": "2026-11-01T03:39:22.949426+00:00"
+      "completed_job_seconds": 965.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T03:49:49.518481+00:00",
+      "job_seconds": 965.0,
+      "receipt_validation": "strict ordinary+diagnostic raw recomputation equal andvalid; sixobservers valid",
+      "receipt": "v1-cgroup-trace-bare-row-overhead-screen-2026-11-01.json",
+      "calibration_decision": "pass_all_eight_frozen_bars",
+      "interpretation": "1m3-pair4GiB same-binaryinstrumentationonly; no productgain/H2waiver; no automaticfullscale/lowercapoverhead claim",
+      "late_ticks": [
+        1,
+        1,
+        0
+      ],
+      "missed_ticks": [
+        0,
+        0,
+        0
+      ]
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-01T03:39:22.949426+00:00",
-  "completed_job_seconds": 44538.0,
-  "maximum_committed_seconds": 84583.0,
-  "remaining_unreserved_seconds": 131417.0,
+  "updated_at": "2026-11-01T03:52:59.112994+00:00",
+  "completed_job_seconds": 45348.0,
+  "maximum_committed_seconds": 80148.0,
+  "remaining_unreserved_seconds": 135852.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -2258,12 +2276,12 @@
       "primary_revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
       "matched_control_revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
       "primary_cache_kib_per_connection": 8192,
-      "candidate_4m": "Unpublished, only controlled 8/4 trial after primary validation",
-      "status": "Research only, GH correctness and measurement pending"
+      "candidate_4m": "Published1af mechanism only; no GHdata/admissionyet",
+      "status": "Historical4711mscreenvalidbutrefreshH2hold; source63rootreuse1mscreenvalidbutscanRSSH2hold; no promotion"
     }
   },
-  "running_job_seconds_observed": 214.949426,
-  "used_runner_seconds_observed": 44752.949426,
+  "running_job_seconds_observed": 0,
+  "used_runner_seconds_observed": 45348.0,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -2494,7 +2512,7 @@
     }
   ],
   "current_research_direction": {
-    "status": "corrected_smoke_valid_1m_calibration_running",
+    "status": "calibration_complete_whole_memory_composition_observed",
     "source_revision": "d64f94369a97a35a644010e19c98de5992c06185",
     "purpose": "Whole-fullscan RAM trace calibration; same binary off/on, no source RAM gain/product qualification",
     "prior_invalid_run_preserved": 41265785702,
@@ -2504,8 +2522,19 @@
       "cgroup-trace-bare-row-overhead-screen"
     ],
     "expected_both_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-    "product_gates": "Unchanged;63H2RSShold remains,cache4mechanismsourcepublishedbutunmeasured",
+    "product_gates": "Unchanged; source63H2RSShold remains; no meaningfulwholeRAMsourcegainqualified",
     "smoke_run": 41268681360,
-    "calibration_run": 41269627684
+    "calibration_run": 41269627684,
+    "calibration_decision": "pass all8frozenbars",
+    "composition_receipt": "v1-fullscan-memory-composition-2026-11-01.json",
+    "next": "4MiBcachemechanism sourcepublishedbutunmeasured; separateadmissionhelperreviewpending, noreservation/dispatch"
+  },
+  "current_research_candidate": {
+    "name": "4MiBsharedstagedcachemechanism",
+    "revision": "1af549a8f1d834fb292e78a6cbd48ad9d12252cd",
+    "baseline": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+    "status": "published, unmeasured; pendingprivatehelperclosurebeforeanyreservation",
+    "product_qualification": false,
+    "scope": "v1 measurements; sharedconstant alsoaffectsv2diskstaging unmeasured"
   }
 }
