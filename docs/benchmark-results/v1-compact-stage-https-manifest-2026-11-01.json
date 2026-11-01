@@ -1,6 +1,6 @@
 {
   "created_at": "2026-10-31T23:26:24.884169+00:00",
-  "status": "preregistered_research_only",
+  "status": "Real changed-full smoke and fresh matched1m controls valid; candidate screen eligible for admission; no promotion",
   "candidate_revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
   "control_revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -44,10 +44,27 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "must be observed from actual artifact; not borrowed from older joint",
       "campaign_cap_seconds": 216000,
-      "status": "ready_for_admission",
+      "status": "completed",
       "depends_on": "Frozen reviewed source and passed normal hooks. Full GH Python and Rust gates before workers.",
       "purpose": "Real product schema, hardlink ownership, previous-history and changed-full end-to-end proof; no performance qualification",
-      "artifact_prefix": "/tmp/freespace-compact-stage-https-changed-full-smoke"
+      "artifact_prefix": "/tmp/freespace-compact-stage-https-changed-full-smoke",
+      "admitted_at": "2026-10-31T23:29:23.067248+00:00",
+      "dispatch_receipt": "/tmp/freespace-compact-stage-https-changed-full-smoke-dispatch.json",
+      "run_id": 41252735964,
+      "created_at": "2026-10-31T23:29:24Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 374.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-10-31T23:37:51.973027+00:00",
+      "job_seconds": 374.0,
+      "receipt": "v1-compact-stage-https-changed-full-smoke-2026-11-01.json",
+      "receipt_validation": "strict_valid_2workers_and_observers_changed_full_pass",
+      "actual_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "actual_candidate_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
+      "qualification": "protocol_smoke_only_not_promoted",
+      "profile_structure": "valid",
+      "profile_original_hwm_contract": false
     },
     {
       "id": "compact-stage-https-matched-control-screen",
@@ -84,10 +101,27 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "must be observed from actual artifact; not borrowed from older joint",
       "campaign_cap_seconds": 216000,
-      "status": "conditional_protocol_smoke",
+      "status": "completed",
       "depends_on": "Real changed-full smoke valid for canonical baseline and candidate; fresh matched A/A control before candidate comparison. Same frozen harness hashes. No retries after ordinary failure.",
       "purpose": "Fresh matched one-million-file source screen; no full-scale extrapolation or promotion",
-      "artifact_prefix": "/tmp/freespace-compact-stage-https-matched-control-screen"
+      "artifact_prefix": "/tmp/freespace-compact-stage-https-matched-control-screen",
+      "admitted_at": "2026-10-31T23:38:27.739099+00:00",
+      "dispatch_receipt": "/tmp/freespace-compact-stage-https-matched-control-screen-dispatch.json",
+      "run_id": 41253374855,
+      "created_at": "2026-10-31T23:38:29Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 1540.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T00:06:30.800366+00:00",
+      "job_seconds": 1540.0,
+      "receipt": "v1-compact-stage-https-aa-screen-2026-11-01.json",
+      "receipt_validation": "strict_valid_scan_and_refresh_12workers_and_observers",
+      "actual_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "actual_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "qualification": "matched_control_variability_only",
+      "profile_structure": "valid",
+      "profile_original_hwm_contract": false
     },
     {
       "id": "compact-stage-https-candidate-screen",
@@ -122,12 +156,20 @@
       "profile_policy": "profile-v2",
       "allocation_diagnostics": true,
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
-      "candidate_binary_sha256": "must be observed from actual artifact; not borrowed from older joint",
+      "candidate_binary_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
       "campaign_cap_seconds": 216000,
-      "status": "conditional_matched_control",
+      "status": "in_progress",
       "depends_on": "Real changed-full smoke valid for canonical baseline and candidate; fresh matched A/A control before candidate comparison. Same frozen harness hashes. No retries after ordinary failure.",
       "purpose": "Fresh matched one-million-file source screen; no full-scale extrapolation or promotion",
-      "artifact_prefix": "/tmp/freespace-compact-stage-https-candidate-screen"
+      "artifact_prefix": "/tmp/freespace-compact-stage-https-candidate-screen",
+      "expected_binary_basis": "Actual successful canonical-epoch musl smoke41252735964, unchanged source471c4d; reject another actual candidate binary cohort",
+      "admitted_at": "2026-11-01T00:06:46.872126+00:00",
+      "dispatch_receipt": "/tmp/freespace-compact-stage-https-candidate-screen-dispatch.json",
+      "run_id": 41255297627,
+      "created_at": "2026-11-01T00:06:48Z",
+      "conclusion": "",
+      "head_sha_verified": true,
+      "completed_job_seconds": 0
     }
   ],
   "forecasts": {
@@ -142,5 +184,7 @@
     "No 4MiB source acceptance without matched8/4 representative-scale wall/phase/I/O/RSS evidence.",
     "Full-scale work requires a separately admitted case-matched forecast and source; old SQL/joint measurements do not qualify compact source."
   ],
-  "local_state": "Installed v2 configuration unchanged; nightly timer temporarily stopped; Persistent catch-up on later restore must be scheduled"
+  "local_state": "Installed v2 configuration unchanged; nightly timer temporarily stopped; Persistent catch-up on later restore must be scheduled",
+  "updated_at": "2026-11-01T00:07:03.619213+00:00",
+  "actual_frozen_candidate_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b"
 }

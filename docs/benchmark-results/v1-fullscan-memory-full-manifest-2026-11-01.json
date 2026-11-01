@@ -559,10 +559,17 @@
       "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "forecast_source": "v1-fullscan-memory-full-1024-aa-forecast-2026-11-01.json",
       "campaign_cap_seconds": 216000,
-      "status": "ready_for_admission",
+      "status": "in_progress",
       "depends_on": "Valid matching1m1024MiB A/A evidence, revalidated raw receipts and hashes. New full-control production and ordinary measurement source byte-identical to55; only reviewed build preparation and tests changed. Fresh source/remote/budget admission required.",
       "purpose": "Two full-scale baseline scans at1GiB, exploratory capacity/pressure evidence only; no source improvement, exact minimum, D11 or H2 waiver",
-      "artifact_prefix": "/tmp/freespace-fullscan-memory-full-1024-aa"
+      "artifact_prefix": "/tmp/freespace-fullscan-memory-full-1024-aa",
+      "admitted_at": "2026-10-31T23:29:31.514397+00:00",
+      "dispatch_receipt": "/tmp/freespace-fullscan-memory-full-1024-aa-dispatch.json",
+      "run_id": 41252744694,
+      "created_at": "2026-10-31T23:29:32Z",
+      "conclusion": "",
+      "head_sha_verified": true,
+      "completed_job_seconds": 0
     }
   ],
   "campaign_cap_seconds": 216000,
@@ -571,5 +578,6 @@
     "One A/A pair is capacity/pressure exploration, not repeated qualification or a source optimization.",
     "512MiB full case requires valid1GiB full completion and separately frozen case-matched forecast and admission.",
     "No scan-only refresh profile-v2 or memory.events.local is claimed. Endpoint memory.stat is not peak decomposition."
-  ]
+  ],
+  "updated_at": "2026-10-31T23:29:45.330889+00:00"
 }

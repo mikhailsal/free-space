@@ -102,17 +102,45 @@ authorized by that result.
 Planning and earlier source reviews used the requested `claude-opus-5-5`.
 The published [8 MiB default research source](../benchmark-results/v1-compact-stage-source-reviews-2026-11-01.md)
 has compact temporary indexes and comprehensive mutation integration. It is
-source-reviewed with dispositions but unmeasured; 4 MiB is a controlled experiment
-only. The [preregistered next cases](../benchmark-results/v1-compact-stage-manifest-2026-11-01.json)
-require a real GitHub changed-full smoke and new Rust tests before matched screens.
+source-reviewed with dispositions and has completed the small smoke below; 4 MiB
+is a controlled experiment only. The [preregistered cases](../benchmark-results/v1-compact-stage-manifest-2026-11-01.json)
+require matched controls and further screens before qualification.
 The [progress report](../benchmark-results/v1-optimization-progress-2026-10-31.md)
 separates these states and source variants.
 The first new compact-source smoke failed in apt setup before tests or measurement;
-its receipt is preserved. A focused Opus-reviewed build-only mirror repair and
-[replacement cases](../benchmark-results/v1-compact-stage-https-manifest-2026-11-01.json)
-are frozen separately. An independent full-scale baseline1GiB A/A case has a
-[case-matched forecast](../benchmark-results/v1-fullscan-memory-full-manifest-2026-11-01.json)
-and budget reservation; it is capacity exploration, not a claimed code improvement.
+its receipt is preserved. After a focused Opus-reviewed build-only mirror repair,
+the [HTTPS changed-full smoke](../benchmark-results/v1-compact-stage-https-changed-full-smoke-2026-11-01.md)
+passed independent strict and semantic validation for one 100k-file, 10k-entry
+subtree pair (run 41252735964). GitHub passed 325 Rust tests with one ignored and
+121 Python tests. The actual baseline binary hash was
+`ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980` and the
+candidate hash was `2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b`.
+Profile structure was valid, but the original VmHWM monotonic contract was false;
+the preserved anomaly is not allocation evidence. This smoke does not establish
+a benefit or no-regression result.
+
+The [fresh 1m A/A control](../benchmark-results/v1-compact-stage-https-aa-screen-2026-11-01.md),
+run 41253374855 on `4f22bf8e3b67f7f59049a72116b90c061fb1328b`, passed strict
+validation for 12 commands and observers at 4 GiB. Both actual binaries matched
+`ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`, with no
+max, OOM or swap events. Maximum absolute paired scan differences were 0.3312%
+time, 192 KiB RSS and zero disk bytes; refresh differences were 0.3318%, 80 KiB
+and 4,096 bytes. These spreads are descriptive, not confidence intervals.
+
+Candidate screen 41255297627 is in progress on `471c4d14ed4881106ce1d0b6cd5d6361839b2bc8`,
+with three scan and three unchanged 100-entry refresh pairs at 1m files and 4 GiB.
+Its expected candidate binary hash `2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b`
+was frozen before results. Independent full-scale 1 GiB baseline A/A run 41252744694 is also
+in progress on `e0299a6385e27fef4f78b682e7a5d25b969a02a1`; both actual binaries
+were independently hashed as `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`.
+Its [case-matched forecast](../benchmark-results/v1-fullscan-memory-full-manifest-2026-11-01.json)
+and reservation cover capacity exploration, not a code improvement. No lower
+full-scale RAM success is yet established. Track complete scan time, refresh time,
+process RSS, and application disk separately; full-scan process RSS and total
+worker-cgroup memory are distinct measures. The campaign ledger remains
+authoritative for runner time. The local timer remains stopped, with persistent
+catch-up possible on restoration; no install, master merge or backend switch has
+been made.
 Completed usage is 33,310 runner seconds (9h 15m 10s) of 60 hours. The local
 `freespace.timer` is temporarily stopped for GitHub-only research; `Persistent=yes`
 can trigger catch-up when restored. Installed backend and configuration remain unchanged.

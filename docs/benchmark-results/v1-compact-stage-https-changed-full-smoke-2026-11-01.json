@@ -1,0 +1,1118 @@
+{
+  "run_id": 41252735964,
+  "head": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+  "strict_summary_equal_raw": true,
+  "description": {
+    "operation": "refresh",
+    "protocol": "v1-single-operation-pairs-v4",
+    "github": {
+      "GITHUB_SHA": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+      "GITHUB_RUN_ID": "41252735964",
+      "GITHUB_RUN_ATTEMPT": "1"
+    },
+    "fixture": {
+      "files": 100000,
+      "expected_entries": 100409,
+      "expected_subtree_entries": 10000,
+      "directories": 409,
+      "shape": "mixed-full-mutation-subtree-v1",
+      "fixed_mtime": 1700000000,
+      "payload_block_fraction": 0.01,
+      "distribution": {
+        "small_files": 9998,
+        "outer_files": 90002,
+        "payload_files": 900,
+        "sparse_files": 21,
+        "hardlink_files": 91,
+        "longname_files": 2904
+      },
+      "mutation_plan": {
+        "old_owner_path": "small/nested/owner",
+        "old_outside_path": "unrelated/old-link",
+        "new_owner_path": "unrelated/outside-owner",
+        "new_link_path": "small/replacement/new-link",
+        "old_owner_dev": 1792,
+        "old_owner_inode": 2561300,
+        "old_owner_allocated": 4096,
+        "old_owner_size": 9,
+        "old_owner_mtime": 1700000000000000000,
+        "outside_owner_dev": 1792,
+        "outside_owner_inode": 2561302,
+        "outside_owner_allocated": 4096,
+        "outside_owner_size": 13,
+        "outside_owner_mtime": 1700000000000000000,
+        "removed_nested_entries": 3,
+        "added_nested_entries": 3,
+        "expected_entry_delta": 0,
+        "expected_file_delta": 0
+      },
+      "setup_seconds": 3.7897882169999946
+    },
+    "identical_binaries": false,
+    "valid": true,
+    "issues": [],
+    "metrics": {
+      "elapsed_seconds": {
+        "baseline_median": 1.2198273089999958,
+        "candidate_median": 1.1393093189999917,
+        "paired_deltas": [
+          -0.08051799000000415
+        ],
+        "paired_percent_changes": [
+          -6.6007695848367405
+        ],
+        "median_paired_percent_change": -6.6007695848367405,
+        "max_abs_percent_change": 6.6007695848367405,
+        "max_abs_delta": 0.08051799000000415
+      },
+      "peak_rss_kib": {
+        "baseline_median": 74708,
+        "candidate_median": 62284,
+        "paired_deltas": [
+          -12424
+        ],
+        "paired_percent_changes": [
+          -16.63007977726616
+        ],
+        "median_paired_percent_change": -16.63007977726616,
+        "max_abs_percent_change": 16.63007977726616,
+        "max_abs_delta": 12424
+      },
+      "app_disk_peak_bytes": {
+        "baseline_median": 36732928,
+        "candidate_median": 36732928,
+        "paired_deltas": [
+          0
+        ],
+        "paired_percent_changes": [
+          0.0
+        ],
+        "median_paired_percent_change": 0.0,
+        "max_abs_percent_change": 0.0,
+        "max_abs_delta": 0
+      }
+    },
+    "arms": [
+      {
+        "id": "p1-baseline-v1",
+        "revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+        "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+        "elapsed_seconds": 1.2198273089999958,
+        "rss_kib": 74708,
+        "app_disk_peak_bytes": 36732928,
+        "cgroup_peak_bytes": 132788224,
+        "cgroup_cap_bytes": 1073741824,
+        "memory_endpoint": {
+          "anon": 8798208,
+          "file": 38739968,
+          "kernel": 15077376,
+          "slab_reclaimable": 14493656
+        },
+        "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "phases": {
+          "load_seconds": 0.337859035,
+          "walk_seconds": 0.260854399,
+          "finalize_seconds": 0.005533076,
+          "insert_seconds": 0.055605317,
+          "index_seconds": 0.099674447,
+          "publish_seconds": 0.001846071,
+          "total_seconds": 1.203693385
+        }
+      },
+      {
+        "id": "p1-candidate-v1",
+        "revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+        "binary_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
+        "elapsed_seconds": 1.1393093189999917,
+        "rss_kib": 62284,
+        "app_disk_peak_bytes": 36732928,
+        "cgroup_peak_bytes": 120438784,
+        "cgroup_cap_bytes": 1073741824,
+        "memory_endpoint": {
+          "anon": 8794112,
+          "file": 38842368,
+          "kernel": 15052800,
+          "slab_reclaimable": 14490712
+        },
+        "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "phases": {
+          "load_seconds": 0.208915586,
+          "walk_seconds": 0.324466535,
+          "finalize_seconds": 0.005401336,
+          "insert_seconds": 0.057410657,
+          "index_seconds": 0.093711079,
+          "publish_seconds": 0.00166081,
+          "total_seconds": 1.123441671
+        }
+      }
+    ]
+  },
+  "profile": {
+    "policy": "profile-v2",
+    "valid_structure": true,
+    "issues": [],
+    "strict_summary": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 1.2198273089999958,
+            "candidate": 1.1393093189999917,
+            "delta": -0.08051799000000415
+          },
+          "peak_rss_kib": {
+            "baseline": 74708,
+            "candidate": 62284,
+            "delta": -12424
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 36732928,
+            "candidate": 36732928,
+            "delta": 0
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": -0.08051799000000415,
+          "max_abs_delta": 0.08051799000000415
+        },
+        "peak_rss_kib": {
+          "median_delta": -12424,
+          "max_abs_delta": 12424
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": 0,
+          "max_abs_delta": 0
+        }
+      },
+      "identical_binaries": false,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "changed-full",
+        "subtree_entries": 10000,
+        "memory_mib": 1024,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": {
+          "recipe": "full-balanced-v1",
+          "renamed_inode": 2551303,
+          "deleted_inode": 2551305,
+          "nested_deleted_inode": 2561301,
+          "new_file_inode": 2651629,
+          "old_owner_inode": 2561300,
+          "old_outside_inode": 2561300,
+          "outside_owner_inode": 2561302,
+          "new_link_inode": 2561302,
+          "changed_size": 8192,
+          "changed_mtime": 1700000060000000000,
+          "target_mtime": 1700000060000000000,
+          "added_inode": 2651624,
+          "added_size": 5,
+          "added_mtime": 1700000060000000000,
+          "new_file_size": 11,
+          "new_file_mtime": 1700000060000000000,
+          "replacement_mtime": 1700000060000000000,
+          "old_outside_size": 9,
+          "old_outside_mtime": 1700000000000000000,
+          "new_link_size": 13,
+          "new_link_mtime": 1700000000000000000,
+          "replacement_inode": 2651627,
+          "removed_nested_entries": 3,
+          "added_nested_entries": 3,
+          "subtree_entries_before": 10000,
+          "subtree_entries_after": 10000,
+          "entry_delta": 0,
+          "file_delta": 0
+        }
+      }
+    },
+    "original_hwm_monotonic_contract_pass": false,
+    "arms": {
+      "p1-baseline-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 74732,
+            "hwm_kib": 74708,
+            "delta_kib": -24
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [
+          {
+            "previous_phase": "refresh_after_names",
+            "phase": "refresh_after_nodes",
+            "before": 100409,
+            "after": 200818,
+            "buffer_changed": true
+          }
+        ],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000185792,
+            "hwm_kib": 7808,
+            "phase": "refresh_start",
+            "rss_kib": 7808
+          },
+          {
+            "elapsed_seconds": 0.345339886,
+            "hwm_kib": 48100,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1194882,
+            "node_buffer_changed": false,
+            "node_capacity": 100409,
+            "node_len": 100409,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 48100
+          },
+          {
+            "elapsed_seconds": 0.606334738,
+            "hwm_kib": 64492,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1194882,
+            "node_buffer_changed": false,
+            "node_capacity": 100409,
+            "node_len": 100409,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 64492
+          },
+          {
+            "elapsed_seconds": 0.606697979,
+            "hwm_kib": 64492,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 100409,
+            "node_len": 100409,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 64492
+          },
+          {
+            "elapsed_seconds": 0.607341706,
+            "hwm_kib": 70636,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": true,
+            "node_capacity": 200818,
+            "node_len": 110408,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 70636
+          },
+          {
+            "elapsed_seconds": 0.607502039,
+            "hwm_kib": 70636,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 200818,
+            "node_len": 110408,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 70636
+          },
+          {
+            "elapsed_seconds": 0.611745489,
+            "hwm_kib": 74732,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 200818,
+            "node_len": 110408,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 74732
+          },
+          {
+            "elapsed_seconds": 0.668889911,
+            "hwm_kib": 74708,
+            "phase": "index",
+            "rss_kib": 62620
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 74708
+      },
+      "p1-candidate-v1": {
+        "valid_structure": true,
+        "issues": [],
+        "hwm_anomalies": [
+          {
+            "previous_phase": "refresh_after_finalize",
+            "phase": "index",
+            "previous_hwm_kib": 62452,
+            "hwm_kib": 62284,
+            "delta_kib": -168
+          }
+        ],
+        "original_hwm_monotonic_contract_pass": false,
+        "node_capacity_changes": [],
+        "name_capacity_changes": [],
+        "events": [
+          {
+            "elapsed_seconds": 0.000165491,
+            "hwm_kib": 7616,
+            "phase": "refresh_start",
+            "rss_kib": 7616
+          },
+          {
+            "elapsed_seconds": 0.540487071,
+            "hwm_kib": 54256,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1194882,
+            "node_buffer_changed": false,
+            "node_capacity": 110408,
+            "node_len": 100409,
+            "node_size_bytes": 88,
+            "phase": "refresh_loaded",
+            "rss_kib": 54256
+          },
+          {
+            "elapsed_seconds": 0.540600262,
+            "hwm_kib": 54256,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1194882,
+            "node_buffer_changed": false,
+            "node_capacity": 110408,
+            "node_len": 100409,
+            "node_size_bytes": 88,
+            "phase": "refresh_before_graft",
+            "rss_kib": 54256
+          },
+          {
+            "elapsed_seconds": 0.541173843,
+            "hwm_kib": 58356,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 110408,
+            "node_len": 100409,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_names",
+            "rss_kib": 58356
+          },
+          {
+            "elapsed_seconds": 0.541303049,
+            "hwm_kib": 58356,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 110408,
+            "node_len": 110408,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_nodes",
+            "rss_kib": 58356
+          },
+          {
+            "elapsed_seconds": 0.541426616,
+            "hwm_kib": 58356,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 110408,
+            "node_len": 110408,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_graft",
+            "rss_kib": 58356
+          },
+          {
+            "elapsed_seconds": 0.545907526,
+            "hwm_kib": 62452,
+            "name_buffer_changed": false,
+            "name_capacity": 1703936,
+            "name_len": 1254904,
+            "node_buffer_changed": false,
+            "node_capacity": 110408,
+            "node_len": 110408,
+            "node_size_bytes": 88,
+            "phase": "refresh_after_finalize",
+            "rss_kib": 62452
+          },
+          {
+            "elapsed_seconds": 0.604969828,
+            "hwm_kib": 62284,
+            "phase": "index",
+            "rss_kib": 50336
+          }
+        ],
+        "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate.",
+        "time_peak_rss_kib": 62284
+      }
+    },
+    "warning": "Boundary samples and buffer movement do not establish copying, physical overlap, or a phase peak. This description is not a product acceptance gate."
+  },
+  "manifest": {
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "pairs": 1,
+    "files": 100000,
+    "operation": "refresh",
+    "scenario": "changed-full",
+    "fixture_receipt": {
+      "files": 100000,
+      "expected_entries": 100409,
+      "expected_subtree_entries": 10000,
+      "directories": 409,
+      "shape": "mixed-full-mutation-subtree-v1",
+      "fixed_mtime": 1700000000,
+      "payload_block_fraction": 0.01,
+      "distribution": {
+        "small_files": 9998,
+        "outer_files": 90002,
+        "payload_files": 900,
+        "sparse_files": 21,
+        "hardlink_files": 91,
+        "longname_files": 2904
+      },
+      "mutation_plan": {
+        "old_owner_path": "small/nested/owner",
+        "old_outside_path": "unrelated/old-link",
+        "new_owner_path": "unrelated/outside-owner",
+        "new_link_path": "small/replacement/new-link",
+        "old_owner_dev": 1792,
+        "old_owner_inode": 2561300,
+        "old_owner_allocated": 4096,
+        "old_owner_size": 9,
+        "old_owner_mtime": 1700000000000000000,
+        "outside_owner_dev": 1792,
+        "outside_owner_inode": 2561302,
+        "outside_owner_allocated": 4096,
+        "outside_owner_size": 13,
+        "outside_owner_mtime": 1700000000000000000,
+        "removed_nested_entries": 3,
+        "added_nested_entries": 3,
+        "expected_entry_delta": 0,
+        "expected_file_delta": 0
+      },
+      "setup_seconds": 3.7897882169999946
+    },
+    "runner_preparation": {
+      "success": true,
+      "acted": false,
+      "freed_bytes": 0,
+      "duration_seconds": 0.0001438239999984603,
+      "floor_bytes": 45097156608,
+      "target_bytes": 47244640256
+    },
+    "runner_preparation_policy": "sdk-space-v1",
+    "case_policy": "qualification-v1",
+    "subtree_entries": 10000,
+    "memory_mib": 1024,
+    "setup_memory_mib": 4096,
+    "observer_memory_mib": 4096,
+    "mutation_receipt": {
+      "recipe": "full-balanced-v1",
+      "renamed_inode": 2551303,
+      "deleted_inode": 2551305,
+      "nested_deleted_inode": 2561301,
+      "new_file_inode": 2651629,
+      "old_owner_inode": 2561300,
+      "old_outside_inode": 2561300,
+      "outside_owner_inode": 2561302,
+      "new_link_inode": 2561302,
+      "changed_size": 8192,
+      "changed_mtime": 1700000060000000000,
+      "target_mtime": 1700000060000000000,
+      "added_inode": 2651624,
+      "added_size": 5,
+      "added_mtime": 1700000060000000000,
+      "new_file_size": 11,
+      "new_file_mtime": 1700000060000000000,
+      "replacement_mtime": 1700000060000000000,
+      "old_outside_size": 9,
+      "old_outside_mtime": 1700000000000000000,
+      "new_link_size": 13,
+      "new_link_mtime": 1700000000000000000,
+      "replacement_inode": 2651627,
+      "removed_nested_entries": 3,
+      "added_nested_entries": 3,
+      "subtree_entries_before": 10000,
+      "subtree_entries_after": 10000,
+      "entry_delta": 0,
+      "file_delta": 0
+    },
+    "seed_link_facts": {
+      "snapshot.db": {
+        "small/nested/owner": [
+          0,
+          4096,
+          9,
+          1700000000,
+          2,
+          1792,
+          2561300,
+          4096,
+          9
+        ],
+        "unrelated/old-link": [
+          2,
+          0,
+          0,
+          1700000000,
+          2,
+          1792,
+          2561300,
+          4096,
+          9
+        ],
+        "unrelated/outside-owner": [
+          0,
+          4096,
+          13,
+          1700000000,
+          1,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "snapshot.prev.db": {
+        "small/nested/owner": [
+          0,
+          4096,
+          9,
+          1700000000,
+          2,
+          1792,
+          2561300,
+          4096,
+          9
+        ],
+        "unrelated/old-link": [
+          2,
+          0,
+          0,
+          1700000000,
+          2,
+          1792,
+          2561300,
+          4096,
+          9
+        ],
+        "unrelated/outside-owner": [
+          0,
+          4096,
+          13,
+          1700000000,
+          1,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "seed_previous_sha256": "2630badd5a6a9430b911a29a1c9ca77c9e07b3df11d9726f7f699947232f17a2",
+    "expected_arms": [
+      "p1-baseline-v1",
+      "p1-candidate-v1"
+    ],
+    "provenance": {
+      "baseline-v1": {
+        "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+        "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+        "build": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+          "compiler_host": "x86_64-unknown-linux-gnu",
+          "target": "x86_64-unknown-linux-musl",
+          "profile": "release --locked",
+          "flags": {
+            "RUSTFLAGS": "",
+            "CARGO_ENCODED_RUSTFLAGS": "",
+            "SOURCE_DATE_EPOCH": "1793464183"
+          },
+          "release_profile": {
+            "lto": "thin",
+            "codegen-units": 4,
+            "strip": "debuginfo"
+          },
+          "cargo_config": {},
+          "bun": "1.4.2"
+        }
+      },
+      "candidate-v1": {
+        "sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
+        "source_revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+        "build": {
+          "sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
+          "source_revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+          "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+          "compiler_host": "x86_64-unknown-linux-gnu",
+          "target": "x86_64-unknown-linux-musl",
+          "profile": "release --locked",
+          "flags": {
+            "RUSTFLAGS": "",
+            "CARGO_ENCODED_RUSTFLAGS": "",
+            "SOURCE_DATE_EPOCH": "1793464183"
+          },
+          "release_profile": {
+            "lto": "thin",
+            "codegen-units": 4,
+            "strip": "debuginfo"
+          },
+          "cargo_config": {},
+          "bun": "1.4.2"
+        }
+      }
+    },
+    "seed_sha256": "14946cd709f387d8c6d080445b4917aaf204966f9383cd8553594f7cfdad0308",
+    "sample_interval_seconds": 0.02,
+    "cache_policy": "cold after seed copy, before single CLI",
+    "observer_policy": "separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+    "diagnostic_policy": {
+      "profile_policy": "profile-v2",
+      "allocation_diagnostics": true,
+      "scope": "measured refresh CLI only; seeds and observers disabled"
+    },
+    "environment": {
+      "kernel": "7.0.0-1017-azure",
+      "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4267.826\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4269.569\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4263.534\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4269.513\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+      "memory": "MemTotal:       16367524 kB\nMemFree:        14185184 kB\nMemAvailable:   15278360 kB\nBuffers:          109472 kB\nCached:          1193488 kB\nSwapCached:            0 kB\nActive:           840672 kB\nInactive:         754128 kB\nActive(anon):     347852 kB\nInactive(anon):        0 kB\nActive(file):     492820 kB\nInactive(file):   754128 kB\nUnevictable:       46728 kB\nMlocked:           43656 kB\nSwapTotal:       3145724 kB\nSwapFree:        3145724 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:                 0 kB\nWriteback:             0 kB\nAnonPages:        338592 kB\nMapped:           337804 kB\nShmem:             47256 kB\nKReclaimable:     192156 kB\nSlab:             288380 kB\nSReclaimable:     192156 kB\nSUnreclaim:        96224 kB\nKernelStack:        4128 kB\nPageTables:         6452 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    11329484 kB\nCommitted_AS:    2103856 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       38900 kB\nVmallocChunk:          0 kB\nPercpu:             2336 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:         1468416 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:             0 kB\nGPUReclaim:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      111744 kB\nDirectMap2M:     4077568 kB\nDirectMap1G:    14680064 kB\n",
+      "image": [
+        {
+          "Id": "sha256:b504ce03c18d58306a4ca34f9f2d4acaafca425dede1e9ed895c4c56c867434e",
+          "RepoTags": [
+            "freespace-pairs:e4ee95eba7454ec696abd3a85703ac22",
+            "representative-calibration:41252735964-paired-local"
+          ],
+          "RepoDigests": [],
+          "Parent": "",
+          "Comment": "buildkit.dockerfile.v0",
+          "Created": "2026-10-31T23:34:40.831657709Z",
+          "DockerVersion": "",
+          "Author": "",
+          "Config": {
+            "Hostname": "",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+              "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            ],
+            "Cmd": null,
+            "Image": "",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": [
+              "python3",
+              "/harness/bench-v2-container.py",
+              "--inside"
+            ],
+            "OnBuild": null,
+            "Labels": {
+              "org.opencontainers.image.version": "24.04"
+            }
+          },
+          "Architecture": "amd64",
+          "Os": "linux",
+          "Size": 202779257,
+          "GraphDriver": {
+            "Data": {
+              "LowerDir": "/var/lib/docker/overlay2/c2eaff15d1e5b1f10dca599588a84ee976da32c650a5b6e84778f96afea94804/diff",
+              "MergedDir": "/var/lib/docker/overlay2/eipblshcoj7d9k4qlvdhlyo2w/merged",
+              "UpperDir": "/var/lib/docker/overlay2/eipblshcoj7d9k4qlvdhlyo2w/diff",
+              "WorkDir": "/var/lib/docker/overlay2/eipblshcoj7d9k4qlvdhlyo2w/work"
+            },
+            "Name": "overlay2"
+          },
+          "RootFS": {
+            "Type": "layers",
+            "Layers": [
+              "sha256:bec87777bc2fb2edcdf9af11df1531469e7df911309c1413082b18fcb8610278",
+              "sha256:df862f38f73aabebdf6e7bfd1f1518936033aa473630e4239720ae41149ff35a"
+            ]
+          },
+          "Metadata": {
+            "LastTagTime": "2026-10-31T23:35:23.170178058Z"
+          }
+        }
+      ]
+    },
+    "filesystem": {
+      "filesystems": [
+        {
+          "target": "/home/runner/work/_temp/representative-volume.U2Udjg/mount",
+          "source": "/dev/loop0",
+          "fstype": "ext4",
+          "options": "rw,relatime"
+        }
+      ]
+    },
+    "github": {
+      "GITHUB_SHA": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+      "GITHUB_RUN_ID": "41252735964",
+      "GITHUB_RUN_ATTEMPT": "1"
+    }
+  },
+  "specs": {
+    "p1-baseline-v1": {
+      "backend": "v1",
+      "single_operation": true,
+      "files": 100000,
+      "expected_entries": 100409,
+      "expected_subtree_entries": 10000,
+      "memory_mib": 1024,
+      "observer_memory_mib": 4096,
+      "scenario": "changed-full",
+      "workers": 1,
+      "cpus": 2,
+      "keep_previous": true,
+      "scan_profile": "disk",
+      "timeout_seconds": 600,
+      "io_limits": {
+        "rbps": 33554432,
+        "wbps": 33554432,
+        "riops": 2200,
+        "wiops": 3600
+      },
+      "io_device": "/dev/loop0",
+      "io_device_number": "7:0",
+      "minimum_free_bytes": 2147483648,
+      "id": "p1-baseline-v1",
+      "arm": "baseline-v1",
+      "pair": 1,
+      "operation": "refresh",
+      "allocation_diagnostics": true,
+      "target": "/scratch/tree/small",
+      "seed_sha256": "14946cd709f387d8c6d080445b4917aaf204966f9383cd8553594f7cfdad0308",
+      "seed_timestamp": 1793489730,
+      "initial_snapshot_allocated_bytes": 25063424,
+      "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "mutation_plan": {
+        "old_owner_path": "small/nested/owner",
+        "old_outside_path": "unrelated/old-link",
+        "new_owner_path": "unrelated/outside-owner",
+        "new_link_path": "small/replacement/new-link",
+        "old_owner_dev": 1792,
+        "old_owner_inode": 2561300,
+        "old_owner_allocated": 4096,
+        "old_owner_size": 9,
+        "old_owner_mtime": 1700000000000000000,
+        "outside_owner_dev": 1792,
+        "outside_owner_inode": 2561302,
+        "outside_owner_allocated": 4096,
+        "outside_owner_size": 13,
+        "outside_owner_mtime": 1700000000000000000,
+        "removed_nested_entries": 3,
+        "added_nested_entries": 3,
+        "expected_entry_delta": 0,
+        "expected_file_delta": 0
+      }
+    },
+    "p1-candidate-v1": {
+      "backend": "v1",
+      "single_operation": true,
+      "files": 100000,
+      "expected_entries": 100409,
+      "expected_subtree_entries": 10000,
+      "memory_mib": 1024,
+      "observer_memory_mib": 4096,
+      "scenario": "changed-full",
+      "workers": 1,
+      "cpus": 2,
+      "keep_previous": true,
+      "scan_profile": "disk",
+      "timeout_seconds": 600,
+      "io_limits": {
+        "rbps": 33554432,
+        "wbps": 33554432,
+        "riops": 2200,
+        "wiops": 3600
+      },
+      "io_device": "/dev/loop0",
+      "io_device_number": "7:0",
+      "minimum_free_bytes": 2147483648,
+      "id": "p1-candidate-v1",
+      "arm": "candidate-v1",
+      "pair": 1,
+      "operation": "refresh",
+      "allocation_diagnostics": true,
+      "target": "/scratch/tree/small",
+      "seed_sha256": "14946cd709f387d8c6d080445b4917aaf204966f9383cd8553594f7cfdad0308",
+      "seed_timestamp": 1793489730,
+      "initial_snapshot_allocated_bytes": 25063424,
+      "binary_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
+      "source_revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
+      "mutation_plan": {
+        "old_owner_path": "small/nested/owner",
+        "old_outside_path": "unrelated/old-link",
+        "new_owner_path": "unrelated/outside-owner",
+        "new_link_path": "small/replacement/new-link",
+        "old_owner_dev": 1792,
+        "old_owner_inode": 2561300,
+        "old_owner_allocated": 4096,
+        "old_owner_size": 9,
+        "old_owner_mtime": 1700000000000000000,
+        "outside_owner_dev": 1792,
+        "outside_owner_inode": 2561302,
+        "outside_owner_allocated": 4096,
+        "outside_owner_size": 13,
+        "outside_owner_mtime": 1700000000000000000,
+        "removed_nested_entries": 3,
+        "added_nested_entries": 3,
+        "expected_entry_delta": 0,
+        "expected_file_delta": 0
+      }
+    }
+  },
+  "observer_facts": {
+    "p1-candidate-v1": {
+      "validated": true,
+      "current_entries": 100409,
+      "previous_entries": 100409,
+      "semantic_sha256": "34cb7e74c6901516f83707bce8b0a877c043b08cc8b1a774ee6d2a356279fd6c",
+      "previous_sha256": "2630badd5a6a9430b911a29a1c9ca77c9e07b3df11d9726f7f699947232f17a2",
+      "full_link_facts": {
+        "current": {
+          "unrelated/old-link": [
+            0,
+            4096,
+            9,
+            1700000000,
+            2,
+            1792,
+            2561300,
+            4096,
+            9
+          ],
+          "unrelated/outside-owner": [
+            0,
+            4096,
+            13,
+            1700000000,
+            1,
+            null,
+            null,
+            null,
+            null
+          ],
+          "small/replacement/new-link": [
+            2,
+            0,
+            0,
+            1700000000,
+            2,
+            1792,
+            2561302,
+            4096,
+            13
+          ]
+        },
+        "previous": {
+          "small/nested/owner": [
+            0,
+            4096,
+            9,
+            1700000000,
+            2,
+            1792,
+            2561300,
+            4096,
+            9
+          ],
+          "unrelated/old-link": [
+            2,
+            0,
+            0,
+            1700000000,
+            2,
+            1792,
+            2561300,
+            4096,
+            9
+          ],
+          "unrelated/outside-owner": [
+            0,
+            4096,
+            13,
+            1700000000,
+            1,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      }
+    },
+    "p1-baseline-v1": {
+      "validated": true,
+      "current_entries": 100409,
+      "previous_entries": 100409,
+      "semantic_sha256": "34cb7e74c6901516f83707bce8b0a877c043b08cc8b1a774ee6d2a356279fd6c",
+      "previous_sha256": "2630badd5a6a9430b911a29a1c9ca77c9e07b3df11d9726f7f699947232f17a2",
+      "full_link_facts": {
+        "current": {
+          "unrelated/old-link": [
+            0,
+            4096,
+            9,
+            1700000000,
+            2,
+            1792,
+            2561300,
+            4096,
+            9
+          ],
+          "unrelated/outside-owner": [
+            0,
+            4096,
+            13,
+            1700000000,
+            1,
+            null,
+            null,
+            null,
+            null
+          ],
+          "small/replacement/new-link": [
+            2,
+            0,
+            0,
+            1700000000,
+            2,
+            1792,
+            2561302,
+            4096,
+            13
+          ]
+        },
+        "previous": {
+          "small/nested/owner": [
+            0,
+            4096,
+            9,
+            1700000000,
+            2,
+            1792,
+            2561300,
+            4096,
+            9
+          ],
+          "unrelated/old-link": [
+            2,
+            0,
+            0,
+            1700000000,
+            2,
+            1792,
+            2561300,
+            4096,
+            9
+          ],
+          "unrelated/outside-owner": [
+            0,
+            4096,
+            13,
+            1700000000,
+            1,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      }
+    }
+  },
+  "worker_cgroup_end": {
+    "p1-candidate-v1": {
+      "memory.current": "63549440",
+      "memory.peak": "120438784",
+      "memory.max": "1073741824",
+      "memory.stat": "anon 8794112\nfile 38842368\nkernel 15052800\nkernel_stack 16384\npagetables 262144\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10543104\nfile_dirty 32768\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8794112\ninactive_file 17670144\nactive_file 21098496\nunevictable 0\nslab_reclaimable 14490712\nslab_unreclaimable 249416\nslab 14740128\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 4986\npgmajfault 403\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 21\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.swap.current": "0",
+      "memory.swap.peak": "0",
+      "memory.swap.max": "0",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "cpu.max": "200000 100000",
+      "cpu.stat": "usage_usec 406054\nuser_usec 252521\nsystem_usec 153532\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 12\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+      "io.stat": "7:0 rbytes=15421440 wbytes=11669504 rios=860 wios=15 dbytes=0 dios=0\n259:0 rbytes=39661568 wbytes=11669504 rios=965 wios=55 dbytes=0 dios=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=409561\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=409531"
+    },
+    "p1-baseline-v1": {
+      "memory.current": "63045632",
+      "memory.peak": "132788224",
+      "memory.max": "1073741824",
+      "memory.stat": "anon 8798208\nfile 38739968\nkernel 15077376\nkernel_stack 49152\npagetables 258048\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10244096\nfile_dirty 32768\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8790016\ninactive_file 17653760\nactive_file 21020672\nunevictable 0\nslab_reclaimable 14493656\nslab_unreclaimable 251176\nslab 14744832\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 4992\npgmajfault 402\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 27\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.swap.current": "0",
+      "memory.swap.peak": "0",
+      "memory.swap.max": "0",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "cpu.max": "200000 100000",
+      "cpu.stat": "usage_usec 408495\nuser_usec 257312\nsystem_usec 151183\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 14\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+      "io.stat": "7:0 rbytes=15392768 wbytes=11669504 rios=853 wios=21 dbytes=0 dios=0\n259:0 rbytes=39559168 wbytes=11669504 rios=958 wios=52 dbytes=0 dios=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=319860\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=319426"
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 66305,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020576768,
+      "available_bytes": 91856834560
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020576768,
+      "available_bytes": 91856834560
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.0001438239999984603
+  },
+  "tests": {
+    "rust_passed": 325,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 121,
+    "compact_planner_tests": "passed; see log"
+  },
+  "job_seconds": {
+    "build": 291,
+    "paired": 83,
+    "total": 374
+  },
+  "original_artifact_files": 68,
+  "indexed_payload_files": 76,
+  "archive_sha256": "8e9135e9fb0b4350d6ba7ee1a485991ef0ab42e0c19f86c83aaee5ef8f94e98d",
+  "index_sha256": "888edfb80de6ee0e1b4aa72b658291e54376243002359a66eada470d77e1408e"
+}
