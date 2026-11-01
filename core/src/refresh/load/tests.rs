@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 
-use super::{checked_capacity, prepare_refresh};
+use super::{ROOT_READS, checked_capacity, load_tree, prepare_refresh};
 use crate::queries::common::{Paths, resolve};
 use crate::refresh::graft;
 use crate::scan::{self, WalkOptions};
@@ -96,4 +96,47 @@ fn capacity_rejects_raw_id_and_usize_overflow() {
     assert_eq!(checked_capacity(100, 128).unwrap(), 228);
     assert!(checked_capacity(u32::MAX as usize, 1).is_err());
     assert!(checked_capacity(usize::MAX, 1).is_err());
+}
+
+#[test]
+fn refresh_reads_roots_once_and_preserves_multiple_root_metadata() {
+    let tmp = tempfile::tempdir().unwrap();
+    let first = tmp.path().join("a");
+    let second = tmp.path().join("b");
+    let target = first.join("target");
+    fs::create_dir_all(&target).unwrap();
+    fs::create_dir_all(&second).unwrap();
+    files(&target, 2);
+    let dir = SnapshotDir::new(tmp.path().join("snapshot"));
+    fs::create_dir_all(dir.as_path()).unwrap();
+    let mut opts = WalkOptions::new(vec![first, second]);
+    opts.workers = 1;
+    let mut tree = scan::walk(&opts).unwrap();
+    let meta = WriteMeta::new(1, None, tree.started_at);
+    let fin = tree.finalize();
+    let reserve = Reserve {
+        dir: dir.path.clone(),
+        min_free: 0,
+        check_every: 64 * 1024 * 1024,
+    };
+    writer::write_snapshot(&dir.current(), tree, fin, &meta, &reserve).unwrap();
+    let snap = Snapshot::open_current(&dir).unwrap();
+    let expected = load_tree(&snap).unwrap();
+    let (row, path) = resolve(&snap, target.as_os_str().as_bytes()).unwrap();
+    ROOT_READS.with(|count| count.set(0));
+    let actual =
+        prepare_refresh(&snap, &row, &path, 1, Arc::new(AtomicU64::new(0)), "target").unwrap();
+    ROOT_READS.with(|count| assert_eq!(count.get(), 1));
+    assert_eq!(actual.loaded.tree.roots.len(), 2);
+    for (left, right) in actual.loaded.tree.roots.iter().zip(&expected.tree.roots) {
+        assert_eq!(left.path, right.path);
+        assert_eq!(left.fs_type, right.fs_type);
+        assert_eq!(left.dev, right.dev);
+        assert_eq!(left.stats.total, right.stats.total);
+        assert_eq!(left.stats.used, right.stats.used);
+        assert_eq!(left.stats.free, right.stats.free);
+        assert_eq!(left.stats.avail, right.stats.avail);
+        assert_eq!(left.stats.inodes_total, right.stats.inodes_total);
+        assert_eq!(left.stats.inodes_free, right.stats.inodes_free);
+    }
 }

@@ -35,12 +35,11 @@ pub(super) fn prepare_refresh(
     let t = Instant::now();
     let sub = rescan_subtree(snap, &roots, x, xpath, workers, seen, label)?;
     let walk_seconds = t.elapsed().as_secs_f64();
-    drop(roots);
     let extra = sub
         .as_ref()
         .map_or(0, |tree| tree.nodes.len().saturating_sub(1));
     let t = Instant::now();
-    let loaded = load_tree_with_extra(snap, extra)?;
+    let loaded = load_tree_with_roots(snap, extra, Some(roots))?;
     let load_seconds = root_seconds + t.elapsed().as_secs_f64();
     // The walked subtree remains live and nodes include graft headroom here;
     // the prefix since refresh_start also includes the walk, not just loading.
@@ -70,6 +69,14 @@ pub fn load_tree(snap: &Snapshot) -> Result<Loaded> {
 }
 
 pub(super) fn load_tree_with_extra(snap: &Snapshot, extra: usize) -> Result<Loaded> {
+    load_tree_with_roots(snap, extra, None)
+}
+
+fn load_tree_with_roots(
+    snap: &Snapshot,
+    extra: usize,
+    roots: Option<Vec<RootInfo>>,
+) -> Result<Loaded> {
     let conn = &snap.conn;
     let n = entry_count(conn)?;
     let capacity = checked_capacity(n, extra)?;
@@ -86,7 +93,11 @@ pub(super) fn load_tree_with_extra(snap: &Snapshot, extra: usize) -> Result<Load
     )?;
     subtract_children(&mut tree, &parent, &raw_of);
     let links = load_links(conn, &raw_of, &mut tree)?;
-    load_roots(conn, &mut tree)?;
+    if let Some(roots) = roots {
+        tree.roots = roots;
+    } else {
+        load_roots(conn, &mut tree)?;
+    }
     load_mounts(conn, &raw_of, &mut tree)?;
     Ok(Loaded {
         tree,
@@ -252,7 +263,14 @@ fn load_links(
     Ok(links)
 }
 
+#[cfg(test)]
+thread_local! {
+    static ROOT_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn load_roots(conn: &rusqlite::Connection, tree: &mut Tree) -> Result<()> {
+    #[cfg(test)]
+    ROOT_READS.with(|count| count.set(count.get() + 1));
     let mut st = conn.prepare("SELECT entry_id, path, fs_type, fs_used, fs_total, fs_avail, inodes_used FROM roots ORDER BY entry_id")?;
     let mut rows = st.query([])?;
     while let Some(r) = rows.next()? {
