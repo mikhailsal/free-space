@@ -171,6 +171,14 @@ def measured_command(spec):
     timed_out = threading.Event()
     sampler_errors = []
     proc = None
+    diagnostic = None
+    diagnostic_error = None
+    if spec.get('cgroup_trace_enabled') is True:
+        try:
+            from bench_v1_cgroup_diagnostic import TraceSession
+            diagnostic = TraceSession(group, output, Path('/scratch/snapshot'))
+        except Exception as error:
+            diagnostic_error = repr(error)
 
     def sample():
         nonlocal sampled_memory, filesystem_used_peak
@@ -192,6 +200,8 @@ def measured_command(spec):
                     for key in peaks[kind]:
                         peaks[kind][key] = max(peaks[kind][key], current[kind][key])
                 sampled_memory = max(sampled_memory, int((group / "memory.current").read_text()))
+                if diagnostic is not None:
+                    diagnostic.tick()
                 stopped.wait(0.02)
         except Exception as error:
             sampler_errors.append(repr(error))
@@ -228,6 +238,8 @@ def measured_command(spec):
     finally:
         stopped.set()
         sampler.join()
+        if diagnostic is not None:
+            diagnostic.stop()
     filesystem_used_end = filesystem_used("/scratch/snapshot")
     filesystem_used_peak = max(filesystem_used_peak, filesystem_used_end)
     elapsed = finished - started
@@ -247,6 +259,9 @@ def measured_command(spec):
                sampler_errors=sampler_errors, elapsed_seconds=elapsed, cgroup_path=str(group),
                cgroup_before=before, cgroup_after=after, sampled_memory_peak=sampled_memory,
                sampled_disk_peak=peaks, endpoint_disk=endpoint, sample_interval_seconds=0.02)
+    if spec.get('cgroup_trace_enabled') is True:
+        row['cgroup_trace_receipt'] = (diagnostic.receipt(started, finished) if diagnostic is not None
+                                       else {'valid': False, 'error': diagnostic_error})
     row["filesystem_used_start"] = filesystem_used_start
     row["filesystem_used_end"] = filesystem_used_end
     row["filesystem_used_peak"] = filesystem_used_peak

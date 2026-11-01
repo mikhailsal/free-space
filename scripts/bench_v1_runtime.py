@@ -193,6 +193,8 @@ def inside(mode, spec_path):
     helper = legacy()
     spec = json.loads(Path(spec_path).read_text())
     if mode == "worker":
+        if spec.get('cgroup_trace') == 'contrast':
+            spec['cgroup_trace_enabled'] = spec.get('arm') == 'candidate-v1'
         return helper.measured_command(spec)
     output = Path("/results") / spec["id"] / "observer.json"
     snapshot = Path("/scratch/snapshot")

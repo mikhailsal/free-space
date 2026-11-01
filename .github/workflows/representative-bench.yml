@@ -22,6 +22,11 @@ on:
         type: choice
         options: [auto, scan, refresh]
         default: auto
+      cgroup_trace:
+        description: Opt-in identical-binary scan instrumentation contrast
+        type: choice
+        options: ['off', contrast]
+        default: 'off'
       target:
         description: Compilation target for both benchmark arms
         type: choice
@@ -104,6 +109,7 @@ jobs:
           TARGET: ${{ inputs.target || 'x86_64-unknown-linux-gnu' }}
           SUBTREE: ${{ inputs.subtree_entries || '100' }}
           SCENARIO: ${{ inputs.scenario || 'unchanged' }}
+          CGROUP_TRACE: ${{ inputs.cgroup_trace || 'off' }}
           MEMORY: ${{ inputs.memory_mib || '4096' }}
           BASE_REF: ${{ inputs.baseline || 'e8265778ef78ec4acd9da1375eedb0be37a123f5' }}
           COMPARISON: ${{ inputs.comparison || 'control' }}
@@ -114,6 +120,8 @@ jobs:
           from bench_v1_admission import baseline_epoch,benchmark_target,qualification_case,stage_files,stage_operations,stage_timeouts,validate_changed_full_baseline
           policy=stage_timeouts(os.environ['STAGE'],os.environ.get('REQUESTED_MINUTES'))
           operations=stage_operations(os.environ['STAGE'],os.environ['OPERATION'])
+          if os.environ['CGROUP_TRACE'] not in ('off','contrast') or (os.environ['CGROUP_TRACE']=='contrast' and operations != ['scan']):
+              raise ValueError('cgroup trace contrast requires scan-only')
           files=stage_files(os.environ['STAGE'])
           policy['files']=files
           policy.update(qualification_case(os.environ['SUBTREE'],os.environ['SCENARIO'],os.environ['MEMORY'],operations,files))
@@ -250,6 +258,22 @@ jobs:
           name: representative-binary
           path: binaries/
           retention-days: 7
+      - name: Verify identical binaries for cgroup trace contrast
+        if: ${{ inputs.cgroup_trace == 'contrast' }}
+        env:
+          CGROUP_TRACE: ${{ inputs.cgroup_trace || 'off' }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          if os.environ.get('CGROUP_TRACE', 'off') == 'contrast':
+              hashes = {arm: hashlib.sha256((Path('binaries') / arm).read_bytes()).hexdigest()
+                        for arm in ('baseline', 'candidate')}
+              for arm, digest in hashes.items():
+                  print(f'{arm}_sha256={digest}')
+              if hashes['baseline'] != hashes['candidate']:
+                  raise SystemExit('cgroup trace contrast requires identical binary hashes')
+          PY
 
   paired:
     needs: build
@@ -358,6 +382,7 @@ jobs:
         timeout-minutes: ${{ fromJSON(needs.build.outputs.paired_step_minutes) }}
         env:
           BENCH_PROTOCOL: v1-pairs
+          BENCH_CGROUP_TRACE: ${{ inputs.cgroup_trace || 'off' }}
           BENCH_IO: ${{ inputs.io || 'native' }}
           STAGE: ${{ inputs.stage || 'smoke' }}
           OPERATIONS: ${{ needs.build.outputs.operations }}

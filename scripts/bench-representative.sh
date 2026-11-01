@@ -7,6 +7,12 @@ if [[ ${GITHUB_ACTIONS:-} != true || ${RUNNER_ENVIRONMENT:-} != github-hosted ]]
 fi
 case ${BENCH_IO:?} in native|limited|local) ;; *) exit 2 ;; esac
 case ${BENCH_PROTOCOL:-v2} in v2|v1-pairs) ;; *) exit 2 ;; esac
+case ${BENCH_CGROUP_TRACE:-off} in off|contrast) ;; *) exit 2 ;; esac
+if [[ ${BENCH_CGROUP_TRACE:-off} == contrast &&
+      ( ${BENCH_PROTOCOL:-v2} != v1-pairs || ${BENCH_OPERATION:-scan} != scan ) ]]; then
+  echo 'Cgroup trace contrast requires a v1 scan-only case.' >&2
+  exit 2
+fi
 repo=$(pwd)
 output=${BENCH_OUTPUT:-$repo/representative-results}
 mkdir -p "$(dirname "$output")"
@@ -35,6 +41,16 @@ finish_cleanup() {
     if (( status != 0 )); then
       python3 -c 'import json,sys; json.dump({"success": False, "exit_code": int(sys.argv[2])}, open(sys.argv[1], "w")); print()' \
         "$output/measurements/runner-cleanup.json" "$status" || true
+    fi
+    if [[ ${BENCH_CGROUP_TRACE:-off} == contrast ]]; then
+      local diagnostic_block
+      diagnostic_block=$(python3 scripts/bench_v1_cgroup_diagnostic.py "$output/measurements") || status=1
+      if [[ -z $diagnostic_block ]]; then
+        diagnostic_block='## Cgroup instrumentation contrast — INVALID
+
+Diagnostic report unavailable. This is instrumentation contrast, not a noise band or optimization; reads, JSON and cache writes are cocharged to the worker, and the shared 20ms sampler may delay disk sampling and reserve checks. Output and snapshot may share a physical disk. Five-second points are non-atomic and cannot attribute phases or decompose peak memory. Receipt scope and st_dev are unavailable.'
+      fi
+      printf '%s\n' "$diagnostic_block" >> "$GITHUB_STEP_SUMMARY" || status=1
     fi
   fi
   printf 'cleanup final_status=%s\n' "$status" >> "$output/cleanup.log"
@@ -167,12 +183,14 @@ export RUNNER_TEMP="$mount_dir/jobs"
 if [[ ${BENCH_PROTOCOL:-v2} == v1-pairs ]]; then
   chmod +x binaries/baseline
   measurement_status=0
+  trace_args=()
+  if [[ ${BENCH_CGROUP_TRACE:-off} == contrast ]]; then trace_args=(--cgroup-trace contrast); fi
   run_owned python3 scripts/bench-v2-container.py --v1-pairs --baseline binaries/baseline \
     --candidate binaries/candidate --output "$output/measurements" --files "${BENCH_FILES:?}" \
     --pairs "${BENCH_PAIRS:-1}" --operation "${BENCH_OPERATION:-scan}" \
     --scenario "${BENCH_SCENARIO:-unchanged}" --memory "${BENCH_MEMORY:-4096}" \
     --subtree-entries "${BENCH_SUBTREE_ENTRIES:-100}" \
-    --timeout-seconds "${BENCH_COMMAND_TIMEOUT:-1200}" "${extra[@]}" || measurement_status=$?
+    --timeout-seconds "${BENCH_COMMAND_TIMEOUT:-1200}" "${trace_args[@]}" "${extra[@]}" || measurement_status=$?
   if [[ -f $output/measurements/summary.md ]]; then
     cat "$output/measurements/summary.md" >> "$GITHUB_STEP_SUMMARY" || measurement_status=1
   fi

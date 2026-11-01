@@ -29,10 +29,13 @@ def arguments(argv):
     parser.add_argument("--subtree-entries", type=int, choices=(100, 10000, 100000), default=100)
     parser.add_argument("--memory", type=int, choices=(512, 1024, 2048, 4096), default=4096)
     parser.add_argument("--timeout-seconds", type=int, default=1200)
+    parser.add_argument("--cgroup-trace", choices=("off", "contrast"), default="off")
     parser.add_argument("--io-device")
     for flag in ("read-bps", "write-bps", "read-iops", "write-iops"):
         parser.add_argument("--" + flag, type=int)
     args = parser.parse_args(argv)
+    if args.cgroup_trace == 'contrast' and args.operation != 'scan':
+        parser.error('cgroup trace contrast requires scan-only')
     if not 100 <= args.files <= 8000000 or not 1 <= args.pairs <= 3 or args.timeout_seconds < 1:
         parser.error("files 100..8000000, pairs 1..3 and positive timeout required")
     limits = [getattr(args, x) for x in ("read_bps", "write_bps", "read_iops", "write_iops")]
@@ -79,6 +82,8 @@ def host(args):
     setup_output.mkdir(exist_ok=False)
     binaries = {"baseline-v1": args.baseline.resolve(), "candidate-v1": args.candidate.resolve()}
     sources = {arm: provenance(binary) for arm, binary in binaries.items()}
+    if args.cgroup_trace == 'contrast' and sources['baseline-v1']['sha256'] != sources['candidate-v1']['sha256']:
+        raise ValueError('cgroup trace contrast requires identical actual binary hashes')
     validate_changed_full_baseline(args.scenario, 'candidate', sources['baseline-v1']['source_revision'])
     build_keys = ("compiler", "target", "flags", "profile", "release_profile", "cargo_config")
     if any(sources["baseline-v1"]["build"][key] != sources["candidate-v1"]["build"][key] for key in build_keys):
@@ -166,6 +171,8 @@ def host(args):
                                          image=json.loads(helper.capture(["docker", "image", "inspect", image]))),
                         filesystem=json.loads(helper.capture(["findmnt", "-T", str(scratch), "-J"])),
                         github={k: os.environ.get(k) for k in ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")})
+        if args.cgroup_trace == 'contrast':
+            manifest['cgroup_trace_policy'] = {'mode': 'contrast', 'baseline-v1': False, 'candidate-v1': True}
         helper.dump(output / "manifest.json", manifest)
         for pair in range(1, args.pairs + 1):
             arms = list(binaries) if pair % 2 else list(reversed(binaries))
@@ -190,6 +197,8 @@ def host(args):
                             seed_sha256=seed_digest, seed_timestamp=cutoff,
                             initial_snapshot_allocated_bytes=initial,
                             binary_sha256=sources[arm]["sha256"], source_revision=sources[arm]["source_revision"])
+                if args.cgroup_trace == 'contrast':
+                    spec['cgroup_trace'] = 'contrast'
                 if args.scenario == 'changed-full':
                     spec['mutation_plan'] = fixture['mutation_plan']
                 spec_path = output / (ident + ".json")
