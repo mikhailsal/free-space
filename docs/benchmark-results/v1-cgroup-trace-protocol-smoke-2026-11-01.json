@@ -1,0 +1,131 @@
+{
+  "run_id": 41265785702,
+  "head": "e3c46ef604ef8a381754ad4ff06e800eb9618100",
+  "status": "invalid_diagnostic",
+  "ordinary_equal_raw_valid": true,
+  "diagnostic_equal_raw": true,
+  "diagnostic": {
+    "valid": false,
+    "issues": [
+      "invalid diagnostic receipt"
+    ],
+    "policy": "contrast",
+    "diagnostic_arms": [],
+    "interpretation": "Instrumentation contrast, not a noise band or product optimization. Cgroup reads, JSON encoding and cache writes are cocharged to the worker. The shared 20ms sampler can delay disk sampling and free-space reserve checks. Output and snapshot devices can share a physical disk. Five-second points are non-atomic; they provide no phase attribution or peak decomposition."
+  },
+  "trace_receipt": {
+    "valid": false,
+    "started_ns": 99386417404,
+    "ended_ns": 104315153568,
+    "interval_ns": 5000000000,
+    "samples": 2,
+    "attempted": 2,
+    "missed": 0,
+    "late": 0,
+    "max_lateness_ns": 1107566,
+    "final_covers_due_tick": false,
+    "final_covered_deadline_ns": null,
+    "late_tolerance_ns": 20000000,
+    "errors": 1,
+    "missing": 0,
+    "truncated": false,
+    "bytes": 4614,
+    "wall_ns": 869621,
+    "thread_cpu_ns": 870601,
+    "cli_start_ns": 99386983110,
+    "cli_end_ns": 104314389518,
+    "devices": {
+      "output_st_dev": 2049,
+      "snapshot_st_dev": 1792
+    },
+    "error": null,
+    "sha256": "96c29216e6fc046b20b2a665e3c9f6f3b40f7d5f7b444a0c3e27357a5faca4a6",
+    "setup_wall_ns": 90733,
+    "setup_thread_cpu_ns": 89975,
+    "finalize_wall_ns": 673981,
+    "finalize_thread_cpu_ns": 673481,
+    "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage"
+  },
+  "root_cause_reproduction": {
+    "run_id": 41265785702,
+    "source_revision": "e3c46ef604ef8a381754ad4ff06e800eb9618100",
+    "raw_sample_preserved": true,
+    "actual_rejected_io_stat": "7:0 \n8:0 rbytes=17690624 wbytes=0 rios=600 wios=0 dbytes=0 dios=0",
+    "actual_error": "missing io counter",
+    "remove_only_bare_device_row_then_same_parser": "pass",
+    "root_cause": "The parser rejects the actually preserved device-only initial io.stat row; complete counter row passes. No source or raw data modified.",
+    "checked_at": "2026-11-01T02:45:17.327721+00:00"
+  },
+  "linux_source": "https://github.com/torvalds/linux/blob/v6.8/block/blk-cgroup.c#L1051-L1082",
+  "candidate_cgroup_start": {
+    "path": "/sys/fs/cgroup",
+    "metrics": {
+      "memory.current": "27836416",
+      "memory.peak": "27836416",
+      "memory.max": "4294967296",
+      "memory.stat": "anon 8716288\nfile 17518592\nkernel 954368\nkernel_stack 16384\npagetables 98304\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 10235904\nfile_dirty 12288\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 8667136\ninactive_file 2932736\nactive_file 14577664\nunevictable 0\nslab_reclaimable 637888\nslab_unreclaimable 177264\nslab 815152\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 0\npgsteal 0\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 3585\npgmajfault 181\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.swap.current": "0",
+      "memory.swap.peak": "0",
+      "memory.swap.max": "0",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "cpu.max": "200000 100000",
+      "cpu.stat": "usage_usec 74561\nuser_usec 45129\nsystem_usec 29432\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "io.max": "7:0 rbps=33554432 wbps=33554432 riops=2200 wiops=3600",
+      "io.stat": "7:0 \n8:0 rbytes=17506304 wbytes=0 rios=565 wios=0 dbytes=0 dios=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=33376\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=33376"
+    }
+  },
+  "observers": {
+    "p1-candidate-v1": {
+      "validated": true,
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "14ec3da37049035001c8bc79d4e55c1afe3e62258d676f178007cc1f3aedcf60",
+      "previous_sha256": null
+    },
+    "p1-baseline-v1": {
+      "validated": true,
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "14ec3da37049035001c8bc79d4e55c1afe3e62258d676f178007cc1f3aedcf60",
+      "previous_sha256": null
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 2049,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020601344,
+      "available_bytes": 91856809984
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020601344,
+      "available_bytes": 91856809984
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.00018109199999827297
+  },
+  "job_seconds": {
+    "build": 275,
+    "paired": 94,
+    "total": 369
+  },
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 149
+  },
+  "both_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "original_artifact_files": 69,
+  "indexed_payload_files": 88,
+  "archive_sha256": "be8f95a87b23545877b1cb87e216ed3a326d784f0b76446bb5ccd02f7420168f",
+  "index_sha256": "3327aad9e4ffdff88aeb9cb6f646183b583512b2f887ab749cb44439140caf6a"
+}

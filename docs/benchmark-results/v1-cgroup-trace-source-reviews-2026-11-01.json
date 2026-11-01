@@ -1,0 +1,77 @@
+{
+  "scope": "outside source reviews and mocked tests; no app, Rust-test or benchmark results claimed for this new source",
+  "source_revision": "e3c46ef604ef8a381754ad4ff06e800eb9618100",
+  "source_freeze_sha256": "38f16db2607c4555dc90fac617e5949a0b54ee8332f014fc7e37d045f0d5b04d",
+  "final_review_result": "NO_FINDINGS",
+  "model": "claude-opus-5-5",
+  "review_chain": [
+    {
+      "file": "evidence/freespace-cgroup-trace-component-review.json",
+      "sha256": "9e59a50191b844def7c49cacc23be5f16322428472d3e7309882bd3f4c8ffa74",
+      "status": "completed",
+      "exit_code": 0,
+      "model": "claude-opus-5-5",
+      "result": "findings retained in raw response"
+    },
+    {
+      "file": "evidence/freespace-cgroup-diagnostic-final-review.json",
+      "sha256": "a4255c97b01c83db28ea07ad6e6c8337b671bb43048479192f55c7fb01bf2859",
+      "status": "completed",
+      "exit_code": 0,
+      "model": "claude-opus-5-5",
+      "result": "findings retained in raw response"
+    },
+    {
+      "file": "evidence/freespace-cgroup-diagnostic-closure-with-admission-review.json",
+      "sha256": "3ac4acb0b7e8345b173066d2f985d6d8672d2cc2d95e96c3ae7137a471301dbd",
+      "status": "completed",
+      "exit_code": 0,
+      "model": "claude-opus-5-5",
+      "result": "findings retained in raw response"
+    },
+    {
+      "file": "evidence/freespace-cgroup-diagnostic-canonical-review.json",
+      "sha256": "ca71e0d8e18860f6fe69b876a926185ddc05335bf00eaaccfe1a9d9f8229cc24",
+      "status": "completed",
+      "exit_code": 0,
+      "model": "claude-opus-5-5",
+      "result": "findings retained in raw response"
+    },
+    {
+      "file": "evidence/freespace-cgroup-diagnostic-canonical-v2-review.json",
+      "sha256": "3313dcb2b994d4216a3295c43b7f8332302db72bc27c1112f379637e520d2864",
+      "status": "completed",
+      "exit_code": 0,
+      "model": "claude-opus-5-5",
+      "result": "NO_FINDINGS"
+    }
+  ],
+  "source_files": 9,
+  "context_files": 3,
+  "private_files": 8,
+  "evidence_files": 37,
+  "payload_count_excluding_index": 57,
+  "archive_sha256": "722856b098f1b377d0722240a2d316e9b5b50321a48f66fab9719eab42a5a908",
+  "archive_index_sha256": "ee2f7301ecd1ad6c3085fce6b5ec59b93b64eb54ee4dec2df3cd9197abc42201",
+  "source_publication": {
+    "source_revision": "e3c46ef604ef8a381754ad4ff06e800eb9618100",
+    "branch": "perf/v1-cgroup-memory-trace",
+    "remote_ref_output": "e3c46ef604ef8a381754ad4ff06e800eb9618100\trefs/heads/perf/v1-cgroup-memory-trace",
+    "normal_pre_push_hooks": {
+      "exit_code": 0,
+      "checks": [
+        "rust metadata (cargo fmt/clippy all-targets)",
+        "size",
+        "shell",
+        "tsc",
+        "biome"
+      ],
+      "rust_metadata_elapsed_seconds_observed": 18.14,
+      "bounds": "CPUQuota50%,MemoryMax2G,180s,oneCargoJob,nice19",
+      "Rust_test_or_app_execution_locally": false
+    },
+    "source_hashes_unchanged_after_hooks": true,
+    "checked_at": "2026-11-01T02:37:25.988447+00:00"
+  },
+  "limitations": "The live smoke run is separate and is not evidence in this source-review archive. The prior findings remain in their unmodified raw responses; canonical v2 is the final validated response."
+}

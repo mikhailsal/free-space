@@ -162,10 +162,14 @@ The [root-reuse screen](../benchmark-results/v1-root-reuse-candidate-screen-2026
 
 Median refresh changes were −0.354023% time, −90,148 KiB (−23.85221%) RSS, zero sampled disk and −15,249,408 bytes (−3.31387%) total cgroup peak. The RSS result is below the 25% benefit floor. Profile-v2 structure passed, while the original HWM monotonic contract was false. The `471c4d` screen remains a separate historical result on another VM; the timing difference does not attribute the earlier gap to root-query removal.
 
-A bounded, default-off W1 cgroup composition trace is under implementation and review to investigate full-scan memory composition. It is unrun and unregistered, and does not establish a source gain or a lower-cap success. The campaign ledger is authoritative for
+The bounded, default-off W1 cgroup composition trace source `e3c46ef604ef8a381754ad4ff06e800eb9618100` was published with exact Opus review and normal hooks; the [source review](../benchmark-results/v1-cgroup-trace-source-reviews-2026-11-01.md) records that evidence. Its [protocol smoke](../benchmark-results/v1-cgroup-trace-protocol-smoke-2026-11-01.md), run 41265785702, failed diagnostic validation. The ordinary pair and both current/previous observers were valid for 100,449 entries; both musl binaries matched ED2 at the 4 GiB local-I/O case. GitHub passed 307 Rust tests with one ignored and 149 Python tests; build and paired jobs consumed 275 and 94 seconds. The preserved initial raw `io.stat` had a bare device row rejected by the parser, and a reproduction confirmed that cause. The smoke remains invalid for calibration and gives no product-gain evidence. The unrun E3 screen was cancelled and its 5,400-second reservation released.
+
+A separate parser correction accepts valid bare and extension-only rows as unreported counters without zero-filling. It is uncommitted, unreviewed and unregistered, with no replacement GitHub run. A separate one-line optional 4 MiB cache prototype from source 63 is also uncommitted and unmeasured; it establishes no production memory gain or canonical qualification. Any future mechanism control needs fresh 63-source epoch-matched binary hashes and prospective admission.
+
+The campaign ledger is authoritative for
 runner time under the unchanged 60-hour limit. The local `freespace.timer` remains
-stopped; `Persistent=yes` can trigger catch-up on restoration. No install, master
-merge or backend switch has been made.
+stopped; `Persistent=yes` can trigger catch-up on restoration. The installed backend remains v2 with `low_memory=true`; no install, master
+merge or backend/configuration switch has been made.
 D16 permits test-host backend switching without certifying a production release
 or unlimited local load. Continue the accepted investigation and conditional
 qualification with immutable preregistered workloads, bounded jobs and recorded
