@@ -1,0 +1,57 @@
+{
+  "status": "final canonical source/controller review clean; research cases pending",
+  "source_head": "1af549a8f1d834fb292e78a6cbd48ad9d12252cd",
+  "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "source_epoch": "1793464183",
+  "final_review_sha256": "8bb5f7f88e09dd58e8967c635702aa03b5ef819d9655ce0b230a6592300ea174",
+  "helper_sha256": "da7599ec834ef06873aa487a0b38255fd98b2ec0ffb2cb54551b7333b3141450",
+  "source_freeze_sha256": "936f489e19f308e1f2a0dcead1627c0a93c32141c9e8ea9d62d1781735695ab3",
+  "final_inputs": {
+    "prompt_sha256": "6fbcaf8d73fc4f175c0740794d70354deb56d18262bc50038f95055851e52a2e",
+    "private_file_sha256": {
+      "/tmp/freespace-admit-cache4-canonical.py": "da7599ec834ef06873aa487a0b38255fd98b2ec0ffb2cb54551b7333b3141450",
+      "/tmp/test-freespace-cache4-canonical-admission.py": "8d8e86308a4b117eb4802f773984979451d35f14382b7bf7e1d869cfb4a6bea8",
+      "/tmp/freespace-cache4-canonical-draft-manifest.json": "aa0268919e3e72140f6ebd4605b6f59938781da02f3510902452d5eda02f8ff0",
+      "/tmp/freespace-cache4-canonical-prereg-audit-20261101.json": "4cb66c7a3a70967befa8b653552928fc9c847b617ed50df489d913f5b9f83978",
+      "/tmp/freespace-admit-cache4-mechanism.py": "a4cb5ed585988d28ed6f77c4e5931f7a2f0a97fdad1b103461f4791cc532198d"
+    },
+    "composed_app_sha256": {
+      "core/src/refresh.rs": "f1f3c7b8ba8fd4d9bf2f0cfad9de536e8347ebf4a69817928b3a9d1096d0f4d8",
+      "core/src/refresh/load.rs": "0d227dd0dc74012fd626ceece50e7c8ee0392885a971476a92eb70ee3ab62757",
+      "core/src/refresh/load/tests.rs": "ad6e681ca31ded1e8d6e2c1dec7ddf6ba39da7b4ddcea630f91ca7a4f41668ab",
+      "core/src/scan/staged.rs": "3a435d1059d99d5a1a2dd5f06e73d27759c8e0e813c85f6be75d060f55aac46a",
+      "core/src/scan/staged/visit.rs": "734fdfccc74255b52779f6531aacb25736328e2b5fbae8d7ac064f5d7ebccfef",
+      "core/src/scan/staged/visit/tests.rs": "b80412ac041f355a2229d7202a2de7aba92ff6eabf38a3ca25c9bec437249fc1",
+      "core/src/scan/staged/write.rs": "daa472a2a1df8945974aaa5cd81520991fda38b77f33c94fbef4e43a595a4dfb",
+      "core/src/scan/staged/write/batch.rs": "6fc64211bf527243e45c6f91918d6c24690d572428bb026fad0d251a75cc2f77",
+      "core/src/scan/staged/write/batch/tests.rs": "123690ed2c3b82132d3c7e8104c33fd8bea80ef3d7c97f7ef7b169f8ae104758",
+      "core/src/scan/staged/write/tests.rs": "9d6bc0abfdf273e278bf5ec3a2b091618f9e64e054b23f3e112a2d3d8dd66598",
+      "core/tests/staged.rs": "2b3561d12a76050f463625897e1558739326fc61a5d30ad7a2d3038ba90c8058"
+    },
+    "draft_freeze_sha256": "697d8f4004a09a9236a1b112e179c308a287660046c4f768d7b0009aec7d68a8",
+    "prior_review_sha256": "d76e3b8ef2fd3dcdf2e877a059658705582d0ae85f87d49f02766c7a220c2953"
+  },
+  "preregistration": {
+    "version": 1,
+    "kind": "reviewed initial canonical reservation; no dispatch",
+    "ledger_path": "/home/tass/myprojects/corp_v2/free-space/docs/benchmark-results/v1-w1-campaign-2026-10-31.json",
+    "ledger_old_sha256": "da2ec7d02e2f97155aafa9eef1a1c3339fb234adcfbd80b9067c4cdf9dc366ee",
+    "manifest_path": "/home/tass/myprojects/corp_v2/free-space/docs/benchmark-results/v1-cache4-canonical-manifest-2026-11-01.json",
+    "source_freeze_sha256": "936f489e19f308e1f2a0dcead1627c0a93c32141c9e8ea9d62d1781735695ab3",
+    "ledger_new_sha256": "79e66dc96e99b8349e9d33d2e3c420031e2880005517ae657f75e120de169919",
+    "manifest_new_sha256": "cfec31a7021cea5758b15e942f0730c16b59a4fd487be391e6fc96af98809525",
+    "reserved_case_ids": [
+      "cache4-canonical-aa",
+      "cache4-canonical-candidate"
+    ],
+    "maximum_committed_seconds": 93741.0,
+    "remaining_unreserved_seconds": 122259.0
+  },
+  "source_scope": "11 composed application files and 54 benchmark/workflow files; v2 staging cache effect unmeasured",
+  "tests": "26 mocked tests passed",
+  "actual_candidate_binary_sha256": null,
+  "control_expected_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "indexed_payload_count": 94,
+  "archive_sha256": "1d76923123929dcd1f1831a0a2ca92eaff4343b23f564dc992a2fcf992496390",
+  "embedded_index_sha256": "1800a68d59f94b50c1db18904e54aab3e3e2c3785a3131c908b6a0c99fa8ee85"
+}

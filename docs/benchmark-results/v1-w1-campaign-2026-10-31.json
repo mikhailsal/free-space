@@ -54,7 +54,8 @@
     41269627684,
     41271696304,
     41273349166,
-    41274381403
+    41274381403,
+    41277463149
   ],
   "runs": [
     {
@@ -2498,13 +2499,63 @@
       "job_seconds": 308.0,
       "receipt": "v1-cutover-rehearsal-smoke-2026-11-01.json",
       "interpretation": "controlled2entryfixture+100kstrictcompatibilityonly; nohosttransition/performance/productqualification"
+    },
+    {
+      "id": "cache4-canonical-aa",
+      "branch": "perf/v1-memory-candidate-control",
+      "revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "screen",
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "swap_mib": 0,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 1950,
+      "forecast_with_margin_seconds": 2535,
+      "research_only": true,
+      "artifact_prefix": "/tmp/freespace-cache4-canonical-aa",
+      "binary_artifact_prefix": "/tmp/freespace-cache4-canonical-aa-binaries",
+      "status": "in_progress",
+      "source_epoch": "1793464183",
+      "cgroup_trace": "off",
+      "expected_baseline_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "expected_candidate_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "depends_on": "Reviewed source/controller and valid frozen mechanism evidence",
+      "case_kind": "canonical same-app independently built A/A",
+      "run_id": 41277463149,
+      "created_at": "2026-11-01T05:34:31Z",
+      "conclusion": null,
+      "head_sha_verified": true,
+      "completed_job_seconds": 0.0,
+      "running_job_seconds_observed": 9.111081,
+      "usage_observed_at": "2026-11-01T05:34:43.111081+00:00",
+      "measurement_validation": "unverified"
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-01T05:10:59.435911+00:00",
+  "updated_at": "2026-11-01T05:34:43.111081+00:00",
   "completed_job_seconds": 48141.0,
-  "maximum_committed_seconds": 82941.0,
-  "remaining_unreserved_seconds": 133059.0,
+  "maximum_committed_seconds": 93741.0,
+  "remaining_unreserved_seconds": 122259.0,
   "candidate_branch": "perf/v1-root-reuse-cache4",
   "forecasts": [
     {
@@ -2543,7 +2594,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 34800,
+  "planned_reserved_seconds": 40200,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Joint SQL plus exact refresh capacity",
@@ -2836,6 +2887,48 @@
       "profile_policy": "not_applicable_scan_only",
       "allocation_diagnostics": false,
       "forecast_method": "max(initial2156,completed prior paired seconds+900),30%margin strictly below3300; fixed caps"
+    },
+    {
+      "id": "cache4-canonical-candidate",
+      "branch": "perf/v1-root-reuse-cache4",
+      "revision": "1af549a8f1d834fb292e78a6cbd48ad9d12252cd",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "stage": "screen",
+      "operations": [
+        "scan",
+        "refresh"
+      ],
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "swap_mib": 0,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 1950,
+      "forecast_with_margin_seconds": 2535,
+      "research_only": true,
+      "artifact_prefix": "/tmp/freespace-cache4-canonical-candidate",
+      "binary_artifact_prefix": "/tmp/freespace-cache4-canonical-candidate-binaries",
+      "status": "planned",
+      "source_epoch": "1793464183",
+      "cgroup_trace": "off",
+      "expected_baseline_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "expected_candidate_binary_sha256": null,
+      "depends_on": "Reviewed source/controller, valid frozen mechanism evidence and fresh canonical A/A",
+      "case_kind": "canonical compound candidate"
     }
   ],
   "parallel_candidates": {
@@ -2853,8 +2946,8 @@
       "status": "Historical4711mscreenvalidbutrefreshH2hold; source63rootreuse1mscreenvalidbutscanRSSH2hold; no promotion"
     }
   },
-  "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 48141.0,
+  "running_job_seconds_observed": 9.111081,
+  "used_runner_seconds_observed": 48150.111081,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
