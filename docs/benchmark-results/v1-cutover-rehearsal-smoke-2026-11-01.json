@@ -1,0 +1,169 @@
+{
+  "run_id": 41274381403,
+  "head": "788656c829423c091656ea36899c85aecd21c651",
+  "status": "valid_disposable_rehearsal_and_protocol_smoke",
+  "strict_equal_raw_valid": true,
+  "summary": {
+    "valid": true,
+    "issues": [],
+    "pairs": [
+      {
+        "pair": 1,
+        "elapsed_seconds": {
+          "baseline": 4.428237209000002,
+          "candidate": 4.427440047999994,
+          "delta": -0.0007971610000083729
+        },
+        "peak_rss_kib": {
+          "baseline": 37860,
+          "candidate": 37912,
+          "delta": 52
+        },
+        "app_disk_peak_bytes": {
+          "baseline": 45314048,
+          "candidate": 45314048,
+          "delta": 0
+        }
+      }
+    ],
+    "summary": {
+      "elapsed_seconds": {
+        "median_delta": -0.0007971610000083729,
+        "max_abs_delta": 0.0007971610000083729
+      },
+      "peak_rss_kib": {
+        "median_delta": 52,
+        "max_abs_delta": 52
+      },
+      "app_disk_peak_bytes": {
+        "median_delta": 0,
+        "max_abs_delta": 0
+      }
+    },
+    "identical_binaries": true,
+    "measurement_protocol": "v1-single-operation-pairs-v4",
+    "case": {
+      "case_policy": "qualification-v1",
+      "scenario": "unchanged",
+      "subtree_entries": 100,
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": null
+    }
+  },
+  "rehearsal": {
+    "valid": true,
+    "status": "success",
+    "target": "x86_64-unknown-linux-musl",
+    "reader_scope": "controlled fixture child only",
+    "layout_before_reset": [
+      {
+        "path": ".lock",
+        "kind": "file"
+      },
+      {
+        "path": "snapshot.db",
+        "kind": "file"
+      },
+      {
+        "path": "state.json",
+        "kind": "file"
+      },
+      {
+        "path": "unrelated.keep",
+        "kind": "file"
+      },
+      {
+        "path": "v2",
+        "kind": "directory"
+      },
+      {
+        "path": "v2/.lock",
+        "kind": "file"
+      },
+      {
+        "path": "v2/generations.db",
+        "kind": "file"
+      },
+      {
+        "path": "v2/generations.db-shm",
+        "kind": "file"
+      },
+      {
+        "path": "v2/generations.db-wal",
+        "kind": "file"
+      },
+      {
+        "path": "v2/generations.db.readers",
+        "kind": "file"
+      },
+      {
+        "path": "v2/state.json",
+        "kind": "file"
+      }
+    ],
+    "entries": 2,
+    "reset_capacity": {
+      "removed_allocated_bytes": 249856,
+      "remaining_named_paths_allocated_bytes": 0,
+      "available_before_bytes": 89063936000,
+      "available_after_bytes": 89064185856
+    },
+    "previous": "NO_PREV",
+    "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "note": "Production reader quiescence requires stopped services and privileged inventory."
+  },
+  "observers": {
+    "p1-candidate-v1": {
+      "validated": true,
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "1015dadb81b04a21ce99114a38e9c4f1a1d8383d44df844b9d511abac24cd40c",
+      "previous_sha256": null
+    },
+    "p1-baseline-v1": {
+      "validated": true,
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "1015dadb81b04a21ce99114a38e9c4f1a1d8383d44df844b9d511abac24cd40c",
+      "previous_sha256": null
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 66305,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020630016,
+      "available_bytes": 91856781312
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020630016,
+      "available_bytes": 91856781312
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.00013161900000113747
+  },
+  "job_seconds": {
+    "build": 221,
+    "paired": 87,
+    "total": 308
+  },
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 139
+  },
+  "both_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "original_measurement_files": 66,
+  "indexed_payload_files": 82,
+  "archive_sha256": "b3bdd07192db4a6c12b95e52a0c95fbd36971a5c48256e4e6fe73cf1314b00e0",
+  "index_sha256": "8e5ffadde829fc19cb0a8b0cbb658146b02ede10ef54a709ef2d964648420337"
+}

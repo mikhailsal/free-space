@@ -1,0 +1,9 @@
+# Disposable v1 cutover rehearsal smoke
+
+Run 41274381403 on `788656c829423c091656ea36899c85aecd21c651` passed the disposable GitHub-runner cutover rehearsal and its ordinary 100,000-file scan smoke. Strict ordinary summary recomputation matched raw, cleanup succeeded, and both observers validated 100,449 current and previous entries. Both independently downloaded musl binaries hashed to `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`; baseline source was `e8265778ef78ec4acd9da1375eedb0be37a123f5`, and build epoch was 1793464183. Worker, setup and observer budgets were 4 GiB, with no swap or hierarchical OOM events.
+
+The separate target-specific rehearsal receipt reports success, two fresh entries and `NO_PREV`. Its private fixture generated old v1 and v2 history, refused the controlled child reader and a held writer, retained the fixture lock inodes and unrelated/configuration files, reset allowlisted generated paths, rechecked capacity, and verified a fresh v1 snapshot. The receipt records 249,856 allocated bytes in removed named paths; zero remaining named-path allocation does not prove absence of unlinked pinned inodes. Reader refusal covers the controlled fixture child, not arbitrary host readers. Production quiescence still requires stopped services and privileged process inventory.
+
+This is a disposable protocol rehearsal, not a host transition, product installation or performance qualification. GitHub ran 307 Rust tests successfully with one ignored and 139 Python tests; build and paired jobs used 221 and 87 runner seconds. Runner preparation did not delete SDKs.
+
+The deterministic archive preserves 66 original measurement files, the separate rehearsal receipt, source and supporting evidence; all 82 indexed payloads were verified. Archive SHA-256: `b3bdd07192db4a6c12b95e52a0c95fbd36971a5c48256e4e6fe73cf1314b00e0`.

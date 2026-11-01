@@ -1,0 +1,161 @@
+{
+  "run_id": 41271696304,
+  "result": "valid same-source A/A; descriptive spread, not a confidence interval or product gain",
+  "source_revision": "63d98cc8ff88a54ab9687c5fb93fffd930e33d26",
+  "actual_both_binary_sha256": "1ad28691243b2d2c52fee323c793d2d90323e57fc5ec52c4e80b8aba3344e35e",
+  "source_date_epoch": "1793493808",
+  "strict_summaries_equal_raw": true,
+  "refresh_profile_valid_structure": true,
+  "original_hwm_monotonic_contract_pass": false,
+  "pairs": {
+    "scan": [
+      {
+        "pair": 1,
+        "baseline": {
+          "elapsed_seconds": 46.82613006,
+          "rss_kib": 37748,
+          "app_disk_peak_bytes": 456916992,
+          "cgroup_peak_bytes": 1939521536
+        },
+        "candidate": {
+          "elapsed_seconds": 46.87730771600002,
+          "rss_kib": 37684,
+          "app_disk_peak_bytes": 456916992,
+          "cgroup_peak_bytes": 1939869696
+        },
+        "deltas": {
+          "elapsed_seconds": 0.05117765600002144,
+          "rss_kib": -64,
+          "app_disk_peak_bytes": 0,
+          "cgroup_peak_bytes": 348160
+        }
+      },
+      {
+        "pair": 2,
+        "baseline": {
+          "elapsed_seconds": 46.85279249299998,
+          "rss_kib": 37672,
+          "app_disk_peak_bytes": 456916992,
+          "cgroup_peak_bytes": 1939427328
+        },
+        "candidate": {
+          "elapsed_seconds": 46.756248837999976,
+          "rss_kib": 37672,
+          "app_disk_peak_bytes": 456916992,
+          "cgroup_peak_bytes": 1939750912
+        },
+        "deltas": {
+          "elapsed_seconds": -0.09654365500000495,
+          "rss_kib": 0,
+          "app_disk_peak_bytes": 0,
+          "cgroup_peak_bytes": 323584
+        }
+      },
+      {
+        "pair": 3,
+        "baseline": {
+          "elapsed_seconds": 46.761259422999956,
+          "rss_kib": 37600,
+          "app_disk_peak_bytes": 456916992,
+          "cgroup_peak_bytes": 1939763200
+        },
+        "candidate": {
+          "elapsed_seconds": 46.86260340199999,
+          "rss_kib": 37636,
+          "app_disk_peak_bytes": 456916992,
+          "cgroup_peak_bytes": 1939611648
+        },
+        "deltas": {
+          "elapsed_seconds": 0.10134397900003478,
+          "rss_kib": 36,
+          "app_disk_peak_bytes": 0,
+          "cgroup_peak_bytes": -151552
+        }
+      }
+    ],
+    "refresh": [
+      {
+        "pair": 1,
+        "baseline": {
+          "elapsed_seconds": 10.578642225000067,
+          "rss_kib": 288192,
+          "app_disk_peak_bytes": 376193024,
+          "cgroup_peak_bytes": 437911552
+        },
+        "candidate": {
+          "elapsed_seconds": 10.503302620999989,
+          "rss_kib": 288280,
+          "app_disk_peak_bytes": 376193024,
+          "cgroup_peak_bytes": 445251584
+        },
+        "deltas": {
+          "elapsed_seconds": -0.075339604000078,
+          "rss_kib": 88,
+          "app_disk_peak_bytes": 0,
+          "cgroup_peak_bytes": 7340032
+        }
+      },
+      {
+        "pair": 2,
+        "baseline": {
+          "elapsed_seconds": 10.512532043999954,
+          "rss_kib": 288324,
+          "app_disk_peak_bytes": 376193024,
+          "cgroup_peak_bytes": 445247488
+        },
+        "candidate": {
+          "elapsed_seconds": 10.492077906999953,
+          "rss_kib": 288200,
+          "app_disk_peak_bytes": 376193024,
+          "cgroup_peak_bytes": 444751872
+        },
+        "deltas": {
+          "elapsed_seconds": -0.020454137000001538,
+          "rss_kib": -124,
+          "app_disk_peak_bytes": 0,
+          "cgroup_peak_bytes": -495616
+        }
+      },
+      {
+        "pair": 3,
+        "baseline": {
+          "elapsed_seconds": 10.503650016999927,
+          "rss_kib": 288304,
+          "app_disk_peak_bytes": 376193024,
+          "cgroup_peak_bytes": 445378560
+        },
+        "candidate": {
+          "elapsed_seconds": 10.51775737999992,
+          "rss_kib": 288228,
+          "app_disk_peak_bytes": 376193024,
+          "cgroup_peak_bytes": 445243392
+        },
+        "deltas": {
+          "elapsed_seconds": 0.014107362999993711,
+          "rss_kib": -76,
+          "app_disk_peak_bytes": 0,
+          "cgroup_peak_bytes": -135168
+        }
+      }
+    ]
+  },
+  "github_tests": {
+    "rust_passed": 326,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_lines": [
+      "Ran 121 tests in 1.328s"
+    ]
+  },
+  "job_seconds": {
+    "build": 295,
+    "paired": 1036,
+    "aggregate": 1331
+  },
+  "helper_measurement_validation": "valid; all 203 recorded evidence hashes independently checked",
+  "dispatch_provenance": "verification-input receipt reconstructed by removing the later measurement_validation field; its exact bytes match helper-recorded input hash; post-decision receipt separately retained",
+  "payload_count_excluding_index": 271,
+  "archive_sha256": "d06b730fc72de4687ef61813f1671c559f2b4803492da770a49e6f574c60f549",
+  "internal_index_sha256": "1ea7be29eaddd0f50548cf84199dcffe56209098aeff5c4b0ba544138dfef487",
+  "campaign_completed_seconds_after_run": 46679
+}

@@ -1,0 +1,11 @@
+# W2 cutover rehearsal: source review and preregistration
+
+The reviewed research source is `788656c829423c091656ea36899c85aecd21c651` on `perf/v1-cutover-rehearsal`, parent `4f22bf8e3b67f7f59049a72116b90c061fb1328b`. The change covers exactly three files: the representative workflow, `scripts/bench_v1_cutover.py` and its test. The archive contains their exact committed bodies, the 19 closure context bodies, full source diff, both outside-review prompts and responses, structured validations, source freeze, publication and preregistration evidence. Each indexed payload was verified after archive creation.
+
+The initial outside review raised P2/P3 findings and context gaps; the subsequent closure completed with sole `claude-opus-5-5`, exit 0 and literal `NO_FINDINGS`. This is source-review coverage of the three changed files and supplied context. Routine handwritten bookkeeping was not outside reviewed as a program. The publication record reports normal bounded hooks (Rust metadata, size, shell, TypeScript and Biome; metadata took about 18 seconds); the agent reported 18 tiny guard tests. These are reported results, not reconstructed raw hook or test logs. No local app or Rust tests are claimed.
+
+The committed application inputs match `e8265778ef78ec4acd9da1375eedb0be37a123f5`; the preregistered musl build uses epoch `1793464183` and expects both binaries to equal `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`. This is an expected hash, not yet observed runtime evidence. A 3,300-second maximum was registered before run `41274381403`, created at 04:46:32 UTC and in progress at registration. Its controlled two-entry fixture and ordinary 100k smoke remain scientifically unverified; no product, performance or host-migration result is claimed here.
+
+The rehearsal covers a controlled fixture reader and preservation of all three protected lock inodes and the lease file. It does not prove the absence of arbitrary host v1 readers. The remaining named-path metric does not prove pinned inode identity. No private host manifest, personal snapshot path or configuration is included.
+
+The archive SHA-256 is `ac0f5261c0cc5036b8caf66de08d0479eb5d86a65482f7941708939d3a299f55`; its internal `SHA256SUMS` indexes all 35 evidence and source payloads.
