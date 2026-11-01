@@ -1,0 +1,182 @@
+{
+  "run_id": 41268681360,
+  "head": "d64f94369a97a35a644010e19c98de5992c06185",
+  "status": "valid_protocol_smoke_only",
+  "ordinary_equal_raw_valid": true,
+  "diagnostic_equal_raw_valid": true,
+  "diagnostic": {
+    "valid": true,
+    "issues": [],
+    "policy": "contrast",
+    "diagnostic_arms": [
+      {
+        "id": "p1-candidate-v1",
+        "devices": {
+          "output_st_dev": 2049,
+          "snapshot_st_dev": 1792
+        },
+        "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage",
+        "samples": 3,
+        "bytes": 6848,
+        "missed": 0,
+        "max_record_bytes": 2185,
+        "coverage_ns": 5035179225,
+        "sampled_current_max": 250986496,
+        "final_memory_peak": 258719744,
+        "sampling_wall_ns": 1590751,
+        "sampling_thread_cpu_ns": 1590796,
+        "setup_wall_ns": 100859,
+        "setup_thread_cpu_ns": 99766,
+        "finalize_wall_ns": 721353,
+        "finalize_thread_cpu_ns": 720944
+      }
+    ],
+    "cgroup_peak_bytes": [
+      {
+        "pair": 1,
+        "off": 256700416,
+        "on": 258719744,
+        "delta": 2019328
+      }
+    ],
+    "ordinary_summary": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 5.046096645999995,
+            "candidate": 5.03357227699999,
+            "delta": -0.012524369000004754
+          },
+          "peak_rss_kib": {
+            "baseline": 37940,
+            "candidate": 38012,
+            "delta": 72
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 45330432,
+            "candidate": 45330432,
+            "delta": 0
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": -0.012524369000004754,
+          "max_abs_delta": 0.012524369000004754
+        },
+        "peak_rss_kib": {
+          "median_delta": 72,
+          "max_abs_delta": 72
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": 0,
+          "max_abs_delta": 0
+        }
+      },
+      "identical_binaries": true,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "unchanged",
+        "subtree_entries": 100,
+        "memory_mib": 4096,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null
+      }
+    },
+    "interpretation": "Instrumentation contrast, not a noise band or product optimization. Cgroup reads, JSON encoding and cache writes are cocharged to the worker. The shared 20ms sampler can delay disk sampling and free-space reserve checks. Output and snapshot devices can share a physical disk. Five-second points are non-atomic; they provide no phase attribution or peak decomposition."
+  },
+  "trace_receipt": {
+    "valid": true,
+    "started_ns": 202896299385,
+    "ended_ns": 207931478610,
+    "interval_ns": 5000000000,
+    "samples": 3,
+    "attempted": 3,
+    "missed": 0,
+    "late": 0,
+    "max_lateness_ns": 15446236,
+    "final_covers_due_tick": false,
+    "final_covered_deadline_ns": null,
+    "late_tolerance_ns": 20000000,
+    "errors": 0,
+    "missing": 0,
+    "truncated": false,
+    "bytes": 6848,
+    "wall_ns": 1590751,
+    "thread_cpu_ns": 1590796,
+    "cli_start_ns": 202897094581,
+    "cli_end_ns": 207930666858,
+    "devices": {
+      "output_st_dev": 2049,
+      "snapshot_st_dev": 1792
+    },
+    "error": null,
+    "sha256": "7a352b3621f691a1cd5469722967fb461e74191c77a2c86d3f01ab3a43acff75",
+    "setup_wall_ns": 100859,
+    "setup_thread_cpu_ns": 99766,
+    "finalize_wall_ns": 721353,
+    "finalize_thread_cpu_ns": 720944,
+    "scope": "worker cgroup includes CLI, helper, sampler and diagnostic; output may share storage"
+  },
+  "initial_io_stat": "7:0 \n8:0 rbytes=17690624 wbytes=0 rios=600 wios=0 dbytes=0 dios=0",
+  "initial_unreported_devices": [
+    "7:0"
+  ],
+  "observers": {
+    "p1-candidate-v1": {
+      "validated": true,
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "d11ba312a16f88d71661b70a6924ee0839f9b3e87f714d04363a6105cd2a7e69",
+      "previous_sha256": null
+    },
+    "p1-baseline-v1": {
+      "validated": true,
+      "current_entries": 100449,
+      "previous_entries": 100449,
+      "semantic_sha256": "d11ba312a16f88d71661b70a6924ee0839f9b3e87f714d04363a6105cd2a7e69",
+      "previous_sha256": null
+    }
+  },
+  "runner_preparation": {
+    "success": true,
+    "floor_bytes": 45097156608,
+    "target_bytes": 47244640256,
+    "target_path": "/home/runner/work/_temp",
+    "target_dev": 2049,
+    "before": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020498944,
+      "available_bytes": 91856912384
+    },
+    "after": {
+      "total_bytes": 154894188544,
+      "used_bytes": 63020498944,
+      "available_bytes": 91856912384
+    },
+    "actions": [],
+    "errors": [],
+    "duration_seconds": 0.0002237190000045075
+  },
+  "job_seconds": {
+    "build": 215,
+    "paired": 103,
+    "total": 318
+  },
+  "tests": {
+    "rust_passed": 307,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_passed": 151
+  },
+  "both_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "original_artifact_files": 69,
+  "indexed_payload_files": 88,
+  "archive_sha256": "794feb3e128de5b47a69c84f35bb00fca170790226c2f28f792ec620c6623c54",
+  "index_sha256": "eca639d314dcefebbe831fea44e7f170a6096c690e698b8a2d38e4b213c97c69"
+}

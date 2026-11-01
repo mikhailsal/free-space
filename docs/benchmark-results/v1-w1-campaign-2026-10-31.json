@@ -49,7 +49,9 @@
     41256220919,
     41259537703,
     41260421846,
-    41265785702
+    41265785702,
+    41268681360,
+    41269627684
   ],
   "runs": [
     {
@@ -1814,13 +1816,104 @@
       "result_md": "docs/benchmark-results/v1-cgroup-trace-protocol-smoke-2026-11-01.md",
       "actual_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "actual_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980"
+    },
+    {
+      "branch": "perf/v1-cgroup-memory-trace-bare-row",
+      "revision": "d64f94369a97a35a644010e19c98de5992c06185",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "operations": [
+        "scan"
+      ],
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "cgroup_trace": "contrast",
+      "research_only": true,
+      "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "status": "completed",
+      "id": "cgroup-trace-bare-row-protocol-smoke",
+      "files": 100000,
+      "expected_entries": 100449,
+      "pairs_per_operation": 1,
+      "stage": "smoke",
+      "timeout_minutes": 20,
+      "maximum_job_seconds": 3300,
+      "forecast_seconds": 900,
+      "forecast_with_margin_seconds": 1170.0,
+      "artifact_prefix": "/tmp/freespace-cgroup-trace-bare-row-protocol-smoke",
+      "binary_artifact_prefix": "/tmp/freespace-cgroup-trace-bare-row-protocol-smoke-binaries",
+      "swap_mib": 0,
+      "run_id": 41268681360,
+      "created_at": "2026-11-01T03:18:59Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 318.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T03:26:26.050464+00:00",
+      "job_seconds": 318.0
+    },
+    {
+      "branch": "perf/v1-cgroup-memory-trace-bare-row",
+      "revision": "d64f94369a97a35a644010e19c98de5992c06185",
+      "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+      "comparison": "candidate",
+      "operations": [
+        "scan"
+      ],
+      "subtree_entries": 100,
+      "scenario": "unchanged",
+      "memory_mib": 4096,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "cpus": 2,
+      "workers": 1,
+      "target": "x86_64-unknown-linux-musl",
+      "io": "local",
+      "scan_profile": "disk",
+      "runner_preparation_policy": "sdk-space-v1",
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "cgroup_trace": "contrast",
+      "research_only": true,
+      "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+      "status": "in_progress",
+      "id": "cgroup-trace-bare-row-overhead-screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "pairs_per_operation": 3,
+      "stage": "screen",
+      "timeout_minutes": 55,
+      "maximum_job_seconds": 5400,
+      "forecast_seconds": 2400,
+      "forecast_with_margin_seconds": 3120.0,
+      "artifact_prefix": "/tmp/freespace-cgroup-trace-bare-row-overhead-screen",
+      "binary_artifact_prefix": "/tmp/freespace-cgroup-trace-bare-row-overhead-screen-binaries",
+      "swap_mib": 0,
+      "run_id": 41269627684,
+      "created_at": "2026-11-01T03:33:07Z",
+      "conclusion": null,
+      "head_sha_verified": true,
+      "completed_job_seconds": 155.0,
+      "running_job_seconds_observed": 214.949426,
+      "usage_observed_at": "2026-11-01T03:39:22.949426+00:00"
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-01T02:50:16.429584+00:00",
-  "completed_job_seconds": 44065.0,
-  "maximum_committed_seconds": 78865.0,
-  "remaining_unreserved_seconds": 137135.0,
+  "updated_at": "2026-11-01T03:39:22.949426+00:00",
+  "completed_job_seconds": 44538.0,
+  "maximum_committed_seconds": 84583.0,
+  "remaining_unreserved_seconds": 131417.0,
   "candidate_branch": "perf/v1-child-batches",
   "forecasts": [
     {
@@ -2169,8 +2262,8 @@
       "status": "Research only, GH correctness and measurement pending"
     }
   },
-  "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 44065.0,
+  "running_job_seconds_observed": 214.949426,
+  "used_runner_seconds_observed": 44752.949426,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -2401,11 +2494,18 @@
     }
   ],
   "current_research_direction": {
-    "status": "corrected_io_parser_source_in_development_unregistered",
-    "reason": "Confirmed legitimate zero-counter io.stat row rejected in first diagnostic smoke; no screen or calibration admitted",
-    "prior_invalid_run": 41265785702,
-    "new_worktree": "/tmp/free-space-v1-cgroup-memory-trace-bare-row",
-    "new_cases": "not_registered_or_dispatched",
-    "product_gates": "unchanged; RootReuse63 H2 remains inconclusive"
+    "status": "corrected_smoke_valid_1m_calibration_running",
+    "source_revision": "d64f94369a97a35a644010e19c98de5992c06185",
+    "purpose": "Whole-fullscan RAM trace calibration; same binary off/on, no source RAM gain/product qualification",
+    "prior_invalid_run_preserved": 41265785702,
+    "old_screen_cancelled": true,
+    "new_cases": [
+      "cgroup-trace-bare-row-protocol-smoke",
+      "cgroup-trace-bare-row-overhead-screen"
+    ],
+    "expected_both_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "product_gates": "Unchanged;63H2RSShold remains,cache4mechanismsourcepublishedbutunmeasured",
+    "smoke_run": 41268681360,
+    "calibration_run": 41269627684
   }
 }

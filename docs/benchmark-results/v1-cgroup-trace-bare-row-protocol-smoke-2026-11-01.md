@@ -1,0 +1,9 @@
+# Corrected cgroup diagnostic protocol smoke
+
+Run 41268681360 on `d64f94369a97a35a644010e19c98de5992c06185` passed independent strict ordinary and diagnostic recomputation, each equal to the saved raw summary. Both observers validated 100,449 current and previous entries; cleanup succeeded. Both downloaded musl binaries independently hashed to `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`, with baseline epoch 1793464183. Worker, seed and observer budgets were 4 GiB; swap was disabled. Seeds and observers were untraced, with baseline worker trace off and candidate trace on.
+
+The initial trace preserved raw `io.stat` as `7:0` followed by `8:0 rbytes=17690624 wbytes=0 rios=600 wios=0 dbytes=0 dios=0`; `io_stat_unreported_devices` was `["7:0"]`. Unreported counters were not filled with zero. The trace had two periodic samples and one final sample, zero errors, missing fields, missed or late ticks, and no truncation. Sampled local and hierarchical events and all I/O values remain in raw evidence; ordinary endpoint collection does not capture `memory.events.local`.
+
+This is a one-pair protocol-validity smoke: no numeric calibration bar, product gain or promotion claim applies. Five-second points are non-atomic, do not decompose the peak or attribute phases, and tracing is cocharged to the worker. The previous E3 smoke remains invalid and its unrun screen remains cancelled. Runner disk preparation required no deletions. GitHub tests: 307 Rust passed, one ignored, and 151 Python passed. Build and paired jobs used 215 and 103 seconds.
+
+The deterministic archive preserves 69 original artifact files and supporting source, receipts, logs and validation; all 88 indexed payloads were verified. Archive SHA-256: `794feb3e128de5b47a69c84f35bb00fca170790226c2f28f792ec620c6623c54`.

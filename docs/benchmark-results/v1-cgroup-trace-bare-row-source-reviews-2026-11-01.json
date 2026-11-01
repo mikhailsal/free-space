@@ -1,0 +1,72 @@
+{
+  "source_revision": "d64f94369a97a35a644010e19c98de5992c06185",
+  "scope": "outside source review and mocked tests only; no corrected-source app, Rust test, or GH result claimed",
+  "source_freeze_sha256": "250afabb28bc93d61b8836da8bbf295377ca60ef6700b6263bf325e8b5bcbbed",
+  "model": "claude-opus-5-5",
+  "final_review_result": "NO_FINDINGS",
+  "review_chain": [
+    {
+      "file": "evidence/freespace-cgroup-bare-row-canonical-review.json",
+      "sha256": "ea0cf4a7e98477fc0c7c7b6f26e0e5ea04e3b22f46e65656e089f75ca5d52677",
+      "model": "claude-opus-5-5",
+      "status": "completed",
+      "exit_code": 0,
+      "result": "P3 retained verbatim in raw response"
+    },
+    {
+      "file": "evidence/freespace-cgroup-bare-row-discard-closure-review.json",
+      "sha256": "633bb7537b9edd43f4a4f0e5b059175f09c44df57f713e342771e3f880e612bc",
+      "model": "claude-opus-5-5",
+      "status": "completed",
+      "exit_code": 0,
+      "result": "NO_FINDINGS"
+    }
+  ],
+  "source_files": 9,
+  "context_files": 3,
+  "private_files": 9,
+  "payload_count_excluding_index": 40,
+  "archive_sha256": "482f09d5f66e1aac2617e97a2ae58b2c22c5e51d399f72711ccb33ed91863806",
+  "archive_index_sha256": "9cb2adf6d4e7b306c45f5763b0c8f8d9f76db6df6c258eb5f0f4b923a8e9e247",
+  "baseline_immutability": {
+    "comparison_baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "candidate": "d64f94369a97a35a644010e19c98de5992c06185",
+    "paths_checked": [
+      "core",
+      "cli",
+      "Cargo.toml",
+      "Cargo.lock",
+      ".cargo",
+      "web"
+    ],
+    "git_diff_name_only": [],
+    "prior_diagnostic_source": "e3c46ef604ef8a381754ad4ff06e800eb9618100",
+    "prior_to_candidate_changed_paths": [
+      "scripts/bench_v1_cgroup_diagnostic.py",
+      "scripts/bench_v1_cgroup_trace.py",
+      "scripts/tests/test_bench_v1_cgroup_diagnostic.py",
+      "scripts/tests/test_bench_v1_cgroup_trace.py"
+    ],
+    "kernel_primary_source": "https://raw.githubusercontent.com/torvalds/linux/v6.8/block/blk-cgroup.c",
+    "prior_framework_archive": "v1-cgroup-trace-source-reviews-2026-11-01.tar.gz",
+    "prior_framework_archive_sha256": "722856b098f1b377d0722240a2d316e9b5b50321a48f66fab9719eab42a5a908",
+    "failed_smoke_run": 41265785702,
+    "scope": "failure root-cause receipt retained; no result for new live run"
+  },
+  "publication": {
+    "source_revision": "d64f94369a97a35a644010e19c98de5992c06185",
+    "remote_head_verified": true,
+    "reviewed_bytes_unchanged": true,
+    "normal_hooks_exit_code": 0,
+    "checks": [
+      "rust metadata21.67s",
+      "size",
+      "shell",
+      "tsc",
+      "biome"
+    ],
+    "bounds": "CPU50%,2GiB,180s,oneCargoJob,nice19",
+    "local_Rust_test_or_app_execution": false
+  },
+  "prior_invocation_note": "Agent-reported operational history: initial module-path unittest invocation failed; corrected direct invocation passed; raw initial error not retained. The archived clone log separately records 4+7 passing tests."
+}
