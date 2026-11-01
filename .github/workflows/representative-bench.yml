@@ -245,6 +245,23 @@ jobs:
                       'bun':subprocess.check_output(['bun','--version'],text=True).strip()}
               p.with_name(arm+'.build.json').write_text(json.dumps(record,indent=2)+'\n')
           PY
+      - name: Disposable cutover rehearsal
+        id: cutover_rehearsal
+        env:
+          BENCH_TARGET: ${{ steps.policy.outputs.target }}
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 scripts/bench_v1_cutover.py --binary "$PWD/binaries/candidate" \
+            --output "$RUNNER_TEMP/freespace-cutover-rehearsal.json"
+      - name: Upload cutover rehearsal receipt
+        if: always() && steps.cutover_rehearsal.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: disposable-cutover-rehearsal
+          path: ${{ runner.temp }}/freespace-cutover-rehearsal.json
+          if-no-files-found: warn
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: representative-binary
