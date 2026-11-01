@@ -78,15 +78,26 @@ def _io(raw):
         values = {}
         for part in parts[1:]:
             key, value = part.split('=', 1)
-            if key in values or not value:
+            if not key or key in values or not value:
                 raise ValueError('invalid io counter')
             values[key] = value
-        if not {'rbytes', 'wbytes', 'rios', 'wios'} <= values.keys():
+        required = {'rbytes', 'wbytes', 'rios', 'wios'}
+        present = required & values.keys()
+        if present and present != required:
             raise ValueError('missing io counter')
-        if not all(_integer(values[key]) for key in ('rbytes', 'wbytes', 'rios', 'wios')):
+        if present and not all(_integer(values[key]) for key in required):
             raise ValueError('invalid required io counter')
+        discard = {'dbytes', 'dios'} & values.keys()
+        if discard and not present:
+            raise ValueError('discard counters require primary io counters')
+        if any(not _integer(values[key]) for key in discard):
+            raise ValueError('invalid discard io counter')
         rows[parts[0]] = values
     return rows
+
+
+def _io_unreported(raw):
+    return [device for device, values in _io(raw).items() if 'rbytes' not in values]
 
 
 def _validate(name, raw):
@@ -230,6 +241,7 @@ class CgroupTrace:
             else:
                 self.missed += 1 + overdue // INTERVAL_NS
         values, unavailable = {}, {}
+        io_stat_unreported_devices = None
         for name in FILES:
             try:
                 raw = self.read(self.group, name)
@@ -250,6 +262,8 @@ class CgroupTrace:
             values[name] = raw
             try:
                 _validate(name, raw)
+                if name == 'io.stat':
+                    io_stat_unreported_devices = _io_unreported(raw)
             except (ValueError, OverflowError):
                 unavailable[name] = 'invalid_content'
                 self.errors += 1
@@ -261,6 +275,7 @@ class CgroupTrace:
                                 lateness_ns=lateness,
                                 final_covers_due_tick=self.final_covers_due_tick if kind == 'final' else None,
                                 final_covered_deadline_ns=self.final_covered_deadline_ns if kind == 'final' else None,
+                                io_stat_unreported_devices=io_stat_unreported_devices,
                                 start_ns=start, end_ns=end, values=values,
                                 unavailable=unavailable),
                            limit):

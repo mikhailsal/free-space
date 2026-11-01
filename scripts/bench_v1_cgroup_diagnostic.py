@@ -7,7 +7,7 @@ from pathlib import Path
 import stat
 import time
 
-from bench_v1_cgroup_trace import CgroupTrace, FILES, LATE_TOLERANCE_NS, MAX_OUTPUT, MAX_RECORD_BYTES, MAX_SAMPLES, _validate
+from bench_v1_cgroup_trace import CgroupTrace, FILES, LATE_TOLERANCE_NS, MAX_OUTPUT, MAX_RECORD_BYTES, MAX_SAMPLES, _io_unreported, _validate
 
 
 class TraceSession:
@@ -161,6 +161,8 @@ def _trace(path, receipt):
             if not isinstance(raw, str) or len(raw.encode()) > 65536:
                 raise ValueError('invalid cgroup value')
             _validate(name, raw)
+        if sample.get('io_stat_unreported_devices') != _io_unreported(fields['io.stat']):
+            raise ValueError('io.stat unreported devices mismatch')
         sampled_currents.append(int(fields['memory.current']))
         prior = end
     if summary['late'] != sum(v > LATE_TOLERANCE_NS for v in latenesses) or summary['max_lateness_ns'] != max(latenesses):

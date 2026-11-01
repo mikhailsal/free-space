@@ -255,7 +255,7 @@ python3() {
                 fake.return_value.tick.assert_not_called()
                 fake.return_value.stop.assert_called_once()
 
-    def make_case(self, root):
+    def make_case(self, root, io_stat=None):
         from bench_v1_cgroup_trace import CgroupTrace
         fixture(root)
         manifest = json.loads((root / 'manifest.json').read_text())
@@ -275,6 +275,8 @@ python3() {
             if name == 'two':
                 clock = Clock()
                 data = values()
+                if io_stat is not None:
+                    data['io.stat'] = io_stat
                 collector = CgroupTrace('/fake', directory, read=lambda _, key: data[key], clock=clock,
                                         cpu_clock=lambda: 0)
                 self.assertTrue(collector.start())
@@ -292,6 +294,34 @@ python3() {
         result = summarize(root)
         self.assertTrue(result['valid'], result['issues'])
         put(root / 'summary.json', result)
+
+    def test_actual_bare_io_row_and_unreported_metadata_validation(self):
+        observed = '7:0 \n8:0 rbytes=17690624 wbytes=0 rios=600 wios=0 dbytes=0 dios=0'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'measurements'
+            self.make_case(root, observed)
+            self.assertTrue(analyze(root)['valid'])
+            metric_path = root / 'two' / 'metrics.json'
+            metric = json.loads(metric_path.read_text())
+            metric['cgroup_trace_receipt']['valid'] = False
+            put(metric_path, metric)
+            self.assertFalse(analyze(root)['valid'])
+            metric['cgroup_trace_receipt']['valid'] = True
+            put(metric_path, metric)
+            path = root / 'two' / 'cgroup-trace.jsonl'
+            lines = [json.loads(line) for line in path.read_text().splitlines()]
+            self.assertEqual(lines[0]['io_stat_unreported_devices'], ['7:0'])
+            lines[0]['io_stat_unreported_devices'] = []
+            encode = lambda item: (json.dumps(item, separators=(',', ':')) + '\n').encode()
+            lines[-1]['bytes_before_summary'] = sum(len(encode(line)) for line in lines[:-1])
+            data = b''.join(map(encode, lines))
+            path.write_bytes(data)
+            metric_path = root / 'two' / 'metrics.json'
+            metric = json.loads(metric_path.read_text())
+            metric['cgroup_trace_receipt']['sha256'] = hashlib.sha256(data).hexdigest()
+            metric['cgroup_trace_receipt']['bytes'] = len(data)
+            put(metric_path, metric)
+            self.assertFalse(analyze(root)['valid'])
 
     def test_pending_host_summary_requires_cleanup_cli_rewrite(self):
         from bench_v1_summary import main as summary_main

@@ -176,10 +176,37 @@ class TraceTests(unittest.TestCase):
             self.assertTrue(summary['valid_before_close'])
             self.assertEqual(summary['errors_before_close'], 0)
 
+    def test_observed_bare_and_extension_only_io_rows_then_full_counters(self):
+        observed = '7:0 \n8:0 rbytes=17690624 wbytes=0 rios=600 wios=0 dbytes=0 dios=0'
+        raw = values()
+        raw['io.stat'] = observed
+        with tempfile.TemporaryDirectory() as tmp:
+            obj, clock = self.make(tmp, raw)
+            self.assertTrue(obj.start())
+            obj.tick()
+            raw['io.stat'] = '7:0 depth=max cost.vrate=12.50\n8:0 rbytes=1 wbytes=2 rios=3 wios=4'
+            clock.now = trace.INTERVAL_NS
+            obj.tick()
+            raw['io.stat'] = '7:0 rbytes=1 wbytes=2 rios=3 wios=4'
+            clock.now += 1
+            self.assertTrue(obj.stop()['valid'])
+            records = [json.loads(line) for line in Path(tmp, 'cgroup-trace.jsonl').read_text().splitlines()]
+            self.assertEqual(records[0]['values']['io.stat'], observed)
+            self.assertEqual(records[0]['io_stat_unreported_devices'], ['7:0'])
+            self.assertEqual(records[1]['io_stat_unreported_devices'], ['7:0'])
+            self.assertEqual(records[2]['io_stat_unreported_devices'], [])
+            self.assertEqual(trace._io(observed)['7:0'], {})
+
     def test_malformed_counters_are_preserved_and_invalid(self):
         raw = values()
         cases = [('memory.pressure', raw['memory.pressure'].replace('avg10=0.00', 'avg10=0.00 avg10=0.01', 1)),
                  ('io.stat', '7:0 rbytes=1 wbytes=2'),
+                 ('io.stat', '7:0 rbytes=1 rbytes=2 wbytes=2 rios=3 wios=4'),
+                 ('io.stat', '7:0 rbytes=-1 wbytes=2 rios=3 wios=4'),
+                 ('io.stat', '7:0 =invalid'),
+                 ('io.stat', '7:0 dbytes=5 dios=1'),
+                 ('io.stat', '7:0 rbytes=1 wbytes=2 rios=3 wios=4 dbytes=-1'),
+                 ('io.stat', '7:0 depth=max\n7:0'),
                  ('memory.current', '-1'),
                  ('memory.peak', 'nan'),
                  ('memory.stat', raw['memory.stat'] + '\nanon 5'),
@@ -196,6 +223,7 @@ class TraceTests(unittest.TestCase):
                 self.assertEqual(record['values'][name], bad)
                 self.assertEqual(record['unavailable'][name], 'invalid_content')
         trace._validate('io.stat', '')
+        trace._validate('io.stat', '7:0 rbytes=1 wbytes=2 rios=3 wios=4')
         trace._validate('io.stat', '7:0 rbytes=1 wbytes=2 rios=3 wios=4 dbytes=9')
         trace._validate('io.stat', '7:0 rbytes=1 wbytes=2 rios=3 wios=4 depth=max cost.vrate=12.50')
 
