@@ -1,0 +1,1091 @@
+{
+  "decision": "NOT ADMITTED",
+  "case_id": "x86_64-unknown-linux-musl|local|scan|100|unchanged|512",
+  "control_revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "expected_binaries_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "file_scale": 7.264383,
+  "entry_scale": 7.26439349367197,
+  "components_seconds": {
+    "fixture": 460,
+    "two_seeds": 702,
+    "two_workers": 2608,
+    "two_observers": 456,
+    "two_copies": 14,
+    "calibration_setup_cleanup_allowance": 600,
+    "low_memory_pressure_uncertainty_allowance": 1500
+  },
+  "base_max_per_worker_seconds": 1303.921706263,
+  "worker_cap_seconds": 1800,
+  "forecast_seconds": 6340,
+  "margin_factor": 1.3,
+  "with_margin_seconds": 8242.0,
+  "step_cap_seconds": 7200,
+  "paired_job_cap_seconds": 7800,
+  "build_cap_seconds": 1500,
+  "aggregate_job_cap_seconds": 9300,
+  "one_million_512_aa": {
+    "manifest": {
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "pairs": 3,
+      "files": 1000000,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "fixture_receipt": {
+        "files": 1000000,
+        "expected_entries": 1004499,
+        "expected_subtree_entries": 100,
+        "directories": 4499,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 999901,
+          "payload_files": 10000,
+          "sparse_files": 235,
+          "hardlink_files": 999,
+          "longname_files": 32255
+        },
+        "setup_seconds": 61.954516324
+      },
+      "runner_preparation": {
+        "success": true,
+        "acted": false,
+        "freed_bytes": 0,
+        "duration_seconds": 0.0001984820000018317,
+        "floor_bytes": 45097156608,
+        "target_bytes": 47244640256
+      },
+      "runner_preparation_policy": "sdk-space-v1",
+      "case_policy": "qualification-v1",
+      "subtree_entries": 100,
+      "memory_mib": 512,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": null,
+      "expected_arms": [
+        "p1-baseline-v1",
+        "p1-candidate-v1",
+        "p2-baseline-v1",
+        "p2-candidate-v1",
+        "p3-baseline-v1",
+        "p3-candidate-v1"
+      ],
+      "provenance": {
+        "baseline-v1": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "build": {
+            "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+            "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+            "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+            "compiler_host": "x86_64-unknown-linux-gnu",
+            "target": "x86_64-unknown-linux-musl",
+            "profile": "release --locked",
+            "flags": {
+              "RUSTFLAGS": "",
+              "CARGO_ENCODED_RUSTFLAGS": "",
+              "SOURCE_DATE_EPOCH": "1793464183"
+            },
+            "release_profile": {
+              "lto": "thin",
+              "codegen-units": 4,
+              "strip": "debuginfo"
+            },
+            "cargo_config": {},
+            "bun": "1.4.2"
+          }
+        },
+        "candidate-v1": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+          "build": {
+            "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+            "source_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
+            "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+            "compiler_host": "x86_64-unknown-linux-gnu",
+            "target": "x86_64-unknown-linux-musl",
+            "profile": "release --locked",
+            "flags": {
+              "RUSTFLAGS": "",
+              "CARGO_ENCODED_RUSTFLAGS": "",
+              "SOURCE_DATE_EPOCH": "1793464183"
+            },
+            "release_profile": {
+              "lto": "thin",
+              "codegen-units": 4,
+              "strip": "debuginfo"
+            },
+            "cargo_config": {},
+            "bun": "1.4.2"
+          }
+        }
+      },
+      "seed_sha256": "841784d6805581c9741417987023cb1f0897db388de53d5d0ee3c3d9ac423f38",
+      "sample_interval_seconds": 0.02,
+      "cache_policy": "cold after seed copy, before single CLI",
+      "observer_policy": "separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+      "diagnostic_policy": {
+        "profile_policy": "profile-v2",
+        "allocation_diagnostics": false,
+        "scope": "measured refresh CLI only; seeds and observers disabled"
+      },
+      "environment": {
+        "kernel": "7.0.0-1017-azure",
+        "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2445.429\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3241.380\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2445.429\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3042.387\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.85\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+        "memory": "MemTotal:       16367524 kB\nMemFree:        12251280 kB\nMemAvailable:   15077920 kB\nBuffers:          383600 kB\nCached:          1463372 kB\nSwapCached:            0 kB\nActive:           916072 kB\nInactive:        1291900 kB\nActive(anon):     417992 kB\nInactive(anon):        0 kB\nActive(file):     498080 kB\nInactive(file):  1291900 kB\nUnevictable:       46760 kB\nMlocked:           43688 kB\nSwapTotal:       3145724 kB\nSwapFree:        3145724 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              1428 kB\nWriteback:             0 kB\nAnonPages:        407772 kB\nMapped:           339400 kB\nShmem:             48248 kB\nKReclaimable:    1382588 kB\nSlab:            1639420 kB\nSReclaimable:    1382588 kB\nSUnreclaim:       256832 kB\nKernelStack:        4656 kB\nPageTables:         6600 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    11329484 kB\nCommitted_AS:    2206296 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       43124 kB\nVmallocChunk:          0 kB\nPercpu:             2384 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:         1478656 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:             0 kB\nGPUReclaim:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      134272 kB\nDirectMap2M:     4055040 kB\nDirectMap1G:    14680064 kB\n",
+        "image": [
+          {
+            "Id": "sha256:3175a3981354d5c58b42de28a000bfc27113565c6e63889ecae317f5746863c5",
+            "RepoTags": [
+              "freespace-pairs:703e495acdad4335b96edcef3d71bc86",
+              "representative-calibration:41248061322-paired-local"
+            ],
+            "RepoDigests": [],
+            "Parent": "",
+            "Comment": "buildkit.dockerfile.v0",
+            "Created": "2026-10-31T22:28:09.290261157Z",
+            "DockerVersion": "",
+            "Author": "",
+            "Config": {
+              "Hostname": "",
+              "Domainname": "",
+              "User": "",
+              "AttachStdin": false,
+              "AttachStdout": false,
+              "AttachStderr": false,
+              "Tty": false,
+              "OpenStdin": false,
+              "StdinOnce": false,
+              "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+              ],
+              "Cmd": null,
+              "Image": "",
+              "Volumes": null,
+              "WorkingDir": "",
+              "Entrypoint": [
+                "python3",
+                "/harness/bench-v2-container.py",
+                "--inside"
+              ],
+              "OnBuild": null,
+              "Labels": {
+                "org.opencontainers.image.version": "24.04"
+              }
+            },
+            "Architecture": "amd64",
+            "Os": "linux",
+            "Size": 202779257,
+            "GraphDriver": {
+              "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/2f3a5356738941f69d07bac04edd8256ad552e984a258ac90ba089cf308ee682/diff",
+                "MergedDir": "/var/lib/docker/overlay2/ma2bk1w90nfbn1q6p5t0203rf/merged",
+                "UpperDir": "/var/lib/docker/overlay2/ma2bk1w90nfbn1q6p5t0203rf/diff",
+                "WorkDir": "/var/lib/docker/overlay2/ma2bk1w90nfbn1q6p5t0203rf/work"
+              },
+              "Name": "overlay2"
+            },
+            "RootFS": {
+              "Type": "layers",
+              "Layers": [
+                "sha256:bec87777bc2fb2edcdf9af11df1531469e7df911309c1413082b18fcb8610278",
+                "sha256:6e417ef3d3801479ba93980ff6aa9858f54410c92dd8022b980f0ed40745d654"
+              ]
+            },
+            "Metadata": {
+              "LastTagTime": "2026-10-31T22:28:52.296019694Z"
+            }
+          }
+        ]
+      },
+      "filesystem": {
+        "filesystems": [
+          {
+            "target": "/home/runner/work/_temp/representative-volume.DipXMP/mount",
+            "source": "/dev/loop0",
+            "fstype": "ext4",
+            "options": "rw,relatime"
+          }
+        ]
+      },
+      "github": {
+        "GITHUB_SHA": "55d6e3460f34710e2520b77da66e659d410f6c25",
+        "GITHUB_RUN_ID": "41248061322",
+        "GITHUB_RUN_ATTEMPT": "1"
+      }
+    },
+    "seeds": [
+      39.887013877000015,
+      39.21946165999998
+    ],
+    "arms": [
+      {
+        "id": "p1-baseline-v1",
+        "worker": 83.709196829,
+        "observer": 27.89162856400003,
+        "copy": 0.2647557330000154
+      },
+      {
+        "id": "p1-candidate-v1",
+        "worker": 84.97800023799999,
+        "observer": 28.245773302999964,
+        "copy": 0.5147395879999976
+      },
+      {
+        "id": "p2-baseline-v1",
+        "worker": 84.81729313799997,
+        "observer": 28.11636484199994,
+        "copy": 0.5291004099999554
+      },
+      {
+        "id": "p2-candidate-v1",
+        "worker": 82.22016623700006,
+        "observer": 28.146107129999905,
+        "copy": 0.5005088789999945
+      },
+      {
+        "id": "p3-baseline-v1",
+        "worker": 85.3564813449999,
+        "observer": 28.145833708000055,
+        "copy": 0.5236494929999935
+      },
+      {
+        "id": "p3-candidate-v1",
+        "worker": 85.12708413899998,
+        "observer": 28.51940837699999,
+        "copy": 0.5138116480000008
+      }
+    ],
+    "github": {
+      "conclusion": "success",
+      "headSha": "55d6e3460f34710e2520b77da66e659d410f6c25",
+      "jobs": [
+        {
+          "completedAt": "2026-10-31T22:27:41Z",
+          "conclusion": "success",
+          "databaseId": 124675549827,
+          "name": "build",
+          "startedAt": "2026-10-31T22:24:45Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-31T22:24:49Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-31T22:24:46Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:24:51Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 2,
+              "startedAt": "2026-10-31T22:24:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:24:51Z",
+              "conclusion": "success",
+              "name": "Validate per-stage time envelope",
+              "number": 3,
+              "startedAt": "2026-10-31T22:24:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:25:04Z",
+              "conclusion": "success",
+              "name": "Run dtolnay/rust-toolchain@1.99.1",
+              "number": 4,
+              "startedAt": "2026-10-31T22:24:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:25:22Z",
+              "conclusion": "success",
+              "name": "Install musl tools",
+              "number": 5,
+              "startedAt": "2026-10-31T22:25:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:25:24Z",
+              "conclusion": "success",
+              "name": "Run oven-sh/setup-bun@v2",
+              "number": 6,
+              "startedAt": "2026-10-31T22:25:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:25:30Z",
+              "conclusion": "success",
+              "name": "Run Swatinem/rust-cache@v2",
+              "number": 7,
+              "startedAt": "2026-10-31T22:25:24Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:26:52Z",
+              "conclusion": "success",
+              "name": "Check benchmark contracts and repository gates",
+              "number": 8,
+              "startedAt": "2026-10-31T22:25:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:35Z",
+              "conclusion": "success",
+              "name": "Build both arms with one recorded toolchain",
+              "number": 9,
+              "startedAt": "2026-10-31T22:26:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:38Z",
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 10,
+              "startedAt": "2026-10-31T22:27:35Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:38Z",
+              "conclusion": "success",
+              "name": "Post Run Swatinem/rust-cache@v2",
+              "number": 18,
+              "startedAt": "2026-10-31T22:27:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:38Z",
+              "conclusion": "success",
+              "name": "Post Run oven-sh/setup-bun@v2",
+              "number": 19,
+              "startedAt": "2026-10-31T22:27:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:38Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 20,
+              "startedAt": "2026-10-31T22:27:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:38Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 21,
+              "startedAt": "2026-10-31T22:27:38Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/mikhailsal/free-space/actions/runs/41248061322/job/124675549827"
+        },
+        {
+          "completedAt": "2026-10-31T22:42:52Z",
+          "conclusion": "success",
+          "databaseId": 124676207748,
+          "name": "paired",
+          "startedAt": "2026-10-31T22:27:44Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-31T22:27:46Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-31T22:27:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:47Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 2,
+              "startedAt": "2026-10-31T22:27:46Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:49Z",
+              "conclusion": "success",
+              "name": "Run actions/download-artifact@v4",
+              "number": 3,
+              "startedAt": "2026-10-31T22:27:47Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:49Z",
+              "conclusion": "skipped",
+              "name": "Check time admission before local-scale allocation",
+              "number": 4,
+              "startedAt": "2026-10-31T22:27:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:49Z",
+              "conclusion": "success",
+              "name": "Prepare ephemeral runner disk when needed",
+              "number": 5,
+              "startedAt": "2026-10-31T22:27:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:27:49Z",
+              "conclusion": "success",
+              "name": "Summarize runner disk preparation",
+              "number": 6,
+              "startedAt": "2026-10-31T22:27:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:42:48Z",
+              "conclusion": "success",
+              "name": "Paired v1 commands with isolated observers",
+              "number": 7,
+              "startedAt": "2026-10-31T22:27:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:42:50Z",
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 8,
+              "startedAt": "2026-10-31T22:42:48Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:42:50Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 16,
+              "startedAt": "2026-10-31T22:42:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T22:42:50Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 17,
+              "startedAt": "2026-10-31T22:42:50Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/mikhailsal/free-space/actions/runs/41248061322/job/124676207748"
+        }
+      ],
+      "status": "completed"
+    },
+    "validation": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 83.709196829,
+            "candidate": 84.97800023799999,
+            "delta": 1.268803408999986
+          },
+          "peak_rss_kib": {
+            "baseline": 35248,
+            "candidate": 34020,
+            "delta": -1228
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459874304,
+            "candidate": 459862016,
+            "delta": -12288
+          }
+        },
+        {
+          "pair": 2,
+          "elapsed_seconds": {
+            "baseline": 84.81729313799997,
+            "candidate": 82.22016623700006,
+            "delta": -2.5971269009999105
+          },
+          "peak_rss_kib": {
+            "baseline": 33832,
+            "candidate": 33940,
+            "delta": 108
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459870208,
+            "candidate": 459890688,
+            "delta": 20480
+          }
+        },
+        {
+          "pair": 3,
+          "elapsed_seconds": {
+            "baseline": 85.3564813449999,
+            "candidate": 85.12708413899998,
+            "delta": -0.22939720599993052
+          },
+          "peak_rss_kib": {
+            "baseline": 33912,
+            "candidate": 33108,
+            "delta": -804
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459911168,
+            "candidate": 459874304,
+            "delta": -36864
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": -0.22939720599993052,
+          "max_abs_delta": 2.5971269009999105
+        },
+        "peak_rss_kib": {
+          "median_delta": -804,
+          "max_abs_delta": 1228
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": -12288,
+          "max_abs_delta": 36864
+        }
+      },
+      "identical_binaries": true,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "unchanged",
+        "subtree_entries": 100,
+        "memory_mib": 512,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null
+      }
+    }
+  },
+  "full_1024_aa": {
+    "manifest": {
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "pairs": 1,
+      "files": 7264383,
+      "operation": "scan",
+      "scenario": "unchanged",
+      "fixture_receipt": {
+        "files": 7264383,
+        "expected_entries": 7297076,
+        "expected_subtree_entries": 100,
+        "directories": 32693,
+        "shape": "mixed-depth1-6-fanout1000-longnames-payload1pct-sparse-hardlinks-v1",
+        "fixed_mtime": 1700000000,
+        "payload_block_fraction": 0.01,
+        "distribution": {
+          "small_files": 99,
+          "outer_files": 7264284,
+          "payload_files": 72643,
+          "sparse_files": 1703,
+          "hardlink_files": 7264,
+          "longname_files": 234332
+        },
+        "setup_seconds": 459.187023322
+      },
+      "runner_preparation": {
+        "success": true,
+        "acted": false,
+        "freed_bytes": 0,
+        "duration_seconds": 0.0002494649999995602,
+        "floor_bytes": 45097156608,
+        "target_bytes": 47244640256
+      },
+      "runner_preparation_policy": "sdk-space-v1",
+      "case_policy": "qualification-v1",
+      "subtree_entries": 100,
+      "memory_mib": 1024,
+      "setup_memory_mib": 4096,
+      "observer_memory_mib": 4096,
+      "mutation_receipt": null,
+      "expected_arms": [
+        "p1-baseline-v1",
+        "p1-candidate-v1"
+      ],
+      "provenance": {
+        "baseline-v1": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+          "build": {
+            "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+            "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+            "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+            "compiler_host": "x86_64-unknown-linux-gnu",
+            "target": "x86_64-unknown-linux-musl",
+            "profile": "release --locked",
+            "flags": {
+              "RUSTFLAGS": "",
+              "CARGO_ENCODED_RUSTFLAGS": "",
+              "SOURCE_DATE_EPOCH": "1793464183"
+            },
+            "release_profile": {
+              "lto": "thin",
+              "codegen-units": 4,
+              "strip": "debuginfo"
+            },
+            "cargo_config": {},
+            "bun": "1.4.2"
+          }
+        },
+        "candidate-v1": {
+          "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+          "source_revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+          "build": {
+            "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+            "source_revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+            "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+            "compiler_host": "x86_64-unknown-linux-gnu",
+            "target": "x86_64-unknown-linux-musl",
+            "profile": "release --locked",
+            "flags": {
+              "RUSTFLAGS": "",
+              "CARGO_ENCODED_RUSTFLAGS": "",
+              "SOURCE_DATE_EPOCH": "1793464183"
+            },
+            "release_profile": {
+              "lto": "thin",
+              "codegen-units": 4,
+              "strip": "debuginfo"
+            },
+            "cargo_config": {},
+            "bun": "1.4.2"
+          }
+        }
+      },
+      "seed_sha256": "5eb45fefae7e870c8e06631017d2560de79cefaf7583ba8e8678f920c96ba99d",
+      "sample_interval_seconds": 0.02,
+      "cache_policy": "cold after seed copy, before single CLI",
+      "observer_policy": "separate no-swap container, read-only snapshot, full-file integrity and semantic digest",
+      "diagnostic_policy": {
+        "profile_policy": "profile-v2",
+        "allocation_diagnostics": false,
+        "scope": "measured refresh CLI only; seeds and observers disabled"
+      },
+      "environment": {
+        "kernel": "7.0.0-1017-azure",
+        "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2445.431\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.86\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3241.599\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.86\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3252.760\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.86\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 25\nmodel\t\t: 1\nmodel name\t: AMD EPYC 7763 64-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3239.328\ncache size\t: 512 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 13\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves user_shstk clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload umip vaes vpclmulqdq rdpid fsrm\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass srso spectre_v2_user tsa\nbogomips\t: 4890.86\nTLB size\t: 2560 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+        "memory": "MemTotal:       16367524 kB\nMemFree:         2173368 kB\nMemAvailable:   13356568 kB\nBuffers:          507192 kB\nCached:          2190576 kB\nSwapCached:          352 kB\nActive:           659408 kB\nInactive:        3026872 kB\nActive(anon):     569252 kB\nInactive(anon):   479004 kB\nActive(file):      90156 kB\nInactive(file):  2547868 kB\nUnevictable:       46780 kB\nMlocked:           43708 kB\nSwapTotal:       3145724 kB\nSwapFree:        3133056 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               144 kB\nWriteback:             0 kB\nAnonPages:       1035244 kB\nMapped:           211768 kB\nShmem:             50760 kB\nKReclaimable:    8948448 kB\nSlab:           10256408 kB\nSReclaimable:    8948448 kB\nSUnreclaim:      1307960 kB\nKernelStack:        4208 kB\nPageTables:         7872 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    11329484 kB\nCommitted_AS:    2916720 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       42676 kB\nVmallocChunk:          0 kB\nPercpu:             2384 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    419840 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:           68380 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:             0 kB\nGPUReclaim:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      189568 kB\nDirectMap2M:     3999744 kB\nDirectMap1G:    14680064 kB\n",
+        "image": [
+          {
+            "Id": "sha256:94350896f3b10bbced7185051672697a2dac9a4d21bbd30a8936cde00d6ea9bc",
+            "RepoTags": [
+              "freespace-pairs:358ca5c3708142f5961e027805db2bbd",
+              "representative-calibration:41252744694-paired-local"
+            ],
+            "RepoDigests": [],
+            "Parent": "",
+            "Comment": "buildkit.dockerfile.v0",
+            "Created": "2026-10-31T23:34:17.889249562Z",
+            "DockerVersion": "",
+            "Author": "",
+            "Config": {
+              "Hostname": "",
+              "Domainname": "",
+              "User": "",
+              "AttachStdin": false,
+              "AttachStdout": false,
+              "AttachStderr": false,
+              "Tty": false,
+              "OpenStdin": false,
+              "StdinOnce": false,
+              "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+              ],
+              "Cmd": null,
+              "Image": "",
+              "Volumes": null,
+              "WorkingDir": "",
+              "Entrypoint": [
+                "python3",
+                "/harness/bench-v2-container.py",
+                "--inside"
+              ],
+              "OnBuild": null,
+              "Labels": {
+                "org.opencontainers.image.version": "24.04"
+              }
+            },
+            "Architecture": "amd64",
+            "Os": "linux",
+            "Size": 202779257,
+            "GraphDriver": {
+              "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/22d9af0afd346739c76bd71186464a47202825e94cda95564dc55aa8502e9306/diff",
+                "MergedDir": "/var/lib/docker/overlay2/iygreg1vo8jm437yx6i7s0p2c/merged",
+                "UpperDir": "/var/lib/docker/overlay2/iygreg1vo8jm437yx6i7s0p2c/diff",
+                "WorkDir": "/var/lib/docker/overlay2/iygreg1vo8jm437yx6i7s0p2c/work"
+              },
+              "Name": "overlay2"
+            },
+            "RootFS": {
+              "Type": "layers",
+              "Layers": [
+                "sha256:bec87777bc2fb2edcdf9af11df1531469e7df911309c1413082b18fcb8610278",
+                "sha256:fe6bd54b532b273c83666f54ad71d594fb7584c08b60d59397b481172ea366e9"
+              ]
+            },
+            "Metadata": {
+              "LastTagTime": "2026-10-31T23:35:00.620318915Z"
+            }
+          }
+        ]
+      },
+      "filesystem": {
+        "filesystems": [
+          {
+            "target": "/home/runner/work/_temp/representative-volume.ikd7hU/mount",
+            "source": "/dev/loop0",
+            "fstype": "ext4",
+            "options": "rw,relatime"
+          }
+        ]
+      },
+      "github": {
+        "GITHUB_SHA": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+        "GITHUB_RUN_ID": "41252744694",
+        "GITHUB_RUN_ATTEMPT": "1"
+      }
+    },
+    "seeds": [
+      339.7023513710001,
+      350.562181473
+    ],
+    "arms": [
+      {
+        "id": "p1-baseline-v1",
+        "worker": 1116.8363801100002,
+        "observer": 227.66030562199967,
+        "copy": 3.8257822470000065
+      },
+      {
+        "id": "p1-candidate-v1",
+        "worker": 1303.921706263,
+        "observer": 227.75004978800007,
+        "copy": 6.594961594000324
+      }
+    ],
+    "github": {
+      "conclusion": "success",
+      "createdAt": "2026-10-31T23:29:32Z",
+      "event": "workflow_dispatch",
+      "headSha": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
+      "jobs": [
+        {
+          "completedAt": "2026-10-31T23:33:54Z",
+          "conclusion": "success",
+          "databaseId": 124689496308,
+          "name": "build",
+          "startedAt": "2026-10-31T23:29:36Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-31T23:29:38Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-31T23:29:37Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:29:40Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 2,
+              "startedAt": "2026-10-31T23:29:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:29:40Z",
+              "conclusion": "success",
+              "name": "Validate per-stage time envelope",
+              "number": 3,
+              "startedAt": "2026-10-31T23:29:40Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:29:53Z",
+              "conclusion": "success",
+              "name": "Run dtolnay/rust-toolchain@1.99.1",
+              "number": 4,
+              "startedAt": "2026-10-31T23:29:40Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:30:12Z",
+              "conclusion": "success",
+              "name": "Install musl tools",
+              "number": 5,
+              "startedAt": "2026-10-31T23:29:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:30:13Z",
+              "conclusion": "success",
+              "name": "Run oven-sh/setup-bun@v2",
+              "number": 6,
+              "startedAt": "2026-10-31T23:30:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:30:14Z",
+              "conclusion": "success",
+              "name": "Run Swatinem/rust-cache@v2",
+              "number": 7,
+              "startedAt": "2026-10-31T23:30:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:32:01Z",
+              "conclusion": "success",
+              "name": "Check benchmark contracts and repository gates",
+              "number": 8,
+              "startedAt": "2026-10-31T23:30:14Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:33:45Z",
+              "conclusion": "success",
+              "name": "Build both arms with one recorded toolchain",
+              "number": 9,
+              "startedAt": "2026-10-31T23:32:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:33:47Z",
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 10,
+              "startedAt": "2026-10-31T23:33:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:33:52Z",
+              "conclusion": "success",
+              "name": "Post Run Swatinem/rust-cache@v2",
+              "number": 18,
+              "startedAt": "2026-10-31T23:33:47Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:33:52Z",
+              "conclusion": "success",
+              "name": "Post Run oven-sh/setup-bun@v2",
+              "number": 19,
+              "startedAt": "2026-10-31T23:33:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:33:52Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 20,
+              "startedAt": "2026-10-31T23:33:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:33:52Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 21,
+              "startedAt": "2026-10-31T23:33:52Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/mikhailsal/free-space/actions/runs/41252744694/job/124689496308"
+        },
+        {
+          "completedAt": "2026-11-01T00:42:52Z",
+          "conclusion": "success",
+          "databaseId": 124690400958,
+          "name": "paired",
+          "startedAt": "2026-10-31T23:33:56Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-31T23:33:58Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-31T23:33:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:34:00Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 2,
+              "startedAt": "2026-10-31T23:33:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:34:00Z",
+              "conclusion": "success",
+              "name": "Run actions/download-artifact@v4",
+              "number": 3,
+              "startedAt": "2026-10-31T23:34:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:34:00Z",
+              "conclusion": "success",
+              "name": "Check time admission before local-scale allocation",
+              "number": 4,
+              "startedAt": "2026-10-31T23:34:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:34:01Z",
+              "conclusion": "success",
+              "name": "Prepare ephemeral runner disk when needed",
+              "number": 5,
+              "startedAt": "2026-10-31T23:34:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-31T23:34:01Z",
+              "conclusion": "success",
+              "name": "Summarize runner disk preparation",
+              "number": 6,
+              "startedAt": "2026-10-31T23:34:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-11-01T00:42:50Z",
+              "conclusion": "success",
+              "name": "Paired v1 commands with isolated observers",
+              "number": 7,
+              "startedAt": "2026-10-31T23:34:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-11-01T00:42:51Z",
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 8,
+              "startedAt": "2026-11-01T00:42:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-11-01T00:42:51Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 16,
+              "startedAt": "2026-11-01T00:42:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-11-01T00:42:51Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 17,
+              "startedAt": "2026-11-01T00:42:51Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/mikhailsal/free-space/actions/runs/41252744694/job/124690400958"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-01T00:42:53Z",
+      "url": "https://github.com/mikhailsal/free-space/actions/runs/41252744694",
+      "workflowName": "Representative scanner benchmark"
+    },
+    "validation": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 1116.8363801100002,
+            "candidate": 1303.921706263,
+            "delta": 187.08532615299987
+          },
+          "peak_rss_kib": {
+            "baseline": 34992,
+            "candidate": 35000,
+            "delta": 8
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 3356524544,
+            "candidate": 3356532736,
+            "delta": 8192
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": 187.08532615299987,
+          "max_abs_delta": 187.08532615299987
+        },
+        "peak_rss_kib": {
+          "median_delta": 8,
+          "max_abs_delta": 8
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": 8192,
+          "max_abs_delta": 8192
+        }
+      },
+      "identical_binaries": true,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "unchanged",
+        "subtree_entries": 100,
+        "memory_mib": 1024,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null
+      }
+    }
+  },
+  "raw_sha256": {
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/manifest.json": "6e4f0d6fa3dd3c4e7c3b191cf669122f8a3238fce04809f840672b7ddee73fed",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/p1-baseline-v1/metrics.json": "8653742a73c42e53c943716689963ee1787acba01cdd030568296aec0ee058e9",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/p1-baseline-v1/observer.json": "096daa5d1b07962bb951aa56b2a6439ef3c79df2099fbd979275dd644ff84865",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/p1-baseline-v1/setup.json": "3425154445dc70a21ebe2432c8b4c693e994ef38c0c14d1e2f64d14647101710",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/p1-candidate-v1/metrics.json": "d66ee7148dc6165be2f6cba80175f4723becfdc97f13f7b6e7e59a4f77523376",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/p1-candidate-v1/observer.json": "f6f548cde4df618b8498b67349b90c450cc3799f549f54233b3dbbc62858cb20",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements/p1-candidate-v1/setup.json": "214196ed333e017e20cf1afad78cd4d6cd034d870c75ba18b43f07ef14390609",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements-setup/seed-1/metrics.json": "4bbcaec53d98c53f3480e0480191ba7720e9ae231cef585178ee8ca6f66043c1",
+    "/tmp/freespace-fullscan-memory-full-1024-aa/scan/measurements-setup/seed-2/metrics.json": "c42d21a2720b0ab4cc2741733abed685d60b925e135d52518b9f407921e09410",
+    "/tmp/freespace-fullscan-memory-full-1024-aa-github.json": "56be3fab829dfac29d3c7019143c7555f83f7d9fdfc9924859d485151df7547c",
+    "/tmp/freespace-fullscan-memory-full-1024-aa-validation.json": "0a306309a8660b2d5b0ae0f7f67bb426b0f3c4f35f93f32eb49fb79e527f9c67",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/manifest.json": "10bd454b814600fb6e0d0faf5b2e9cc812719e16c52438b5531059f5a2698234",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p1-baseline-v1/metrics.json": "9f0e9f864262654e448d3238f83e59a53080c5907bee0151d16567f86cb234f6",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p1-baseline-v1/observer.json": "2ee6fd0ee6245a876f33fcf7924f11808e008d9610eef7bd6f0db1da456f9b48",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p1-baseline-v1/setup.json": "c5fc545b3ca6f1e3e3f4810ee2ddb6ec1bf64912a917717cdee58138fcd0776e",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p1-candidate-v1/metrics.json": "5088922bd9c1c260a1f2377eef5d9d197f449e0901681b73ee677c0d1f272ef4",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p1-candidate-v1/observer.json": "6c325a7064cded9f7fa9c53ebb79079267b4c2ed4ead93e6f4ec9f7eb2c582cb",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p1-candidate-v1/setup.json": "b3170d379c2abe698fdb088693b9f436a11b02cc21e4416cd381c5b65cc05acc",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p2-baseline-v1/metrics.json": "968a75f4cfc625388d4669d0c18dc8c2966c33387f47b836b9710ec6bc47a560",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p2-baseline-v1/observer.json": "66b9441742c7ef31aa6b186d9377f42d383354970bfdbf3e8f730b15c109ef82",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p2-baseline-v1/setup.json": "02909c2d99f433c5a7ed9defc8fd853299b3ef13f18f4e73765cbea9fefa92eb",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p2-candidate-v1/metrics.json": "ed0d61fb958fe46142f2709b31e0d8748aa93c9592feff3d175b05570eb5f5a6",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p2-candidate-v1/observer.json": "91382ca65c4ef3f1b7fc00869146240d92613f712cb6d374e6c3425a8cbf34a8",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p2-candidate-v1/setup.json": "e7f158381d57151ff76210c9dca9df5af49acfdf56c124f2ffaf96208d9d356e",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p3-baseline-v1/metrics.json": "78eb89cb616fe6bfeb17a444c19b85e888bc975198d4fd7eb79553a4efef088a",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p3-baseline-v1/observer.json": "4c6805e8d5917fc51a14df8606213296bf21efa843ea89d2e4acf7edd74ccdb7",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p3-baseline-v1/setup.json": "ae28e74a2e9ca01716eed16f850b334483e2efbde062b5c08ef3103fd8965d48",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p3-candidate-v1/metrics.json": "f6e2766e5ad8c26b3769ef7e9f8a43fe1e4c9c92ed9921023176e7d64aa8f9e3",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p3-candidate-v1/observer.json": "72c3aa3bb8631ee3de31a8806a8f4fda25beca46f65ff7670981b23467085705",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements/p3-candidate-v1/setup.json": "8f8966c12d6d24714659b85816e53635f83f855a6fe8d2b398fe56e2d0e23654",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements-setup/seed-1/metrics.json": "ab445fc6560503bc03e341acaf06e4f6cf0adb2f697b464128241b51d1d7c646",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa/scan/measurements-setup/seed-2/metrics.json": "bfe786dab9bbc058c85095a1ce6d0c3696dc216b4c8002eb942010c80319fcc0",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa-github.json": "ac56cde09d5d24baaded923a4f984d19c3b26b8c3fda65e17109a34c4ff9b1d8",
+    "/tmp/freespace-fullscan-memory-repaired-512-aa-validation.json": "6a4fbbf4e598a31ffeabe978f0dbc52f1b3317de94e37e08d6ef84af56347548"
+  },
+  "limitations": [
+    "The 1500s pressure allowance is whole-step, not a demonstrated per-worker upper bound; 1800s command cap is not assured at full-scale 512 MiB.",
+    "Full 1GiB A/A one-pair 16.75% spread and cross-VM scaling are not causal estimates.",
+    "512MiB full-scale capacity remains unmeasured; no cap increases, fixture reduction, or gate waivers."
+  ]
+}

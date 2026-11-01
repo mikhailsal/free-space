@@ -1,6 +1,6 @@
 {
   "created_at": "2026-10-31T23:27:50.212506+00:00",
-  "status": "preregistered_exploratory_memory_followup",
+  "status": "Full1GiB baseline A/A strict valid, exploratory capacity only",
   "source_revision": "e0299a6385e27fef4f78b682e7a5d25b969a02a1",
   "original_control_revision": "55d6e3460f34710e2520b77da66e659d410f6c25",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -559,7 +559,7 @@
       "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "forecast_source": "v1-fullscan-memory-full-1024-aa-forecast-2026-11-01.json",
       "campaign_cap_seconds": 216000,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Valid matching1m1024MiB A/A evidence, revalidated raw receipts and hashes. New full-control production and ordinary measurement source byte-identical to55; only reviewed build preparation and tests changed. Fresh source/remote/budget admission required.",
       "purpose": "Two full-scale baseline scans at1GiB, exploratory capacity/pressure evidence only; no source improvement, exact minimum, D11 or H2 waiver",
       "artifact_prefix": "/tmp/freespace-fullscan-memory-full-1024-aa",
@@ -567,9 +567,15 @@
       "dispatch_receipt": "/tmp/freespace-fullscan-memory-full-1024-aa-dispatch.json",
       "run_id": 41252744694,
       "created_at": "2026-10-31T23:29:32Z",
-      "conclusion": "",
+      "conclusion": "success",
       "head_sha_verified": true,
-      "completed_job_seconds": 0
+      "completed_job_seconds": 4394.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T00:51:20.280788+00:00",
+      "job_seconds": 4394.0,
+      "receipt": "v1-fullscan-memory-full-1024-aa-2026-11-01.json",
+      "receipt_validation": "independently_strict_valid_all_commands_and_observers",
+      "qualification": "not_promoted"
     }
   ],
   "campaign_cap_seconds": 216000,
@@ -579,5 +585,21 @@
     "512MiB full case requires valid1GiB full completion and separately frozen case-matched forecast and admission.",
     "No scan-only refresh profile-v2 or memory.events.local is claimed. Endpoint memory.stat is not peak decomposition."
   ],
-  "updated_at": "2026-10-31T23:29:45.330889+00:00"
+  "updated_at": "2026-11-01T00:56:35.455606+00:00",
+  "minimum_tested_success_full": {
+    "baseline_worker_mib": 1024,
+    "exact_minimum_known": false,
+    "source_RAM_gain_demonstrated": false,
+    "timed_successes": 2,
+    "scope": "7,264,383files/7,297,076entries, stagedv1 musl/local, one A/A pair; other setup/observer budgets separate"
+  },
+  "unadmitted_next_case": {
+    "memory_mib": 512,
+    "status": "not_admitted_no_dispatch",
+    "forecast_seconds": 6340,
+    "forecast_with_margin_seconds": 8242,
+    "step_cap_seconds": 7200,
+    "assessment": "v1-fullscan-memory-full-512-aa-admission-2026-11-01.json",
+    "reason": "Conservative maximum-per-arm forecast plus unchanged overhead/uncertainty does not fit; no full512 capacity evidence"
+  }
 }

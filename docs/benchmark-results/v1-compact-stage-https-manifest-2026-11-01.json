@@ -1,6 +1,6 @@
 {
   "created_at": "2026-10-31T23:26:24.884169+00:00",
-  "status": "Real changed-full smoke and fresh matched1m controls valid; candidate screen eligible for admission; no promotion",
+  "status": "Valid compact screen; refresh H2 inconclusive. No promotion. Narrow root metadata reuse experiment prepared separately.",
   "candidate_revision": "471c4d14ed4881106ce1d0b6cd5d6361839b2bc8",
   "control_revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
   "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -158,7 +158,7 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "candidate_binary_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
       "campaign_cap_seconds": 216000,
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": "Real changed-full smoke valid for canonical baseline and candidate; fresh matched A/A control before candidate comparison. Same frozen harness hashes. No retries after ordinary failure.",
       "purpose": "Fresh matched one-million-file source screen; no full-scale extrapolation or promotion",
       "artifact_prefix": "/tmp/freespace-compact-stage-https-candidate-screen",
@@ -167,9 +167,15 @@
       "dispatch_receipt": "/tmp/freespace-compact-stage-https-candidate-screen-dispatch.json",
       "run_id": 41255297627,
       "created_at": "2026-11-01T00:06:48Z",
-      "conclusion": "",
+      "conclusion": "success",
       "head_sha_verified": true,
-      "completed_job_seconds": 0
+      "completed_job_seconds": 1336.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T00:39:06.217685+00:00",
+      "job_seconds": 1336.0,
+      "receipt": "v1-compact-stage-https-candidate-screen-2026-11-01.json",
+      "receipt_validation": "independently_strict_valid_all_commands_and_observers",
+      "qualification": "not_promoted"
     }
   ],
   "forecasts": {
@@ -185,6 +191,7 @@
     "Full-scale work requires a separately admitted case-matched forecast and source; old SQL/joint measurements do not qualify compact source."
   ],
   "local_state": "Installed v2 configuration unchanged; nightly timer temporarily stopped; Persistent catch-up on later restore must be scheduled",
-  "updated_at": "2026-11-01T00:07:03.619213+00:00",
-  "actual_frozen_candidate_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b"
+  "updated_at": "2026-11-01T00:56:35.455606+00:00",
+  "actual_frozen_candidate_sha256": "2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b",
+  "candidate_screen_h2": "Refresh positive median0.235127%, worst0.349425% outside AA0.331818%; other measured guards improved."
 }

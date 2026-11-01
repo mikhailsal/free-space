@@ -1,0 +1,674 @@
+{
+  "run_id": 41256220919,
+  "url": "https://github.com/mikhailsal/free-space/actions/runs/41256220919",
+  "scientific_kind": "A/A, workflow comparison=candidate",
+  "head": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+  "baseline_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "candidate_revision": "4f22bf8e3b67f7f59049a72116b90c061fb1328b",
+  "binary_sha256_independently_downloaded_both": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "source_manifest_sha256": "21a40337c256c176c4c6eaaeab846865f3310c13c0a450b67ac6820e6f5168cf",
+  "case": "three 1m-file scan-only pairs, worker 1024MiB no swap, setup/observer 4096MiB, musl/local, 2 CPUs/1 worker",
+  "validation": {
+    "run": 41256220919,
+    "strict_valid": true,
+    "strict_summary_equal_raw": true,
+    "arms": [
+      {
+        "id": "p1-baseline-v1",
+        "elapsed_seconds": 79.36721974999998,
+        "rss_kib": 37408,
+        "cgroup_peak_bytes": 1073741824,
+        "cgroup_current_end_bytes": 961671168,
+        "memory_events_before": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_events_after": {
+          "low": 0,
+          "high": 0,
+          "max": 1570,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+        "memory_pressure_after": "some avg10=0.11 avg60=0.34 avg300=0.11 total=555870\nfull avg10=0.11 avg60=0.34 avg300=0.11 total=555870",
+        "memory_stat_end": "anon 8794112\nfile 223375360\nkernel 729092096\nkernel_stack 16384\npagetables 167936\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 3301376\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 8384512\nactive_anon 409600\ninactive_file 218787840\nactive_file 4427776\nunevictable 0\nslab_reclaimable 728630032\nslab_unreclaimable 247736\nslab 728877768\nworkingset_refault_anon 0\nworkingset_refault_file 36081\nworkingset_activate_anon 0\nworkingset_activate_file 522\nworkingset_restore_anon 0\nworkingset_restore_file 3950\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 94162\npgsteal 94098\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 94162\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 94098\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5458\npgmajfault 307\npgrefill 85783\npgactivate 96\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+        "io_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=63842\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=63842",
+        "io_pressure_after": "some avg10=15.81 avg60=20.58 avg300=8.17 total=29683674\nfull avg10=15.63 avg60=20.31 avg300=8.06 total=29273344",
+        "disk_peak_bytes": 459837440,
+        "disk_end": {
+          "db": {
+            "logical_bytes": 256016384,
+            "allocated_bytes": 256110592
+          },
+          "wal": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "shm": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "stage": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "other": {
+            "logical_bytes": 163,
+            "allocated_bytes": 4096
+          },
+          "total": {
+            "logical_bytes": 256016547,
+            "allocated_bytes": 256114688
+          }
+        },
+        "observer": {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "logical_content_unchanged": true,
+          "semantic_sha256": "4fa5f287c6c7c3a060591050c5ff346be48e38f2120fbf3a6966ecba85c0651e"
+        }
+      },
+      {
+        "id": "p1-candidate-v1",
+        "elapsed_seconds": 78.52659958999999,
+        "rss_kib": 36564,
+        "cgroup_peak_bytes": 1073741824,
+        "cgroup_current_end_bytes": 963158016,
+        "memory_events_before": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_events_after": {
+          "low": 0,
+          "high": 0,
+          "max": 1639,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+        "memory_pressure_after": "some avg10=0.03 avg60=0.19 avg300=0.06 total=399983\nfull avg10=0.03 avg60=0.19 avg300=0.06 total=399983",
+        "memory_stat_end": "anon 8790016\nfile 230756352\nkernel 723025920\nkernel_stack 16384\npagetables 233472\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 3211264\nfile_dirty 20480\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 8409088\nactive_anon 380928\ninactive_file 226013184\nactive_file 4526080\nunevictable 0\nslab_reclaimable 722499688\nslab_unreclaimable 245160\nslab 722744848\nworkingset_refault_anon 0\nworkingset_refault_file 31432\nworkingset_activate_anon 0\nworkingset_activate_file 547\nworkingset_restore_anon 0\nworkingset_restore_file 2003\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 87769\npgsteal 87689\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 87769\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 87689\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5706\npgmajfault 319\npgrefill 90722\npgactivate 111\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+        "io_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=163118\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=162982",
+        "io_pressure_after": "some avg10=12.74 avg60=20.09 avg300=7.96 total=28549722\nfull avg10=11.77 avg60=19.79 avg300=7.89 total=28328804",
+        "disk_peak_bytes": 459829248,
+        "disk_end": {
+          "db": {
+            "logical_bytes": 256016384,
+            "allocated_bytes": 256098304
+          },
+          "wal": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "shm": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "stage": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "other": {
+            "logical_bytes": 163,
+            "allocated_bytes": 4096
+          },
+          "total": {
+            "logical_bytes": 256016547,
+            "allocated_bytes": 256102400
+          }
+        },
+        "observer": {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "logical_content_unchanged": true,
+          "semantic_sha256": "4fa5f287c6c7c3a060591050c5ff346be48e38f2120fbf3a6966ecba85c0651e"
+        }
+      },
+      {
+        "id": "p2-baseline-v1",
+        "elapsed_seconds": 79.74036979100003,
+        "rss_kib": 37132,
+        "cgroup_peak_bytes": 1073741824,
+        "cgroup_current_end_bytes": 959868928,
+        "memory_events_before": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_events_after": {
+          "low": 0,
+          "high": 0,
+          "max": 1708,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+        "memory_pressure_after": "some avg10=0.04 avg60=0.20 avg300=0.06 total=410402\nfull avg10=0.04 avg60=0.20 avg300=0.06 total=410402",
+        "memory_stat_end": "anon 8794112\nfile 213426176\nkernel 737443840\nkernel_stack 16384\npagetables 229376\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 3698688\nfile_dirty 16384\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 8417280\nactive_anon 376832\ninactive_file 208375808\nactive_file 4853760\nunevictable 0\nslab_reclaimable 736935992\nslab_unreclaimable 235064\nslab 737171056\nworkingset_refault_anon 0\nworkingset_refault_file 34956\nworkingset_activate_anon 0\nworkingset_activate_file 624\nworkingset_restore_anon 0\nworkingset_restore_file 3913\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 95486\npgsteal 95417\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 95486\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 95417\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5558\npgmajfault 324\npgrefill 82777\npgactivate 99\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+        "io_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=37331\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=37235",
+        "io_pressure_after": "some avg10=10.98 avg60=18.88 avg300=7.68 total=28295034\nfull avg10=10.44 avg60=18.45 avg300=7.51 total=27703582",
+        "disk_peak_bytes": 459841536,
+        "disk_end": {
+          "db": {
+            "logical_bytes": 256016384,
+            "allocated_bytes": 256110592
+          },
+          "wal": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "shm": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "stage": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "other": {
+            "logical_bytes": 163,
+            "allocated_bytes": 4096
+          },
+          "total": {
+            "logical_bytes": 256016547,
+            "allocated_bytes": 256114688
+          }
+        },
+        "observer": {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "logical_content_unchanged": true,
+          "semantic_sha256": "4fa5f287c6c7c3a060591050c5ff346be48e38f2120fbf3a6966ecba85c0651e"
+        }
+      },
+      {
+        "id": "p2-candidate-v1",
+        "elapsed_seconds": 78.022491436,
+        "rss_kib": 37328,
+        "cgroup_peak_bytes": 1073741824,
+        "cgroup_current_end_bytes": 964386816,
+        "memory_events_before": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_events_after": {
+          "low": 0,
+          "high": 0,
+          "max": 1587,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+        "memory_pressure_after": "some avg10=0.03 avg60=0.19 avg300=0.06 total=432267\nfull avg10=0.03 avg60=0.19 avg300=0.06 total=432267",
+        "memory_stat_end": "anon 8790016\nfile 231825408\nkernel 723230720\nkernel_stack 16384\npagetables 159744\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 3596288\nfile_dirty 12288\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 8421376\nactive_anon 368640\ninactive_file 227069952\nactive_file 4599808\nunevictable 0\nslab_reclaimable 722779472\nslab_unreclaimable 247464\nslab 723026936\nworkingset_refault_anon 0\nworkingset_refault_file 29400\nworkingset_activate_anon 0\nworkingset_activate_file 553\nworkingset_restore_anon 0\nworkingset_restore_file 1670\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 85481\npgsteal 85400\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 85481\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 85400\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5559\npgmajfault 320\npgrefill 89760\npgactivate 106\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+        "io_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=22037\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=22022",
+        "io_pressure_after": "some avg10=15.19 avg60=19.51 avg300=7.69 total=27387364\nfull avg10=15.19 avg60=19.51 avg300=7.69 total=27359894",
+        "disk_peak_bytes": 459853824,
+        "disk_end": {
+          "db": {
+            "logical_bytes": 256016384,
+            "allocated_bytes": 256126976
+          },
+          "wal": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "shm": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "stage": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "other": {
+            "logical_bytes": 163,
+            "allocated_bytes": 4096
+          },
+          "total": {
+            "logical_bytes": 256016547,
+            "allocated_bytes": 256131072
+          }
+        },
+        "observer": {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "logical_content_unchanged": true,
+          "semantic_sha256": "4fa5f287c6c7c3a060591050c5ff346be48e38f2120fbf3a6966ecba85c0651e"
+        }
+      },
+      {
+        "id": "p3-baseline-v1",
+        "elapsed_seconds": 85.84431394600006,
+        "rss_kib": 35508,
+        "cgroup_peak_bytes": 1073741824,
+        "cgroup_current_end_bytes": 963223552,
+        "memory_events_before": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_events_after": {
+          "low": 0,
+          "high": 0,
+          "max": 1649,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+        "memory_pressure_after": "some avg10=0.03 avg60=0.21 avg300=0.07 total=475791\nfull avg10=0.03 avg60=0.21 avg300=0.07 total=475791",
+        "memory_stat_end": "anon 8790016\nfile 208510976\nkernel 745459712\nkernel_stack 16384\npagetables 233472\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 3284992\nfile_dirty 12288\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 8400896\nactive_anon 389120\ninactive_file 203759616\nactive_file 4505600\nunevictable 0\nslab_reclaimable 744936768\nslab_unreclaimable 252296\nslab 745189064\nworkingset_refault_anon 0\nworkingset_refault_file 36942\nworkingset_activate_anon 0\nworkingset_activate_file 536\nworkingset_restore_anon 0\nworkingset_restore_file 4901\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 98668\npgsteal 98588\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 98668\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 98588\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5729\npgmajfault 319\npgrefill 83871\npgactivate 109\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+        "io_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=66671\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=66671",
+        "io_pressure_after": "some avg10=12.86 avg60=21.79 avg300=8.88 total=33221591\nfull avg10=12.74 avg60=21.72 avg300=8.86 total=33136049",
+        "disk_peak_bytes": 459837440,
+        "disk_end": {
+          "db": {
+            "logical_bytes": 256016384,
+            "allocated_bytes": 256110592
+          },
+          "wal": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "shm": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "stage": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "other": {
+            "logical_bytes": 163,
+            "allocated_bytes": 4096
+          },
+          "total": {
+            "logical_bytes": 256016547,
+            "allocated_bytes": 256114688
+          }
+        },
+        "observer": {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "logical_content_unchanged": true,
+          "semantic_sha256": "4fa5f287c6c7c3a060591050c5ff346be48e38f2120fbf3a6966ecba85c0651e"
+        }
+      },
+      {
+        "id": "p3-candidate-v1",
+        "elapsed_seconds": 71.80862527900001,
+        "rss_kib": 37344,
+        "cgroup_peak_bytes": 1073741824,
+        "cgroup_current_end_bytes": 964370432,
+        "memory_events_before": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_events_after": {
+          "low": 0,
+          "high": 0,
+          "max": 1628,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        },
+        "memory_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+        "memory_pressure_after": "some avg10=0.07 avg60=0.30 avg300=0.10 total=533866\nfull avg10=0.07 avg60=0.30 avg300=0.10 total=533866",
+        "memory_stat_end": "anon 8790016\nfile 245575680\nkernel 709443584\nkernel_stack 16384\npagetables 110592\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 3215360\nfile_dirty 16384\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 8404992\nactive_anon 385024\ninactive_file 240762880\nactive_file 4661248\nunevictable 0\nslab_reclaimable 709079912\nslab_unreclaimable 208528\nslab 709288440\nworkingset_refault_anon 0\nworkingset_refault_file 27337\nworkingset_activate_anon 0\nworkingset_activate_file 548\nworkingset_restore_anon 0\nworkingset_restore_file 1604\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgpromote_success 0\npgscan 80032\npgsteal 79960\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 80032\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 79960\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 5487\npgmajfault 319\npgrefill 97240\npgactivate 101\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 15\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+        "io_pressure_before": "some avg10=0.00 avg60=0.00 avg300=0.00 total=41514\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=41507",
+        "io_pressure_after": "some avg10=7.56 avg60=16.63 avg300=6.61 total=24246699\nfull avg10=7.38 avg60=16.58 avg300=6.59 total=24224704",
+        "disk_peak_bytes": 459849728,
+        "disk_end": {
+          "db": {
+            "logical_bytes": 256016384,
+            "allocated_bytes": 256122880
+          },
+          "wal": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "shm": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "stage": {
+            "logical_bytes": 0,
+            "allocated_bytes": 0
+          },
+          "other": {
+            "logical_bytes": 162,
+            "allocated_bytes": 4096
+          },
+          "total": {
+            "logical_bytes": 256016546,
+            "allocated_bytes": 256126976
+          }
+        },
+        "observer": {
+          "validated": true,
+          "current_entries": 1004499,
+          "previous_entries": 1004499,
+          "logical_content_unchanged": true,
+          "semantic_sha256": "4fa5f287c6c7c3a060591050c5ff346be48e38f2120fbf3a6966ecba85c0651e"
+        }
+      }
+    ],
+    "summary": {
+      "valid": true,
+      "issues": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "elapsed_seconds": {
+            "baseline": 79.36721974999998,
+            "candidate": 78.52659958999999,
+            "delta": -0.8406201599999861
+          },
+          "peak_rss_kib": {
+            "baseline": 37408,
+            "candidate": 36564,
+            "delta": -844
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459837440,
+            "candidate": 459829248,
+            "delta": -8192
+          }
+        },
+        {
+          "pair": 2,
+          "elapsed_seconds": {
+            "baseline": 79.74036979100003,
+            "candidate": 78.022491436,
+            "delta": -1.717878355000039
+          },
+          "peak_rss_kib": {
+            "baseline": 37132,
+            "candidate": 37328,
+            "delta": 196
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459841536,
+            "candidate": 459853824,
+            "delta": 12288
+          }
+        },
+        {
+          "pair": 3,
+          "elapsed_seconds": {
+            "baseline": 85.84431394600006,
+            "candidate": 71.80862527900001,
+            "delta": -14.035688667000045
+          },
+          "peak_rss_kib": {
+            "baseline": 35508,
+            "candidate": 37344,
+            "delta": 1836
+          },
+          "app_disk_peak_bytes": {
+            "baseline": 459837440,
+            "candidate": 459849728,
+            "delta": 12288
+          }
+        }
+      ],
+      "summary": {
+        "elapsed_seconds": {
+          "median_delta": -1.717878355000039,
+          "max_abs_delta": 14.035688667000045
+        },
+        "peak_rss_kib": {
+          "median_delta": 196,
+          "max_abs_delta": 1836
+        },
+        "app_disk_peak_bytes": {
+          "median_delta": 12288,
+          "max_abs_delta": 12288
+        }
+      },
+      "identical_binaries": true,
+      "measurement_protocol": "v1-single-operation-pairs-v4",
+      "case": {
+        "case_policy": "qualification-v1",
+        "scenario": "unchanged",
+        "subtree_entries": 100,
+        "memory_mib": 1024,
+        "setup_memory_mib": 4096,
+        "observer_memory_mib": 4096,
+        "mutation_receipt": null
+      }
+    },
+    "binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "diagnostic_policy": {
+      "profile_policy": "profile-v2",
+      "allocation_diagnostics": false,
+      "scope": "measured refresh CLI only; seeds and observers disabled"
+    },
+    "profile_v2": "not applicable to scan; no allocation diagnostics",
+    "memory_events_local": "not collected",
+    "runner_preparation": {
+      "success": true,
+      "acted": false,
+      "freed_bytes": 0,
+      "duration_seconds": 0.00016453300000307536,
+      "floor_bytes": 45097156608,
+      "target_bytes": 47244640256
+    },
+    "cleanup": {
+      "success": true,
+      "exit_code": 0
+    },
+    "rust_passed": 307,
+    "rust_ignored": 1,
+    "python_test_counts": [
+      "121"
+    ],
+    "jobs": [
+      {
+        "name": "build",
+        "seconds": 151.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "paired",
+        "seconds": 822.0,
+        "conclusion": "success"
+      }
+    ]
+  },
+  "paired_time_percent": [
+    -1.059152837465982,
+    -2.154339589222633,
+    -16.35016697300316
+  ],
+  "interpretation": "Strictly valid 1GiB capped baseline/control success under reclaim; source arms have identical binaries. No exact minimum, candidate capacity gain, promotion, or full-scale result follows. Hierarchical memory events only; local events not collected. Profile-v2 is not applicable to scan.",
+  "archive_payload_sha256": {
+    "artifacts/runner-preparation/receipt.json": "384e05d17021c312c32cb0e077ae30e18426a012bddf8f9c0b52d4a765b7cf68",
+    "artifacts/scan/cleanup.log": "487b3ff00ec7ee3ad0dd1fc10d4e5cf0a38b68015ee61765d04fbb636627c588",
+    "artifacts/scan/disk-calibration.json": "09667fc98318b90bb64bf79b40cb122a8f8ed8a5fac531b1e3bc8684b8aec65d",
+    "artifacts/scan/filesystem.json": "89cf7dccb9a6d5c375c25d8544e1b64eb233ab87eb9b80d5c5755961f92e1fa5",
+    "artifacts/scan/final-summary.md": "2ffa75089f6ca80345f8c8c6ca1eaad26a541fccae375a4ca69a855b54c9fbc3",
+    "artifacts/scan/fio-randread.json": "5261b3f5f936589cc4835aff8c2742668bb6b1fb5706a4c17a0074351df5d86a",
+    "artifacts/scan/fio-randwrite.json": "b371fd0c482e8952ca21fd6984f82986a74654dd8a7c62297080ee74b99bd295",
+    "artifacts/scan/fio-read.json": "af6b59cdd8750b9383b46d6e31d063c69f28d3a3141cedfa61d2aae423f12e9f",
+    "artifacts/scan/fio-write.json": "a45b1bf290d778a503fbba3c4b59f2af59e289cb05c3c8e6990df10686ca3a30",
+    "artifacts/scan/host-disk.txt": "beb6b1cf32a549a3d4d05c444326416577fb1940b34e48ea39c66589fa0e06c7",
+    "artifacts/scan/inodes.txt": "0e4f4e48d344bba407755d14186afd9cddcd1eaf2845d92c3ce1cb647cddd417",
+    "artifacts/scan/loop-devices.json": "f9c99125fd8e7806f3144457a8e936987aa798ffe02a26a6955b8f3f8cac1fe6",
+    "artifacts/scan/measurements-setup/seed-1.json": "f103c5e64b8d82a921174addd9637d0dc9e5a5923db3c08ffec4d518b89530fa",
+    "artifacts/scan/measurements-setup/seed-1/cgroup-end.json": "360b6a985cde87e06e33f8c22653ce30dd7a2c9f9837d0bc445279891bb99bd3",
+    "artifacts/scan/measurements-setup/seed-1/cgroup-start.json": "852dc5636e3bbaefb245ec5086368fe3e49c49194a800ecfcae26fed1477e480",
+    "artifacts/scan/measurements-setup/seed-1/metrics.json": "f51a218ed1c742c3355d682c7e702ee8a6e58e76420ab2cb25f6c33450bb403b",
+    "artifacts/scan/measurements-setup/seed-1/stderr.log": "76493fb7598faecd2fb847d3690ab881c65622fc96cfdcd81cddff5156751641",
+    "artifacts/scan/measurements-setup/seed-1/stdout.json": "45506d49cb78be88f3ff1078e36a9e94ffccf81f142063a7068453c25ae43027",
+    "artifacts/scan/measurements-setup/seed-1/time.log": "af14f91deaab1f9eb06603dfcfb3e4fd6e52bf8fcb55bfe4ad9623eb3fe824da",
+    "artifacts/scan/measurements-setup/seed-1/worker.log": "267d4b0305aab5d842af44a715e01dfc2c7b593ef2d419c3a5d7893fb5957286",
+    "artifacts/scan/measurements-setup/seed-1/writer-state.json": "1621e82722d0e293f600b1be02b6bdd6f290e5fbaa2bcefeaea50cbe562f16eb",
+    "artifacts/scan/measurements-setup/seed-2.json": "068d2d6279f547af797adc0ff830eb7e2fd35d043b4e1ba43c4c5e916f205382",
+    "artifacts/scan/measurements-setup/seed-2/cgroup-end.json": "a39c50771d2e0e3c3009bb1bd33422544e368e5631a2dd22c66e6d7e19e7adfa",
+    "artifacts/scan/measurements-setup/seed-2/cgroup-start.json": "8a0d06d3b60b5de60d20446ac08f5010e48e7053fc0f3ffe4cb5a37350c23118",
+    "artifacts/scan/measurements-setup/seed-2/metrics.json": "dcf599f0a004ca9fad1f34c9d131f767282d7068e8dc888455e39a4cdd849aa1",
+    "artifacts/scan/measurements-setup/seed-2/stderr.log": "e0fec9a030ae34ec4640364d843d459b6cee94edc9a453fdbd80ba44c0f31393",
+    "artifacts/scan/measurements-setup/seed-2/stdout.json": "394387e53a7b440295d3fb7626b7c042d3c49e82f3a607a601e56b6fc02f7401",
+    "artifacts/scan/measurements-setup/seed-2/time.log": "0ff1e72b7b6fd890ba3c4a013f92557d163dcf38e973b0b32403a344a3b542d4",
+    "artifacts/scan/measurements-setup/seed-2/worker.log": "92f2dd279e5b4ff1b085c33b6505a987c9fe6a750f6aaa1296af46c27d249f8f",
+    "artifacts/scan/measurements-setup/seed-2/writer-state.json": "3ac2722ba683b33da3ea13b7310ce960a6377162f47642e1d34aa6a80ed01696",
+    "artifacts/scan/measurements/capacity-admission.json": "5078522d470ae9647b3612310e695611314be19d7fa7c3451ab071143b809c18",
+    "artifacts/scan/measurements/manifest.json": "9dfc2ddf4a6f9e413c4515f3a5f304a061f90d47087ba455428bca94207a0749",
+    "artifacts/scan/measurements/p1-baseline-v1.json": "b6cbd63f0bed8250a13a4295f7634e1ad57562097fde1836619610d099359267",
+    "artifacts/scan/measurements/p1-baseline-v1/cache-flush.json": "430b93822e48b5d9ad9740f2a7b26544279344dc029f2ecebb26516900f30377",
+    "artifacts/scan/measurements/p1-baseline-v1/cgroup-end.json": "34754d1e3139c4b097c06591daa1a052bc741cc66898fbca30b4f5eed2f3ec99",
+    "artifacts/scan/measurements/p1-baseline-v1/cgroup-start.json": "44885db3ccba6c8dff4d715999dc5ccdca1d685c4fde2b7655ac454210862a54",
+    "artifacts/scan/measurements/p1-baseline-v1/metrics.json": "3b64343b7a76ce1ecd39c519de5462b9db596fce008d5bf955a97f3834b371bc",
+    "artifacts/scan/measurements/p1-baseline-v1/observer-state.json": "e6e01d2e5004f7c2410f656484836a3391fe6772148827a6349958d219806d44",
+    "artifacts/scan/measurements/p1-baseline-v1/observer.json": "cab93fc4450363187bec26ba34d9a3e145f273910487b1b3033609f2ab1ed43c",
+    "artifacts/scan/measurements/p1-baseline-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/scan/measurements/p1-baseline-v1/setup.json": "278c717b0c8e8db6b858a4f01b07b6d02840e220a04367aff461f422e7b1a5bc",
+    "artifacts/scan/measurements/p1-baseline-v1/spec.json": "b6cbd63f0bed8250a13a4295f7634e1ad57562097fde1836619610d099359267",
+    "artifacts/scan/measurements/p1-baseline-v1/stderr.log": "6a575697f1509833071f9be522b3d9b1e031be881ed89ee9a83350277b8206f3",
+    "artifacts/scan/measurements/p1-baseline-v1/stdout.json": "a0df42e5b182135df789180f8775227ba4d4a0fa5526f167720b185aaec6a6f0",
+    "artifacts/scan/measurements/p1-baseline-v1/time.log": "54253dd2d3b06f4e10203eaae6737e4fb27036dc5bb88cf5ae83228f65c3b526",
+    "artifacts/scan/measurements/p1-baseline-v1/worker.log": "2b34525d97316aa7c0cceb4dffafa5533d775fdc934769641eef72e53eca9b26",
+    "artifacts/scan/measurements/p1-baseline-v1/writer-state.json": "8f3fbff285f51cf839284435e8e429f08c45821bb44c9f1e25dadd7999cc6d8a",
+    "artifacts/scan/measurements/p1-candidate-v1.json": "d94f3d889d66fc852cf20ab20271d5e7f8264d37d069ef06a363ee1cec60f1ca",
+    "artifacts/scan/measurements/p1-candidate-v1/cache-flush.json": "86d9484ca1733069083ebf6fd3ba00437803448285377f0270f050fb4ecb0826",
+    "artifacts/scan/measurements/p1-candidate-v1/cgroup-end.json": "55bcbdf0221ee43359c93d4c81d16bf1028cf60746c5fea0c7cf670c2b42965e",
+    "artifacts/scan/measurements/p1-candidate-v1/cgroup-start.json": "e73df22557826724597dfcf04f816096df2e67a071faf1a1e8e546faf4b00846",
+    "artifacts/scan/measurements/p1-candidate-v1/metrics.json": "8ad49353966b85cdf08590abc3ecd3bf26564b47ba6192ad98f51d5bc3eef6b2",
+    "artifacts/scan/measurements/p1-candidate-v1/observer-state.json": "7c28a1e7081140e8048427256c8fe2dd0ec31fe559d50c87cfbd7918bba3d7c5",
+    "artifacts/scan/measurements/p1-candidate-v1/observer.json": "768ba7b85157f3711ae779287f2a6a64745f5297be99619e2ff93cf607e122ff",
+    "artifacts/scan/measurements/p1-candidate-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/scan/measurements/p1-candidate-v1/setup.json": "5279575c403a3fe37a6a0a73b5ef11482dea57c2fa62f32e4fcff8f6f3d9abde",
+    "artifacts/scan/measurements/p1-candidate-v1/spec.json": "d94f3d889d66fc852cf20ab20271d5e7f8264d37d069ef06a363ee1cec60f1ca",
+    "artifacts/scan/measurements/p1-candidate-v1/stderr.log": "c6754c7d14537aaa5f47b3364b806fb9c9f72a34b4fc73f18d3cd6dc16ba3895",
+    "artifacts/scan/measurements/p1-candidate-v1/stdout.json": "29b500408c5edee1d21c91c377998e14ce48ac7ba8f31e0e9531b39e42c55b53",
+    "artifacts/scan/measurements/p1-candidate-v1/time.log": "96bc486731fa0975e7537979a257b3859e89db0a19796b183ca6e7b209c06ded",
+    "artifacts/scan/measurements/p1-candidate-v1/worker.log": "4e6373dbe9b0753b84dbc804264913188b3d2b389c6c0399e68b9006093890a8",
+    "artifacts/scan/measurements/p1-candidate-v1/writer-state.json": "4eb94e236245f49ff193d3026214de5e8548a6c3f5fd7c79345394a3cab512b5",
+    "artifacts/scan/measurements/p2-baseline-v1.json": "81f6b9d3426ff06a5c7d222feb4107f455d33ef6253896577fe9ab55f4d299c7",
+    "artifacts/scan/measurements/p2-baseline-v1/cache-flush.json": "613112398c0923858d56bb544340d23bcc8ca4b8a7672fea57beb373d1046fd8",
+    "artifacts/scan/measurements/p2-baseline-v1/cgroup-end.json": "43c85f9f49bab95df84939df6bb3371f3d696f5e3f02c85932964d4738701a28",
+    "artifacts/scan/measurements/p2-baseline-v1/cgroup-start.json": "b1243df3e3b8db6788b57d546575fd44bc12037319a6932364c7ba22c5f7a868",
+    "artifacts/scan/measurements/p2-baseline-v1/metrics.json": "11b343fa6c882dfd4e4aeae7f022177c9ac405170b6e32855b1083863a788c58",
+    "artifacts/scan/measurements/p2-baseline-v1/observer-state.json": "6b91214c878557c87a36c6bab7ad466f1448f5422b9e9b37c155c2e5697d7e58",
+    "artifacts/scan/measurements/p2-baseline-v1/observer.json": "2b7e1275ca89024922e0747049a921e004c0f518b0fe40caa205a7008a7d3e6e",
+    "artifacts/scan/measurements/p2-baseline-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/scan/measurements/p2-baseline-v1/setup.json": "ecb5b9818e6625e64dd6073233b5298ce0555fd56dce751200c1099e9e587900",
+    "artifacts/scan/measurements/p2-baseline-v1/spec.json": "81f6b9d3426ff06a5c7d222feb4107f455d33ef6253896577fe9ab55f4d299c7",
+    "artifacts/scan/measurements/p2-baseline-v1/stderr.log": "7a36fc379d29519246e69d109dda9b08a803d231f3713cc32a64038fd9729369",
+    "artifacts/scan/measurements/p2-baseline-v1/stdout.json": "e78f59a45d86a7ebf1ac61a7fc4170162013355b8d51587eaa4adb14283fbea1",
+    "artifacts/scan/measurements/p2-baseline-v1/time.log": "4fda70e3cca5dc1cebffeedff87f8ed79eba5891439ea55f0377f6190af846af",
+    "artifacts/scan/measurements/p2-baseline-v1/worker.log": "4e2edce259db7957e7447e4d4764764e4258aa16cded43c88b5af33efda972e6",
+    "artifacts/scan/measurements/p2-baseline-v1/writer-state.json": "d8370ad04e1d116bcf910c5b71d9c76d3fe2e662df865e7d91eab198b5484611",
+    "artifacts/scan/measurements/p2-candidate-v1.json": "355fcbb7689a2d5eceea294a7bfac667d73f7e15f96ba999e92ded53e1a35f63",
+    "artifacts/scan/measurements/p2-candidate-v1/cache-flush.json": "580af20521a4002b91d75a5aa0ad4c08f66e3aa8937d473bb6d9b5c2cbe76057",
+    "artifacts/scan/measurements/p2-candidate-v1/cgroup-end.json": "c60d847b2a053d32ca9571803bf782abd6eb274c2d8be4fac9c81866eae4eed0",
+    "artifacts/scan/measurements/p2-candidate-v1/cgroup-start.json": "afce9ae75179b355be9111b02fa72dc3fdcca0b88ec1a9cd0da7ca6515040c4f",
+    "artifacts/scan/measurements/p2-candidate-v1/metrics.json": "323a8870a9da5100446aefe8562b182926741c21617982aff74e54d69460f9fb",
+    "artifacts/scan/measurements/p2-candidate-v1/observer-state.json": "a7fa6d7966d574dd4479aa858fd9cec5be7e1c1ec780f0c7a24fc5ad549d98f7",
+    "artifacts/scan/measurements/p2-candidate-v1/observer.json": "924005a9d4222f561665555e72a81b3fee85354721d85fb3fe4fd4def1ec3dc7",
+    "artifacts/scan/measurements/p2-candidate-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/scan/measurements/p2-candidate-v1/setup.json": "d167691c0a35cc9f9f6fff3e78b92aab3ddbb044e9cf05b30f23c3e5313cce64",
+    "artifacts/scan/measurements/p2-candidate-v1/spec.json": "355fcbb7689a2d5eceea294a7bfac667d73f7e15f96ba999e92ded53e1a35f63",
+    "artifacts/scan/measurements/p2-candidate-v1/stderr.log": "2c7eca0669e1d8123279e07654e614c36c9612cb854261a35403a66b0fca93d4",
+    "artifacts/scan/measurements/p2-candidate-v1/stdout.json": "fdafe71c8041ead45de136bc83f334eb2ef2ed1f84c87c65763e24daea997b33",
+    "artifacts/scan/measurements/p2-candidate-v1/time.log": "8039368d977c6aff5f3c268ac10a85562adab4d43cdca33dcc46f42010537653",
+    "artifacts/scan/measurements/p2-candidate-v1/worker.log": "b245eeafa0c128db2391c1b83256973c489a43e195acb162fd9d1445223ecadd",
+    "artifacts/scan/measurements/p2-candidate-v1/writer-state.json": "76353ecb41dbc698ba830329ec31bbf1055b1da5041ece1349e507f8edcfaf0c",
+    "artifacts/scan/measurements/p3-baseline-v1.json": "df159c3e8a9126b85cc1abeef9bd3bb23d0604a21c2c93489724e04f7fee9a2a",
+    "artifacts/scan/measurements/p3-baseline-v1/cache-flush.json": "1c010dfccfc59d5b9b421af043946774ddce85e07242dbfdaee8b29f388000ff",
+    "artifacts/scan/measurements/p3-baseline-v1/cgroup-end.json": "571d69a8c9bbb6e59ad6f05076e4aabd8f5807b8ca6c0689aab0969a3d64b650",
+    "artifacts/scan/measurements/p3-baseline-v1/cgroup-start.json": "560fc37fec4e8e685a987c5d70a9054cae946ffe079aca0696984e3dfddbba36",
+    "artifacts/scan/measurements/p3-baseline-v1/metrics.json": "17465cae55edee44200266f98762f3e48b6494074c93c307af556158dff987d1",
+    "artifacts/scan/measurements/p3-baseline-v1/observer-state.json": "00feb5cf2b088fcece9fa4307f9860d3758f68ca3cdbd4bfbdc174f5a07b97ff",
+    "artifacts/scan/measurements/p3-baseline-v1/observer.json": "c596093bdf69ad968ab5f158ac69547359c4ddbfb566377e1b93bdad4fca26c7",
+    "artifacts/scan/measurements/p3-baseline-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/scan/measurements/p3-baseline-v1/setup.json": "aedee420195dbd45e7ea1e35d476e8dee41eb413db0ced9f6c10b8a249750761",
+    "artifacts/scan/measurements/p3-baseline-v1/spec.json": "df159c3e8a9126b85cc1abeef9bd3bb23d0604a21c2c93489724e04f7fee9a2a",
+    "artifacts/scan/measurements/p3-baseline-v1/stderr.log": "9877f43c03f929c4a04a0152f73b217b47d9606025deb38059db1dc638305b29",
+    "artifacts/scan/measurements/p3-baseline-v1/stdout.json": "67d12ae38140b816cbe7b72bd806a1cbfe6e3450fedc3572c16d071264adc448",
+    "artifacts/scan/measurements/p3-baseline-v1/time.log": "13db5a285d586428411f60b9ec90869bf43dc6d6590c4bc771eda8527665b322",
+    "artifacts/scan/measurements/p3-baseline-v1/worker.log": "fb66174f4912d3fa27750ebe1f319bcd476dda4fdc4ca6b317b8d405fb4e7f3b",
+    "artifacts/scan/measurements/p3-baseline-v1/writer-state.json": "d65a7f4f7bc71f1a98c161b0b95cc507b9f6805f6faf73ebfa61a8a46f87c485",
+    "artifacts/scan/measurements/p3-candidate-v1.json": "5b8767f7701568a31f5fd5d2ed747023990471b40aade1de141af967f0de1a5b",
+    "artifacts/scan/measurements/p3-candidate-v1/cache-flush.json": "b9ee905d0b452b94503527b33d0aed568290867fba85f51535dc1b6e138beebc",
+    "artifacts/scan/measurements/p3-candidate-v1/cgroup-end.json": "0ecc1a4d0b58354a652263d55cf15ca8b8d667be89ca9b53fb242e1cffe7268c",
+    "artifacts/scan/measurements/p3-candidate-v1/cgroup-start.json": "161d8ab08f5b12b14b87c642f766ab9a92438bdbd55439bb179ac5d6b7f603e4",
+    "artifacts/scan/measurements/p3-candidate-v1/metrics.json": "113961b8587fa8a689bd5332c0cb3643c558a79a08a027e5478a44eb3eb9423d",
+    "artifacts/scan/measurements/p3-candidate-v1/observer-state.json": "17c5f3a7076c1b9ee0eb8b6d64df76fee3cb2771adeb79bcb23fd51a42966566",
+    "artifacts/scan/measurements/p3-candidate-v1/observer.json": "6813cae085b293a44b711c85af1ad4fdd21ba8c46352da0a2dbfa49c0260b55f",
+    "artifacts/scan/measurements/p3-candidate-v1/observer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/scan/measurements/p3-candidate-v1/setup.json": "7886c91c1d02defd03ac29b133b3e9c9870d4fe8aefb0b7d01b97c5e8ccd7f2f",
+    "artifacts/scan/measurements/p3-candidate-v1/spec.json": "5b8767f7701568a31f5fd5d2ed747023990471b40aade1de141af967f0de1a5b",
+    "artifacts/scan/measurements/p3-candidate-v1/stderr.log": "7dd18c21e763ab1a61809c0695ddbb5e816763086a01567a27f34080405393c0",
+    "artifacts/scan/measurements/p3-candidate-v1/stdout.json": "4b6e92591da13fd8898e28cc1284d16d5237e8e95c1d79f24b22fbbfc235f08d",
+    "artifacts/scan/measurements/p3-candidate-v1/time.log": "da52c7ddc8c3ec407d3581532db34d71847d57ced6e60cc00c62a17678e6f4c4",
+    "artifacts/scan/measurements/p3-candidate-v1/worker.log": "7154d4526a5d32b9e349e396a72dd5cf243fcc2a9d5927523c04a53b326544b8",
+    "artifacts/scan/measurements/p3-candidate-v1/writer-state.json": "ce3766f976b5ec589b665a436639cfe16f53830e6334f79729c4af28eceae4dd",
+    "artifacts/scan/measurements/runner-cleanup.json": "9ce3df27ea2cd331bcf5b94150246e78fe397ab131f7c60a94b1391956a78081",
+    "artifacts/scan/measurements/status.json": "4939bcda3c3b998c4307dee647ec43869406f4db72ec2b8372ebf1613f0d55b6",
+    "artifacts/scan/measurements/summary.json": "ab3540885b304d5d261f1d99fd93e650892952f40b651d19ea3abbb6df687068",
+    "artifacts/scan/measurements/summary.md": "2ffa75089f6ca80345f8c8c6ca1eaad26a541fccae375a4ca69a855b54c9fbc3",
+    "binaries/baseline": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "binaries/baseline.build.json": "9505612004baddcf2ceee3dc27fec10b10772c85ffc040dcf0112d2cbe9062d7",
+    "binaries/baseline.revision.txt": "ac5853eff41ae841c05ec4e2f002de467b8da0265420378b162f3b31fc1bd11b",
+    "binaries/candidate": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "binaries/candidate.build.json": "e1a0aef87ba871a2a125d161b95521033a92c8c8962a52a8c420ed88c658cef5",
+    "binaries/candidate.revision.txt": "b46b3f0c6b5c7dea77e77181c604837deb7be45644a8720b4c9e182551632963",
+    "context/freespace-admit-compact-scan-memory.py": "9f9abf4fbbaa7c618f8827a15c99c207d45a805949766cc6012fe865d6c91139",
+    "context/freespace-admit-compact-stage-https.py": "4e4b99fabea52cc9f200698d8a18e8bcc44ffddd4ae606de24e0c70ba3b85ebc",
+    "context/freespace-compact-scan-memory-1024-aa-dispatch.json": "2f73c6b871d2926e3ba68171fdb1126b8f7152a53c2742bb24803364134d7a7e",
+    "context/freespace-compact-scan-memory-1024-aa-gh.log": "7bcf7444b3790a3b5b4697a72706194a483dbd506dc43d8401896d826f9010b8",
+    "context/freespace-compact-scan-memory-1024-aa-github.json": "0c3b64d009435f68d888b76c1d55a05177671b2d4514fe64137a3c0b03e261ed",
+    "context/freespace-compact-scan-memory-1024-aa-validation.json": "f20fa632ab1a8f16d356980f877b3e74ba45efcb4a41db09a2c8486c288deed2",
+    "context/freespace-compact-scan-memory-ladder-proposal.json": "2d5927b8728cd22a5398c37d2d9b07e8569081a923faa04080fc36e048849978",
+    "context/freespace-compact-scan-memory-ladder-proposal.md": "2a59f89f980aea59a43af47487c2f48444899adefc5906a8d74ae01a07570c30",
+    "context/freespace-integrated-https-all-source-hashes.json": "21a40337c256c176c4c6eaaeab846865f3310c13c0a450b67ac6820e6f5168cf",
+    "context/registered-manifest.json": "487639e49b6d04251c224ecebdd69f5e2d48568231b1a45944d6d4ec96682601"
+  }
+}

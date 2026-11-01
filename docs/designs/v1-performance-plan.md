@@ -88,7 +88,7 @@ uses fresh matched controls and the joint source at 4 GiB, then conditionally
 experiment; a genuine memory optimization needs matched source and capacity
 evidence. No minimum requirement or full-scan RAM improvement is claimed yet.
 
-The complete [1m memory ladder](../benchmark-results/v1-fullscan-memory-grid-manifest-2026-10-31.json) now has valid A/A and joint runs at 2 GiB, 1 GiB and 512 MiB. At 512 MiB both arms completed all six scans and semantic observers with pressure and no hierarchical OOM. This lowest tested success is floor-censored, not an exact minimum or candidate capacity gain. The joint 512 MiB median RSS and disk changes were positive (+192 KiB and +28,672 bytes), leaving H2 inconclusive. No result below 4 GiB is inferred for the 7.3m fixture. The earlier 1 GiB build failure remains invalid capacity evidence.
+The complete [1m memory ladder](../benchmark-results/v1-fullscan-memory-grid-manifest-2026-10-31.json) now has valid A/A and joint runs at 2 GiB, 1 GiB and 512 MiB. At 512 MiB both arms completed all six scans and semantic observers with pressure and no hierarchical OOM. This lowest tested success is floor-censored, not an exact minimum or candidate capacity gain. The joint 512 MiB median RSS and disk changes were positive (+192 KiB and +28,672 bytes), leaving H2 inconclusive. These older-source results do not establish capacity for the new compact binary or the 7.3m fixture. The earlier 1 GiB build failure remains invalid capacity evidence.
 
 Exact Opus 5.5 source reviews completed after quota recovery. An exact-target cleanup P3 was corrected and received focused NO_FINDINGS in integrated future worktrees only; frozen measured 55d6e346 and 0adc796a sources remain unchanged. This is not a broad clean-review claim.
 
@@ -102,7 +102,7 @@ authorized by that result.
 Planning and earlier source reviews used the requested `claude-opus-5-5`.
 The published [8 MiB default research source](../benchmark-results/v1-compact-stage-source-reviews-2026-11-01.md)
 has compact temporary indexes and comprehensive mutation integration. It is
-source-reviewed with dispositions and has completed the small smoke below; 4 MiB
+source-reviewed with dispositions and has completed the smoke and screen below; 4 MiB
 is a controlled experiment only. The [preregistered cases](../benchmark-results/v1-compact-stage-manifest-2026-11-01.json)
 require matched controls and further screens before qualification.
 The [progress report](../benchmark-results/v1-optimization-progress-2026-10-31.md)
@@ -127,23 +127,36 @@ max, OOM or swap events. Maximum absolute paired scan differences were 0.3312%
 time, 192 KiB RSS and zero disk bytes; refresh differences were 0.3318%, 80 KiB
 and 4,096 bytes. These spreads are descriptive, not confidence intervals.
 
-Candidate screen 41255297627 is in progress on `471c4d14ed4881106ce1d0b6cd5d6361839b2bc8`,
-with three scan and three unchanged 100-entry refresh pairs at 1m files and 4 GiB.
-Its expected candidate binary hash `2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b`
-was frozen before results. Independent full-scale 1 GiB baseline A/A run 41252744694 is also
-in progress on `e0299a6385e27fef4f78b682e7a5d25b969a02a1`; both actual binaries
-were independently hashed as `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`.
-Its [case-matched forecast](../benchmark-results/v1-fullscan-memory-full-manifest-2026-11-01.json)
-and reservation cover capacity exploration, not a code improvement. No lower
-full-scale RAM success is yet established. Track complete scan time, refresh time,
-process RSS, and application disk separately; full-scan process RSS and total
-worker-cgroup memory are distinct measures. The campaign ledger remains
-authoritative for runner time. The local timer remains stopped, with persistent
-catch-up possible on restoration; no install, master merge or backend switch has
-been made.
-Completed usage is 33,310 runner seconds (9h 15m 10s) of 60 hours. The local
-`freespace.timer` is temporarily stopped for GitHub-only research; `Persistent=yes`
-can trigger catch-up when restored. Installed backend and configuration remain unchanged.
+The [compact candidate screen](../benchmark-results/v1-compact-stage-https-candidate-screen-2026-11-01.md),
+run 41255297627 on `471c4d14ed4881106ce1d0b6cd5d6361839b2bc8`, passed strict
+validation for three scan and three unchanged 100-entry refresh pairs at 1m files
+and 4 GiB. Its actual binary was `2d2fd14fc97dcdc3737523a0ec24616448b2315f2c6ae2d9cb95718515d18c5b`.
+Median scan time changed −27.9103%, RSS −408 KiB (−1.08085%), sampled app disk
+−4,579,328 bytes (−0.99236%), and worker-cgroup peak −4,567,040 bytes
+(−4.355 MiB, −0.23497%) from about 1.81 GiB. These are distinct measures and
+do not establish a code capacity gain. Refresh changes were +8.913, +25.007 and
++37.347 ms: median +0.235127%, worst +0.349425%, exceeding fresh A/A maxima
+of 0.331818% and 35.233 ms. H2 is inconclusive; no promotion is supported.
+Refresh RSS fell 90,048 KiB (23.8237%), below the 25% benefit floor; disk was flat.
+
+The fresh [1m 1 GiB A/A control](../benchmark-results/v1-compact-scan-memory-1024-aa-2026-11-01.md)
+passed all six scans and observers under pressure; its roughly 16.35% maximum
+paired time difference is not a tight timing calibration. The independent
+[full-scale 1 GiB baseline A/A](../benchmark-results/v1-fullscan-memory-full-1024-aa-2026-11-01.md)
+also passed: both actual binaries were `ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980`,
+current and previous each had 7,297,076 entries, and both workers hit the cap
+under pressure without OOM or swap. Times of 1,116.836 and 1,303.922 seconds
+give a 16.751% A/A spread; this is neither latency qualification nor an exact
+minimum or code gain. Full-scale 512 MiB was not admitted: 6,340 seconds plus
+30% is 8,242 seconds, above the 7,200-second cap.
+
+The separate root-reuse63 source experiment removes a confirmed redundant roots
+query by reusing root data. Its exact Opus review returned `NO_FINDINGS` and normal
+hooks passed; its new Rust test has not executed and timing benefit is unproven.
+Next tests are being preregistered. The campaign ledger is authoritative for
+runner time under the unchanged 60-hour limit. The local `freespace.timer` remains
+stopped; `Persistent=yes` can trigger catch-up on restoration. No install, master
+merge or backend switch has been made.
 D16 permits test-host backend switching without certifying a production release
 or unlimited local load. Continue the accepted investigation and conditional
 qualification with immutable preregistered workloads, bounded jobs and recorded

@@ -1,6 +1,6 @@
 {
   "schema": "compact-scan-memory-ladder-v1",
-  "status": "registered",
+  "status": "Baseline1GiB control valid; candidate progression remains conditional/pending. A/A time spread16.35%, not tight timing calibration.",
   "root_manifest_path": "docs/benchmark-results/v1-compact-stage-scan-memory-manifest-2026-11-01.json",
   "source_hash_manifest": "/tmp/freespace-integrated-https-all-source-hashes.json",
   "source_hash_manifest_sha256": "21a40337c256c176c4c6eaaeab846865f3310c13c0a450b67ac6820e6f5168cf",
@@ -40,11 +40,22 @@
       "expected_baseline_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "expected_candidate_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
       "artifact_prefix": "/tmp/freespace-compact-scan-memory-1024-aa",
-      "status": "planned",
+      "status": "completed",
       "advance_disposition": "not_required",
       "profile_policy": "not_applicable_scan_only",
       "allocation_diagnostics": false,
-      "forecast_method": "max(initial2156,completed prior paired seconds+900),30%margin strictly below3300; fixed caps"
+      "forecast_method": "max(initial2156,completed prior paired seconds+900),30%margin strictly below3300; fixed caps",
+      "run_id": 41256220919,
+      "created_at": "2026-11-01T00:19:11Z",
+      "conclusion": "success",
+      "head_sha_verified": true,
+      "completed_job_seconds": 973.0,
+      "running_job_seconds_observed": 0,
+      "usage_observed_at": "2026-11-01T00:39:07.592788+00:00",
+      "job_seconds": 973.0,
+      "receipt": "v1-compact-scan-memory-1024-aa-2026-11-01.json",
+      "receipt_validation": "independently_strict_valid_all_commands_and_observers",
+      "qualification": "not_promoted"
     },
     {
       "id": "compact-scan-memory-1024-candidate",
@@ -188,5 +199,6 @@
   "created_at": "2026-11-01T00:17:51.381341+00:00",
   "campaign_cap_seconds": 216000,
   "parent_review": "Corrected all workflow comparisons to candidate so baseline provenance remains e826. Scientific A/A separate. Fixed source/hashes, strict prior proof, forecast/budget and one-shot receipt reviewed; dispatch network timeout60s added. This registers conditional research cases, no promotion or H2/D11 waiver.",
-  "admission_helper_sha256": "9f9abf4fbbaa7c618f8827a15c99c207d45a805949766cc6012fe865d6c91139"
+  "admission_helper_sha256": "9f9abf4fbbaa7c618f8827a15c99c207d45a805949766cc6012fe865d6c91139",
+  "updated_at": "2026-11-01T00:56:35.455606+00:00"
 }
