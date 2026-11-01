@@ -20,7 +20,7 @@ mod walk;
 mod write;
 
 /// Cache target per connection. Two connections are open during final writing.
-const CACHE_KIB: u64 = 8192;
+const CACHE_KIB: u64 = 4096;
 
 const STAGE_SCHEMA: &str = "BEGIN;
             CREATE TABLE raw(id INTEGER PRIMARY KEY, parent INTEGER, name BLOB NOT NULL,
