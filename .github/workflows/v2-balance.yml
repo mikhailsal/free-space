@@ -1,256 +1,137 @@
-name: v2 storage balance
+name: Cleanup threshold research
 
 on:
-  push:
-    branches: [perf/v2-storage-balance]
-    paths:
-      - .github/workflows/v2-balance.yml
-      - .cargo/**
-      - Cargo.toml
-      - Cargo.lock
-      - VERSION
-      - rust-toolchain*
-      - core/**
-      - cli/**
-      - web/**
-      - scripts/bench-v2-container.py
-      - scripts/bench_v2_config.py
-      - scripts/bench-v2-container/**
-      - scripts/summarize-v2-container.py
-      - scripts/check-v2-observer.py
-      - scripts/check.sh
-      - scripts/check-rust-suppressions.sh
   workflow_dispatch:
     inputs:
-      baseline_ref:
-        description: Baseline revision (v1 and v2 comparator)
-        default: 036fd2b7cb223a212dc3c68d78d4400d74ab793a
+      stage:
+        type: choice
+        options: [smoke, screen]
+        default: smoke
+        required: true
+      smoke_run_id:
+        description: Successful same-source smoke run ID (required for screen)
         type: string
-      candidate_ref:
-        description: Candidate revision
-        default: master
-        type: string
-      steps:
-        description: Pilot 100000; confirmation 1000000; or both
-        default: '100000'
-        type: choice
-        options: ['100000', '1000000', '100000,1000000']
-      memory_mib:
-        description: Container RAM MiB (no swap)
-        default: '256'
-        type: choice
-        options: ['128', '256', '512', '4096']
-      repeats:
-        description: Paired repeats, alternating order
-        default: '2'
-        type: choice
-        options: ['1', '2', '3']
-      scans:
-        description: Complete scans per arm before refresh
-        default: '3'
-        type: choice
-        options: ['2', '3']
-      include_v1:
-        description: Include baseline v1 comparator
-        default: true
-        type: boolean
-      current_backends:
-        description: Compare candidate v1 and v2 instead of historical baseline
-        default: false
-        type: boolean
-      scan_profile:
-        description: Full-scan staging profile
-        default: disk
-        type: choice
-        options: [disk, memory, both]
-      keep_previous:
-        description: Retain previous generation during full scans
-        default: both
-        type: choice
-        options: ['both', 'true', 'false']
-      observer_check:
-        description: Run observer diagnostics instead of performance measurements
-        default: false
-        type: boolean
+        required: false
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: v2-balance-${{ github.ref }}-${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '1000000') || '100000' }}-${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-4g]') && '4096') || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}-${{ inputs.scan_profile || (contains(github.event.head_commit.message, '[bench-profiles]') && 'both') || (contains(github.event.head_commit.message, '[bench-memory]') && 'memory') || 'disk' }}-${{ (inputs.current_backends == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[bench-current]'))) && 'current' || 'historical' }}-${{ inputs.keep_previous || (contains(github.event.head_commit.message, '[bench-keep-prev]') && 'true') || 'both' }}
+  group: cleanup-threshold-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
+  experiment:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    outputs:
-      candidate_revision: ${{ steps.provenance.outputs.candidate_revision }}
+    timeout-minutes: ${{ inputs.stage == 'screen' && 120 || 60 }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.baseline_ref || '036fd2b7cb223a212dc3c68d78d4400d74ab793a' }}
-          path: baseline
           persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.candidate_ref || github.sha }}
-          path: candidate
-          persist-credentials: false
-      # A single installed toolchain compiles both checkouts sequentially.
+      - name: Record source and build start
+        run: |
+          set -euo pipefail
+          mkdir -p cleanup-results/provenance cleanup-results/source binaries
+          date +%s > cleanup-results/provenance/build-start.epoch
+          git rev-parse HEAD > cleanup-results/provenance/source-revision.txt
+          SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
+          printf '%s\n' "$SOURCE_DATE_EPOCH" > cleanup-results/provenance/source-date-epoch.txt
+          python3 - <<'PYSOURCE'
+          import hashlib,json,pathlib,shutil,subprocess
+          selectors=['Cargo.toml','Cargo.lock','rust-toolchain*','.cargo','cli','core',
+                     'scripts/bench-v2-container.py','scripts/bench_v2_config.py',
+                     'scripts/bench-disk-calibration.py','scripts/bench-v2-container/Dockerfile','web/src','web/index.html',
+                     'web/fonts','web/favicon.svg','web/bun.lock','web/package.json',
+                     'scripts/cleanup_probe*','scripts/cleanup_oracle.py','scripts/tests/test_cleanup*',
+                     '.github/workflows/v2-balance.yml']
+          names=subprocess.check_output(['git','ls-files','-z','--',*selectors]).split(b'\0')
+          hashes={}
+          for raw in filter(None,names):
+              name=raw.decode(); source=pathlib.Path(name)
+              if source.is_symlink() or not source.is_file(): raise ValueError('unsafe tracked source: '+name)
+              target=pathlib.Path('cleanup-results/source')/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,target)
+              hashes[name]=hashlib.sha256(target.read_bytes()).hexdigest()
+          if not hashes: raise ValueError('empty source capture')
+          pathlib.Path('cleanup-results/provenance/source-sha256.json').write_text(json.dumps(hashes,indent=2,sort_keys=True)+'\n')
+          PYSOURCE
       - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: x86_64-unknown-linux-musl
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - name: Build both release binaries and record provenance
-        id: provenance
-        shell: bash
+      - name: Install build prerequisites
+        run: |
+          sudo timeout --kill-after=5s 180s apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 --error-on=any update -q
+          sudo env DEBIAN_FRONTEND=noninteractive timeout --kill-after=5s 180s apt-get install -yq --no-install-recommends musl-tools
+      - name: Run contracts and build frozen comparison arms
+        env:
+          RUSTUP_TOOLCHAIN: 1.99.1
         run: |
           set -euo pipefail
-          mkdir binaries
-          rustc -Vv > binaries/compiler.txt
-          cargo -V >> binaries/compiler.txt
-          bun --version >> binaries/compiler.txt
-          for arm in baseline candidate; do
-            git -C "$arm" rev-parse HEAD > "binaries/$arm.revision.txt"
-            (cd "$arm" && timeout 1200 cargo build --release --locked -p freespace) > "binaries/$arm.build.log" 2>&1
-            cp "$arm/target/release/freespace" "binaries/$arm"
-            sha256sum "binaries/$arm" > "binaries/$arm.sha256.txt"
-            "binaries/$arm" --version > "binaries/$arm.version.txt"
-          done
-          echo "candidate_revision=$(cat binaries/candidate.revision.txt)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: v2-balance-binaries
-          path: binaries/
-          if-no-files-found: error
-          retention-days: 7
-
-  verify:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    outputs:
-      candidate_revision: ${{ steps.provenance.outputs.candidate_revision }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.candidate_ref || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.99.1
-        with:
-          components: rustfmt, clippy
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-      - name: Record verified revision
-        id: provenance
-        run: echo "candidate_revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - run: scripts/check.sh rust
-      - run: cargo test --workspace
-
-  measure:
-    if: ${{ !(inputs.observer_check == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[observer-check]'))) }}
-    needs: [build, verify]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+          python3 -m unittest discover -s scripts/tests -p 'test_cleanup*.py'
+          python3 -m compileall -q scripts/cleanup_probe_*.py scripts/cleanup_oracle.py
+          bash -n scripts/cleanup_probe_runner.sh
+          (cd web && bun install --frozen-lockfile)
+          cargo test --workspace --all-targets --locked --target x86_64-unknown-linux-musl
+          cargo build -p freespace --release --locked --target x86_64-unknown-linux-musl --bin freespace --example cleanup_probe
+          cp target/x86_64-unknown-linux-musl/release/freespace binaries/freespace
+          cp target/x86_64-unknown-linux-musl/release/examples/cleanup_probe binaries/cleanup_probe
+          sha256sum binaries/freespace binaries/cleanup_probe > cleanup-results/provenance/binaries.sha256
+          cp binaries/freespace binaries/cleanup_probe cleanup-results/provenance/
+          rustc -Vv > cleanup-results/provenance/rustc.txt
+          bun --version > cleanup-results/provenance/bun.txt
+          printf '%s\n' 'target=x86_64-unknown-linux-musl' 'allocator=mimalloc' 'profile=release --locked' > cleanup-results/provenance/build-context.txt
+          date +%s > cleanup-results/provenance/build-end.epoch
+      - name: Verify referenced smoke run
+        if: inputs.stage == 'screen'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SMOKE_RUN_ID: ${{ inputs.smoke_run_id }}
+        run: |
+          set -euo pipefail
+          [[ $SMOKE_RUN_ID =~ ^[0-9]+$ ]]
+          timeout --kill-after=5s 30s gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SMOKE_RUN_ID" > cleanup-results/provenance/smoke-run.json
+          python3 - <<'PY'
+          import json,os
+          r=json.load(open('cleanup-results/provenance/smoke-run.json'))
+          assert r['id']==int(os.environ['SMOKE_RUN_ID']) and r['head_sha']==os.environ['GITHUB_SHA']
+          assert r['event']=='workflow_dispatch' and r['conclusion']=='success' and r['run_attempt']==1
+          assert r['workflow_id']==397616649 and r['head_branch']=='perf/cleanup-threshold-probe'
+          PY
       - uses: actions/download-artifact@v4
+        if: inputs.stage == 'screen'
         with:
-          name: v2-balance-binaries
-          path: binaries
-      - name: Require the built and verified candidate to match
-        env:
-          BUILT_REVISION: ${{ needs.build.outputs.candidate_revision }}
-          VERIFIED_REVISION: ${{ needs.verify.outputs.candidate_revision }}
-        run: test "$BUILT_REVISION" = "$VERIFIED_REVISION"
-      - name: Run all comparison arms sequentially on this runner
-        env:
-          # Fixed literals selected by booleans; commit text never reaches shell.
-          # Push markers let a branch-only workflow run confirmation before it
-          # exists on the default branch and can accept workflow_dispatch.
-          BENCH_STEPS: ${{ inputs.steps || (contains(github.event.head_commit.message, '[bench-1m]') && '1000000') || '100000' }}
-          BENCH_MEMORY: ${{ inputs.memory_mib || (contains(github.event.head_commit.message, '[bench-4g]') && '4096') || (contains(github.event.head_commit.message, '[bench-128]') && '128') || (contains(github.event.head_commit.message, '[bench-512]') && '512') || '256' }}
-          BENCH_REPEATS: ${{ inputs.repeats || (contains(github.event.head_commit.message, '[bench-once]') && '1') || '2' }}
-          BENCH_SCANS: ${{ inputs.scans || (contains(github.event.head_commit.message, '[bench-two-scans]') && '2') || '3' }}
-          BENCH_PROFILE: ${{ inputs.scan_profile || (contains(github.event.head_commit.message, '[bench-profiles]') && 'both') || (contains(github.event.head_commit.message, '[bench-memory]') && 'memory') || 'disk' }}
-          BENCH_CURRENT: ${{ inputs.current_backends == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[bench-current]')) }}
-          BENCH_KEEP_PREVIOUS: ${{ inputs.keep_previous || (contains(github.event.head_commit.message, '[bench-keep-prev]') && 'true') || 'both' }}
-          BENCH_V1: ${{ (github.event_name == 'push' && !contains(github.event.head_commit.message, '[bench-v2-only]')) || (github.event_name == 'workflow_dispatch' && inputs.include_v1) }}
-        shell: bash
+          name: cleanup-threshold-smoke
+          path: smoke-evidence
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.smoke_run_id }}
+          repository: ${{ github.repository }}
+      - name: Admit screen from same-source smoke
+        if: inputs.stage == 'screen'
         run: |
           set -euo pipefail
-          chmod +x binaries/baseline binaries/candidate
-          extra=()
-          if [[ "$BENCH_CURRENT" == true ]]; then
-            extra+=(--current-backends)
-          elif [[ "$BENCH_V1" == true ]]; then
-            extra+=(--include-v1)
-          fi
-          python3 scripts/bench-v2-container.py \
-            --baseline binaries/baseline --candidate binaries/candidate \
-            --output results --steps "$BENCH_STEPS" --memory "$BENCH_MEMORY" \
-            --repeats "$BENCH_REPEATS" --scans "$BENCH_SCANS" \
-            --scan-profile "$BENCH_PROFILE" --keep-previous "$BENCH_KEEP_PREVIOUS" "${extra[@]}"
-      - name: Summarize measured results
-        if: always()
-        shell: bash
+          cmp smoke-evidence/provenance/binaries.sha256 cleanup-results/provenance/binaries.sha256
+          python3 scripts/cleanup_probe_forecast.py smoke-evidence/measurements/manifest.json cleanup-results/provenance/screen-forecast.json
+      - name: Prepare and measure
+        timeout-minutes: ${{ inputs.stage == 'screen' && 85 || 45 }}
+        env:
+          CLEANUP_STAGE: ${{ inputs.stage }}
+          CLEANUP_IO: local
+          CLEANUP_OUTPUT: ${{ github.workspace }}/cleanup-results
+          STEP_SECONDS: ${{ inputs.stage == 'screen' && 5100 || 2700 }}
         run: |
           set -euo pipefail
-          if [[ -d results ]]; then
-            python3 scripts/summarize-v2-container.py results | tee results/summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-      # Upload raw stdout/stderr, timing, cgroup, file allocation and dbstat JSON.
-      # Scratch trees and databases are never part of the results artifact.
+          export CLEANUP_STEP_DEADLINE_EPOCH=$(( $(date +%s) + STEP_SECONDS ))
+          bash scripts/cleanup_probe_runner.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v2-balance-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            results/
-            binaries/*.txt
-            binaries/*.log
-          if-no-files-found: error
-          retention-days: 14
-
-  # Diagnostic profile only: no timings from this job are accepted measurements.
-  observer-check:
-    if: ${{ inputs.observer_check == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[observer-check]')) }}
-    needs: [build, verify]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: v2-balance-binaries
-          path: binaries
-      - name: Require the built and verified candidate to match
-        env:
-          BUILT_REVISION: ${{ needs.build.outputs.candidate_revision }}
-          VERIFIED_REVISION: ${{ needs.verify.outputs.candidate_revision }}
-        run: test "$BUILT_REVISION" = "$VERIFIED_REVISION"
-      - name: Check observer behavior without collecting performance results
-        shell: bash
-        run: |
-          set -euo pipefail
-          chmod +x binaries/baseline binaries/candidate
-          python3 scripts/check-v2-observer.py \
-            --baseline binaries/baseline --candidate binaries/candidate \
-            --output observer-results
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: v2-observer-check-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            observer-results/
-            binaries/*.txt
-            binaries/*.log
-          if-no-files-found: error
+          name: cleanup-threshold-${{ inputs.stage }}
+          path: cleanup-results/
+          include-hidden-files: true
           retention-days: 14
