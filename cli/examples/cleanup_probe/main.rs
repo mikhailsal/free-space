@@ -229,7 +229,7 @@ fn initial_state(
     ppm: Option<u32>,
 ) -> R<(store::Meta, Vec<Node>)> {
     if operation == "refresh" {
-        let (m, n) = store::read(&db)?;
+        let (m, n) = store::read(db)?;
         if m.root != root {
             return Err("snapshot root mismatch".into());
         }
@@ -239,7 +239,7 @@ fn initial_state(
         let ppm = ppm.ok_or("missing ppm")?;
         let t = threshold(cap, ppm)?;
         let generation = if db.exists() {
-            store::read(&db)?
+            store::read(db)?
                 .0
                 .generation
                 .checked_add(1)

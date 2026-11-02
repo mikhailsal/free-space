@@ -6,6 +6,8 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+type Owners = HashMap<(u64, u64), PathBuf>;
+
 #[derive(Default, PartialEq, Eq)]
 struct Digest {
     count: u64,
@@ -80,11 +82,7 @@ fn retain(retained: &mut Vec<Node>, node: Node) -> R<()> {
     retained.push(node);
     Ok(())
 }
-fn metadata_pass(
-    root: &Path,
-    dev: u64,
-    mounts: &HashSet<PathBuf>,
-) -> R<(HashMap<(u64, u64), PathBuf>, Digest)> {
+fn metadata_pass(root: &Path, dev: u64, mounts: &HashSet<PathBuf>) -> R<(Owners, Digest)> {
     let mut owners = HashMap::new();
     let mut digest = Digest::default();
     let meta = inspect(root, dev, mounts)?;

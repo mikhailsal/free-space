@@ -86,5 +86,5 @@ pub fn threshold(capacity: u64, ppm: u32) -> R<u64> {
     if capacity == 0 || ppm == 0 || ppm > 1_000_000 {
         return Err("capacity and ppm must be positive; ppm <= 1000000".into());
     }
-    u64::try_from(((capacity as u128) * (ppm as u128) + 999_999) / 1_000_000).map_err(Into::into)
+    u64::try_from(((capacity as u128) * (ppm as u128)).div_ceil(1_000_000)).map_err(Into::into)
 }
