@@ -61,3 +61,20 @@ was present in `core`, `cli/src`, `Cargo.toml` or `Cargo.lock` at source freeze.
 Normal pre-push Rust, size, shell, TypeScript and Biome checks passed on the final
 revision without bypass. The source-freeze JSON and capsule preserve scope and
 original provider responses, including all earlier findings.
+
+## Prospective roomy-v2 follow-up
+
+The successful original pilot and its rejected screen admission are preserved
+in the initial-smoke report/capsule. Before any million-entry observations,
+revision `678e998e47020576224337b8fe8ab941f3df2bef` freezes fresh 8 GiB controls
+and a 14,400-second maximum screen job inside the unchanged 216,000-second
+aggregate campaign. Original 4 GiB data will not be pooled with the follow-up.
+
+Actual Opus review 06 required host physical/available-memory evidence and
+admission tests that pass between the old/new caps and fail above each new
+cap. The final source records and checks 10 GiB total and available memory
+and two logical CPUs before build/workload/writer/observer; fresh smoke and
+current screen host are checked by their respective admission paths. Tests
+exercise admitting and both boundary cases. Actual review 07 returned exact
+`NO_FINDINGS`; all normal hooks passed without bypass. The roomy source-freeze
+JSON/capsule preserves the exact 32-file coverage and the new reservation.

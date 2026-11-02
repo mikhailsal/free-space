@@ -58,7 +58,8 @@
     41277463149,
     41279047267,
     41372382738,
-    41373680085
+    41373680085,
+    41476363033
   ],
   "runs": [
     {
@@ -3078,13 +3079,42 @@
       "qualification": false,
       "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41373680085",
       "job_seconds": 1257.0
+    },
+    {
+      "run_id": 41476363033,
+      "case_id": "cleanup-threshold-smoke",
+      "revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+      "stage": "smoke",
+      "workflow_id": 397616649,
+      "workflow_file": "v2-balance.yml",
+      "branch": "perf/cleanup-threshold-probe",
+      "maximum_job_seconds": 3600,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 724.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 125382869851,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T15:55:38Z",
+          "completed_at": "2026-11-02T16:07:42Z",
+          "seconds": 724.0
+        }
+      ],
+      "scientific_kind": "cleanup-threshold-exploratory",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41476363033",
+      "job_seconds": 724.0
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-02T15:54:39.234118+00:00",
-  "completed_job_seconds": 52011.0,
-  "maximum_committed_seconds": 97611.0,
-  "remaining_unreserved_seconds": 118389.0,
+  "updated_at": "2026-11-02T16:31:26.979183+00:00",
+  "completed_job_seconds": 52735.0,
+  "maximum_committed_seconds": 105535.0,
+  "remaining_unreserved_seconds": 110465.0,
   "candidate_branch": "perf/v1-root-reuse-cache4",
   "forecasts": [
     {
@@ -3123,7 +3153,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 45600,
+  "planned_reserved_seconds": 52800,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Joint SQL plus exact refresh capacity",
@@ -3450,7 +3480,7 @@
     }
   },
   "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 52011.0,
+  "used_runner_seconds_observed": 52735.0,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -3791,38 +3821,78 @@
     {
       "id": "cleanup-threshold-smoke",
       "stage": "smoke",
-      "status": "admitted",
+      "status": "completed",
       "branch": "perf/cleanup-threshold-probe",
       "workflow_file": "v2-balance.yml",
       "workflow_id": 397616649,
       "source_revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
-      "reservation_seconds": 3600,
+      "reservation_seconds": 0,
       "maximum_job_seconds": 3600,
       "qualification": false,
       "automatic_retry": false,
       "depends_on": "Complete source review actual claude-opus-5-5, source freeze, normal hooks, financial admission",
-      "review_proof": "docs/benchmark-results/cleanup-threshold-source-freeze-2026-11-02.json"
+      "review_proof": "docs/benchmark-results/cleanup-threshold-source-freeze-2026-11-02.json",
+      "dispatch_intent_at": "2026-11-02T15:55:26.332856+00:00",
+      "run_id": 41476363033,
+      "completed_job_seconds": 724.0,
+      "conclusion": "success",
+      "completed_at": "2026-11-02T16:07:43Z",
+      "scientific_disposition": "Valid30writer/6oracle pilot; all raw checks pass. Exploratory one pair/profile/scenario, not million-scale qualification."
     },
     {
       "id": "cleanup-threshold-screen",
+      "stage": "screen",
+      "status": "declined_time_forecast",
+      "branch": "perf/cleanup-threshold-probe",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "source_revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+      "reservation_seconds": 0,
+      "maximum_job_seconds": 7200,
+      "qualification": false,
+      "automatic_retry": false,
+      "depends_on": "Same-source same-binary valid smoke, raw semantic acceptance and prospective phase forecast fits all caps",
+      "forecast_evidence": "docs/benchmark-results/cleanup-threshold-original-screen-rejection-2026-11-02.json",
+      "scientific_disposition": "Original successful smoke valid; conditional screen rejected, never dispatched. Not reinterpreted as admitted."
+    },
+    {
+      "id": "cleanup-threshold-roomy-smoke",
+      "stage": "smoke",
+      "status": "admitted",
+      "branch": "perf/cleanup-threshold-probe",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "source_revision": "678e998e47020576224337b8fe8ab941f3df2bef",
+      "reservation_seconds": 3600,
+      "maximum_job_seconds": 3600,
+      "memory_mib": 8192,
+      "qualification": false,
+      "automatic_retry": false,
+      "depends_on": "Prospective roomy-v2 source review/freeze and normal hooks; screen also fresh same-source8GiB smoke, same binaries/runtime and valid forecast before dispatch",
+      "review_proof": "docs/benchmark-results/cleanup-threshold-roomy-source-freeze-2026-11-02.json"
+    },
+    {
+      "id": "cleanup-threshold-roomy-screen",
       "stage": "screen",
       "status": "planned",
       "branch": "perf/cleanup-threshold-probe",
       "workflow_file": "v2-balance.yml",
       "workflow_id": 397616649,
       "source_revision": null,
-      "reservation_seconds": 7200,
-      "maximum_job_seconds": 7200,
+      "reservation_seconds": 14400,
+      "maximum_job_seconds": 14400,
+      "memory_mib": 8192,
       "qualification": false,
       "automatic_retry": false,
-      "depends_on": "Same-source same-binary valid smoke, raw semantic acceptance and prospective phase forecast fits all caps"
+      "depends_on": "Prospective roomy-v2 source review/freeze and normal hooks; screen also fresh same-source8GiB smoke, same binaries/runtime and valid forecast before dispatch"
     }
   ],
   "cleanup_threshold_probe": {
     "goal": "Practically assess configurable0.1percent coarse cleanup storage: four metrics, adversarial semantics and integration cost",
     "authorization": "Owner explicitly requested practical prototype and testing using existing GH-first60h campaign",
-    "status": "Implementation prepared; no run dispatched",
+    "status": "Original smoke valid; original screen rejected time projection. Preparing prospective roomy-v2 follow-up.",
     "qualification": false,
-    "manual_root_accounting": true
+    "manual_root_accounting": true,
+    "followup_rationale": "Keep1million scale,3cyclicpairs,IO/CPUandchecks; allow4hmaximumscreenjob within owner60hcap and8GiB measurement ceiling to avoid concealing unconstrained peaks in many-directory case. Fresh source/pilot required; no pooling with4GiB pilot."
   }
 }

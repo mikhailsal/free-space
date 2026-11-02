@@ -1,0 +1,1667 @@
+{
+  "valid": true,
+  "stage": "smoke",
+  "source_sha": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+  "timed_cases": 18,
+  "seed_cases_excluded": 12,
+  "rounds": 1,
+  "protocol_only": true,
+  "optimization_acceptance": "not evaluated",
+  "memory_ceiling_mib": 4096,
+  "runtime_provenance": {
+    "image_id": "sha256:cbc8577774cb0e5cdbe2b1029f25c41855f8e483e1a6dbcdd238c9c20a22158c",
+    "versions": {
+      "fio": "fio-3.36",
+      "packages": [
+        "adduser=3.137ubuntu1",
+        "apt=2.8.3",
+        "base-files=13ubuntu10.5",
+        "base-passwd=3.6.3build1",
+        "bash=5.2.21-2ubuntu4",
+        "bsdutils=1:2.39.3-9ubuntu6.6",
+        "ca-certificates=20260816ubuntu0.24.04.1",
+        "coreutils=9.4-3ubuntu6.3",
+        "dash=0.5.12-6ubuntu5",
+        "debconf=1.5.86ubuntu1",
+        "debianutils=5.17build1",
+        "diffutils=1:3.10-1ubuntu0.1",
+        "dpkg=1.22.6ubuntu6.6",
+        "e2fsprogs=1.47.0-2.4~exp1ubuntu4.1",
+        "findutils=4.9.0-5build1",
+        "fio=3.36-1ubuntu0.1",
+        "gcc-14-base=14.2.0-4ubuntu2~24.04.1",
+        "gpgv=2.4.4-2ubuntu17.6",
+        "grep=3.11-4build1",
+        "gzip=1.12-1ubuntu3.2",
+        "hostname=3.23+nmu2ubuntu2",
+        "init-system-helpers=1.66ubuntu1",
+        "libacl1=2.3.2-1build1.1",
+        "libaio1t64=0.3.113-6build1.1",
+        "libapt-pkg6.0t64=2.8.3",
+        "libargon2-1=0~20190702+dfsg-4build1",
+        "libassuan0=2.5.6-1build1",
+        "libattr1=1:2.5.2-1ubuntu0.1",
+        "libaudit-common=1:3.1.2-2.1ubuntu0.1",
+        "libaudit1=1:3.1.2-2.1ubuntu0.1",
+        "libblkid1=2.39.3-9ubuntu6.6",
+        "libboost-iostreams1.83.0=1.83.0-2.1ubuntu3.2",
+        "libboost-thread1.83.0=1.83.0-2.1ubuntu3.2",
+        "libbz2-1.0=1.0.8-5.1ubuntu0.1",
+        "libc-bin=2.39-0ubuntu8.9",
+        "libc6=2.39-0ubuntu8.9",
+        "libcap-ng0=0.8.4-2build2",
+        "libcap2=1:2.66-5ubuntu2.4",
+        "libcom-err2=1.47.0-2.4~exp1ubuntu4.1",
+        "libcrypt1=1:4.4.36-4build1",
+        "libcryptsetup12=2:2.7.0-1ubuntu4.2",
+        "libdaxctl1=77-2ubuntu2",
+        "libdb5.3t64=5.3.28+dfsg2-7",
+        "libdebconfclient0=0.271ubuntu3",
+        "libdevmapper1.02.1=2:1.02.185-3ubuntu3.2",
+        "libexpat1=2.6.1-2ubuntu0.6",
+        "libext2fs2t64=1.47.0-2.4~exp1ubuntu4.1",
+        "libffi8=3.4.6-1build1",
+        "libgcc-s1=14.2.0-4ubuntu2~24.04.1",
+        "libgcrypt20=1.10.3-2ubuntu0.2",
+        "libgfapi0=11.1-4ubuntu0.1",
+        "libgfrpc0=11.1-4ubuntu0.1",
+        "libgfxdr0=11.1-4ubuntu0.1",
+        "libglusterfs0=11.1-4ubuntu0.1",
+        "libgmp10=2:6.3.0+dfsg-2ubuntu6.1",
+        "libgnutls30t64=3.8.3-1.1ubuntu3.6",
+        "libgpg-error0=1.47-3build2.1",
+        "libgssapi-krb5-2=1.20.1-6ubuntu2.10",
+        "libhogweed6t64=3.9.1-2.2build1.1",
+        "libibverbs1=50.0-2ubuntu0.2",
+        "libicu74=74.2-1ubuntu3.1",
+        "libidn2-0=2.3.7-2build1.1",
+        "libjson-c5=0.17-1build1",
+        "libk5crypto3=1.20.1-6ubuntu2.10",
+        "libkeyutils1=1.6.3-3build1",
+        "libkmod2=31+20240202-2ubuntu7.2",
+        "libkrb5-3=1.20.1-6ubuntu2.10",
+        "libkrb5support0=1.20.1-6ubuntu2.10",
+        "liblz4-1=1.9.4-1build1.1",
+        "liblzma5=5.6.1+really5.4.5-1ubuntu0.4",
+        "libmd0=1.1.0-2build1.1",
+        "libmount1=2.39.3-9ubuntu6.6",
+        "libnbd0=1.20.0-1",
+        "libncursesw6=6.4+20240113-1ubuntu2.2",
+        "libndctl6=77-2ubuntu2",
+        "libnettle8t64=3.9.1-2.2build1.1",
+        "libnl-3-200=3.7.0-0.3build1.1",
+        "libnl-route-3-200=3.7.0-0.3build1.1",
+        "libnpth0t64=1.6-3.1build1",
+        "libnuma1=2.0.18-1ubuntu0.24.04.1",
+        "libp11-kit0=0.25.3-4ubuntu2.2",
+        "libpam-modules=1.5.3-5ubuntu5.7",
+        "libpam-modules-bin=1.5.3-5ubuntu5.7",
+        "libpam-runtime=1.5.3-5ubuntu5.7",
+        "libpam0g=1.5.3-5ubuntu5.7",
+        "libpcre2-8-0=10.42-4ubuntu2.1",
+        "libpmem1=1.13.1-1.1ubuntu2",
+        "libpmemobj1=1.13.1-1.1ubuntu2",
+        "libproc2-0=2:4.0.4-4ubuntu3.3",
+        "libpython3-stdlib=3.12.3-0ubuntu2.1",
+        "libpython3.12-minimal=3.12.3-1ubuntu0.17",
+        "libpython3.12-stdlib=3.12.3-1ubuntu0.17",
+        "librados2=19.2.3-0ubuntu0.24.04.3",
+        "librbd1=19.2.3-0ubuntu0.24.04.3",
+        "librdmacm1t64=50.0-2ubuntu0.2",
+        "libreadline8t64=8.2-4build1",
+        "libseccomp2=2.5.5-1ubuntu3.1",
+        "libselinux1=3.5-2ubuntu2.1",
+        "libsemanage-common=3.5-1build5",
+        "libsemanage2=3.5-1build5",
+        "libsepol2=3.5-2build1",
+        "libsmartcols1=2.39.3-9ubuntu6.6",
+        "libsqlite3-0=3.45.1-1ubuntu2.8",
+        "libss2=1.47.0-2.4~exp1ubuntu4.1",
+        "libssl3t64=3.0.13-0ubuntu3.16",
+        "libstdc++6=14.2.0-4ubuntu2~24.04.1",
+        "libsystemd0=255.4-1ubuntu8.18",
+        "libtasn1-6=4.19.0-3ubuntu0.24.04.2",
+        "libtinfo6=6.4+20240113-1ubuntu2.2",
+        "libtirpc-common=1.3.4+ds-1.1build1",
+        "libtirpc3t64=1.3.4+ds-1.1build1",
+        "libudev1=255.4-1ubuntu8.18",
+        "libunistring5=1.1-2build1.1",
+        "libuuid1=2.39.3-9ubuntu6.6",
+        "libxml2=2.9.14+dfsg-1.3ubuntu3.10",
+        "libxxhash0=0.8.2-2build1",
+        "libzstd1=1.5.5+dfsg2-2build1.1",
+        "login=1:4.13+dfsg1-4ubuntu3.2",
+        "logsave=1.47.0-2.4~exp1ubuntu4.1",
+        "mawk=1.3.4.20240123-1build1",
+        "media-types=10.1.0",
+        "mount=2.39.3-9ubuntu6.6",
+        "ncurses-base=6.4+20240113-1ubuntu2.2",
+        "ncurses-bin=6.4+20240113-1ubuntu2.2",
+        "netbase=6.4",
+        "openssl=3.0.13-0ubuntu3.16",
+        "passwd=1:4.13+dfsg1-4ubuntu3.2",
+        "perl-base=5.38.2-3.2ubuntu0.6",
+        "procps=2:4.0.4-4ubuntu3.3",
+        "python3=3.12.3-0ubuntu2.1",
+        "python3-minimal=3.12.3-0ubuntu2.1",
+        "python3.12=3.12.3-1ubuntu0.17",
+        "python3.12-minimal=3.12.3-1ubuntu0.17",
+        "readline-common=8.2-4build1",
+        "sed=4.9-2ubuntu0.24.04.1",
+        "sensible-utils=0.0.22",
+        "sysvinit-utils=3.08-6ubuntu3",
+        "tar=1.35+dfsg-3ubuntu0.4",
+        "time=1.9-0.2build1",
+        "tzdata=2026e-0ubuntu0.24.04.1",
+        "ubuntu-keyring=2023.11.28.1",
+        "unminimize=0.2.1",
+        "util-linux=2.39.3-9ubuntu6.6",
+        "zlib1g=1:1.3.dfsg-3.1ubuntu2.3"
+      ],
+      "python": "3.12.3",
+      "sqlite": "3.45.1",
+      "time": "time (GNU Time) UNKNOWN"
+    },
+    "smoke_runtime_comparison": "not supplied",
+    "runtime_archive_observation": "present in remote ZIP inventory; image bytes intentionally omitted locally, not verified by this analysis"
+  },
+  "fixtures": {
+    "files": {
+      "profile": "files",
+      "scale": 100000,
+      "capacity_bytes": 536166531072,
+      "threshold_bytes": 536166532,
+      "block_bytes": 4096,
+      "controls": {
+        "below": {
+          "apparent": 536162304,
+          "allocated": 536166400
+        },
+        "equalish": {
+          "apparent": 536166400,
+          "allocated": 536170496
+        },
+        "above": {
+          "apparent": 536170496,
+          "allocated": 536174592
+        },
+        "deep": {
+          "apparent": 536170496,
+          "allocated": 536174592
+        },
+        "sparse": {
+          "apparent": 1072333064,
+          "allocated": 0
+        },
+        "group": {
+          "files": 64,
+          "child_size": 8380416,
+          "child_allocated": 536346624,
+          "minimum_child_allocated": 8380416,
+          "maximum_child_allocated": 8380416
+        }
+      },
+      "fixed_timestamp": 1700000000,
+      "bulk_files": 100000,
+      "bulk_directories": 0,
+      "bulk_allocated_files": 50000,
+      "bulk_empty_files": 50000,
+      "bulk_allocation_bytes_per_file": 4096,
+      "expected_counts": {
+        "files": 100169,
+        "dirs": 107,
+        "others": 0,
+        "entries": 100276
+      },
+      "expected_controls": {
+        "retained": [
+          "large",
+          "large/above",
+          "large/deep",
+          "large/deep/deeper",
+          "large/deep/deeper/large",
+          "large/group"
+        ],
+        "omitted": [
+          "large/below",
+          "large/sparse",
+          "large/group/f000000",
+          "large/group/f000001",
+          "large/group/f000002",
+          "large/group/f000003",
+          "large/group/f000004",
+          "large/group/f000005",
+          "large/group/f000006",
+          "large/group/f000007",
+          "large/group/f000008",
+          "large/group/f000009",
+          "large/group/f000010",
+          "large/group/f000011",
+          "large/group/f000012",
+          "large/group/f000013",
+          "large/group/f000014",
+          "large/group/f000015",
+          "large/group/f000016",
+          "large/group/f000017",
+          "large/group/f000018",
+          "large/group/f000019",
+          "large/group/f000020",
+          "large/group/f000021",
+          "large/group/f000022",
+          "large/group/f000023",
+          "large/group/f000024",
+          "large/group/f000025",
+          "large/group/f000026",
+          "large/group/f000027",
+          "large/group/f000028",
+          "large/group/f000029",
+          "large/group/f000030",
+          "large/group/f000031",
+          "large/group/f000032",
+          "large/group/f000033",
+          "large/group/f000034",
+          "large/group/f000035",
+          "large/group/f000036",
+          "large/group/f000037",
+          "large/group/f000038",
+          "large/group/f000039",
+          "large/group/f000040",
+          "large/group/f000041",
+          "large/group/f000042",
+          "large/group/f000043",
+          "large/group/f000044",
+          "large/group/f000045",
+          "large/group/f000046",
+          "large/group/f000047",
+          "large/group/f000048",
+          "large/group/f000049",
+          "large/group/f000050",
+          "large/group/f000051",
+          "large/group/f000052",
+          "large/group/f000053",
+          "large/group/f000054",
+          "large/group/f000055",
+          "large/group/f000056",
+          "large/group/f000057",
+          "large/group/f000058",
+          "large/group/f000059",
+          "large/group/f000060",
+          "large/group/f000061",
+          "large/group/f000062",
+          "large/group/f000063"
+        ]
+      },
+      "sparse_backing_capability": {
+        "before_outer_allocated": 668577792,
+        "after_outer_allocated": 668676096,
+        "outer_growth": 98304,
+        "inner_allocated": 2144686080
+      },
+      "bulk_actual_allocated_bytes": 204800000,
+      "available_bytes": 533260193792,
+      "inodes_available": 1947712,
+      "raw_name_hex": "2f686f6d652f72756e6e65722f776f726b2f5f74656d702f636c65616e75702d766f6c756d652e3866753739492f6d6f756e742f6a6f62732f666978747572652d66696c65732f6c617267652f7261772dff",
+      "backing_file": {
+        "logical_bytes": 536870912000,
+        "allocated_bytes": 673861632,
+        "outer_available_bytes": 87943815168,
+        "results_available_bytes": 87943815168
+      }
+    },
+    "directories": {
+      "profile": "directories",
+      "scale": 100000,
+      "capacity_bytes": 536166531072,
+      "threshold_bytes": 536166532,
+      "block_bytes": 4096,
+      "controls": {
+        "below": {
+          "apparent": 536162304,
+          "allocated": 536166400
+        },
+        "equalish": {
+          "apparent": 536166400,
+          "allocated": 536170496
+        },
+        "above": {
+          "apparent": 536170496,
+          "allocated": 536174592
+        },
+        "deep": {
+          "apparent": 536170496,
+          "allocated": 536174592
+        },
+        "sparse": {
+          "apparent": 1072333064,
+          "allocated": 0
+        },
+        "group": {
+          "files": 64,
+          "child_size": 8380416,
+          "child_allocated": 536346624,
+          "minimum_child_allocated": 8380416,
+          "maximum_child_allocated": 8380416
+        }
+      },
+      "fixed_timestamp": 1700000000,
+      "bulk_files": 50000,
+      "bulk_directories": 50000,
+      "bulk_allocated_files": 25000,
+      "bulk_empty_files": 25000,
+      "bulk_allocation_bytes_per_file": 4096,
+      "expected_counts": {
+        "files": 50169,
+        "dirs": 50107,
+        "others": 0,
+        "entries": 100276
+      },
+      "expected_controls": {
+        "retained": [
+          "large",
+          "large/above",
+          "large/deep",
+          "large/deep/deeper",
+          "large/deep/deeper/large",
+          "large/group"
+        ],
+        "omitted": [
+          "large/below",
+          "large/sparse",
+          "large/group/f000000",
+          "large/group/f000001",
+          "large/group/f000002",
+          "large/group/f000003",
+          "large/group/f000004",
+          "large/group/f000005",
+          "large/group/f000006",
+          "large/group/f000007",
+          "large/group/f000008",
+          "large/group/f000009",
+          "large/group/f000010",
+          "large/group/f000011",
+          "large/group/f000012",
+          "large/group/f000013",
+          "large/group/f000014",
+          "large/group/f000015",
+          "large/group/f000016",
+          "large/group/f000017",
+          "large/group/f000018",
+          "large/group/f000019",
+          "large/group/f000020",
+          "large/group/f000021",
+          "large/group/f000022",
+          "large/group/f000023",
+          "large/group/f000024",
+          "large/group/f000025",
+          "large/group/f000026",
+          "large/group/f000027",
+          "large/group/f000028",
+          "large/group/f000029",
+          "large/group/f000030",
+          "large/group/f000031",
+          "large/group/f000032",
+          "large/group/f000033",
+          "large/group/f000034",
+          "large/group/f000035",
+          "large/group/f000036",
+          "large/group/f000037",
+          "large/group/f000038",
+          "large/group/f000039",
+          "large/group/f000040",
+          "large/group/f000041",
+          "large/group/f000042",
+          "large/group/f000043",
+          "large/group/f000044",
+          "large/group/f000045",
+          "large/group/f000046",
+          "large/group/f000047",
+          "large/group/f000048",
+          "large/group/f000049",
+          "large/group/f000050",
+          "large/group/f000051",
+          "large/group/f000052",
+          "large/group/f000053",
+          "large/group/f000054",
+          "large/group/f000055",
+          "large/group/f000056",
+          "large/group/f000057",
+          "large/group/f000058",
+          "large/group/f000059",
+          "large/group/f000060",
+          "large/group/f000061",
+          "large/group/f000062",
+          "large/group/f000063"
+        ]
+      },
+      "sparse_backing_capability": {
+        "before_outer_allocated": 602992640,
+        "after_outer_allocated": 603078656,
+        "outer_growth": 86016,
+        "inner_allocated": 2144686080
+      },
+      "bulk_actual_allocated_bytes": 102400000,
+      "available_bytes": 533157548032,
+      "inodes_available": 1947712,
+      "raw_name_hex": "2f686f6d652f72756e6e65722f776f726b2f5f74656d702f636c65616e75702d766f6c756d652e3866753739492f6d6f756e742f6a6f62732f666978747572652d6469726563746f726965732f6c617267652f7261772dff",
+      "backing_file": {
+        "logical_bytes": 536870912000,
+        "allocated_bytes": 812908544,
+        "outer_available_bytes": 87799476224,
+        "results_available_bytes": 87799476224
+      }
+    }
+  },
+  "groups": {
+    "files/full": {
+      "arms": {
+        "v1": [
+          {
+            "id": "files-full-1-v1",
+            "cgroup_memory_peak_bytes": 254693376,
+            "process_peak_rss_kib": 37796,
+            "worker_elapsed_seconds": 4.877148279999972,
+            "sampled_output_peak_estimate_bytes": 45039616,
+            "final_allocated_output_bytes": 25137152,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": null,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "v2": [
+          {
+            "id": "files-full-1-v2",
+            "cgroup_memory_peak_bytes": 350687232,
+            "process_peak_rss_kib": 37888,
+            "worker_elapsed_seconds": 11.041952300000048,
+            "sampled_output_peak_estimate_bytes": 117080064,
+            "final_allocated_output_bytes": 65277952,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": null,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "probe": [
+          {
+            "id": "files-full-1-probe",
+            "cgroup_memory_peak_bytes": 201895936,
+            "process_peak_rss_kib": 9048,
+            "worker_elapsed_seconds": 3.5228238029999943,
+            "sampled_output_peak_estimate_bytes": 32768,
+            "final_allocated_output_bytes": 32768,
+            "boundary": "/scratch/tree",
+            "visited": 200552,
+            "reported_entries": null,
+            "reported_subtree_entries": null,
+            "fallback_full_root": false,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ]
+      },
+      "comparisons": {
+        "v1": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -20.729804924333795
+            ],
+            "median_paired_percent_change": -20.729804924333795
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -76.0609588316224
+            ],
+            "median_paired_percent_change": -76.0609588316224
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -27.768777967111248
+            ],
+            "median_paired_percent_change": -27.768777967111248
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.9272462713714
+            ],
+            "median_paired_percent_change": -99.9272462713714
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.86964314811797
+            ],
+            "median_paired_percent_change": -99.86964314811797
+          },
+          "inconclusive": false
+        },
+        "v2": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -42.42848966910777
+            ],
+            "median_paired_percent_change": -42.42848966910777
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -76.11908783783784
+            ],
+            "median_paired_percent_change": -76.11908783783784
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -68.09600596626396
+            ],
+            "median_paired_percent_change": -68.09600596626396
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.97201231458158
+            ],
+            "median_paired_percent_change": -99.97201231458158
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.94980234674028
+            ],
+            "median_paired_percent_change": -99.94980234674028
+          },
+          "inconclusive": false
+        }
+      }
+    },
+    "files/retained": {
+      "arms": {
+        "v1": [
+          {
+            "id": "files-retained-1-v1",
+            "cgroup_memory_peak_bytes": 103981056,
+            "process_peak_rss_kib": 60516,
+            "worker_elapsed_seconds": 1.167202417999988,
+            "sampled_output_peak_estimate_bytes": 37056512,
+            "final_allocated_output_bytes": 24481792,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 74,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "v2": [
+          {
+            "id": "files-retained-1-v2",
+            "cgroup_memory_peak_bytes": 47284224,
+            "process_peak_rss_kib": 15312,
+            "worker_elapsed_seconds": 0.16520774600002142,
+            "sampled_output_peak_estimate_bytes": 54509568,
+            "final_allocated_output_bytes": 54345728,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 74,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "probe": [
+          {
+            "id": "files-retained-1-probe",
+            "cgroup_memory_peak_bytes": 38076416,
+            "process_peak_rss_kib": 9076,
+            "worker_elapsed_seconds": 0.0649117290000163,
+            "sampled_output_peak_estimate_bytes": 32768,
+            "final_allocated_output_bytes": 32768,
+            "boundary": "/scratch/tree/large",
+            "visited": 148,
+            "reported_entries": null,
+            "reported_subtree_entries": null,
+            "fallback_full_root": false,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ]
+      },
+      "comparisons": {
+        "v1": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -63.38139131804932
+            ],
+            "median_paired_percent_change": -63.38139131804932
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -85.00231343776852
+            ],
+            "median_paired_percent_change": -85.00231343776852
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -94.438691353018
+            ],
+            "median_paired_percent_change": -94.438691353018
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.91157289709295
+            ],
+            "median_paired_percent_change": -99.91157289709295
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.8661535887569
+            ],
+            "median_paired_percent_change": -99.8661535887569
+          },
+          "inconclusive": false
+        },
+        "v2": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -19.47331947331947
+            ],
+            "median_paired_percent_change": -19.47331947331947
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -40.72622779519332
+            ],
+            "median_paired_percent_change": -40.72622779519332
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -60.70902813478983
+            ],
+            "median_paired_percent_change": -60.70902813478983
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.93988578298769
+            ],
+            "median_paired_percent_change": -99.93988578298769
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.9397045523063
+            ],
+            "median_paired_percent_change": -99.9397045523063
+          },
+          "inconclusive": false
+        }
+      }
+    },
+    "files/omitted": {
+      "arms": {
+        "v1": [
+          {
+            "id": "files-omitted-1-v1",
+            "cgroup_memory_peak_bytes": 103993344,
+            "process_peak_rss_kib": 60372,
+            "worker_elapsed_seconds": 1.1671988269999929,
+            "sampled_output_peak_estimate_bytes": 37056512,
+            "final_allocated_output_bytes": 24481792,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 100,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "v2": [
+          {
+            "id": "files-omitted-1-v2",
+            "cgroup_memory_peak_bytes": 46989312,
+            "process_peak_rss_kib": 15380,
+            "worker_elapsed_seconds": 0.16513297800003102,
+            "sampled_output_peak_estimate_bytes": 54349824,
+            "final_allocated_output_bytes": 54345728,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 100,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "probe": [
+          {
+            "id": "files-omitted-1-probe",
+            "cgroup_memory_peak_bytes": 201400320,
+            "process_peak_rss_kib": 9028,
+            "worker_elapsed_seconds": 3.5232262659999947,
+            "sampled_output_peak_estimate_bytes": 32768,
+            "final_allocated_output_bytes": 32768,
+            "boundary": "/scratch/tree",
+            "visited": 200552,
+            "reported_entries": null,
+            "reported_subtree_entries": null,
+            "fallback_full_root": true,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ]
+      },
+      "comparisons": {
+        "v1": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              93.66654850525818
+            ],
+            "median_paired_percent_change": 93.66654850525818
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -85.04604783674552
+            ],
+            "median_paired_percent_change": -85.04604783674552
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              201.85313628660938
+            ],
+            "median_paired_percent_change": 201.85313628660938
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.91157289709295
+            ],
+            "median_paired_percent_change": -99.91157289709295
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.8661535887569
+            ],
+            "median_paired_percent_change": -99.8661535887569
+          },
+          "inconclusive": false
+        },
+        "v2": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              328.60878661087867
+            ],
+            "median_paired_percent_change": 328.60878661087867
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -41.300390117035114
+            ],
+            "median_paired_percent_change": -41.300390117035114
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              2033.569144498401
+            ],
+            "median_paired_percent_change": 2033.569144498401
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.93970909639009
+            ],
+            "median_paired_percent_change": -99.93970909639009
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.9397045523063
+            ],
+            "median_paired_percent_change": -99.9397045523063
+          },
+          "inconclusive": false
+        }
+      }
+    },
+    "directories/full": {
+      "arms": {
+        "v1": [
+          {
+            "id": "directories-full-1-v1",
+            "cgroup_memory_peak_bytes": 469409792,
+            "process_peak_rss_kib": 37580,
+            "worker_elapsed_seconds": 27.933141825999996,
+            "sampled_output_peak_estimate_bytes": 45182976,
+            "final_allocated_output_bytes": 25128960,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": null,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "v2": [
+          {
+            "id": "directories-full-1-v2",
+            "cgroup_memory_peak_bytes": 563486720,
+            "process_peak_rss_kib": 37668,
+            "worker_elapsed_seconds": 33.74132118199998,
+            "sampled_output_peak_estimate_bytes": 117252096,
+            "final_allocated_output_bytes": 65257472,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": null,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "probe": [
+          {
+            "id": "directories-full-1-probe",
+            "cgroup_memory_peak_bytes": 415940608,
+            "process_peak_rss_kib": 9048,
+            "worker_elapsed_seconds": 26.57682335100003,
+            "sampled_output_peak_estimate_bytes": 32768,
+            "final_allocated_output_bytes": 32768,
+            "boundary": "/scratch/tree",
+            "visited": 200552,
+            "reported_entries": null,
+            "reported_subtree_entries": null,
+            "fallback_full_root": false,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ]
+      },
+      "comparisons": {
+        "v1": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -11.390726165337428
+            ],
+            "median_paired_percent_change": -11.390726165337428
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -75.92336349121874
+            ],
+            "median_paired_percent_change": -75.92336349121874
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -4.855588689051493
+            ],
+            "median_paired_percent_change": -4.855588689051493
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.92747710996284
+            ],
+            "median_paired_percent_change": -99.92747710996284
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.86960065199673
+            ],
+            "median_paired_percent_change": -99.86960065199673
+          },
+          "inconclusive": false
+        },
+        "v2": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -26.184487897070586
+            ],
+            "median_paired_percent_change": -26.184487897070586
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -75.97961134119147
+            ],
+            "median_paired_percent_change": -75.97961134119147
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -21.23360194568197
+            ],
+            "median_paired_percent_change": -21.23360194568197
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.97205337804793
+            ],
+            "median_paired_percent_change": -99.97205337804793
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.94978659302033
+            ],
+            "median_paired_percent_change": -99.94978659302033
+          },
+          "inconclusive": false
+        }
+      }
+    },
+    "directories/retained": {
+      "arms": {
+        "v1": [
+          {
+            "id": "directories-retained-1-v1",
+            "cgroup_memory_peak_bytes": 104263680,
+            "process_peak_rss_kib": 60544,
+            "worker_elapsed_seconds": 1.1678171099999872,
+            "sampled_output_peak_estimate_bytes": 37044224,
+            "final_allocated_output_bytes": 24473600,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 74,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "v2": [
+          {
+            "id": "directories-retained-1-v2",
+            "cgroup_memory_peak_bytes": 47517696,
+            "process_peak_rss_kib": 15324,
+            "worker_elapsed_seconds": 0.16558643299993037,
+            "sampled_output_peak_estimate_bytes": 54304768,
+            "final_allocated_output_bytes": 54300672,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 74,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "probe": [
+          {
+            "id": "directories-retained-1-probe",
+            "cgroup_memory_peak_bytes": 38035456,
+            "process_peak_rss_kib": 9148,
+            "worker_elapsed_seconds": 0.06541741900002762,
+            "sampled_output_peak_estimate_bytes": 32768,
+            "final_allocated_output_bytes": 32768,
+            "boundary": "/scratch/tree/large",
+            "visited": 148,
+            "reported_entries": null,
+            "reported_subtree_entries": null,
+            "fallback_full_root": false,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ]
+      },
+      "comparisons": {
+        "v1": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -63.51993714397957
+            ],
+            "median_paired_percent_change": -63.51993714397957
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -84.89032769556026
+            ],
+            "median_paired_percent_change": -84.89032769556026
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -94.39831644528411
+            ],
+            "median_paired_percent_change": -94.39831644528411
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.91154356479434
+            ],
+            "median_paired_percent_change": -99.91154356479434
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.86610878661088
+            ],
+            "median_paired_percent_change": -99.86610878661088
+          },
+          "inconclusive": false
+        },
+        "v2": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              -19.95517627790707
+            ],
+            "median_paired_percent_change": -19.95517627790707
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -40.30279300443749
+            ],
+            "median_paired_percent_change": -40.30279300443749
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              -60.493491033739986
+            ],
+            "median_paired_percent_change": -60.493491033739986
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.93965907376679
+            ],
+            "median_paired_percent_change": -99.93965907376679
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.93965452213925
+            ],
+            "median_paired_percent_change": -99.93965452213925
+          },
+          "inconclusive": false
+        }
+      }
+    },
+    "directories/omitted": {
+      "arms": {
+        "v1": [
+          {
+            "id": "directories-omitted-1-v1",
+            "cgroup_memory_peak_bytes": 104017920,
+            "process_peak_rss_kib": 60536,
+            "worker_elapsed_seconds": 1.1677881310000657,
+            "sampled_output_peak_estimate_bytes": 37044224,
+            "final_allocated_output_bytes": 24473600,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 100,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "v2": [
+          {
+            "id": "directories-omitted-1-v2",
+            "cgroup_memory_peak_bytes": 47259648,
+            "process_peak_rss_kib": 15352,
+            "worker_elapsed_seconds": 0.16576187099997242,
+            "sampled_output_peak_estimate_bytes": 54304768,
+            "final_allocated_output_bytes": 54300672,
+            "boundary": null,
+            "visited": null,
+            "reported_entries": 100276,
+            "reported_subtree_entries": 100,
+            "fallback_full_root": null,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ],
+        "probe": [
+          {
+            "id": "directories-omitted-1-probe",
+            "cgroup_memory_peak_bytes": 415776768,
+            "process_peak_rss_kib": 9140,
+            "worker_elapsed_seconds": 26.575681134999968,
+            "sampled_output_peak_estimate_bytes": 32768,
+            "final_allocated_output_bytes": 32768,
+            "boundary": "/scratch/tree",
+            "visited": 200552,
+            "reported_entries": null,
+            "reported_subtree_entries": null,
+            "fallback_full_root": true,
+            "flags": {
+              "capped": false,
+              "reclaim": false,
+              "oom": false,
+              "swap_pressure": false,
+              "worker_inconclusive": false
+            },
+            "inconclusive": false,
+            "memory_events_delta": {
+              "max": 0,
+              "low": 0,
+              "oom_group_kill": 0,
+              "sock_throttled": 0,
+              "high": 0,
+              "oom_kill": 0,
+              "oom": 0
+            },
+            "reclaim_counter_deltas": {
+              "pgscan": 0,
+              "pgsteal": 0,
+              "pgscan_direct": 0,
+              "pgsteal_direct": 0
+            },
+            "swap_observed": {
+              "memory.swap.current": "0",
+              "memory.swap.peak": "0"
+            },
+            "swap_events_delta": {}
+          }
+        ]
+      },
+      "comparisons": {
+        "v1": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              299.7164796219728
+            ],
+            "median_paired_percent_change": 299.7164796219728
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -84.90154618739263
+            ],
+            "median_paired_percent_change": -84.90154618739263
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              2175.727970641489
+            ],
+            "median_paired_percent_change": 2175.727970641489
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.91154356479434
+            ],
+            "median_paired_percent_change": -99.91154356479434
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.86610878661088
+            ],
+            "median_paired_percent_change": -99.86610878661088
+          },
+          "inconclusive": false
+        },
+        "v2": {
+          "cgroup_memory_peak_bytes": {
+            "paired_percent_changes": [
+              779.7711908476339
+            ],
+            "median_paired_percent_change": 779.7711908476339
+          },
+          "process_peak_rss_kib": {
+            "paired_percent_changes": [
+              -40.46378322042731
+            ],
+            "median_paired_percent_change": -40.46378322042731
+          },
+          "worker_elapsed_seconds": {
+            "paired_percent_changes": [
+              15932.445202675342
+            ],
+            "median_paired_percent_change": 15932.445202675342
+          },
+          "sampled_output_peak_estimate_bytes": {
+            "paired_percent_changes": [
+              -99.93965907376679
+            ],
+            "median_paired_percent_change": -99.93965907376679
+          },
+          "final_allocated_output_bytes": {
+            "paired_percent_changes": [
+              -99.93965452213925
+            ],
+            "median_paired_percent_change": -99.93965452213925
+          },
+          "inconclusive": false
+        }
+      }
+    }
+  },
+  "notes": [
+    "Output peak is a sampled lower-bound estimate, not exact peak allocation.",
+    "Memory peak includes the writer container wrapper and sampler.",
+    "Flags preserve observed cap, reclaim, OOM and swap pressure; flagged comparisons are inconclusive."
+  ]
+}

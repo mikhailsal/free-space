@@ -1,0 +1,260 @@
+{
+  "protocol": "cleanup-threshold-roomy-source-freeze-v2",
+  "frozen_at": "2026-11-02T16:31:26.841193+00:00",
+  "source_revision": "678e998e47020576224337b8fe8ab941f3df2bef",
+  "branch": "perf/cleanup-threshold-probe",
+  "workflow_id": 397616649,
+  "outside_review_model": "claude-opus-5-5",
+  "outside_review_closed": true,
+  "outside_closure": "Original composite01-05 closed; prospective budget/memory delta06 required physicalheadroom/admissionboundary corrections, actual07 NO_FINDINGS closes them.",
+  "inherited_source_review_capsule": "cleanup-threshold-source-reviews-2026-11-02.tar.gz",
+  "new_source_review_capsule": {
+    "path": "cleanup-threshold-roomy-source-reviews-2026-11-02.tar.gz",
+    "bytes": 106199,
+    "sha256": "547b7c0982d835af178c44ce51617b40ca1036ff514cf27985647f6fb21e5ee7"
+  },
+  "files": {
+    ".github/workflows/v2-balance.yml": {
+      "sha256": "4e765acf51abfca234dcc197c88a360ca4550e3fb9545c55cbfcf49df2514c0d",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "Cargo.toml": {
+      "sha256": "f431039329bd945d641e87e41719663efce4bac7fcc1ea7f3372aec6f2584c43",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/Cargo.toml": {
+      "sha256": "404e7bca8d049dff596c58392e137239157e7425ca3ac1914172ba76ca01ee80",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/build.rs": {
+      "sha256": "fd1b158067b50e5a7916290db1b3de781f446c698df71cc47d6defdd3043bd6e",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/main.rs": {
+      "sha256": "7cdab80fdc92d4543d565034e132425f6e7bdefb5aaed02d793b7aeb88cb12ee",
+      "matching_packet_ids": [
+        "01",
+        "02",
+        "05"
+      ]
+    },
+    "cli/examples/cleanup_probe/model.rs": {
+      "sha256": "e38fb4e5e5615739b206ed1553db7e550c2fa243dd095add6fdb0290da606cdc",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/mounts.rs": {
+      "sha256": "c73cb8fac8b1a6ab36223f949c54bba4c785cfce6ce26006345c1a76827f44ce",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/store.rs": {
+      "sha256": "d76b7bfc1f075868821da86af8064414c23756ca463a17aec85395f665083f28",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/tests.rs": {
+      "sha256": "4eeda0d8f84a5a432e9f3eaa6e3db13d7ed9f3eb843f9abd7e088f1a7657c8eb",
+      "matching_packet_ids": [
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/walk.rs": {
+      "sha256": "4ca8d21dcb9fed885b1ed6fa843ad448d45296a3b5f7c189f25d65c9c5b23bfd",
+      "matching_packet_ids": [
+        "01",
+        "02",
+        "05"
+      ]
+    },
+    "core/Cargo.toml": {
+      "sha256": "96e863b6a5c31f568af81f8ff3669376a131420286511a96daa41af3d08a37b5",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "core/src/snapshot/schema.rs": {
+      "sha256": "c567683d39dcd9737eb31c697f09548664b10e004630a002d9ae624a97075af0",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "core/src/snapshot/v2/schema.rs": {
+      "sha256": "3368d4adc9bf645ebc16ebc9ffd7002e85ff99b88231a6369807284c61dc2992",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "docs/designs/cleanup-threshold-experiment.md": {
+      "sha256": "b6d9ff3dd21028624027d2b0c3edc3249d5cabf6312b0ce2fd1801fe30a689c5",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "docs/designs/cleanup-threshold-impact.md": {
+      "sha256": "ba730b153fd40f2ab4d8ebf9537353af242cf90696110223e72b3a7ea2946e23",
+      "matching_packet_ids": [
+        "02"
+      ]
+    },
+    "scripts/bench-disk-calibration.py": {
+      "sha256": "681e2dd0d325d6d2361e077a57b934e05f59d7c984f7bad728b9e8ebca3c73c7",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/bench-v2-container.py": {
+      "sha256": "63cb2d7a9f219bcefceb02f23df7e560ab1ff96071f12f30880257d9459fd20c",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/bench-v2-container/Dockerfile": {
+      "sha256": "f44268de27cfcde7324dbb5f895282ba08c7ebbf6ec42ffbb6996dd5f74bf235",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/bench_v2_config.py": {
+      "sha256": "098f0321d9a0f828ec9cb6321749fe6b7346db05c3fc47ec2dc5f9f68fde840d",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/cleanup_oracle.py": {
+      "sha256": "0e2ad5bcc84f0e3907b7f72427b3bbe9bbcc3eec5732d63322001d1cfd88fba3",
+      "matching_packet_ids": [
+        "02",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe.Dockerfile": {
+      "sha256": "af4c443cbeea314ffe9fd1b41de50d95cec5f1a97c8f3a2947d6869bac9c5a3d",
+      "matching_packet_ids": [
+        "02",
+        "03"
+      ]
+    },
+    "scripts/cleanup_probe_fixture.py": {
+      "sha256": "db79fda2378364dca6499aec4514c97b154a91fa82a94e893d301001a42ee9fb",
+      "matching_packet_ids": [
+        "02",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe_forecast.py": {
+      "sha256": "163e18ae03ccafdd34bf58a727074597eb1a76725fd51dac473d3fd3a9d8a0b9",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "scripts/cleanup_probe_host.py": {
+      "sha256": "7d9ad1ba9b22d6995bb9fe16f81ff83e0e76f063c0354433847ef8b17b3d6cda",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "scripts/cleanup_probe_resources.py": {
+      "sha256": "9c2b15c3394066c177095c795270d642fdd75ebddc5147949122355207f6f288",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "scripts/cleanup_probe_runner.sh": {
+      "sha256": "12197532a88760c41359c28f0d1cf3d58c26b2bbf5a4642bcbcd5450fa444efc",
+      "matching_packet_ids": [
+        "03",
+        "04",
+        "06"
+      ]
+    },
+    "scripts/cleanup_probe_versions.py": {
+      "sha256": "5f7c1b774e3451e7fd9b55b591554fe18e39f7c044015b24336d978e3254b980",
+      "matching_packet_ids": [
+        "03",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe_worker.py": {
+      "sha256": "024cd8a9b5594b207ec283cb30d2db16f0799c6078372dbd98db8048ec60b48b",
+      "matching_packet_ids": [
+        "06"
+      ]
+    },
+    "scripts/tests/test_cleanup_forecast.py": {
+      "sha256": "fb108c4be84d2efc90685d6773cca045106ce9b421b7019cde3c106792ae0c77",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "scripts/tests/test_cleanup_oracle.py": {
+      "sha256": "90ef4d1110d98d9250a2195f3493ff6ce4ee0eeeb71079278de9f69890d439b7",
+      "matching_packet_ids": [
+        "02"
+      ]
+    },
+    "scripts/tests/test_cleanup_resources.py": {
+      "sha256": "7e300a54f418b5c45ed6a3e79ac6ad294884b66a05bc828e32d415458b18f778",
+      "matching_packet_ids": [
+        "07"
+      ]
+    },
+    "scripts/tests/test_cleanup_scope.py": {
+      "sha256": "6de81d185f801ee40c22bd989a21f514a929ab4e7ecc1b7d9080185842437cca",
+      "matching_packet_ids": [
+        "04"
+      ]
+    }
+  },
+  "budgets": {
+    "aggregate_cap": 216000,
+    "completed_before_dispatch": 52735,
+    "old_other_reservations": 34800,
+    "fresh_smoke_max": 3600,
+    "conditional_screen_max": 14400,
+    "maximum_committed": 105535
+  },
+  "resource_policy": {
+    "memory_mib": 8192,
+    "swap_mib": 0,
+    "cpus": 2,
+    "host_total_and_available_min_bytes": 10737418240,
+    "host_cpu_min": 2
+  },
+  "checks": {
+    "tiny_python_tests": 21,
+    "normal_git_hooks": "passed on final source without bypass",
+    "rust_runtime_tests": "Fresh GH-only execution required before measurement"
+  },
+  "prior_experiment": {
+    "run_id": 41476363033,
+    "original_screen": "declined time forecast; not dispatched",
+    "pooling": "prohibited"
+  },
+  "qualification": false,
+  "dispatch_started": false
+}
