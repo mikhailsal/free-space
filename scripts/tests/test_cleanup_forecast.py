@@ -4,7 +4,19 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from cleanup_probe_forecast import forecast
+from cleanup_probe_forecast import forecast as calculate
+
+GIB=1024**3
+
+def forecast(manifest, cleanup, source_sha, build_seconds, **kwargs):
+    timing=kwargs.get("timing",dict(setup_seconds=10,step_outer_available_bytes=10*GIB,
+                   host_outer_available_bytes=10*GIB,step_results_available_bytes=10*GIB,host_results_available_bytes=10*GIB))
+    cycle=dict(before_backing_allocated_bytes=100,peak_backing_allocated_bytes=120,after_backing_allocated_bytes=105)
+    space=kwargs.get("space",dict(samples=100,initial_backing_allocated_bytes=100,peak_backing_allocated_bytes=120,
+                 initial_outer_available_bytes=10*GIB,minimum_outer_available_bytes=10*GIB-20,
+                 initial_results_available_bytes=10*GIB,minimum_results_available_bytes=10*GIB-20,
+                 cycles=[dict(cycle) for _ in range(6)],trims=[{"exit_code":0} for _ in range(26)]))
+    return calculate(manifest,cleanup,source_sha,build_seconds,timing,space,kwargs.get("available_bytes",10*GIB))
 
 
 def smoke():
@@ -38,6 +50,11 @@ class ForecastTests(unittest.TestCase):
         with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
         manifest=smoke(); manifest['phases'].pop()
         with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
+
+    def test_storage_and_setup_gates(self):
+        self.assertFalse(forecast(smoke(),{'success':True},'source',100,available_bytes=2*GIB)['admitted'])
+        with self.assertRaises(ValueError): forecast(smoke(),{'success':True},'source',100,space={})
+        with self.assertRaises(ValueError): forecast(smoke(),{'success':True},'source',100,timing={})
 
     def test_over_cap_rejected(self):
         manifest=smoke(); manifest['elapsed_seconds']=1000

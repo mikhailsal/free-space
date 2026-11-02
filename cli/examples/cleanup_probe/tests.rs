@@ -55,7 +55,8 @@ fn hardlinks_choose_lexical_owner() {
     f.write_all(b"hello").unwrap();
     drop(f);
     fs::hard_link(root.join("z"), root.join("a")).unwrap();
-    let result = walk::scan(&root, 1).unwrap();
+    // Threshold zero exposes both paths to verify ownership, independently of folding.
+    let result = walk::scan(&root, 0).unwrap();
     assert!(result.has_hardlinks);
     let a = result
         .nodes
@@ -72,6 +73,18 @@ fn hardlinks_choose_lexical_owner() {
         fs::metadata(root.join("a")).unwrap().blocks() * 512
     );
     assert_eq!(z.total.allocated, 0);
+    let coarse = walk::scan(&root, 1).unwrap();
+    assert!(!coarse.nodes.iter().any(|n| n.path == root.join("z")));
+    assert_eq!(
+        coarse
+            .nodes
+            .iter()
+            .find(|n| n.path == root)
+            .unwrap()
+            .rest
+            .files,
+        1
+    );
 }
 #[test]
 fn refresh_folds_boundary_and_rebuilds_ancestors() {
@@ -202,4 +215,86 @@ fn refresh_reports_root_fallback_for_omitted_directory() {
         root.join("large").to_string_lossy().as_ref()
     );
     assert!(large["visited"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn refresh_new_cross_boundary_hardlink_falls_back_to_root() {
+    let d = tempfile::tempdir().unwrap();
+    let root = d.path().join("tree");
+    let snapshot = d.path().join("out");
+    fs::create_dir_all(root.join("large")).unwrap();
+    fs::create_dir(&snapshot).unwrap();
+    fs::write(root.join("outside"), vec![1; 131_072]).unwrap();
+    fs::write(root.join("large/keep"), vec![2; 131_072]).unwrap();
+    let nodes = walk::scan(&root, 65_536).unwrap().nodes;
+    assert!(nodes.iter().any(|n| n.path == root.join("large")));
+    let meta = store::Meta {
+        root: root.clone(),
+        threshold: 65_536,
+        ppm: 1000,
+        capacity: 65_536_000,
+        generation: 1,
+        scanned_at: now(),
+        has_hardlinks: false,
+    };
+    store::write(&snapshot.join("coarse.db"), &meta, &nodes).unwrap();
+    fs::hard_link(root.join("outside"), root.join("large/link")).unwrap();
+    let result = execute(Command::Refresh {
+        root: root.clone(),
+        snapshot: snapshot.clone(),
+        target: root.join("large"),
+    })
+    .unwrap();
+    assert_eq!(result["fallback_full_root"], true);
+    assert_eq!(result["boundary"], root.to_string_lossy().as_ref());
+    assert!(result["visited"].as_u64().unwrap() >= 2 * 5);
+    assert!(
+        store::read(&snapshot.join("coarse.db"))
+            .unwrap()
+            .0
+            .has_hardlinks
+    );
+}
+
+#[test]
+fn rebuild_merges_and_recomputes_freshness_extrema() {
+    let root = PathBuf::from("/root");
+    let mut parent = Node {
+        path: root.clone(),
+        parent: None,
+        kind: 1,
+        own_allocated: 0,
+        own_apparent: 0,
+        own_errors: 0,
+        total: model::Stats::default(),
+        rest: model::Stats::default(),
+        scanned_at: 100,
+    };
+    parent.rest.min_scanned_at = Some(40);
+    parent.rest.newest_mtime = Some(75);
+    let child = Node {
+        path: root.join("file"),
+        parent: Some(root),
+        kind: 0,
+        own_allocated: 0,
+        own_apparent: 0,
+        own_errors: 0,
+        total: model::Stats {
+            newest_mtime: Some(85),
+            ..Default::default()
+        },
+        rest: model::Stats::default(),
+        scanned_at: 90,
+    };
+    let mut nodes = vec![parent, child];
+    rebuild(&mut nodes).unwrap();
+    assert_eq!(nodes[0].total.min_scanned_at, Some(40));
+    assert_eq!(nodes[0].total.newest_mtime, Some(85));
+    nodes[0].rest.min_scanned_at = Some(60);
+    nodes[0].rest.newest_mtime = Some(70);
+    nodes[1].scanned_at = 95;
+    nodes[1].total.newest_mtime = Some(65);
+    rebuild(&mut nodes).unwrap();
+    assert_eq!(nodes[0].total.min_scanned_at, Some(60));
+    assert_eq!(nodes[0].total.newest_mtime, Some(70));
 }

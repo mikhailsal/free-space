@@ -30,9 +30,20 @@ jobs:
         with:
           persist-credentials: false
       - name: Record source and build start
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p cleanup-results/provenance cleanup-results/source binaries
+          timeout --kill-after=5s 30s gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/${GITHUB_RUN_ATTEMPT}/jobs" > cleanup-results/provenance/job-start.json
+          python3 - <<'PYJOB'
+          import datetime,json,os
+          jobs=json.load(open('cleanup-results/provenance/job-start.json'))['jobs']
+          match=[j for j in jobs if j['name']=='experiment' and j['started_at']]
+          if len(match)!=1: raise ValueError('cannot identify current job start')
+          start=int(datetime.datetime.fromisoformat(match[0]['started_at'].replace('Z','+00:00')).timestamp())
+          with open(os.environ['GITHUB_ENV'],'a') as out: out.write(f'CLEANUP_JOB_STARTED_EPOCH={start}\n')
+          PYJOB
           date +%s > cleanup-results/provenance/build-start.epoch
           git rev-parse HEAD > cleanup-results/provenance/source-revision.txt
           SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
@@ -124,9 +135,17 @@ jobs:
           CLEANUP_IO: local
           CLEANUP_OUTPUT: ${{ github.workspace }}/cleanup-results
           STEP_SECONDS: ${{ inputs.stage == 'screen' && 5100 || 2700 }}
+          JOB_SECONDS: ${{ inputs.stage == 'screen' && 7200 || 3600 }}
+          CLEANUP_SMOKE_RUNTIME: ${{ github.workspace }}/smoke-evidence/provenance/runtime.json
+          CLEANUP_SMOKE_IMAGE: ${{ github.workspace }}/smoke-evidence/provenance/runtime-image.tar.gz
         run: |
           set -euo pipefail
-          export CLEANUP_STEP_DEADLINE_EPOCH=$(( $(date +%s) + STEP_SECONDS ))
+          export CLEANUP_STEP_STARTED_EPOCH=$(date +%s)
+          export CLEANUP_STEP_OUTER_AVAILABLE=$(df -B1 --output=avail "$RUNNER_TEMP" | tail -1 | tr -d ' ')
+          export CLEANUP_STEP_RESULTS_AVAILABLE=$(df -B1 --output=avail "$GITHUB_WORKSPACE" | tail -1 | tr -d ' ')
+          step_deadline=$((CLEANUP_STEP_STARTED_EPOCH + STEP_SECONDS))
+          job_deadline=$((CLEANUP_JOB_STARTED_EPOCH + JOB_SECONDS - 300))
+          export CLEANUP_STEP_DEADLINE_EPOCH=$((step_deadline < job_deadline ? step_deadline : job_deadline))
           bash scripts/cleanup_probe_runner.sh
       - uses: actions/upload-artifact@v4
         if: always()

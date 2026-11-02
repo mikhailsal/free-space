@@ -52,6 +52,17 @@ def build(root, profile, count):
                    bulk_allocated_files=count // 2 if profile == 'files' else count // 4,
                    bulk_empty_files=count // 2 if profile == 'files' else count // 4,
                    bulk_allocation_bytes_per_file=4096)
+    # These counts come from the construction loops, including all controls,
+    # directory chunks and the root. No second enumeration is needed.
+    expected_files = receipt['bulk_files'] + 99 + 5 + 64 + 1
+    expected_dirs = receipt['bulk_directories'] + count // 1000 + 7
+    receipt['expected_counts'] = dict(files=expected_files, dirs=expected_dirs,
+                                      others=0, entries=expected_files + expected_dirs)
+    receipt['expected_controls'] = {
+        'retained': ['large', 'large/above', 'large/deep', 'large/deep/deeper',
+                     'large/deep/deeper/large', 'large/group'],
+        'omitted': ['large/below', 'large/sparse'] +
+                   [f'large/group/f{i:06}' for i in range(64)]}
     small = root / 'small'
     retained = root / 'large'
     small.mkdir(); retained.mkdir()

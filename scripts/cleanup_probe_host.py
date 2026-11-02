@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import shutil
 import statistics
+import signal
+import threading
 import subprocess
 import sys
 import time
@@ -69,8 +71,9 @@ def oracle(args, cases, out, ident, seconds):
            '--mount',f'type=bind,src={cases["v1"] / "snapshot"},dst=/baseline,readonly',
            '--mount',f'type=bind,src={cases["probe"] / "snapshot"},dst=/coarse,readonly',
            '--mount',f'type=bind,src={cases["v2"] / "snapshot"},dst=/v2,readonly',
+           '--mount',f'type=bind,src={out / ("fixture-" + ident.split("-")[0] + ".json")},dst=/fixture.json,readonly',
            '--mount',f'type=bind,src={Path("scripts").resolve()},dst=/harness,readonly',
-           args.image,'/harness/cleanup_oracle.py','/baseline/snapshot.db','/coarse/coarse.db','/v2/v2/generations.db']
+           args.image,'/harness/cleanup_oracle.py','/baseline/snapshot.db','/coarse/coarse.db','/v2/v2/generations.db','--fixture','/fixture.json']
     try:
         with (out/(ident+'.json')).open('w') as stdout, (out/(ident+'.log')).open('w') as stderr:
             result=subprocess.run(cmd,stdout=stdout,stderr=stderr,timeout=seconds)
@@ -112,6 +115,100 @@ def preserve_evidence(cases, out, profile):
     (target / f'{profile}-receipt.json').write_text(json.dumps(result,indent=2)+'\n')
 
 
+class SpaceMonitor:
+    def __init__(self, out):
+        self.out = out
+        self.backing = Path(os.environ['CLEANUP_BACKING_FILE'])
+        self.outer = Path(os.environ['CLEANUP_OUTER_PATH'])
+        self.stop = threading.Event()
+        self.lock = threading.Lock()
+        self.data = {'samples': 0, 'initial_backing_allocated_bytes': self.backing.stat().st_blocks * 512,
+                     'peak_backing_allocated_bytes': 0, 'minimum_outer_available_bytes': None,
+                     'minimum_results_available_bytes': None, 'cycles': [], 'trims': []}
+        self.cycle = None
+        for key, path in (('initial_outer_available_bytes',self.outer),('initial_results_available_bytes',self.out)):
+            fs=os.statvfs(path)
+            self.data[key]=fs.f_bavail * fs.f_frsize
+        self.sample()
+        self.thread = threading.Thread(target=self.watch, daemon=True)
+        self.thread.start()
+
+    def sample(self):
+        backing = self.backing.stat().st_blocks * 512
+        values = []
+        for path in (self.outer, self.out):
+            fs = os.statvfs(path)
+            values.append(fs.f_bavail * fs.f_frsize)
+        with self.lock:
+            d = self.data
+            d['samples'] += 1
+            d['peak_backing_allocated_bytes'] = max(d['peak_backing_allocated_bytes'], backing)
+            for key, value in zip(('minimum_outer_available_bytes','minimum_results_available_bytes'), values):
+                d[key] = value if d[key] is None else min(d[key],value)
+            if self.cycle is not None:
+                self.cycle['peak_backing_allocated_bytes'] = max(self.cycle['peak_backing_allocated_bytes'], backing)
+        if min(values) < 2 * 1024**3:
+            raise RuntimeError('outer or results filesystem fell below 2 GiB reserve')
+
+    def write(self):
+        with self.lock:
+            data = json.dumps(self.data, indent=2)+'\n'
+        path = self.out / 'space-monitor.json'
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(data)
+        os.replace(tmp, path)
+
+    def watch(self):
+        while not self.stop.wait(0.25):
+            try:
+                self.sample()
+            except Exception as error:
+                with self.lock: self.data['error'] = repr(error)
+                try: self.write()
+                finally: os.kill(os.getpid(), signal.SIGTERM)
+
+    def register_writer_peak(self, value):
+        with self.lock:
+            self.data['peak_backing_allocated_bytes'] = max(self.data['peak_backing_allocated_bytes'], value)
+            if self.cycle is not None:
+                self.cycle['peak_backing_allocated_bytes'] = max(self.cycle['peak_backing_allocated_bytes'], value)
+
+    def begin_cycle(self, ident):
+        self.sample()
+        with self.lock:
+            start = self.backing.stat().st_blocks * 512
+            self.cycle = {'id': ident, 'before_backing_allocated_bytes': start, 'peak_backing_allocated_bytes': start}
+
+    def end_cycle(self):
+        self.sample()
+        with self.lock:
+            self.cycle['after_backing_allocated_bytes'] = self.backing.stat().st_blocks * 512
+            self.data['cycles'].append(self.cycle)
+            self.cycle = None
+        self.write()
+
+    def trim(self, name, mount):
+        self.sample()
+        os.sync()
+        before = self.backing.stat().st_blocks * 512
+        result = subprocess.run(['sudo','-n','fstrim','-v',str(mount)], capture_output=True, text=True, timeout=120)
+        os.sync()
+        after = self.backing.stat().st_blocks * 512
+        with self.lock:
+            self.data['trims'].append(dict(name=name,before_backing_allocated_bytes=before,
+                                           after_backing_allocated_bytes=after,exit_code=result.returncode,
+                                           stdout=result.stdout[-2000:],stderr=result.stderr[-2000:]))
+        self.write()
+        if result.returncode: raise RuntimeError('fstrim failed: '+name)
+        self.sample()
+
+    def close(self):
+        self.stop.set()
+        self.thread.join(timeout=3)
+        self.sample()
+        self.write()
+
+
 def run(args):
     guard()
     start=time.monotonic()
@@ -124,6 +221,7 @@ def run(args):
     count=100000 if args.stage=='smoke' else 1000000
     pairs=1 if args.stage=='smoke' else 3
     scratch=Path(os.environ['RUNNER_TEMP']).resolve()
+    monitor=SpaceMonitor(out)
     def phase(name, fn):
         t=time.monotonic()
         success=False
@@ -141,6 +239,7 @@ def run(args):
     def execute(arm,op,target,tree,case,ident):
         legacy.flush_caches(out,ident)
         row=run_container(args,arm,op,target,tree,case,out,ident,remaining())
+        monitor.register_writer_peak(row['sampled_outer_backing_allocated_peak_bytes'])
         if arm == 'probe' and op == 'refresh':
             expected_fallback = target.endswith('/small')
             if row['report'].get('fallback_full_root') is not expected_fallback:
@@ -185,8 +284,10 @@ def run(args):
                     cycle_started=time.monotonic()
                     evidence_seconds=0.0
                     cases={}
+                    monitor.begin_cycle(f'{profile}-{scenario}-{pair+1}')
                     for arm in arms:
                         case=scratch/('case-'+arm)
+                        monitor.sample()
                         shutil.copytree(seeds[arm],case)
                         cases[arm]=case
                         ident=f'{profile}-{scenario}-{pair+1}-{arm}'
@@ -197,11 +298,17 @@ def run(args):
                         evidence_started=time.monotonic()
                         phase(profile+'-evidence',lambda: preserve_evidence(cases,out,profile))
                         evidence_seconds=time.monotonic()-evidence_started
-                    for case in cases.values(): shutil.rmtree(case)
+                    for arm,case in cases.items():
+                        shutil.rmtree(case)
+                        monitor.trim(f'{profile}-{scenario}-{pair+1}-{arm}',scratch.parent)
+                    monitor.end_cycle()
                     manifest['phases'].append(dict(name=f'{profile}-{scenario}-{pair+1}-cycle',
                                                    seconds=time.monotonic()-cycle_started-evidence_seconds, success=True))
-            for case in seeds.values(): shutil.rmtree(case)
+            for arm,case in seeds.items():
+                shutil.rmtree(case)
+                monitor.trim('seed-'+profile+'-'+arm,scratch.parent)
             shutil.rmtree(tree)
+            monitor.trim('fixture-'+profile,scratch.parent)
         comparisons={}
         for profile in ('files','directories'):
             for scenario in ('full','retained','omitted'):
@@ -221,6 +328,7 @@ def run(args):
         manifest['success']=True
     finally:
         manifest['elapsed_seconds']=time.monotonic()-start
+        monitor.close()
         (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     return 0
 

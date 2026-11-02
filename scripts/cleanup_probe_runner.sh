@@ -15,6 +15,7 @@ volume=$(mktemp -d "$RUNNER_TEMP/cleanup-volume.XXXXXX")
 mount_dir="$volume/mount"
 loop_device=''
 child_pid=''
+space_watcher_pid=''
 if [[ -n ${GITHUB_RUN_ID:-} ]]; then
   export FREESPACE_BENCHMARK_RUN_TOKEN="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}-${GITHUB_JOB:-diagnostic}"
 else
@@ -31,6 +32,10 @@ cleanup() {
   local status=$?
   local containers container attempt containers_stopped=true storage_released=true
   trap - EXIT
+  if [[ -n $space_watcher_pid ]]; then
+    kill "$space_watcher_pid" 2>/dev/null || true
+    wait "$space_watcher_pid" 2>/dev/null || true
+  fi
   printf 'cleanup label=%s initial_status=%s\n' "$benchmark_label" "$status" >> "$output/cleanup.log"
   # Stop the producer before listing containers, so it cannot start another arm.
   if [[ -n $child_pid ]]; then
@@ -140,6 +145,22 @@ bounded() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+# Watch the backing and results filesystems during setup as well as measurement.
+runner_pid=$$
+(
+  while true; do
+    for path in "$volume" "$output"; do
+      available=$(timeout --kill-after=2s 10s df -B1 --output=avail "$path" | tail -1 | tr -d ' ') || available=''
+      if [[ ! $available =~ ^[0-9]+$ ]] || (( available < 2 * 1024 * 1024 * 1024 )); then
+        printf 'outer reserve lost or unavailable: path=%s available=%s\n' "$path" "$available" >> "$output/cleanup.log"
+        kill -TERM "$runner_pid" 2>/dev/null || true
+        exit 1
+      fi
+    done
+    sleep 1
+  done
+) &
+space_watcher_pid=$!
 df -h > "$output/host-disk.txt"
 lsblk -o NAME,MAJ:MIN,SIZE,TYPE,ROTA,MODEL >> "$output/host-disk.txt"
 # No host cache or device is changed outside this ephemeral runner.
@@ -166,14 +187,46 @@ findmnt -T "$mount_dir" -J > "$output/filesystem.json"
 losetup -l -J > "$output/loop-devices.json"
 df -i "$mount_dir" > "$output/inodes.txt"
 image="cleanup-probe:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}-${GITHUB_JOB}"
-bounded 600 docker build -t "$image" scripts/bench-v2-container
+if [[ $CLEANUP_STAGE == smoke ]]; then
+  bounded 600 docker build -f scripts/cleanup_probe.Dockerfile -t "$image" scripts/bench-v2-container
+  bounded 300 bash -c 'set -o pipefail; docker save "$1" | gzip -1 > "$2"' _ "$image" "$output/provenance/runtime-image.tar.gz"
+else
+  [[ -f ${CLEANUP_SMOKE_IMAGE:?} && -f ${CLEANUP_SMOKE_RUNTIME:?} ]] || exit 1
+  bounded 300 docker load -i "$CLEANUP_SMOKE_IMAGE"
+  smoke_image_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["image_id"])' "$CLEANUP_SMOKE_RUNTIME")
+  bounded 30 docker tag "$smoke_image_id" "$image"
+fi
 bounded 30 docker image inspect "$image" > "$output/provenance/image.json"
+version_limit=$(setup_timeout 60)
+run_owned timeout --kill-after=5s "${version_limit}s" docker run --rm --label "$benchmark_label" --network none \
+  --entrypoint python3 "$image" -c 'import json,platform,sqlite3,subprocess; q=lambda x:subprocess.check_output(x,text=True,timeout=10).strip(); print(json.dumps({"python":platform.python_version(),"sqlite":sqlite3.sqlite_version,"fio":q(["fio","--version"]),"time":q(["/usr/bin/time","--version"]).splitlines()[0],"packages":q(["dpkg-query","-W","-f=${Package}=${Version}\n"]).splitlines()},sort_keys=True))' > "$output/provenance/runtime-versions.json"
+python3 - "$output/provenance" <<'PYRUNTIME'
+import json,pathlib,sys
+p=pathlib.Path(sys.argv[1])
+r={'image_id':json.loads((p/'image.json').read_text())[0]['Id'],
+   'versions':json.loads((p/'runtime-versions.json').read_text())}
+(p/'runtime.json').write_text(json.dumps(r,indent=2,sort_keys=True)+'\n')
+PYRUNTIME
+if [[ $CLEANUP_STAGE == screen ]]; then cmp "$CLEANUP_SMOKE_RUNTIME" "$output/provenance/runtime.json"; fi
 calibration_limit=$(setup_timeout 300)
 run_owned timeout --kill-after=5s "${calibration_limit}s" python3 scripts/bench-disk-calibration.py --image "$image" --device "$loop_device" \
   --directory "$mount_dir" --output "$output" --profile local
 mkdir "$mount_dir/jobs"
 export RUNNER_TEMP="$mount_dir/jobs"
 now=$(date +%s)
+CLEANUP_HOST_START="$now" python3 - "$output/provenance/timing.json" <<'PYTIMING'
+import json,os,sys
+start=int(os.environ['CLEANUP_STEP_STARTED_EPOCH']); host=int(os.environ['CLEANUP_HOST_START'])
+with open(sys.argv[1],'w') as out:
+    fs=lambda path: os.statvfs(path).f_bavail * os.statvfs(path).f_frsize
+    json.dump({'step_started_epoch':start,'host_started_epoch':host,'setup_seconds':host-start,
+               'step_outer_available_bytes':int(os.environ['CLEANUP_STEP_OUTER_AVAILABLE']),
+               'step_results_available_bytes':int(os.environ['CLEANUP_STEP_RESULTS_AVAILABLE']),
+               'host_outer_available_bytes':fs(os.environ['CLEANUP_OUTER_PATH']),
+               'host_results_available_bytes':fs(os.environ['CLEANUP_OUTPUT']),
+               'job_started_epoch':int(os.environ['CLEANUP_JOB_STARTED_EPOCH']),
+               'deadline_epoch':int(os.environ['CLEANUP_STEP_DEADLINE_EPOCH']),'upload_reserve_seconds':300},out,indent=2)
+PYTIMING
 budget=$((CLEANUP_STEP_DEADLINE_EPOCH - now - 240))
 if (( budget < 181 )); then echo 'Insufficient time for workload and cleanup.' >&2; exit 1; fi
 run_owned timeout --kill-after=5s "$((budget + 60))s" python3 scripts/cleanup_probe_host.py \

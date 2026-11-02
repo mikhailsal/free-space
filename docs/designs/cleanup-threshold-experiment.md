@@ -42,7 +42,13 @@ are a negative control: large apparent length must not imply large allocation.
 The fixture must protect BOTH filesystems: inner free space and outer host/
 results free space must remain at least 2 GiB. A sparse image's apparent free
 capacity alone is not protection against host ENOSPC. Bounded, run-owned loop/
-container/process cleanup is mandatory. Local workloads remain prohibited.
+container/process cleanup is mandatory. Deleted inner files must be discarded
+with `fstrim` after each case/profile cleanup, outside measured writer time,
+with backing allocation before/after captured. Every seed copy and non-writer
+phase must be protected by outer/results reserve checks and the run monitor.
+Screen admission also projects conservative outer backing growth from smoke;
+the logical 500 GiB size is never treated as physically available host capacity.
+Local workloads remain prohibited.
 
 ## Fixed comparison cases
 
@@ -52,7 +58,13 @@ half regular files. Additional fixed controls are recorded separately from the
 bulk count: actual allocated files straddling the threshold, an aggregate of
 individually subthreshold files, a deep large file, empty files, an apparent-only
 sparse file and raw non-UTF-8 names. Bulk allocation distribution and exact final
-counts are captured before measurement; this is synthetic, not a measured
+counts are captured before measurement. For bulk count N (a multiple of 1000),
+the expected total is `N + N/1000 + 176` entries in both shapes. Files shape:
+`N+169` files and `N/1000+7` directories; directories shape: `N/2+169` files
+and `N/2+N/1000+7` directories. These include the root, chunk directories and
+all fixed controls. At smoke/screen scale the totals are 100,276/1,001,176.
+The fixed retained-refresh subtree has 74 entries; the prototype visits it twice.
+The receipt and independent oracle must agree with these counts. This is synthetic, not a measured
 distribution of the user's real filesystem. Special hardlink/depth cases are
 covered by the example's GH-only tests, not silently omitted from claimed scope.
 
@@ -88,10 +100,17 @@ and RAM, but inside whole-job accounting and prospective runtime projection.
   checked against a streamed independent full-v1 SQLite reference; v2 root
   totals are crosschecked. Missing/extra retained nodes, double counting, sparse
   misclassification and invalid threshold arithmetic fail. Old/new command
-  timestamps differ, so cross-arm freshness extrema are not asserted identical.
+  timestamps differ, so cross-arm scan timestamps are not asserted identical.
+  Filesystem capacity/threshold must agree with the independent fixture receipt,
+  control classification and root kind counts must match. File modification
+  extrema are checked against the reference; scan-time extrema are checked for
+  structural consistency within the coarse image.
 * Exact binary bytes, source file hashes, compiler/target, runtime image and
   commands are archived. Source capture includes build-time web inputs and all
   directly used measurement/helper/oracle modules. Hidden files are included.
+  Use a digest-pinned Ubuntu base for the isolated runtime image. Smoke archives
+  the actual built image and package versions; screen loads that exact image
+  and verifies identity/version evidence instead of rebuilding mutable packages.
 * Report each profile/scenario separately, with all screen points and paired
   medians. A coarse-format benefit includes a changed information contract and
   traversal algorithm; it is not an isolated SQLite-engine optimization.
@@ -105,7 +124,10 @@ Smoke measurement step cap is 2,700 seconds; screen is 5,100, with 240 seconds
 reserved for cleanup. A separately recorded same-source/same-binary successful
 smoke plus raw semantic acceptance is required for screen. Before dispatch,
 project all host time at 10x entry scale and add the two extra screen cycles,
-including seed-copy and case cleanup costs, then add 30% margin and fixed build.
+including seed-copy and case cleanup costs, then add 30% margin and observed
+pre-host setup plus fixed build. Record the projection before dispatch; the
+in-job gate is a second check. Deadlines must reserve upload/cleanup time against
+both the measurement-step and total-job deadlines, including pre-host setup.
 If any step/job/remaining-budget cap fails, do not dispatch the screen.
 
 Source/protocol changes after failure require a new recorded revision and fresh
