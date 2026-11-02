@@ -1,0 +1,59 @@
+{
+  "protocol": "resource-cause-screen-admission-v1",
+  "created_at": "2026-11-02T01:40:09.792868+00:00",
+  "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+  "manifest_sha256": "62d103cf589a87573e9b75380c7c168042176499fdc98f977369c4adfba3f761",
+  "source_freeze_sha256": "fe275407b2bd38d102cf0132d7be32cbaad051587e894f8db30b228cf7d91284",
+  "smoke_run_id": 41372382738,
+  "smoke_archive": "resource-cause-smoke-2026-11-02.tar.gz",
+  "smoke_archive_sha256": "d515eeaf5ef09fee42ddc5233b7bfa7fd24d868622781aca5c2720e7b8ec2bc6",
+  "smoke_valid": true,
+  "transport_recovery": "Recorded sourcebyte retrieval, no source or measurement change",
+  "forecast": {
+    "protocol": "resource-cause-forecast-v1",
+    "stage": "screen",
+    "admitted": true,
+    "host_forecast_seconds": 1302.3004255400006,
+    "host_with_30pct_margin_seconds": 1692.9905532020007,
+    "host_cap_seconds": 2100,
+    "outer_fixed_observed_seconds": 55.465648191,
+    "whole_step_forecast_seconds": 1357.7660737310005,
+    "whole_step_with_30pct_margin_seconds": 1765.0958958503006,
+    "step_cap_seconds": 2700,
+    "maximum_job_seconds": 3600,
+    "cleanup_reserve_seconds": 240,
+    "method": "100k-to-1m linear scale10; fixed23-case schedule:4 each idle/names/stat,7 normal full scans,3 reserve scans,1 disk pin; observed outer setup retained;30percent margin",
+    "limitations": "Planning projection, not measured screen time or a physical upper bound. Nonlinearity can invalidate it; hard deadlines remain active."
+  },
+  "artifact_preflight": {
+    "id": 13071807048,
+    "node_id": "MDg6QXJ0aWZhY3QxMzA3MTgwNzA0OA==",
+    "name": "representative-binary",
+    "size_in_bytes": 8497498,
+    "url": "https://api.github.com/repos/mikhailsal/free-space/actions/artifacts/13071807048",
+    "archive_download_url": "https://api.github.com/repos/mikhailsal/free-space/actions/artifacts/13071807048/zip",
+    "expired": false,
+    "digest": "sha256:777f860ad3b67f3d5106c9082de921b5b2f74ddcec7d71378cb135f498f2a2e1",
+    "created_at": "2026-11-01T05:37:10Z",
+    "updated_at": "2026-11-01T05:37:10Z",
+    "expires_at": "2026-11-08T05:37:09Z",
+    "workflow_run": {
+      "id": 41277463149,
+      "repository_id": 1430470688,
+      "head_repository_id": 1430470688,
+      "head_branch": "perf/v1-memory-candidate-control",
+      "head_sha": "4f22bf8e3b67f7f59049a72116b90c061fb1328b"
+    }
+  },
+  "budget": {
+    "aggregate_cap_runner_seconds": 216000,
+    "completed_job_seconds": 50754.0,
+    "planned_reserved_seconds": 38400,
+    "maximum_committed_seconds": 89154.0,
+    "remaining_unreserved_seconds": 126846.0
+  },
+  "maximum_job_seconds": 3600,
+  "admitted": true,
+  "automatic_retry": false,
+  "qualification": false
+}

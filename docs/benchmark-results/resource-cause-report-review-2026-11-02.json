@@ -1,0 +1,26 @@
+{
+  "protocol": "resource-cause-report-review-proof-v1",
+  "created_at": "2026-11-02T02:30:14.116761+00:00",
+  "completed": true,
+  "qualification": false,
+  "model": "claude-opus-5-5",
+  "session_id": "094b5754-e83d-4824-bb8d-b6b914301ea2",
+  "result": "NO_FINDINGS",
+  "structured": {
+    "completed": true,
+    "gate": "pass"
+  },
+  "scope": "Supplied scientific report, selected actual fields and independent derived checks; not a new code/raw artifact audit",
+  "document_hashes": {
+    "docs/benchmark-results/resource-causes-2026-11-02.md": "075782b190a34a8c051aa7e03d38bf107a1e0e7adf249c87d11cbfb2566234c6",
+    "docs/benchmark-results/resource-causes-prior-evidence-2026-11-02.md": "ca29394acdcc637b4f46fa030ba04d7b9c1452034b50e6449c3449ce2406bf3e",
+    "docs/designs/resource-stack-hypotheses-2026-11-02.md": "297822867a67d0bc87831e9c560a1c72ae5e03a6ac258ab2f2f3d5e4762ea274"
+  },
+  "packet_sha256": "9144184055b8939158a270815d21d3be5442a95fbfb3d7b3bd62976b9ed958bf",
+  "response_sha256": "38bb0fd9e134aabe36afd1df26850e6e9b5b1784ac697126be85ee12dc203c5a",
+  "archive": "resource-cause-report-review-2026-11-02.tar.gz",
+  "archive_sha256": "327e8e4eee4e04acb13d7bd34056ca9a3264983246c94fdbbb7f63d9fbf797a5",
+  "reviewed_current_document_bytes": true,
+  "source_review_proof": "resource-cause-review-proof-2026-11-02.json",
+  "source_review_unchanged": true
+}

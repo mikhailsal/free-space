@@ -56,7 +56,9 @@
     41273349166,
     41274381403,
     41277463149,
-    41279047267
+    41279047267,
+    41372382738,
+    41373680085
   ],
   "runs": [
     {
@@ -3018,13 +3020,71 @@
         "/tmp/freespace-cache4-canonical-candidate-verification-input-dispatch-f980f6cd6b5e2e972881cfd4158b5449fc77ea40bb0913850001f7448285d568.json": "f980f6cd6b5e2e972881cfd4158b5449fc77ea40bb0913850001f7448285d568",
         "/tmp/freespace-cache4-canonical-candidate-github-log-5b6d55a5eee665dcb4b2b5da090e5ef382a9f27721b610bc751b72010f8afc7e.log": "5b6d55a5eee665dcb4b2b5da090e5ef382a9f27721b610bc751b72010f8afc7e"
       }
+    },
+    {
+      "run_id": 41372382738,
+      "case_id": "resource-cause-smoke",
+      "revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+      "stage": "resource-cause-smoke",
+      "workflow_id": 397616649,
+      "workflow_file": "v2-balance.yml",
+      "branch": "perf/resource-cause-proof",
+      "maximum_job_seconds": 3600,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 110.0,
+      "running_job_seconds_observed": 0,
+      "jobs": [
+        {
+          "id": 125045401941,
+          "name": "diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T01:25:09Z",
+          "completed_at": "2026-11-02T01:26:59Z",
+          "seconds": 110.0
+        }
+      ],
+      "scientific_kind": "causal-diagnostic-protocol-smoke",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41372382738",
+      "job_seconds": 110.0
+    },
+    {
+      "run_id": 41373680085,
+      "case_id": "resource-cause-screen",
+      "revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+      "stage": "resource-cause-screen",
+      "workflow_id": 397616649,
+      "workflow_file": "v2-balance.yml",
+      "branch": "perf/resource-cause-proof",
+      "maximum_job_seconds": 3600,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 1257.0,
+      "running_job_seconds_observed": 0,
+      "jobs": [
+        {
+          "id": 125049271383,
+          "name": "diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T01:40:15Z",
+          "completed_at": "2026-11-02T02:01:12Z",
+          "seconds": 1257.0
+        }
+      ],
+      "scientific_kind": "causal-metadata-and-disk-screen",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41373680085",
+      "job_seconds": 1257.0
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-01T06:23:03.617519+00:00",
-  "completed_job_seconds": 50644.0,
-  "maximum_committed_seconds": 85444.0,
-  "remaining_unreserved_seconds": 130556.0,
+  "updated_at": "2026-11-02T02:27:28.702471+00:00",
+  "completed_job_seconds": 52011.0,
+  "maximum_committed_seconds": 86811.0,
+  "remaining_unreserved_seconds": 129189.0,
   "candidate_branch": "perf/v1-root-reuse-cache4",
   "forecasts": [
     {
@@ -3390,7 +3450,7 @@
     }
   },
   "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 50644.0,
+  "used_runner_seconds_observed": 52011.0,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -3641,5 +3701,90 @@
     "status": "Scientific evidence valid; H2 inconclusive; no promotion or qualification advancement",
     "product_qualification": false,
     "scope": "v1 measurements; sharedconstant alsoaffectsv2diskstaging unmeasured"
+  },
+  "resource_cause_proof_cases": [
+    {
+      "id": "resource-cause-smoke",
+      "stage": "smoke",
+      "files": 100000,
+      "expected_entries": 100449,
+      "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+      "branch": "perf/resource-cause-proof",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "inputs": {
+        "diagnostic_stage": "smoke"
+      },
+      "maximum_job_seconds": 3600,
+      "job_timeout_minutes": 60,
+      "step_cap_seconds": 2700,
+      "host_cap_seconds": 2100,
+      "cleanup_reserve_seconds": 240,
+      "status": "completed",
+      "depends_on": "FinalsourceactualOpus5.5NO_FINDINGS +normalhooks +exactremote/sourcefreeze +financialreservation +artifactnonexpiry",
+      "automatic_retry": false,
+      "qualification": false,
+      "reservation_seconds": 0,
+      "dispatch_intent": "/tmp/freespace-resource-smoke-dispatch-intent.json",
+      "dispatch_intent_at": "2026-11-02T01:25:05.316911+00:00",
+      "active_maximum_seconds": 0,
+      "run_id": 41372382738,
+      "job_id": 125045401941,
+      "conclusion": "success",
+      "completed_job_seconds": 110.0,
+      "scientific_disposition": "valid-protocol-smoke; no optimization claim",
+      "archive": "resource-cause-smoke-2026-11-02.tar.gz",
+      "archive_sha256": "d515eeaf5ef09fee42ddc5233b7bfa7fd24d868622781aca5c2720e7b8ec2bc6",
+      "transport_recovery": "byte-exact hiddenworkflow fromfrozenGitref; rawartifactpreserved"
+    },
+    {
+      "id": "resource-cause-screen",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+      "branch": "perf/resource-cause-proof",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "inputs": {
+        "diagnostic_stage": "screen"
+      },
+      "maximum_job_seconds": 3600,
+      "job_timeout_minutes": 60,
+      "step_cap_seconds": 2700,
+      "host_cap_seconds": 2100,
+      "cleanup_reserve_seconds": 240,
+      "status": "completed",
+      "depends_on": "Same-sourcecompletevalidsmoke +freshprospectivecause_forecastallthreecaps +remainingreserve +artifactnonexpiry",
+      "automatic_retry": false,
+      "qualification": false,
+      "reservation_seconds": 0,
+      "dispatch_intent": "/tmp/freespace-resource-screen-dispatch-intent.json",
+      "dispatch_intent_at": "2026-11-02T01:40:09.792868+00:00",
+      "admission": "resource-cause-screen-admission-2026-11-02.json",
+      "admission_sha256": "c7796f2d203a33734f7a5069dd24c5def5f41c9f539f44a33cc9ccca4c8c814b",
+      "active_maximum_seconds": 0,
+      "run_id": 41373680085,
+      "job_id": 125049271383,
+      "conclusion": "success",
+      "completed_job_seconds": 1257.0,
+      "scientific_disposition": "valid causal diagnostic screen; metadata effect and comparability supported; no product qualification",
+      "archive": "resource-cause-screen-2026-11-02.tar.gz",
+      "archive_sha256": "6f7d6c368304ccb958001e36f4430d1879660a6d07172300f2062e7f95646c0d",
+      "receipt": "resource-cause-screen-2026-11-02.json",
+      "transport_recovery": "Byte-exact hidden workflow from frozen Git revision; original artifact preserved; no rerun"
+    }
+  ],
+  "resource_cause_proof": {
+    "manifest_path": "resource-cause-manifest-2026-11-02.json",
+    "manifest_sha256": "62d103cf589a87573e9b75380c7c168042176499fdc98f977369c4adfba3f761",
+    "source_freeze_sha256": "fe275407b2bd38d102cf0132d7be32cbaad051587e894f8db30b228cf7d91284",
+    "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+    "goal": "Explain and prove RAM/disk causes; propose improvements including storage alternatives",
+    "status": "Completed and independently replay-validated; raw archives retained; causal research only",
+    "qualification": false,
+    "report": "resource-causes-2026-11-02.md",
+    "screen_archive": "resource-cause-screen-2026-11-02.tar.gz",
+    "screen_archive_sha256": "6f7d6c368304ccb958001e36f4430d1879660a6d07172300f2062e7f95646c0d"
   }
 }

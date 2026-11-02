@@ -1,0 +1,68 @@
+{
+  "run_id": 41372382738,
+  "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+  "protocol": "resource-cause-v1",
+  "stage": "smoke",
+  "valid": true,
+  "qualification": false,
+  "completed_job_seconds": 110,
+  "archive": "resource-cause-smoke-2026-11-02.tar.gz",
+  "archive_sha256": "d515eeaf5ef09fee42ddc5233b7bfa7fd24d868622781aca5c2720e7b8ec2bc6",
+  "payloads": 215,
+  "transport_recovery": "Onlyhiddenworkflowbyte restored fromexactGitref; originalraw preserved; no measurement/source/gatechanged",
+  "groups": {
+    "ram": {
+      "valid": true,
+      "expected": [
+        "smoke-idle",
+        "smoke-names",
+        "smoke-stat",
+        "smoke-scan"
+      ],
+      "observed": [
+        "smoke-idle",
+        "smoke-names",
+        "smoke-stat",
+        "smoke-scan"
+      ],
+      "scope": "Receipt-valid diagnostic group; overall campaign/cleanup remains separate."
+    },
+    "collector": {
+      "valid": true,
+      "expected": [
+        "smoke-reserve"
+      ],
+      "observed": [
+        "smoke-reserve"
+      ],
+      "scope": "Receipt-valid diagnostic group; overall campaign/cleanup remains separate."
+    },
+    "disk": {
+      "valid": true,
+      "expected": [
+        "disk-pin"
+      ],
+      "observed": [
+        "disk-pin"
+      ],
+      "scope": "Receipt-valid diagnostic group; overall campaign/cleanup remains separate."
+    }
+  },
+  "forecast": {
+    "protocol": "resource-cause-forecast-v1",
+    "stage": "screen",
+    "admitted": true,
+    "host_forecast_seconds": 1302.3004255400006,
+    "host_with_30pct_margin_seconds": 1692.9905532020007,
+    "host_cap_seconds": 2100,
+    "outer_fixed_observed_seconds": 55.465648191,
+    "whole_step_forecast_seconds": 1357.7660737310005,
+    "whole_step_with_30pct_margin_seconds": 1765.0958958503006,
+    "step_cap_seconds": 2700,
+    "maximum_job_seconds": 3600,
+    "cleanup_reserve_seconds": 240,
+    "method": "100k-to-1m linear scale10; fixed23-case schedule:4 each idle/names/stat,7 normal full scans,3 reserve scans,1 disk pin; observed outer setup retained;30percent margin",
+    "limitations": "Planning projection, not measured screen time or a physical upper bound. Nonlinearity can invalidate it; hard deadlines remain active."
+  },
+  "validated_at": "2026-11-02T01:37:21.047922+00:00"
+}

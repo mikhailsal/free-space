@@ -1,0 +1,448 @@
+{
+  "protocol": "resource-cause-screen-receipt-v1",
+  "created_at": "2026-11-02T02:26:39.443391+00:00",
+  "valid": true,
+  "qualification": false,
+  "stage": "screen",
+  "run_id": 41373680085,
+  "attempt": 1,
+  "job_id": 125049271383,
+  "job_seconds": 1257,
+  "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+  "application_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+  "actual_binary_sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+  "files": 1000000,
+  "entries": 1004499,
+  "directories": 4499,
+  "cases": 23,
+  "semantic_observers": 11,
+  "archive": "resource-cause-screen-2026-11-02.tar.gz",
+  "archive_sha256": "6f7d6c368304ccb958001e36f4430d1879660a6d07172300f2062e7f95646c0d",
+  "archive_payload_count": 624,
+  "original_artifact_payload_count": 596,
+  "verification": "Root rechecked all 624 payload hashes and equality of all 596 original files; source freeze, strict replay and summary were independently checked",
+  "summary_member": "screen-evidence/independent-summary.json",
+  "independent_checks": [
+    "screen-evidence/ram-check.md",
+    "screen-evidence/ram-check.json",
+    "screen-evidence/disk-check.md",
+    "screen-evidence/disk-check.json"
+  ],
+  "transport_recovery": {
+    "original_preserved": true,
+    "source": "Immutable Git revision 51ff2065e49184583932c2ef6d90152c1a586671",
+    "recovered_member": "transport-recovery/workflow/v2-balance.yml",
+    "sha256": "f0f10aa90f21e1de230302c524e9a6bd68de1f6024f4d51af86c1eb2a63d7378",
+    "measurement_rerun": false
+  },
+  "rows": [
+    {
+      "id": "lat1-idle",
+      "mode": "idle",
+      "sampler": "full",
+      "group": "latin",
+      "round": 1,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 1.066280048,
+      "kernel_memory_peak_bytes": 35377152,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 15968
+    },
+    {
+      "id": "lat1-names",
+      "mode": "names",
+      "sampler": "full",
+      "group": "latin",
+      "round": 1,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 20.596094636,
+      "kernel_memory_peak_bytes": 233209856,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16036
+    },
+    {
+      "id": "lat1-scan",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "latin",
+      "round": 1,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.402442114,
+      "kernel_memory_peak_bytes": 1940615168,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37808
+    },
+    {
+      "id": "lat1-stat",
+      "mode": "stat",
+      "sampler": "full",
+      "group": "latin",
+      "round": 1,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 34.215209878,
+      "kernel_memory_peak_bytes": 1698287616,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16324
+    },
+    {
+      "id": "lat2-names",
+      "mode": "names",
+      "sampler": "full",
+      "group": "latin",
+      "round": 2,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 20.594739349,
+      "kernel_memory_peak_bytes": 233340928,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16200
+    },
+    {
+      "id": "lat2-stat",
+      "mode": "stat",
+      "sampler": "full",
+      "group": "latin",
+      "round": 2,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 34.214626021,
+      "kernel_memory_peak_bytes": 1698017280,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16428
+    },
+    {
+      "id": "lat2-idle",
+      "mode": "idle",
+      "sampler": "full",
+      "group": "latin",
+      "round": 2,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 1.066126761,
+      "kernel_memory_peak_bytes": 35385344,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16036
+    },
+    {
+      "id": "lat2-scan",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "latin",
+      "round": 2,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.249703507,
+      "kernel_memory_peak_bytes": 1940865024,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37916
+    },
+    {
+      "id": "lat3-stat",
+      "mode": "stat",
+      "sampler": "full",
+      "group": "latin",
+      "round": 3,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 34.21498345,
+      "kernel_memory_peak_bytes": 1698095104,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16132
+    },
+    {
+      "id": "lat3-scan",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "latin",
+      "round": 3,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.398995509,
+      "kernel_memory_peak_bytes": 1940819968,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37776
+    },
+    {
+      "id": "lat3-names",
+      "mode": "names",
+      "sampler": "full",
+      "group": "latin",
+      "round": 3,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 20.596536468,
+      "kernel_memory_peak_bytes": 233754624,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 15848
+    },
+    {
+      "id": "lat3-idle",
+      "mode": "idle",
+      "sampler": "full",
+      "group": "latin",
+      "round": 3,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 1.066432034,
+      "kernel_memory_peak_bytes": 35598336,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 15876
+    },
+    {
+      "id": "lat4-scan",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "latin",
+      "round": 4,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.247916419,
+      "kernel_memory_peak_bytes": 1940295680,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37704
+    },
+    {
+      "id": "lat4-idle",
+      "mode": "idle",
+      "sampler": "full",
+      "group": "latin",
+      "round": 4,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 1.066374927,
+      "kernel_memory_peak_bytes": 35606528,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16076
+    },
+    {
+      "id": "lat4-stat",
+      "mode": "stat",
+      "sampler": "full",
+      "group": "latin",
+      "round": 4,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 34.21533601,
+      "kernel_memory_peak_bytes": 1698476032,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16144
+    },
+    {
+      "id": "lat4-names",
+      "mode": "names",
+      "sampler": "full",
+      "group": "latin",
+      "round": 4,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 20.59619406,
+      "kernel_memory_peak_bytes": 233857024,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 16384
+    },
+    {
+      "id": "col1-full",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "collector",
+      "round": 1,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.097456886,
+      "kernel_memory_peak_bytes": 1940811776,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37808
+    },
+    {
+      "id": "col1-reserve",
+      "mode": "scan",
+      "sampler": "reserve",
+      "group": "collector",
+      "round": 1,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.098373508,
+      "kernel_memory_peak_bytes": 1940955136,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37960
+    },
+    {
+      "id": "col2-reserve",
+      "mode": "scan",
+      "sampler": "reserve",
+      "group": "collector",
+      "round": 2,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.045817851,
+      "kernel_memory_peak_bytes": 1940508672,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37824
+    },
+    {
+      "id": "col2-full",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "collector",
+      "round": 2,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.247160857,
+      "kernel_memory_peak_bytes": 1940856832,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37732
+    },
+    {
+      "id": "col3-full",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "collector",
+      "round": 3,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.198595074,
+      "kernel_memory_peak_bytes": 1940594688,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37840
+    },
+    {
+      "id": "col3-reserve",
+      "mode": "scan",
+      "sampler": "reserve",
+      "group": "collector",
+      "round": 3,
+      "diagnostic_pin": false,
+      "elapsed_seconds": 54.14725266,
+      "kernel_memory_peak_bytes": 1940529152,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37940
+    },
+    {
+      "id": "disk-pin",
+      "mode": "scan",
+      "sampler": "full",
+      "group": "disk",
+      "round": null,
+      "diagnostic_pin": true,
+      "elapsed_seconds": 54.6005855,
+      "kernel_memory_peak_bytes": 1940418560,
+      "peak_scope": "worker lifetime through frozen post-CLI capture; excludes later host acknowledgement hold",
+      "peak_rss_kib": 37796
+    }
+  ],
+  "outcomes": {
+    "policy": "resource-cause-outcomes-v1",
+    "qualification": false,
+    "primary_metadata_effect": "supported",
+    "claim": "Added explicit metadata lookups are sufficient to create a material extra charge in this probe/environment.",
+    "slab_delta_bytes": [
+      1342598504,
+      1342595456,
+      1342587024,
+      1342583096
+    ],
+    "kernel_peak_delta_bytes": [
+      1465077760,
+      1464676352,
+      1464340480,
+      1464619008
+    ],
+    "control_cross_round_ranges_bytes": {
+      "slab": 14296,
+      "peak": 647168
+    },
+    "support_floors_bytes": {
+      "slab": 67108864,
+      "peak": 67108864
+    },
+    "collector": {
+      "status": "within-exploratory-band",
+      "pairs": [
+        {
+          "round": 1,
+          "deltas": {
+            "kernel_memory_peak_bytes": -143360,
+            "peak_rss_kib": -152,
+            "elapsed_seconds": -0.0009166219999983127
+          },
+          "absolute_bounds": {
+            "kernel_memory_peak_bytes": 38819102.72,
+            "peak_rss_kib": 1024,
+            "elapsed_seconds": 2.7049186754
+          },
+          "within": true
+        },
+        {
+          "round": 2,
+          "deltas": {
+            "kernel_memory_peak_bytes": 348160,
+            "peak_rss_kib": -92,
+            "elapsed_seconds": 0.20134300599999477
+          },
+          "absolute_bounds": {
+            "kernel_memory_peak_bytes": 38810173.44,
+            "peak_rss_kib": 1024,
+            "elapsed_seconds": 2.70229089255
+          },
+          "within": true
+        },
+        {
+          "round": 3,
+          "deltas": {
+            "kernel_memory_peak_bytes": 65536,
+            "peak_rss_kib": -100,
+            "elapsed_seconds": 0.051342414000004055
+          },
+          "absolute_bounds": {
+            "kernel_memory_peak_bytes": 38810583.04,
+            "peak_rss_kib": 1024,
+            "elapsed_seconds": 2.7073626330000002
+          },
+          "within": true
+        }
+      ],
+      "scope": "Empirical3-pair descriptive collector bound at this scale/cap, not a confidence interval."
+    },
+    "stat_to_scan_ratios": [
+      {
+        "round": 1,
+        "slab": 0.997205334501962,
+        "peak": 0.875128487092192
+      },
+      {
+        "round": 2,
+        "slab": 0.9971956746719115,
+        "peak": 0.8748765416466179
+      },
+      {
+        "round": 3,
+        "slab": 0.9971989648233591,
+        "peak": 0.874936950360148
+      },
+      {
+        "round": 4,
+        "slab": 0.9971965366517916,
+        "peak": 0.8753696921079575
+      }
+    ],
+    "metadata_scan_comparability": "supported",
+    "interpretation": "supported requires all4 deltas in BOTH primary measures above64MiB and control ranges; rejected means all absolute deltas and control ranges<=16MiB, rejecting only the proposed material effect in this screen; otherwise unresolved. Comparable requires each stat/scan ratio>=0.75 and collector within band. No additive decomposition or population confidence claim."
+  },
+  "by_mode_medians": {
+    "idle": {
+      "elapsed_seconds": 1.0663274875000002,
+      "kernel_memory_peak_bytes": 35491840.0,
+      "peak_rss_kib": 16002.0
+    },
+    "names": {
+      "elapsed_seconds": 20.596144348,
+      "kernel_memory_peak_bytes": 233547776.0,
+      "peak_rss_kib": 16118.0
+    },
+    "stat": {
+      "elapsed_seconds": 34.215096664,
+      "kernel_memory_peak_bytes": 1698191360.0,
+      "peak_rss_kib": 16234.0
+    },
+    "scan": {
+      "elapsed_seconds": 54.324349508,
+      "kernel_memory_peak_bytes": 1940717568.0,
+      "peak_rss_kib": 37792.0
+    }
+  },
+  "disk": {
+    "held_allocated_bytes": 459763712,
+    "stage_released_bytes": 75718656,
+    "previous_released_bytes": 128012288,
+    "final_allocated_bytes": 256032768,
+    "all22release_residuals_bytes": 0,
+    "filesystem_quantization_bytes": 4096,
+    "registered_adjusted_fs_peak_bytes": 459771904,
+    "watcher_coverage_complete": false
+  },
+  "scope": "Causal diagnostic in a controlled 1m/4GiB environment; no optimization qualification, exact peak decomposition, minimum-RAM claim or local-disk equivalence",
+  "scientific_report_review": "resource-cause-report-review-2026-11-02.json"
+}

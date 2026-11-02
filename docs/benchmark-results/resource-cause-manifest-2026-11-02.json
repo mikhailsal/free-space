@@ -1,0 +1,128 @@
+{
+  "campaign": "resource-cause-proof-20261102",
+  "protocol": "resource-cause-v1",
+  "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+  "final_source_hashes": {
+    ".githooks/pre-push": "3f7eab129a9fbb128abae380a3660a565ba02b60ca56cbba112b2b24b8c34844",
+    ".github/workflows/representative-bench.yml": "b87a29bba8b2d8502673ff6dc614c03c114b2d368f01f879819b67f136065865",
+    ".github/workflows/v2-balance.yml": "f0f10aa90f21e1de230302c524e9a6bd68de1f6024f4d51af86c1eb2a63d7378",
+    ".gitignore": "144cf8acc44db639e54616dbcb065774aa1aecb8a7c2892c11acdad075055f2b",
+    "CLAUDE.md": "510561ad3df67c4496c1942f383fa0ff2c20171e31c862a6509ccdae142609da",
+    "docs/benchmark-results/resource-causes-prior-evidence-2026-11-02.md": "ca29394acdcc637b4f46fa030ba04d7b9c1452034b50e6449c3449ce2406bf3e",
+    "docs/designs/resource-cause-proof-plan-2026-11-02.md": "442912ca24ca85bb6e46ea01c9b1179bad2ae83d2c74b3b33d78f5195fccd092",
+    "docs/designs/resource-cause-review-disposition-2026-11-02.md": "53d1497fc236986943bf21b96367c37e6d23a5f42b05ee3e5f2b7949443d3dbf",
+    "docs/designs/resource-stack-hypotheses-2026-11-02.md": "297822867a67d0bc87831e9c560a1c72ae5e03a6ac258ab2f2f3d5e4762ea274",
+    "scripts/bench-disk-calibration.py": "681e2dd0d325d6d2361e077a57b934e05f59d7c984f7bad728b9e8ebca3c73c7",
+    "scripts/bench-v2-container.py": "63cb2d7a9f219bcefceb02f23df7e560ab1ff96071f12f30880257d9459fd20c",
+    "scripts/bench-v2-container/Dockerfile": "af4c443cbeea314ffe9fd1b41de50d95cec5f1a97c8f3a2947d6869bac9c5a3d",
+    "scripts/bench_v1_admission.py": "cdc563be0cc39d88e4e3a3fcd921bd81ce9e47cb71dd8d5d53d5645b80cedf3e",
+    "scripts/bench_v1_fixture.py": "f9a4420749d566632752dc8a8a94265c201097a05d729175ed2d640693151f02",
+    "scripts/bench_v1_pair.py": "060dba1cb9d312ea0712ca0ca5e0e65283c1c729f6165edeac73091a3ab79dbd",
+    "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+    "scripts/bench_v1_runtime.py": "7e0941635fb6253eee414e6e7be4e9be420a25988525a301f7868a66ba525542",
+    "scripts/bench_v1_summary.py": "4192090e14f397ba34559026d200f0c21e21a9f801c05beae059ead5de5fd358",
+    "scripts/bench_v2_config.py": "098f0321d9a0f828ec9cb6321749fe6b7346db05c3fc47ec2dc5f9f68fde840d",
+    "scripts/cause_case.py": "a739759543d3b43044b4c30e0680bf236e4c0ad3d3020941ebed3242cd5c106c",
+    "scripts/cause_forecast.py": "2b4b19a5476c3810b9cf6597abbe70f17371a40ce23485faf5066cd7a576d41a",
+    "scripts/cause_global.py": "26d00ef63e1d63db8722641e8c8ac8afa6fa4b5b36454d3cb0f97186cda8b359",
+    "scripts/cause_host.py": "644bcdb8b81c448bd1c764ddd06a03e9d1e0d0a77947a7a8c3382125f45294df",
+    "scripts/cause_lifetime.py": "05a7d42349894e4a168aab9927a482bb9ad00a2f17ac7294ced25536d6b1b5ac",
+    "scripts/cause_observe.py": "3c47340fc076e07165db23883bf5d7c0d62f24646d9e4f4b9c67e7c834a26395",
+    "scripts/cause_outcomes.py": "f60fe72d180d76495678e8d7ddd61d92e6a09bdf178f3d3b74f0b8d16a6d3424",
+    "scripts/cause_probe.py": "83e445928e933df31e220f2c16f429df1db62e3f51d67bfc8efdbf8aa730d0d1",
+    "scripts/cause_runner.sh": "14bfdddef0fde8d4011e2e7780265d2fe37e828c219c6ccf69005c1670c0e733",
+    "scripts/cause_summary.py": "6fd8a512d90e336217b8c99df57b99989bcf51bf9d7f5bc4f93fcf63603df7e1",
+    "scripts/cause_validate.py": "dcd236a4a7763a6bb9379558f1901ab942fac5874b0c80aab9ebff2b0f5ff4d9",
+    "scripts/cause_worker.py": "761782318334e897fe31f8370fa29b781dfb8590d184af550af7836b2e86e177",
+    "scripts/check.sh": "8ae05f76809fe253f1de77bcb16b0f67da6c1da0bb5529a45ce28a396cafc3ca",
+    "scripts/tests/test_cause_background.py": "46de273ce7dfedca5228b375d8835fd5534764437433981e7f1de60c5f296ebc",
+    "scripts/tests/test_cause_host.py": "50bcf7939cc909de999cd1a06cb582e0966ee264dcad3cff433a11bfe3b52d10",
+    "scripts/tests/test_cause_lifetime.py": "dabf7046cbb693a283625a899009110a39881ec65a04554b9675010184ebe655",
+    "scripts/tests/test_cause_observe.py": "b088b2a0a067b2cf5ed9887a1e1a4729baa794438420ec285d70306b6b072219",
+    "scripts/tests/test_cause_outcomes.py": "f9a31b4010a077fe6a7009fe9a716ab10a25c30212862820147960e3359e7062",
+    "scripts/tests/test_cause_probe_worker.py": "b8484f22a7fd167bc5f0da86ba606541fd52bb2144b925bcbf30e65966587003",
+    "scripts/tests/test_cause_summary.py": "b67e62e16f34cdf728748e50ad985d52fc7105f98e6075eaf31bf0b7416bce59"
+  },
+  "baseline": {
+    "source_revision": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
+    "sha256": "ed2a1cb138b1e48e70a388a4a8fda3e79fcfd2e37fd0c061d41d2d6363f8e980",
+    "run_id": 41277463149,
+    "artifact_id": 13071807048,
+    "target": "x86_64-unknown-linux-musl",
+    "SOURCE_DATE_EPOCH": 1793464183
+  },
+  "proposed_new_maximum_seconds": 7200,
+  "cases": [
+    {
+      "id": "resource-cause-smoke",
+      "stage": "smoke",
+      "files": 100000,
+      "expected_entries": 100449,
+      "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+      "branch": "perf/resource-cause-proof",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "inputs": {
+        "diagnostic_stage": "smoke"
+      },
+      "maximum_job_seconds": 3600,
+      "job_timeout_minutes": 60,
+      "step_cap_seconds": 2700,
+      "host_cap_seconds": 2100,
+      "cleanup_reserve_seconds": 240,
+      "status": "prospective",
+      "depends_on": "FinalsourceactualOpus5.5NO_FINDINGS +normalhooks +exactremote/sourcefreeze +financialreservation +artifactnonexpiry",
+      "automatic_retry": false,
+      "qualification": false
+    },
+    {
+      "id": "resource-cause-screen",
+      "stage": "screen",
+      "files": 1000000,
+      "expected_entries": 1004499,
+      "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+      "branch": "perf/resource-cause-proof",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "inputs": {
+        "diagnostic_stage": "screen"
+      },
+      "maximum_job_seconds": 3600,
+      "job_timeout_minutes": 60,
+      "step_cap_seconds": 2700,
+      "host_cap_seconds": 2100,
+      "cleanup_reserve_seconds": 240,
+      "status": "conditional-prospective",
+      "depends_on": "Same-sourcecompletevalidsmoke +freshprospectivecause_forecastallthreecaps +remainingreserve +artifactnonexpiry",
+      "automatic_retry": false,
+      "qualification": false
+    }
+  ],
+  "root_dispatcher_only": true,
+  "qualification": false,
+  "status": "preregistered-source-frozen-before-dispatch",
+  "created_at": "2026-11-02T01:24:27.338165+00:00",
+  "source_freeze": {
+    "path": "resource-cause-source-freeze-2026-11-02.json",
+    "sha256": "fe275407b2bd38d102cf0132d7be32cbaad051587e894f8db30b228cf7d91284"
+  },
+  "review_proof": {
+    "path": "resource-cause-review-proof-2026-11-02.json",
+    "sha256": "8865312b7da44c9227394a306ccf50c8dcb664d0c44c1286e21280569ecbe749"
+  },
+  "review_archive": {
+    "path": "resource-cause-source-review-2026-11-02.tar.gz",
+    "sha256": "53824d40aaadfa9e80f62673652838bd229c7a930ffe6b57aef3d657c6f51a54"
+  },
+  "initial_smoke_whole_step_forecast_seconds": 1800,
+  "initial_smoke_with_30pct_margin_seconds": 2340,
+  "screen_forecast": "Only validsame-source smoke timing via cause_forecast.py, allthreecaps; separate prospective admission file before screen",
+  "artifact_admission": {
+    "expires_at": "2026-11-08T05:37:09Z",
+    "before_smoke_minimum_remaining_seconds": 10800,
+    "before_screen_minimum_remaining_seconds": 7200,
+    "recheck_before_each_dispatch": true
+  },
+  "paid_compute": false,
+  "bookkeeping": "Manual root-controlled registration under orderedlocks; no autonomous dispatcher or privatebookkeepingprogramreview claimed"
+}

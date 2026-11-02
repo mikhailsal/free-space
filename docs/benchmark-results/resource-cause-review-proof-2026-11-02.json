@@ -1,0 +1,253 @@
+{
+  "protocol": "resource-cause-source-review-binding-v1",
+  "source_revision": "51ff2065e49184583932c2ef6d90152c1a586671",
+  "created_at": "2026-11-02T01:22:02.780573+00:00",
+  "actual_review_model": "claude-opus-5-5",
+  "final_literal": "NO_FINDINGS",
+  "coverage": {
+    "CLAUDE.md": [
+      "03-ram",
+      "03-disk",
+      "04-closure"
+    ],
+    "docs/benchmark-results/resource-causes-prior-evidence-2026-11-02.md": [
+      "03-ram",
+      "03-disk"
+    ],
+    "scripts/bench-v2-container.py": [
+      "03-ram"
+    ],
+    "scripts/bench_v1_admission.py": [
+      "03-ram",
+      "03-disk"
+    ],
+    "scripts/bench_v1_pair.py": [
+      "03-ram",
+      "03-disk"
+    ],
+    "scripts/bench_v1_runtime.py": [
+      "03-ram",
+      "03-disk",
+      "04-closure"
+    ],
+    "scripts/bench_v1_summary.py": [
+      "03-ram"
+    ],
+    "scripts/bench_v2_config.py": [
+      "03-ram"
+    ],
+    "scripts/cause_case.py": [
+      "03-ram",
+      "03-disk",
+      "04-closure"
+    ],
+    "scripts/cause_global.py": [
+      "03-ram"
+    ],
+    "scripts/cause_host.py": [
+      "03-ram",
+      "03-disk",
+      "04-closure"
+    ],
+    "scripts/cause_outcomes.py": [
+      "03-ram"
+    ],
+    "scripts/cause_probe.py": [
+      "03-ram"
+    ],
+    "scripts/cause_worker.py": [
+      "03-ram"
+    ],
+    "scripts/tests/test_cause_background.py": [
+      "03-ram"
+    ],
+    "scripts/tests/test_cause_outcomes.py": [
+      "03-ram"
+    ],
+    "scripts/tests/test_cause_probe_worker.py": [
+      "03-ram"
+    ],
+    ".githooks/pre-push": [
+      "03-disk"
+    ],
+    ".github/workflows/representative-bench.yml": [
+      "03-disk"
+    ],
+    ".github/workflows/v2-balance.yml": [
+      "03-disk"
+    ],
+    ".gitignore": [
+      "03-disk"
+    ],
+    "scripts/bench-disk-calibration.py": [
+      "03-disk"
+    ],
+    "scripts/bench-v2-container/Dockerfile": [
+      "03-disk"
+    ],
+    "scripts/bench_v1_fixture.py": [
+      "03-disk",
+      "04-closure"
+    ],
+    "scripts/bench_v1_runner_prepare.py": [
+      "03-disk"
+    ],
+    "scripts/cause_runner.sh": [
+      "03-disk"
+    ],
+    "scripts/check.sh": [
+      "03-disk"
+    ],
+    "scripts/tests/test_cause_host.py": [
+      "03-disk"
+    ],
+    "docs/designs/resource-cause-proof-plan-2026-11-02.md": [
+      "04-closure"
+    ],
+    "scripts/cause_forecast.py": [
+      "04-closure"
+    ],
+    "scripts/cause_lifetime.py": [
+      "04-closure"
+    ],
+    "scripts/cause_observe.py": [
+      "04-closure"
+    ],
+    "scripts/cause_summary.py": [
+      "04-closure"
+    ],
+    "scripts/cause_validate.py": [
+      "04-closure"
+    ],
+    "scripts/tests/test_cause_lifetime.py": [
+      "04-closure"
+    ],
+    "scripts/tests/test_cause_observe.py": [
+      "04-closure"
+    ],
+    "scripts/tests/test_cause_summary.py": [
+      "04-closure"
+    ],
+    "docs/designs/resource-cause-review-disposition-2026-11-02.md": [
+      "05-text-closure",
+      "06-format-closure"
+    ],
+    "docs/designs/resource-stack-hypotheses-2026-11-02.md": [
+      "05-text-closure",
+      "06-format-closure"
+    ]
+  },
+  "source_hashes": {
+    ".githooks/pre-push": "3f7eab129a9fbb128abae380a3660a565ba02b60ca56cbba112b2b24b8c34844",
+    ".github/workflows/representative-bench.yml": "b87a29bba8b2d8502673ff6dc614c03c114b2d368f01f879819b67f136065865",
+    ".github/workflows/v2-balance.yml": "f0f10aa90f21e1de230302c524e9a6bd68de1f6024f4d51af86c1eb2a63d7378",
+    ".gitignore": "144cf8acc44db639e54616dbcb065774aa1aecb8a7c2892c11acdad075055f2b",
+    "CLAUDE.md": "510561ad3df67c4496c1942f383fa0ff2c20171e31c862a6509ccdae142609da",
+    "docs/benchmark-results/resource-causes-prior-evidence-2026-11-02.md": "ca29394acdcc637b4f46fa030ba04d7b9c1452034b50e6449c3449ce2406bf3e",
+    "docs/designs/resource-cause-proof-plan-2026-11-02.md": "442912ca24ca85bb6e46ea01c9b1179bad2ae83d2c74b3b33d78f5195fccd092",
+    "docs/designs/resource-cause-review-disposition-2026-11-02.md": "53d1497fc236986943bf21b96367c37e6d23a5f42b05ee3e5f2b7949443d3dbf",
+    "docs/designs/resource-stack-hypotheses-2026-11-02.md": "297822867a67d0bc87831e9c560a1c72ae5e03a6ac258ab2f2f3d5e4762ea274",
+    "scripts/bench-disk-calibration.py": "681e2dd0d325d6d2361e077a57b934e05f59d7c984f7bad728b9e8ebca3c73c7",
+    "scripts/bench-v2-container.py": "63cb2d7a9f219bcefceb02f23df7e560ab1ff96071f12f30880257d9459fd20c",
+    "scripts/bench-v2-container/Dockerfile": "af4c443cbeea314ffe9fd1b41de50d95cec5f1a97c8f3a2947d6869bac9c5a3d",
+    "scripts/bench_v1_admission.py": "cdc563be0cc39d88e4e3a3fcd921bd81ce9e47cb71dd8d5d53d5645b80cedf3e",
+    "scripts/bench_v1_fixture.py": "f9a4420749d566632752dc8a8a94265c201097a05d729175ed2d640693151f02",
+    "scripts/bench_v1_pair.py": "060dba1cb9d312ea0712ca0ca5e0e65283c1c729f6165edeac73091a3ab79dbd",
+    "scripts/bench_v1_runner_prepare.py": "43881543a971bea9a990f854e9786d9f4bedae04f96cbc266e7b1d31ebd9fb46",
+    "scripts/bench_v1_runtime.py": "7e0941635fb6253eee414e6e7be4e9be420a25988525a301f7868a66ba525542",
+    "scripts/bench_v1_summary.py": "4192090e14f397ba34559026d200f0c21e21a9f801c05beae059ead5de5fd358",
+    "scripts/bench_v2_config.py": "098f0321d9a0f828ec9cb6321749fe6b7346db05c3fc47ec2dc5f9f68fde840d",
+    "scripts/cause_case.py": "a739759543d3b43044b4c30e0680bf236e4c0ad3d3020941ebed3242cd5c106c",
+    "scripts/cause_forecast.py": "2b4b19a5476c3810b9cf6597abbe70f17371a40ce23485faf5066cd7a576d41a",
+    "scripts/cause_global.py": "26d00ef63e1d63db8722641e8c8ac8afa6fa4b5b36454d3cb0f97186cda8b359",
+    "scripts/cause_host.py": "644bcdb8b81c448bd1c764ddd06a03e9d1e0d0a77947a7a8c3382125f45294df",
+    "scripts/cause_lifetime.py": "05a7d42349894e4a168aab9927a482bb9ad00a2f17ac7294ced25536d6b1b5ac",
+    "scripts/cause_observe.py": "3c47340fc076e07165db23883bf5d7c0d62f24646d9e4f4b9c67e7c834a26395",
+    "scripts/cause_outcomes.py": "f60fe72d180d76495678e8d7ddd61d92e6a09bdf178f3d3b74f0b8d16a6d3424",
+    "scripts/cause_probe.py": "83e445928e933df31e220f2c16f429df1db62e3f51d67bfc8efdbf8aa730d0d1",
+    "scripts/cause_runner.sh": "14bfdddef0fde8d4011e2e7780265d2fe37e828c219c6ccf69005c1670c0e733",
+    "scripts/cause_summary.py": "6fd8a512d90e336217b8c99df57b99989bcf51bf9d7f5bc4f93fcf63603df7e1",
+    "scripts/cause_validate.py": "dcd236a4a7763a6bb9379558f1901ab942fac5874b0c80aab9ebff2b0f5ff4d9",
+    "scripts/cause_worker.py": "761782318334e897fe31f8370fa29b781dfb8590d184af550af7836b2e86e177",
+    "scripts/check.sh": "8ae05f76809fe253f1de77bcb16b0f67da6c1da0bb5529a45ce28a396cafc3ca",
+    "scripts/tests/test_cause_background.py": "46de273ce7dfedca5228b375d8835fd5534764437433981e7f1de60c5f296ebc",
+    "scripts/tests/test_cause_host.py": "50bcf7939cc909de999cd1a06cb582e0966ee264dcad3cff433a11bfe3b52d10",
+    "scripts/tests/test_cause_lifetime.py": "dabf7046cbb693a283625a899009110a39881ec65a04554b9675010184ebe655",
+    "scripts/tests/test_cause_observe.py": "b088b2a0a067b2cf5ed9887a1e1a4729baa794438420ec285d70306b6b072219",
+    "scripts/tests/test_cause_outcomes.py": "f9a31b4010a077fe6a7009fe9a716ab10a25c30212862820147960e3359e7062",
+    "scripts/tests/test_cause_probe_worker.py": "b8484f22a7fd167bc5f0da86ba606541fd52bb2144b925bcbf30e65966587003",
+    "scripts/tests/test_cause_summary.py": "b67e62e16f34cdf728748e50ad985d52fc7105f98e6075eaf31bf0b7416bce59"
+  },
+  "completed_review_chain": [
+    {
+      "id": "03-ram",
+      "status": "completed",
+      "exit_code": 0,
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "result": "[P3] **The screen forecast does not scale the idle cases' entry-dependent host work** (`scripts/cause_forecast.py:34-36`, `projected = ... + 4 * times['smoke-idle']`).\n\nThe comment justifies this as \"Idle retains four one-second controls.\" The value used, however, is the idle case's whole `host-timing.json` `total_seconds`. Each idle case in `scripts/cause_host.py:execute` does more than the one-second sleep:\n\n- It copies the seed with `shutil.copytree(seed, case)` and runs `seed_hash` on the copy.\n- It runs `helper.flush_caches`, which does `os.sync()` on the freshly written copy, then `drop_caches`.\n- It runs `verify_seed_integrity`, which reads and hashes the whole copied snapshot.\n- It removes the copy with `shutil.rmtree(case)`.\n\nAll of this grows with snapshot size, roughly tenfold from 100k to 1m. The 1m retained snapshot is about 244 MiB per generation, with current and previous both copied.\n\nThe names and stat cases include the same work and are scaled by 10. Idle is the only per-case term left at 100k scale. This contradicts the stated method (\"scales entry-dependent work by ten\") in `docs/designs/resource-cause-proof-plan-2026-11-02.md` and the disposition row \"Smoke cannot derive forecast.\"\n\nThe effect is a systematic, non-conservative underestimate of `host_forecast_seconds`. Four idle cases each miss roughly 9\u00d7 their copy, hash, flush and verify time. This feeds all three admission inequalities (2100 / 2700 / +240 cleanup). A borderline screen could then be admitted and hit the hard host deadline, charging up to 3600 runner-seconds for an invalid campaign.\n\nFix: split the idle receipt into constant parts (worker and capture time) and scaled parts (`copy_and_seed_hash_seconds`, `cache_flush_seconds`, the seed-integrity time, `case_cleanup_seconds`), and project `4 \u00d7 (constant + 10 \u00d7 scaled)`. A simpler, more conservative option is to scale the idle total by 10 like the other cases.\n\nThis forecast runs after source freeze and must be fixed before freeze. Adjust `test_screen_forecast_uses_every_fixed_case_and_both_caps`, whose expected 234 s encodes the current formula.\n\nNo other material RAM-scope findings. These parts were checked and look consistent:\n\n- **Probe:** dirent ABI and record bounds, DT_UNKNOWN rejection, inode/type parity, and the multiset digest.\n- **Worker sampler:** the 250 ms coverage with boundary gaps, and the frozen pre/post cgroup brackets.\n- **Raw counters:** required counters, events and events.local, and the pgscan/pgsteal censoring check.\n- **Validator:** cross-checks of schedule, counts, Docker caps and I/O.\n- **Outcomes:** support and rejection rules, the collector bounds and the 0.75 ratios, all matching the plan.\n- **Forecast:** case multiplicities of 4/4/4/7/3/1.\n\nOutside this part's packet, and not reviewed: `cause_observe.capture_cgroup`, `cause_lifetime`, `bench_v1_fixture.prepare` (fixture entry-type composition), `cause_runner.sh` and `v2-balance.yml`.",
+      "packet_sha256": "92526a09a61e91d7644e39dfda471e754eb2b62a44baddd923a5287dc50ae0ab",
+      "prompt_sha256": "7d40299e26377b4c30b9cc229eb4109f84dc7b4295afa647ee79a9ca9812e34e",
+      "response_sha256": "00eabd2ed74813c2081e0dd7519ad976a27cdc0431edcea065023cd4c1641e96",
+      "role": "completedfinitefindingsandclosurechain"
+    },
+    {
+      "id": "03-disk",
+      "status": "completed",
+      "exit_code": 0,
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "result": "**[P3] Named-file vanish races during traversal count as hard errors, which can fail the disk group.**\n- **Where:** `scripts/cause_observe.py` (`record_inventory` \u2192 `walk`), `scripts/cause_lifetime.py` (`poll`), and `scripts/cause_validate.py` (`lifetime_ok`).\n- **What happens:**\n  - `walk` puts every `OSError` from `entry.stat(...)` or a subdirectory `os.open` into `errors`. That includes `FileNotFoundError` when a name disappears between `readdir` and `fstatat`.\n  - `LifetimeWatch.poll` then reports each inventory error as `self._issue(\"errors\", ...)`, the true-error kind, not `races`.\n  - `lifetime_ok` requires `counts['errors'] - counts['races'] - counts['limits'] == 0`.\n- **When it triggers:** an ordinary unlink or rename during a watched poll. Examples are the stage removal, the `snapshot.prev.tmp` link-then-rename, the output rename over current, or anything created and unlinked under `snapshot/tmp`.\n- **Consequence:** the declared \"races are not absence/errors\" contract breaks, and `disk-pin` becomes invalid. Because failed measurements are never rerun, the smoke is invalid and the screen cannot be admitted. That costs a new source, review and reservation.\n- **Probability:** low per run, since each window is microseconds per 50 ms poll. But it is a deterministic misclassification on a one-shot path.\n- **Fix:**\n  - In `walk`, classify `FileNotFoundError` separately as a race, and still mark the inventory incomplete.\n  - In `poll`, map those entries to `_issue(\"races\", ...)`.\n  - Keep treating any error as fatal in the quiescent inventories inside `disk_capture` (held, unlinked and final).\n\n**[P3] The \"stage retirement observed\" check is vacuous.**\n- **Where:** `scripts/cause_validate.py` (`lifetime_ok`, last `need`), together with `scripts/cause_lifetime.py` (`poll`, `present.setdefault(\"named:\" + path, absent)`).\n- **What happens:**\n  - On the first complete poll, before the stage exists, `_transition` records `named:snapshot.stage.tmp` going from `None` to `{\"state\": \"absent\"}`. `test_identity_transitions_and_deduplicated_maxima` asserts exactly this as `stage_changes[0]`.\n  - `lifetime_ok` only checks that some transition for that path has `current.state == 'absent'`, so the first poll satisfies it every time.\n- **Consequence:**\n  - The lifetime receipt is accepted even if the watcher never observed the stage existing and then retiring. That could happen if the watch started late or every poll during the stage lifetime was incomplete.\n  - The retirement itself is still verified by `disk_capture` (`path_state == 'absent'` and `naturally_unlinked`). So this is a misleading evidence claim, not a missing gate.\n- **Fix:** require a transition whose `previous` carries an `inode` and whose `current` is `absent`, with the inode equal to the pinned stage inode. Alternatively, drop the claim.\n\n**[P3] The pinned baseline artifact likely expires about seven days after its build run, and nothing before dispatch checks the remaining lifetime.**\n- **Where:** `.github/workflows/representative-bench.yml` (`representative-binary` upload, `retention-days: 7`) and `.github/workflows/v2-balance.yml` (provenance step asserts `artifact['expired'] is False`; download uses `run-id: 41277463149`).\n- **Why it matters:**\n  - Run 41277463149 is adjacent to the 2026-11-01 canonical run, so expiry is probably around 2026-11-08.\n  - Smoke, the forecast, any repair-and-review cycle and the screen all have to finish before then.\n  - The in-workflow check fails closed, but only after a runner job has started and been charged.\n  - Because source identity is frozen to this artifact ID and run, an expiry forces a new source and review rather than a simple redispatch.\n- **Fix:** have the root admission procedure read `expires_at` and refuse dispatch unless the smoke, plus the screen if it remains possible, fits before expiry. Alternatively, archive the verified ED2 payload under a durable identity before freezing.",
+      "packet_sha256": "1c04a6e8c8bb993637b2abffd9265403b3ba57d70282a482e646c2c1bb08530f",
+      "prompt_sha256": "e63db61b08e115432dde8f8eb91c7755dc6fdbb8d6e4e574b9ffa7453f4c6d32",
+      "response_sha256": "7e50ba1a668cbe17079d31af9a1c86c8ba01b0d38d20d0e5563c11a2191f8f31",
+      "role": "completedfinitefindingsandclosurechain"
+    },
+    {
+      "id": "04-closure",
+      "status": "completed",
+      "exit_code": 0,
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "result": "# Closure review: bd108e1 (`resource-cause-review-closure-v1`)\n\n**Scope.** I re-read every body whose hash changed since the 03 packets:\n\n- the plan, disposition and stack-hypotheses docs;\n- `cause_forecast.py`, `cause_lifetime.py`, `cause_observe.py`, `cause_summary.py`, `cause_validate.py`;\n- `test_cause_lifetime.py`, `test_cause_observe.py`, `test_cause_summary.py`.\n\nI also checked their unchanged consumers that appear in the packet (`cause_case.py`, `cause_host.py`). Other final hashes match the bodies reviewed in 03, and I did not reread those bodies.\n\nThe 03 reviews are treated as completed but not clean. Review02 timed out and is not counted as coverage.\n\n## 03 findings: all four closed\n\n**1. RAM P3: the idle case was not scaled in the forecast. Closed.**\n- `cause_forecast.py` now projects `10\u00b7(setup + fixed_host) + 40\u00b7idle + 40\u00b7(names + stat) + 70\u00b7scan + 30\u00b7reserve + 10\u00b7disk`.\n- The multiplicities match `build_schedule('screen')`: 4 idle, 4 names, 4 stat, 4 Williams scans plus 3 full collector scans = 7 full scans, 3 reserve scans, and 1 disk pass.\n- Each idle term uses the whole `total_seconds`, so its copy, hash, flush, verify and cleanup time and its 1 s sleep are all scaled.\n- The test numbers check out:\n  - Base fixture: setup 4 s, six cases at 1 s each, elapsed 10 s, so `fixed_host = 0`. The projection is 40 + 40 + 80 + 70 + 30 + 10 = 270, and the whole step is 270 + (200 \u2212 10) = 460.\n  - Rejection case: projected 4230, which is not admitted.\n- All three admission inequalities still use the scaled host total.\n\n**2. Disk P3: a vanished name was counted as a hard error. Closed.**\n- Live handling:\n  - `walk` marks `FileNotFoundError` with `race=True`, both for `entry.stat` and for opening a subdirectory.\n  - `poll` maps those entries to the `races` counter.\n  - `_issue` counting keeps `errors \u2212 races \u2212 limits` equal to the number of true errors, which is what `lifetime_ok` checks.\n- Quiescent handling stays fatal:\n  - Any race entry still makes `complete` false.\n  - `disk_capture` requires `complete` for the held, unlinked and final inventories.\n  - `inventory_ok` requires that `errors` is empty.\n- Tests cover both the observe-level case (stat and subdirectory open) and the watcher-level mapping. Patching `cause_lifetime.os.scandir` patches the shared `os` module, so the injection reaches `record_inventory`.\n\n**3. Disk P3: the stage-retirement check was vacuous. Closed.**\n- `lifetime_ok` now walks the transitions for `named:snapshot.stage.tmp` in order.\n- `observed` becomes true only when a current state matches the pinned stage's device and inode.\n- `retired` becomes true only for an `absent` state that comes after such an observation.\n- An initial absence therefore fails.\n- An `unavailable` sample in between neither sets `observed` nor counts as absence. `_transition` keeps it as `unavailable` and never synthesizes `absent` from an incomplete sample.\n- Incomplete polls still record the identities that were actually present, so they can count as positive observations.\n- The tests cover the initial-absence failure (disk group invalid, RAM group still valid) and the tolerated unknown intermediate sample.\n\n**4. Disk P3: artifact expiry was not checked before dispatch. Closed at procedure level, as scoped.**\n- The plan doc and the packet's admission policy require a root re-check of authoritative metadata immediately before each dispatch:\n  - smoke needs at least 10800 s remaining (two 3600 s jobs plus 3600 s margin);\n  - screen needs at least 7200 s remaining (one 3600 s job plus 3600 s margin).\n- The recorded remaining time of 534,978.6 s matches checked_at 2026-11-02T01:00:50Z against expiry 2026-11-08T05:37:09Z.\n- No claim of in-workflow enforcement is made.\n\n**New interface effects checked:** none are adverse.\n- The `cause_summary` group split still yields a valid RAM group when the disk pass fails.\n- The forecast's `require_cleanup` path is unchanged.\n- The only fixture schema change is the addition of stage transition records.\n- No new claims about application execution, dispatch or engine performance were introduced.\n\n## Findings\n\n**[P3] The new native refresh evidence in `resource-stack-hypotheses-2026-11-02.md` misdescribes its raw data in two places.**\n\n1. **\"Warm\" is contradicted for v1.**\n   - The doc calls the three v1 refreshes \"three warm commands\". The raw metrics for `0002-\u2026-5-refresh` show GNU time `inputs = 2,528,376` 512-byte blocks, about 1.2 GiB read from storage. Refreshes 6 and 7 show 64 and 0.\n   - So the first v1 command, which is also the 28.929 s upper end of the quoted range, was not warm. The v2 commands also show about 7\u201310k input blocks each.\n   - Fix: describe them as \"consecutive, not cache-controlled\". Note that v1 refresh 5 read about 1.2 GiB while refreshes 6 and 7 were near-warm.\n\n2. **\"Original full-size\" is ambiguous.**\n   - The same document defines the full-size fixture as 7,297,076 entries. These measurements report 7,202,464 entries (the `7195248`-file fixture).\n   - Fix: say it is an older fixture of about 7.20M entries, not the canonical full-size one, so no one compares it directly with canonical results.\n\nThe quoted numeric ranges are otherwise exact:\n- v2: 0.0169\u20130.0302 s and 8.02\u20138.14 MiB (8208\u20138332 KiB).\n- v1: 26.497\u201328.929 s and about 1.081 GiB (1,133,208\u20131,133,724 KiB).\n- All rows have 18 subtree entries.\n\nThe doc also already disclaims any per-command cgroup, cold-start or promotion result. Because no gate or code depends on this text, the severity stays at P3. It should still be corrected before the freeze, because it is an evidence claim that will be archived.\n\nNon-blocking note: the disposition table's \"64 new tiny tests\" is a historical count from review01. The packet now records 68. Updating or dating that count would avoid confusion.\n\nNo P1 or P2 issues remain in the combined reviewed source.",
+      "packet_sha256": "3453ed78df12e1ec651b57c81a963945459c5cd9d7df95f1e117f0470e10dd8d",
+      "prompt_sha256": "1a657d993be38593333d8dc2b2bd07b5aee78e41a8403cc0a6b98eeeca011549",
+      "response_sha256": "ae0fe920a185856c191ad2aeaab36658951d614f679bcf93189e60e93d185b4f",
+      "role": "completedfinitefindingsandclosurechain"
+    },
+    {
+      "id": "05-text-closure",
+      "status": "completed",
+      "exit_code": 0,
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "result": "NO_FINDINGS\n\n**Scope:** This was a text-only check of the two changed documentation bodies against the supplied raw metrics. I did not reread the omitted bodies or audit any code. The final source hashes are taken as asserted by the packet; I computed none of them.\n\n**The 04 P3 is closed.** Each element of the corrected wording in `resource-stack-hypotheses-2026-11-02.md` matches the raw data:\n\n| Doc wording | Raw support | Result |\n| --- | --- | --- |\n| Older fixture of 7,202,464 entries, not the canonical 7,297,076 | All six reports show `entries: 7202464`. The doc's own canonical definition is 7,297,076. | \u2713 |\n| \"three consecutive, not cache-controlled\" | Generations 6, 7, 8 for each engine (suffixes 5, 6, 7). No claim that all were warm remains. | \u2713 |\n| First v1 read about 1.206 GiB | 2,528,376 \u00d7 512 = 1,294,528,512 B, which is 1.2056 GiB | \u2713 |\n| Later v1 reads of 32 KiB and 0 | 64 \u00d7 512 = 32,768 B, and 0 | \u2713 |\n| v2 reads about 3.46\u20135.09 MiB | 7,088 \u00d7 512 = 3.461 MiB and 10,432 \u00d7 512 = 5.094 MiB (7,096 falls in between) | \u2713 |\n| v2 time 0.0169\u20130.0302 s | 0.016917, 0.017582, 0.030184 | \u2713 |\n| v2 RSS 8.02\u20138.14 MiB | 8,208 to 8,332 KiB | \u2713 |\n| v1 time 26.497\u201328.929 s | 26.4969, 27.9311, 28.9294 | \u2713 |\n| v1 RSS about 1.081 GiB | 1,133,208 to 1,133,724 KiB, which is 1.0807\u20131.0812 GiB | \u2713 |\n| 18-entry refreshes | `subtree_entries: 18` in every report | \u2713 |\n| No per-cgroup, cold, canonical or promotion claim | The doc explicitly disclaims total-cgroup saving, cold results and promotion. It also states this is not the canonical fixture and not a fresh-cgroup screen. | \u2713 |\n\n**The non-blocking count note is resolved.** The disposition doc now dates \"64 new tiny tests\" to that checkpoint and adds \"(68 new tests after follow-up repairs)\".\n\n**The new \"Closure review04\" section is accurate.** It describes 04 correctly: one sole Opus 5.5 run, exit 0, all four 03 findings closed, one P3 documentation issue remaining, and no P1 or P2. It restates the correction consistently with the stack doc. It does not count 03's structured pass or review02's timeout as a clean review.\n\nNo material findings remain in the combined reviewed final source.",
+      "packet_sha256": "915c4a637cce166389d78dfa1483f99f4990a599339d9a0667d594dff59ddaae",
+      "prompt_sha256": "4c5f1f5bc4fd32b62e8e61190d04d026a0ef2bd384abd2d5ab9b56d153d7568b",
+      "response_sha256": "b7e99a1f3102f73fc20fb35e3e62cd1449dbc0334702dfb6d9c8b112c9a04c4c",
+      "role": "completedfinitefindingsandclosurechain"
+    },
+    {
+      "id": "06-format-closure",
+      "status": "completed",
+      "exit_code": 0,
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "result": "NO_FINDINGS",
+      "packet_sha256": "0898eed161cbf0c7a89027a4dcea2b6f439b0898100be6383082d5ebcb0b6ede",
+      "prompt_sha256": "3ca90bdaa2eddbd00a5c8d4a4d40eaae2a037a8f86d26f75f81ef4b173e0efb7",
+      "response_sha256": "5923a7b347d70ccc3bf39b09e5286aa513b43923f67d2c31c15f4268f4f6ff44",
+      "role": "finalcleanformatclosure"
+    }
+  ],
+  "excluded": [
+    "review02 timeout: no outside coverage",
+    "review05 alone: actualcompletednoFindings but installedstructuredparser unverifiedformat; final06required"
+  ],
+  "method": "Exact final bodies in completed actual03/04 review scopes, finitefindingsclosed04/05, final06 literal+structured clean; no claim finaltextreview rereadunchangedcode or privatebookkeepingprogramreviewed"
+}
