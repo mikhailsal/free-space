@@ -189,7 +189,8 @@ df -i "$mount_dir" > "$output/inodes.txt"
 image="cleanup-probe:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}-${GITHUB_JOB}"
 if [[ $CLEANUP_STAGE == smoke ]]; then
   bounded 600 docker build -f scripts/cleanup_probe.Dockerfile -t "$image" scripts/bench-v2-container
-  bounded 300 bash -c 'set -o pipefail; docker save "$1" | gzip -1 > "$2"' _ "$image" "$output/provenance/runtime-image.tar.gz"
+  bounded 300 docker save -o "$output/provenance/runtime-image.tar" "$image"
+  bounded 300 gzip -1 "$output/provenance/runtime-image.tar"
 else
   [[ -f ${CLEANUP_SMOKE_IMAGE:?} && -f ${CLEANUP_SMOKE_RUNTIME:?} ]] || exit 1
   bounded 300 docker load -i "$CLEANUP_SMOKE_IMAGE"
@@ -199,7 +200,8 @@ fi
 bounded 30 docker image inspect "$image" > "$output/provenance/image.json"
 version_limit=$(setup_timeout 60)
 run_owned timeout --kill-after=5s "${version_limit}s" docker run --rm --label "$benchmark_label" --network none \
-  --entrypoint python3 "$image" -c 'import json,platform,sqlite3,subprocess; q=lambda x:subprocess.check_output(x,text=True,timeout=10).strip(); print(json.dumps({"python":platform.python_version(),"sqlite":sqlite3.sqlite_version,"fio":q(["fio","--version"]),"time":q(["/usr/bin/time","--version"]).splitlines()[0],"packages":q(["dpkg-query","-W","-f=${Package}=${Version}\n"]).splitlines()},sort_keys=True))' > "$output/provenance/runtime-versions.json"
+  --mount "type=bind,src=$repo/scripts,dst=/harness,readonly" \
+  --entrypoint python3 "$image" /harness/cleanup_probe_versions.py > "$output/provenance/runtime-versions.json"
 python3 - "$output/provenance" <<'PYRUNTIME'
 import json,pathlib,sys
 p=pathlib.Path(sys.argv[1])
