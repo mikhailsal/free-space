@@ -1,0 +1,239 @@
+{
+  "protocol": "resource-format-overhead-v1",
+  "scope": "Offline arithmetic from retained raw page aggregates, not a compression or product benchmark",
+  "source_archive": "resource-cause-screen-2026-11-02.tar.gz",
+  "source_member": "original-artifact/measurements/disk-pin/disk.json",
+  "source_member_sha256": "24b46dfbe35c12c93a751a231f8325b5ae2d58b1f034237e0f80d87d235d1f8c",
+  "entries": 1004499,
+  "databases": {
+    "published_current": {
+      "logical_bytes": 128012288,
+      "groups": {
+        "table": {
+          "bytes": 69500928,
+          "payload": 59888890,
+          "unused": 3269416
+        },
+        "index": {
+          "bytes": 58507264,
+          "payload": 40102832,
+          "unused": 6173062
+        },
+        "schema": {
+          "bytes": 4096,
+          "payload": 2259,
+          "unused": 1667
+        }
+      },
+      "objects": {
+        "denied": {
+          "bytes": 4096,
+          "payload": 0,
+          "unused": 4088
+        },
+        "entries": {
+          "bytes": 69431296,
+          "payload": 59866582,
+          "unused": 3234296
+        },
+        "entries_alloc": {
+          "bytes": 9785344,
+          "payload": 6027594,
+          "unused": 715589
+        },
+        "entries_mtime": {
+          "bytes": 14942208,
+          "payload": 10012092,
+          "unused": 1872847
+        },
+        "entries_parent_alloc": {
+          "bytes": 14888960,
+          "payload": 10009172,
+          "unused": 1822675
+        },
+        "entries_path_hash": {
+          "bytes": 18853888,
+          "payload": 14030062,
+          "unused": 1755097
+        },
+        "hardlinks": {
+          "bytes": 40960,
+          "payload": 21978,
+          "unused": 6870
+        },
+        "hardlinks_inode": {
+          "bytes": 36864,
+          "payload": 23912,
+          "unused": 6854
+        },
+        "meta": {
+          "bytes": 4096,
+          "payload": 74,
+          "unused": 4010
+        },
+        "mounts": {
+          "bytes": 4096,
+          "payload": 0,
+          "unused": 4088
+        },
+        "refreshes": {
+          "bytes": 4096,
+          "payload": 0,
+          "unused": 4088
+        },
+        "roots": {
+          "bytes": 4096,
+          "payload": 44,
+          "unused": 4040
+        },
+        "sqlite_schema": {
+          "bytes": 4096,
+          "payload": 2259,
+          "unused": 1667
+        },
+        "sqlite_stat1": {
+          "bytes": 4096,
+          "payload": 212,
+          "unused": 3848
+        },
+        "sqlite_stat4": {
+          "bytes": 4096,
+          "payload": 0,
+          "unused": 4088
+        }
+      },
+      "exclusive_page_breakdown": {
+        "table_record_payload": {
+          "bytes": 59888890,
+          "MiB": 57.1144962310791,
+          "percent_of_file": 46.78370407690862
+        },
+        "index_record_payload": {
+          "bytes": 40102832,
+          "MiB": 38.24504089355469,
+          "percent_of_file": 31.327330076312673
+        },
+        "btree_cell_structure_including_rowid_keys": {
+          "bytes": 18574162,
+          "MiB": 17.713701248168945,
+          "percent_of_file": 14.509671134071128
+        },
+        "unused_page_space": {
+          "bytes": 9444145,
+          "MiB": 9.006638526916504,
+          "percent_of_file": 7.3775300383663165
+        },
+        "schema_record_payload": {
+          "bytes": 2259,
+          "MiB": 0.0021543502807617188,
+          "percent_of_file": 0.0017646743412632387
+        }
+      },
+      "index_pages_percent": 45.70441237641187,
+      "non_table_payload_percent": 53.21629592309138,
+      "file_to_table_payload_ratio": 2.137496420454612,
+      "freelist_count": 0
+    },
+    "stage": {
+      "logical_bytes": 75714560,
+      "groups": {
+        "table": {
+          "bytes": 42389504,
+          "payload": 35936774,
+          "unused": 254629
+        },
+        "index": {
+          "bytes": 33320960,
+          "payload": 26777150,
+          "unused": 3426642
+        },
+        "schema": {
+          "bytes": 4096,
+          "payload": 942,
+          "unused": 3019
+        }
+      },
+      "objects": {
+        "jobs": {
+          "bytes": 4096,
+          "payload": 0,
+          "unused": 4088
+        },
+        "links": {
+          "bytes": 180224,
+          "payload": 161333,
+          "unused": 6135
+        },
+        "links_owner": {
+          "bytes": 221184,
+          "payload": 175195,
+          "unused": 39286
+        },
+        "mount_info": {
+          "bytes": 4096,
+          "payload": 0,
+          "unused": 4088
+        },
+        "raw": {
+          "bytes": 42201088,
+          "payload": 35775441,
+          "unused": 240318
+        },
+        "raw_children": {
+          "bytes": 33099776,
+          "payload": 26601955,
+          "unused": 3387356
+        },
+        "sqlite_schema": {
+          "bytes": 4096,
+          "payload": 942,
+          "unused": 3019
+        }
+      },
+      "exclusive_page_breakdown": {
+        "table_record_payload": {
+          "bytes": 35936774,
+          "MiB": 34.2719783782959,
+          "percent_of_file": 47.46349183036922
+        },
+        "index_record_payload": {
+          "bytes": 26777150,
+          "MiB": 25.536680221557617,
+          "percent_of_file": 35.36591905176495
+        },
+        "btree_cell_structure_including_rowid_keys": {
+          "bytes": 9315404,
+          "MiB": 8.883861541748047,
+          "percent_of_file": 12.303319203070057
+        },
+        "unused_page_space": {
+          "bytes": 3684290,
+          "MiB": 3.513612747192383,
+          "percent_of_file": 4.8660257683594805
+        },
+        "schema_record_payload": {
+          "bytes": 942,
+          "MiB": 0.0008983612060546875,
+          "percent_of_file": 0.0012441464362997025
+        }
+      },
+      "index_pages_percent": 44.00865566675683,
+      "non_table_payload_percent": 52.53650816963078,
+      "file_to_table_payload_ratio": 2.1068824931252874,
+      "freelist_count": 0
+    }
+  },
+  "entries_header_bound": {
+    "columns": 16,
+    "minimum_header_bytes_per_row": 17,
+    "minimum_header_total_bytes": 17076483,
+    "entry_payload_bytes": 59866582,
+    "encoded_body_upper_bound_bytes": 42790099,
+    "scope": "Source/SQLite-format bound, not decoded header measurement; excludes rowid key outside record payload and includes derived/repeated fields; not semantic raw minimum"
+  },
+  "unknowns": [
+    "Exact sum of semantic field-value lengths and repeated/derived bytes",
+    "Measured compression ratio and codec CPU/RAM",
+    "Equivalent indexed compressed-layout size and update/compaction peak"
+  ]
+}
