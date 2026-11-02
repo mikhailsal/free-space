@@ -83,8 +83,12 @@ pub fn write(path: &Path, m: &Meta, nodes: &[Node]) -> R<()> {
 fn decode(v: Vec<u8>) -> PathBuf {
     PathBuf::from(OsString::from_vec(v))
 }
+fn unsigned(r: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
+    let value: i64 = r.get(index)?;
+    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, value))
+}
 fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Node> {
-    let u = |i| r.get::<_, u64>(i);
+    let u = |i| unsigned(r, i);
     Ok(Node {
         path: decode(r.get(0)?),
         parent: r.get::<_, Option<Vec<u8>>>(1)?.map(decode),
@@ -121,7 +125,7 @@ pub fn read(path: &Path) -> R<(Meta, Vec<Node>)> {
     if count != 1 {
         return Err("snapshot must have exactly one meta row".into());
     }
-    let m=c.query_row("SELECT root,threshold,ppm,capacity,generation,scanned_at,has_hardlinks FROM meta WHERE singleton=1",[],|r|Ok(Meta{root:decode(r.get(0)?),threshold:r.get(1)?,ppm:r.get(2)?,capacity:r.get(3)?,generation:r.get(4)?,scanned_at:r.get(5)?,has_hardlinks:r.get(6)?}))?;
+    let m=c.query_row("SELECT root,threshold,ppm,capacity,generation,scanned_at,has_hardlinks FROM meta WHERE singleton=1",[],|r|Ok(Meta{root:decode(r.get(0)?),threshold:unsigned(r,1)?,ppm:r.get(2)?,capacity:unsigned(r,3)?,generation:unsigned(r,4)?,scanned_at:r.get(5)?,has_hardlinks:r.get(6)?}))?;
     let mut q = c.prepare("SELECT * FROM nodes ORDER BY path LIMIT ?1")?;
     let nodes = q
         .query_map([crate::model::MAX_RECORDS as i64 + 1], row)?

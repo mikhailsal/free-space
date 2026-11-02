@@ -55,6 +55,31 @@ fn inspect(path: &Path, root_dev: u64, mounts: &HashSet<PathBuf>) -> R<fs::Metad
     }
     Ok(m)
 }
+fn record_owner(
+    owners: &mut HashMap<(u64, u64), PathBuf>,
+    path: &Path,
+    metadata: &fs::Metadata,
+) -> R<()> {
+    owners
+        .entry((metadata.dev(), metadata.ino()))
+        .and_modify(|old| {
+            if path.as_os_str().as_bytes() < old.as_os_str().as_bytes() {
+                *old = path.to_path_buf();
+            }
+        })
+        .or_insert_with(|| path.to_path_buf());
+    if owners.len() > MAX_RECORDS {
+        return Err("hardlink owner cap exceeded".into());
+    }
+    Ok(())
+}
+fn retain(retained: &mut Vec<Node>, node: Node) -> R<()> {
+    if retained.len() >= MAX_RECORDS {
+        return Err("retained record cap exceeded".into());
+    }
+    retained.push(node);
+    Ok(())
+}
 fn metadata_pass(
     root: &Path,
     dev: u64,
@@ -77,17 +102,7 @@ fn metadata_pass(
             return Err("visited entry cap exceeded".into());
         }
         if !m.is_dir() && m.nlink() > 1 {
-            owners
-                .entry((m.dev(), m.ino()))
-                .and_modify(|old: &mut PathBuf| {
-                    if p.as_os_str().as_bytes() < old.as_os_str().as_bytes() {
-                        *old = p.clone();
-                    }
-                })
-                .or_insert(p.clone());
-            if owners.len() > MAX_RECORDS {
-                return Err("hardlink owner cap exceeded".into());
-            }
+            record_owner(&mut owners, &p, &m)?;
         }
         if m.is_dir() {
             if stack.len() >= MAX_DEPTH {
@@ -154,10 +169,7 @@ fn finish(stack: &mut Vec<Frame>, retained: &mut Vec<Node>, threshold: u64) -> R
         }
     }
     if keep {
-        retained.push(frame.node);
-        if retained.len() > MAX_RECORDS {
-            return Err("retained record cap exceeded".into());
-        }
+        retain(retained, frame.node)?;
     }
     Ok(())
 }
@@ -208,10 +220,7 @@ fn fold_pass(
         } else {
             frame.node.total.add(&n.total)?;
             if n.total.allocated >= threshold {
-                retained.push(n);
-                if retained.len() > MAX_RECORDS {
-                    return Err("retained record cap exceeded".into());
-                }
+                retain(&mut retained, n)?;
             } else {
                 frame.node.rest.add(&n.total)?;
             }
