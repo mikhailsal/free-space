@@ -3081,10 +3081,10 @@
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-02T02:27:28.702471+00:00",
+  "updated_at": "2026-11-02T15:54:39.234118+00:00",
   "completed_job_seconds": 52011.0,
-  "maximum_committed_seconds": 86811.0,
-  "remaining_unreserved_seconds": 129189.0,
+  "maximum_committed_seconds": 97611.0,
+  "remaining_unreserved_seconds": 118389.0,
   "candidate_branch": "perf/v1-root-reuse-cache4",
   "forecasts": [
     {
@@ -3123,7 +3123,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 34800,
+  "planned_reserved_seconds": 45600,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Joint SQL plus exact refresh capacity",
@@ -3786,5 +3786,43 @@
     "report": "resource-causes-2026-11-02.md",
     "screen_archive": "resource-cause-screen-2026-11-02.tar.gz",
     "screen_archive_sha256": "6f7d6c368304ccb958001e36f4430d1879660a6d07172300f2062e7f95646c0d"
+  },
+  "cleanup_threshold_probe_cases": [
+    {
+      "id": "cleanup-threshold-smoke",
+      "stage": "smoke",
+      "status": "admitted",
+      "branch": "perf/cleanup-threshold-probe",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "source_revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+      "reservation_seconds": 3600,
+      "maximum_job_seconds": 3600,
+      "qualification": false,
+      "automatic_retry": false,
+      "depends_on": "Complete source review actual claude-opus-5-5, source freeze, normal hooks, financial admission",
+      "review_proof": "docs/benchmark-results/cleanup-threshold-source-freeze-2026-11-02.json"
+    },
+    {
+      "id": "cleanup-threshold-screen",
+      "stage": "screen",
+      "status": "planned",
+      "branch": "perf/cleanup-threshold-probe",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "source_revision": null,
+      "reservation_seconds": 7200,
+      "maximum_job_seconds": 7200,
+      "qualification": false,
+      "automatic_retry": false,
+      "depends_on": "Same-source same-binary valid smoke, raw semantic acceptance and prospective phase forecast fits all caps"
+    }
+  ],
+  "cleanup_threshold_probe": {
+    "goal": "Practically assess configurable0.1percent coarse cleanup storage: four metrics, adversarial semantics and integration cost",
+    "authorization": "Owner explicitly requested practical prototype and testing using existing GH-first60h campaign",
+    "status": "Implementation prepared; no run dispatched",
+    "qualification": false,
+    "manual_root_accounting": true
   }
 }

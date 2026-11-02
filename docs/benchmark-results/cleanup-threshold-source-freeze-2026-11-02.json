@@ -1,0 +1,304 @@
+{
+  "protocol": "cleanup-threshold-source-freeze-v1",
+  "frozen_at": "2026-11-02T15:54:38.953507+00:00",
+  "source_revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+  "branch": "perf/cleanup-threshold-probe",
+  "base_revision": "00572310808e84f46c2eaba9bdc9cfd79647d672",
+  "workflow_id": 397616649,
+  "workflow_path": ".github/workflows/v2-balance.yml",
+  "outside_review_model": "claude-opus-5-5",
+  "outside_review_closed": true,
+  "coverage_kind": "Composite exact-file-body coverage; full source02 plus runtime03, harness04 and unchanged schema/counting proof05",
+  "reviews": [
+    {
+      "id": "01",
+      "source_revision": "888b67fb9baa77bce3864301bad2bf63ed44fda4",
+      "packet_sha256": "96cb9de0e72d74a7b8d47d927c76274160691b2906fd1b8fb5af039f94d7da94",
+      "response_sha256": "94e0f0c196d49cb5f526e167642b6bb48749a6930bdf06584f27ad3a7aa636fd",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "host_disposition": "findings; corrected before any run"
+    },
+    {
+      "id": "02",
+      "source_revision": "21d29aa242e3f31a66d91992778398f733b45c90",
+      "packet_sha256": "d89b3a7ce6ef4291839eb3ecb88183e7e86db82408fb65ebc598485bed0a9b60",
+      "response_sha256": "bcbc4b250b723fba4dcc72fca7d1446d39b4cad8b155650986b007b407c451fe",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "host_disposition": "findings; corrected in d718f11 and confirmed by closure04"
+    },
+    {
+      "id": "03",
+      "source_revision": "f7decf817b5bf769c25956713dacc4c4a1870f50",
+      "packet_sha256": "9017bcd3381a4a4e84650edf45d7e85a63edced325bdc4d4e75452ea7950863d",
+      "response_sha256": "f6834496c0aba3ece790e522e41cf039e376ae68358c9ec40e12a53af803c504",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "host_disposition": "NO_FINDINGS; runtime delta only"
+    },
+    {
+      "id": "04",
+      "source_revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+      "packet_sha256": "43be6db0e32bdc8d5098e494dcf8c667ba090ccb379a1a276cb495c480460f7e",
+      "response_sha256": "911b3b24e334c95ef75d2ac6006a1c8cee97879143afe72e0ffcf2db1b1b0b82",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "host_disposition": "remaining output-schema coverage question; source proof in05"
+    },
+    {
+      "id": "05",
+      "source_revision": "d718f11fd3e64e7c8874c49d575d60067a0c9aee",
+      "packet_sha256": "dd17e3803972a80408d5e45498a407d0bc923035f40cd7a1c683422880e3c529",
+      "response_sha256": "aa43e9f1003a5e5c1b7b3b3050360caaa8a2fc482f9c91bfe8d7515c585aba2e",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "host_disposition": "NO_FINDINGS; closes output-schema question without source changes"
+    }
+  ],
+  "files": {
+    ".github/workflows/v2-balance.yml": {
+      "sha256": "c13ff0b5d0e8baf01c3465d202019c0612684d111c65410e6ca7db1601e52f31",
+      "matching_packet_ids": [
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    "Cargo.toml": {
+      "sha256": "f431039329bd945d641e87e41719663efce4bac7fcc1ea7f3372aec6f2584c43",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/Cargo.toml": {
+      "sha256": "404e7bca8d049dff596c58392e137239157e7425ca3ac1914172ba76ca01ee80",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/build.rs": {
+      "sha256": "fd1b158067b50e5a7916290db1b3de781f446c698df71cc47d6defdd3043bd6e",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/main.rs": {
+      "sha256": "7cdab80fdc92d4543d565034e132425f6e7bdefb5aaed02d793b7aeb88cb12ee",
+      "matching_packet_ids": [
+        "01",
+        "02",
+        "05"
+      ]
+    },
+    "cli/examples/cleanup_probe/model.rs": {
+      "sha256": "e38fb4e5e5615739b206ed1553db7e550c2fa243dd095add6fdb0290da606cdc",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/mounts.rs": {
+      "sha256": "c73cb8fac8b1a6ab36223f949c54bba4c785cfce6ce26006345c1a76827f44ce",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/store.rs": {
+      "sha256": "d76b7bfc1f075868821da86af8064414c23756ca463a17aec85395f665083f28",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/tests.rs": {
+      "sha256": "4eeda0d8f84a5a432e9f3eaa6e3db13d7ed9f3eb843f9abd7e088f1a7657c8eb",
+      "matching_packet_ids": [
+        "02"
+      ]
+    },
+    "cli/examples/cleanup_probe/walk.rs": {
+      "sha256": "4ca8d21dcb9fed885b1ed6fa843ad448d45296a3b5f7c189f25d65c9c5b23bfd",
+      "matching_packet_ids": [
+        "01",
+        "02",
+        "05"
+      ]
+    },
+    "core/Cargo.toml": {
+      "sha256": "96e863b6a5c31f568af81f8ff3669376a131420286511a96daa41af3d08a37b5",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "core/src/snapshot/schema.rs": {
+      "sha256": "c567683d39dcd9737eb31c697f09548664b10e004630a002d9ae624a97075af0",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "core/src/snapshot/v2/schema.rs": {
+      "sha256": "3368d4adc9bf645ebc16ebc9ffd7002e85ff99b88231a6369807284c61dc2992",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "docs/designs/cleanup-threshold-experiment.md": {
+      "sha256": "558bff3a9d29b12371d4c991f6fb17b83a494bfb68715d624b7aa48e96fce60e",
+      "matching_packet_ids": [
+        "02",
+        "04"
+      ]
+    },
+    "docs/designs/cleanup-threshold-impact.md": {
+      "sha256": "ba730b153fd40f2ab4d8ebf9537353af242cf90696110223e72b3a7ea2946e23",
+      "matching_packet_ids": [
+        "02"
+      ]
+    },
+    "scripts/bench-disk-calibration.py": {
+      "sha256": "681e2dd0d325d6d2361e077a57b934e05f59d7c984f7bad728b9e8ebca3c73c7",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/bench-v2-container.py": {
+      "sha256": "63cb2d7a9f219bcefceb02f23df7e560ab1ff96071f12f30880257d9459fd20c",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/bench-v2-container/Dockerfile": {
+      "sha256": "f44268de27cfcde7324dbb5f895282ba08c7ebbf6ec42ffbb6996dd5f74bf235",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/bench_v2_config.py": {
+      "sha256": "098f0321d9a0f828ec9cb6321749fe6b7346db05c3fc47ec2dc5f9f68fde840d",
+      "matching_packet_ids": [
+        "01",
+        "02"
+      ]
+    },
+    "scripts/cleanup_oracle.py": {
+      "sha256": "0e2ad5bcc84f0e3907b7f72427b3bbe9bbcc3eec5732d63322001d1cfd88fba3",
+      "matching_packet_ids": [
+        "02",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe.Dockerfile": {
+      "sha256": "af4c443cbeea314ffe9fd1b41de50d95cec5f1a97c8f3a2947d6869bac9c5a3d",
+      "matching_packet_ids": [
+        "02",
+        "03"
+      ]
+    },
+    "scripts/cleanup_probe_fixture.py": {
+      "sha256": "db79fda2378364dca6499aec4514c97b154a91fa82a94e893d301001a42ee9fb",
+      "matching_packet_ids": [
+        "02",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe_forecast.py": {
+      "sha256": "13e8c919ce28fa4fd7aa7653ca3cf6dfda46c67e4f301ffa55299f422fb542b9",
+      "matching_packet_ids": [
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe_host.py": {
+      "sha256": "cd0f1e0e382e4cebd03d0a1afa0a542a43b1539299d708ccc0ec1586bea58019",
+      "matching_packet_ids": [
+        "04",
+        "05"
+      ]
+    },
+    "scripts/cleanup_probe_runner.sh": {
+      "sha256": "12197532a88760c41359c28f0d1cf3d58c26b2bbf5a4642bcbcd5450fa444efc",
+      "matching_packet_ids": [
+        "03",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe_versions.py": {
+      "sha256": "5f7c1b774e3451e7fd9b55b591554fe18e39f7c044015b24336d978e3254b980",
+      "matching_packet_ids": [
+        "03",
+        "04"
+      ]
+    },
+    "scripts/cleanup_probe_worker.py": {
+      "sha256": "942e4ab787ea6c4935d8ba1a1e9d4875570d7fe408e3a9b0beb1e31d2e9f64ce",
+      "matching_packet_ids": [
+        "04",
+        "05"
+      ]
+    },
+    "scripts/tests/test_cleanup_forecast.py": {
+      "sha256": "8700c9d1dc8ea2ac31f6747a18212aeda8048a9030a9502816e98596409ac2cc",
+      "matching_packet_ids": [
+        "04"
+      ]
+    },
+    "scripts/tests/test_cleanup_oracle.py": {
+      "sha256": "90ef4d1110d98d9250a2195f3493ff6ce4ee0eeeb71079278de9f69890d439b7",
+      "matching_packet_ids": [
+        "02"
+      ]
+    },
+    "scripts/tests/test_cleanup_scope.py": {
+      "sha256": "6de81d185f801ee40c22bd989a21f514a929ab4e7ecc1b7d9080185842437cca",
+      "matching_packet_ids": [
+        "04"
+      ]
+    }
+  },
+  "capsule": {
+    "path": "cleanup-threshold-source-reviews-2026-11-02.tar.gz",
+    "sha256": "42c8117d0dfa9914f0f89aabfb9f52c66d15ef738ea679dd3324ccef5ae5e92f",
+    "bytes": 351920
+  },
+  "budget": {
+    "aggregate_cap_seconds": 216000,
+    "completed_before_dispatch": 52011,
+    "smoke_max_seconds": 3600,
+    "conditional_screen_max_seconds": 7200,
+    "old_reserved_seconds": 34800
+  },
+  "fixture": {
+    "logical_volume_gib": 500,
+    "threshold_ppm": 1000,
+    "smoke_entries_per_profile": 100276,
+    "screen_entries_per_profile": 1001176,
+    "profiles": [
+      "files",
+      "directories"
+    ],
+    "large_refresh_entries": 74,
+    "small_refresh_entries": 100
+  },
+  "checks": {
+    "normal_git_hooks": "passed at final source, no bypass",
+    "tiny_python_tests": 16,
+    "rust_runtime_tests": "GH-only before measurements; not run locally"
+  },
+  "qualification": false,
+  "dispatch_started": false
+}
