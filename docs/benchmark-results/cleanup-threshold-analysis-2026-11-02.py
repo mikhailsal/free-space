@@ -44,11 +44,22 @@ def number(value, label):
     return value
 
 
+def host_resource(receipt):
+    require(receipt.get('success') is True, 'failed host resource receipt')
+    for key in ('mem_total_bytes', 'mem_available_bytes'):
+        require(type(receipt.get(key)) is int and receipt[key] >= 10 * 1024**3, 'insufficient host memory: ' + key)
+    require(receipt['mem_available_bytes'] <= receipt['mem_total_bytes'], 'impossible host available memory')
+    require(type(receipt.get('cpu_count')) is int and receipt['cpu_count'] >= 2, 'insufficient host CPUs')
+    require(receipt.get('writer_ceiling_bytes') == 8 * 1024**3 and receipt.get('host_overhead_bytes') == 2 * 1024**3, 'wrong host headroom policy')
+    return receipt
+
+
 def point(base, case, memory_mib=4096):
     ident = case['id']
     m = read(base / ident / 'metrics.json')
     state = read(base / ident / 'docker-state.json')
     report = m['report']
+    host = host_resource(read(base / (ident + '.host-resource.json'))) if memory_mib == 8192 else None
     require(m['id'] == ident and m['validated'] is True and case['validated'] is True, ident + ': invalid worker/manifest')
     require(m['exit_code'] == 0 and m['time']['exit_code'] == 0 and not m['sample_errors'], ident + ': worker failure')
     require(m['scope_errors'] == [] and m['expected_scope'], ident + ': unvalidated work scope')
@@ -81,6 +92,7 @@ def point(base, case, memory_mib=4096):
               'final_allocated_output_bytes': number(m['final_output']['total']['allocated_bytes'], ident),
               'boundary': report.get('boundary'), 'visited': report.get('visited'),
               'reported_entries': report.get('entries'), 'reported_subtree_entries': report.get('subtree_entries'),
+              'host_available_before_bytes': host['mem_available_bytes'] if host else None,
               'fallback_full_root': report.get('fallback_full_root'), 'flags': flags,
               'inconclusive': any(flags.values()), 'memory_events_delta': delta,
               'reclaim_counter_deltas': reclaim, 'swap_observed': swap, 'swap_events_delta': swap_delta}
@@ -145,6 +157,8 @@ def analyze(root, smoke_root=None):
     if manifest.get('protocol') == 'cleanup-threshold-roomy-v2':
         require(manifest.get('resource_policy') == {'memory_mib':8192, 'swap_mib':0, 'cpus':2}, 'wrong roomy resource policy')
         memory_mib = 8192
+        host_resource(manifest['resource_context'])
+        host_resource(read(base.parent / 'provenance' / 'host-resource.json'))
     else:
         require(manifest.get('protocol') is None and manifest.get('source_sha') == 'd718f11fd3e64e7c8874c49d575d60067a0c9aee', 'unknown legacy protocol')
         memory_mib = 4096
@@ -172,6 +186,8 @@ def analyze(root, smoke_root=None):
             for n in range(1, rounds + 1):
                 oracle_id = f'{p}-{s}-{n}-oracle'
                 o = read(base / (oracle_id + '.json'))
+                if memory_mib == 8192:
+                    host_resource(read(base / (oracle_id + '.host-resource.json')))
                 require(o.get('success') is True and o.get('v2_checked') is True and o.get('fixture_checked') is True and all(isinstance(o.get(k), int) and o[k] > 0 for k in ('visited', 'retained', 'threshold')), oracle_id + ': invalid oracle output')
                 require(o['visited'] == fixtures[p]['expected_counts']['entries'] and o['threshold'] == fixtures[p]['threshold_bytes'] and o['retained'] <= o['visited'], oracle_id + ': invalid oracle counts/threshold')
             for arm in ARMS:
