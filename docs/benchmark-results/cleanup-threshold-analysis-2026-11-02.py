@@ -91,6 +91,7 @@ def point(base, case, memory_mib=4096):
               'sampled_output_peak_estimate_bytes': number(m['output_peak_estimate_bytes'], ident),
               'final_allocated_output_bytes': number(m['final_output']['total']['allocated_bytes'], ident),
               'boundary': report.get('boundary'), 'visited': report.get('visited'),
+              'reported_retained_nodes': report.get('retained'),
               'reported_entries': report.get('entries'), 'reported_subtree_entries': report.get('subtree_entries'),
               'host_available_before_bytes': host['mem_available_bytes'] if host else None,
               'fallback_full_root': report.get('fallback_full_root'), 'flags': flags,
@@ -147,6 +148,32 @@ def provenance(root, stage, smoke_root=None):
             'runtime_archive_observation': archive_observation}
 
 
+def calibration(root, required):
+    path = root / 'disk-calibration.json'
+    if not path.is_file():
+        require(not required, 'missing screen disk calibration evidence')
+        return {'checked_locally': False, 'note': 'Early selective smoke download omitted calibration; separate supplement is preserved.'}
+    c = read(path)
+    limits = {'rbps':33554432, 'wbps':33554432, 'riops':2200, 'wiops':3600}
+    require(c.get('success') is True and c.get('profile') == 'local' and c.get('requested_limits') == limits, 'invalid disk calibration')
+    installed = {p[0]:dict(t.split('=', 1) for t in p[1:]) for line in c['io_max'].splitlines() if (p := line.split())}
+    require(all(installed.get(c['device'], {}).get(k) == str(v) for k,v in limits.items()), 'calibration limits not installed')
+    reports = {j['mode']:j for j in c['jobs']}
+    require(len(c['jobs']) == 4 and set(reports) == {'read','write','randread','randwrite'}, 'incomplete calibration modes')
+    for mode,direction,metric,bound in [('read','read','bw_bytes',33554432),('write','write','bw_bytes',33554432),
+                                         ('randread','read','iops',2200),('randwrite','write','iops',3600)]:
+        raw = read(root / ('fio-' + mode + '.json'))['jobs']
+        require(len(raw) == 1 and raw[0]['error'] == 0, 'fio calibration failed: ' + mode)
+        value = raw[0][direction][metric]
+        require(0 < value <= 1.25 * bound and reports[mode]['observed'] == value and reports[mode]['limit'] == bound, 'calibration observation mismatch: ' + mode)
+    device = [line.split() for line in c['io_stat_after'].splitlines() if line.startswith(c['device'] + ' ')]
+    require(len(device) == 1, 'missing calibration device activity')
+    io = {k:int(v) for k,v in (item.split('=',1) for item in device[0][1:])}
+    require(io.get('rbytes',0) > 0 and io.get('wbytes',0) > 0, 'no calibration read/write activity')
+    return {'checked_locally': True, 'profile':c['profile'], 'device':c['device'], 'observations':c['jobs'],
+            'scope':'Verified requested ceiling and direct I/O activity; physical local-device equivalence is not inferred.'}
+
+
 def analyze(root, smoke_root=None):
     base = root / 'measurements' if (root / 'measurements' / 'manifest.json').is_file() else root
     manifest = read(base / 'manifest.json')
@@ -163,6 +190,7 @@ def analyze(root, smoke_root=None):
         require(manifest.get('protocol') is None and manifest.get('source_sha') == 'd718f11fd3e64e7c8874c49d575d60067a0c9aee', 'unknown legacy protocol')
         memory_mib = 4096
     runtime = provenance(base.parent, stage, smoke_root)
+    disk_calibration = calibration(base.parent, stage == 'screen')
     fixtures = {p: fixture_receipt(base, p, stage) for p in PROFILES}
     rounds = 1 if stage == 'smoke' else 3
     expected = {f'{p}-{s}-{n}-{a}' for p in PROFILES for s in SCENARIOS for n in range(1, rounds + 1) for a in ARMS}
@@ -201,6 +229,8 @@ def analyze(root, smoke_root=None):
                         expected_visited = 148 if s == 'retained' else 2 * fixtures[p]['expected_counts']['entries']
                         expected_boundary = '/scratch/tree/large' if s == 'retained' else '/scratch/tree'
                         require(row['visited'] == expected_visited and row['boundary'] == expected_boundary and row['fallback_full_root'] is (s == 'omitted'), ident + ': unexpected visits/boundary/fallback')
+                        oracle = read(base / f'{p}-{s}-{n}-oracle.json')
+                        require(row['reported_retained_nodes'] == oracle['retained'], ident + ': retained count differs from independent oracle')
                     else:
                         require(row['reported_entries'] == fixtures[p]['expected_counts']['entries'], ident + ': wrong full entry count')
                         if s != 'full':
@@ -221,7 +251,8 @@ def analyze(root, smoke_root=None):
             groups[p + '/' + s] = group
     return {'valid': True, 'stage': stage, 'source_sha': manifest.get('source_sha'), 'timed_cases': len(expected),
             'seed_cases_excluded': len(seeds), 'rounds': rounds, 'protocol_only': stage == 'smoke',
-            'optimization_acceptance': 'not evaluated', 'memory_ceiling_mib': memory_mib, 'runtime_provenance': runtime, 'fixtures': fixtures, 'groups': groups,
+            'optimization_acceptance': 'not evaluated', 'memory_ceiling_mib': memory_mib, 'runtime_provenance': runtime,
+            'disk_calibration': disk_calibration, 'fixtures': fixtures, 'groups': groups,
             'notes': ['Output peak is a sampled lower-bound estimate, not exact peak allocation.',
                       'Memory peak includes the writer container wrapper and sampler.',
                       'Flags preserve observed cap, reclaim, OOM and swap pressure; flagged comparisons are inconclusive.']}

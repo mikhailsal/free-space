@@ -1,0 +1,104 @@
+{
+  "protocol": "cleanup-coarse-format-analysis-v1",
+  "run_id": 41482637607,
+  "artifact_id": 13162225431,
+  "method": "Two exact gzip members selected by ZIP directory; bounded HTTP range reads; gzip decoded with a 65536-byte limit; SQLite read-only immutable; PRAGMA integrity_check, page_size, page_count, node count and dbstat aggregated by object.",
+  "interpretation": "SQLite dbstat payload includes record headers and other record-format overhead; it is not raw semantic-data size. A 16384-byte database is one current image; two such full images occupy 32768 logical bytes, before any filesystem allocation effects.",
+  "members": {
+    "files": {
+      "artifact_member": "measurements/snapshot-evidence/files-probe.db.gz",
+      "gzip_bytes": 926,
+      "zip_compressed_bytes": 931,
+      "database_bytes": 16384,
+      "gzip_sha256": "8bee45a3a43a56793bc0394e51cf1a9e0fad88d1053994fe852c01ccb9709562",
+      "database_sha256": "f91a32e0d3bbecf9fcde0777c42c6dcdb2ce23e052a869d7e893b3ad7c3c69e2",
+      "integrity_check": [
+        "ok"
+      ],
+      "page_size": 4096,
+      "page_count": 4,
+      "node_count": 8,
+      "dbstat": {
+        "available": true,
+        "objects": [
+          {
+            "name": "meta",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 39,
+            "unused_bytes": 4045
+          },
+          {
+            "name": "nodes",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 812,
+            "unused_bytes": 3252
+          },
+          {
+            "name": "nodes_parent",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 370,
+            "unused_bytes": 3694
+          },
+          {
+            "name": "sqlite_schema",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 969,
+            "unused_bytes": 3005
+          }
+        ]
+      }
+    },
+    "directories": {
+      "artifact_member": "measurements/snapshot-evidence/directories-probe.db.gz",
+      "gzip_bytes": 945,
+      "zip_compressed_bytes": 950,
+      "database_bytes": 16384,
+      "gzip_sha256": "5ffebcd055574c90bb37d7fc90c4f5b2888d084502f164bf12301e885c85fd97",
+      "database_sha256": "475ee9fec436a0b3abfdfaba2846b0539624efd9b2a573e57161801b33a8fa3f",
+      "integrity_check": [
+        "ok"
+      ],
+      "page_size": 4096,
+      "page_count": 4,
+      "node_count": 8,
+      "dbstat": {
+        "available": true,
+        "objects": [
+          {
+            "name": "meta",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 39,
+            "unused_bytes": 4045
+          },
+          {
+            "name": "nodes",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 816,
+            "unused_bytes": 3248
+          },
+          {
+            "name": "nodes_parent",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 370,
+            "unused_bytes": 3694
+          },
+          {
+            "name": "sqlite_schema",
+            "pages": 1,
+            "page_bytes": 4096,
+            "payload_bytes": 969,
+            "unused_bytes": 3005
+          }
+        ]
+      }
+    }
+  },
+  "http_range_bytes": 776608
+}

@@ -1,0 +1,196 @@
+{
+  "protocol": "cleanup-calibration-supplement-v1",
+  "method": "Exact named ZIP members via bounded HTTP ranges; raw JSON bytes retained separately, SHA-256 recorded; fio results checked against the recorded local synthetic envelope.",
+  "runs": {
+    "41476363033": {
+      "artifact_id": 13158132312,
+      "raw_files": {
+        "disk-calibration.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/disk-calibration.json",
+          "sha256": "0d30a792757155b7a99438e6e9718bbc3ba59730a1b0feb54923f0080b7309ee",
+          "bytes": 1076
+        },
+        "fio-read.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/fio-read.json",
+          "sha256": "84275dea0d8561cc8f07b0e7788e01bb140ad53e3d4638ec6afc18e4c1e8b291",
+          "bytes": 6715
+        },
+        "fio-write.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/fio-write.json",
+          "sha256": "6d3496af0cc7e6bc347767969c42a4f49f825e888827d1a74dba375d895fc4b7",
+          "bytes": 6714
+        },
+        "fio-randread.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/fio-randread.json",
+          "sha256": "5a2e9c0e27d36dbdd7309007fe15edc442d6d510d2afa5b548bea2673927c860",
+          "bytes": 6703
+        },
+        "fio-randwrite.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/fio-randwrite.json",
+          "sha256": "e15d5e1a3af9acdfbe2b569284e0cce274e00534e1af1ae8c04e49ce1d43dc97",
+          "bytes": 6713
+        },
+        "measurements/snapshot-evidence/files-receipt.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/measurements/snapshot-evidence/files-receipt.json",
+          "sha256": "3070e24f95cb03b66a297abdb94a3bdfec86f6505379cf05646c2dca66cb9330",
+          "bytes": 430
+        },
+        "measurements/snapshot-evidence/directories-receipt.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41476363033/supplemental-calibration/measurements/snapshot-evidence/directories-receipt.json",
+          "sha256": "6a56fb12d57741dad07f6a7a16f9623ecd3a9184fcdbb8d4a75237923122ced9",
+          "bytes": 442
+        }
+      },
+      "success": true,
+      "errors": [],
+      "calibration_success": true,
+      "profile": "local",
+      "device": "7:0",
+      "requested_limits": {
+        "rbps": 33554432,
+        "wbps": 33554432,
+        "riops": 2200,
+        "wiops": 3600
+      },
+      "io_max": {
+        "rbps": "33554432",
+        "wbps": "33554432",
+        "riops": "2200",
+        "wiops": "3600"
+      },
+      "io_stat_delta": {
+        "rbytes": 425668608,
+        "wbytes": 483004416,
+        "rios": 22643,
+        "wios": 36641
+      },
+      "fio": {
+        "read": {
+          "error": 0,
+          "metric": "bw_bytes",
+          "observed": 33541015,
+          "limit": 33554432,
+          "valid": true
+        },
+        "write": {
+          "error": 0,
+          "metric": "bw_bytes",
+          "observed": 33517562,
+          "limit": 33554432,
+          "valid": true
+        },
+        "randread": {
+          "error": 0,
+          "metric": "iops",
+          "observed": 2199.660068,
+          "limit": 2200,
+          "valid": true
+        },
+        "randwrite": {
+          "error": 0,
+          "metric": "iops",
+          "observed": 3599.380124,
+          "limit": 3600,
+          "valid": true
+        }
+      },
+      "selected_bytes": 28793,
+      "http_range_bytes": 732180
+    },
+    "41482637607": {
+      "artifact_id": 13162225431,
+      "raw_files": {
+        "disk-calibration.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/disk-calibration.json",
+          "sha256": "48cba21885d26a9a70b59bb48404204b38b7bfcd8fa27c80cc42c25d74a9ff7d",
+          "bytes": 1078
+        },
+        "fio-read.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/fio-read.json",
+          "sha256": "3476816dae142ed4a24877108c33237876c8f75d725ccc0861c01af267863367",
+          "bytes": 6723
+        },
+        "fio-write.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/fio-write.json",
+          "sha256": "1dedd96eb0109eb71cb52373fcf9f5b6a0b2a65b3fbb6870a28257ee558679b3",
+          "bytes": 6721
+        },
+        "fio-randread.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/fio-randread.json",
+          "sha256": "cfb9aea8ed2ff1eb7700583047cf00dfbff6d8a1aeb3dc034eeda11dd7d97c07",
+          "bytes": 6705
+        },
+        "fio-randwrite.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/fio-randwrite.json",
+          "sha256": "8f7c88c19683033ab799416c2d028bf874d97fe04d05e8d62df652222ff6dae0",
+          "bytes": 6701
+        },
+        "measurements/snapshot-evidence/files-receipt.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/measurements/snapshot-evidence/files-receipt.json",
+          "sha256": "edf2e449962a4965f41998194215c6a647444124a6dbe37db3b6c20f1bda31f5",
+          "bytes": 430
+        },
+        "measurements/snapshot-evidence/directories-receipt.json": {
+          "path": "/tmp/freespace-cleanup-evidence/41482637607/supplemental-calibration/measurements/snapshot-evidence/directories-receipt.json",
+          "sha256": "42edd59bf459355ba41c662354d67f8221e3ab3cff115846365b2b0dc0cfa1e9",
+          "bytes": 442
+        }
+      },
+      "success": true,
+      "errors": [],
+      "calibration_success": true,
+      "profile": "local",
+      "device": "7:0",
+      "requested_limits": {
+        "rbps": 33554432,
+        "wbps": 33554432,
+        "riops": 2200,
+        "wiops": 3600
+      },
+      "io_max": {
+        "rbps": "33554432",
+        "wbps": "33554432",
+        "riops": "2200",
+        "wiops": "3600"
+      },
+      "io_stat_delta": {
+        "rbytes": 423723008,
+        "wbytes": 483004416,
+        "rios": 22422,
+        "wios": 36641
+      },
+      "fio": {
+        "read": {
+          "error": 0,
+          "metric": "bw_bytes",
+          "observed": 33392806,
+          "limit": 33554432,
+          "valid": true
+        },
+        "write": {
+          "error": 0,
+          "metric": "bw_bytes",
+          "observed": 33510867,
+          "limit": 33554432,
+          "valid": true
+        },
+        "randread": {
+          "error": 0,
+          "metric": "iops",
+          "observed": 2168.873842,
+          "limit": 2200,
+          "valid": true
+        },
+        "randwrite": {
+          "error": 0,
+          "metric": "iops",
+          "observed": 3597.581693,
+          "limit": 3600,
+          "valid": true
+        }
+      },
+      "selected_bytes": 28800,
+      "http_range_bytes": 776608
+    }
+  }
+}
