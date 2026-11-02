@@ -9,3 +9,4 @@ web/test-results/
 web/playwright-report/
 web/guard-shots/
 web/pregate-shots/
+__pycache__/
