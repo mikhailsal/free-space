@@ -31,10 +31,11 @@ def command(arm, operation, target):
     return ['/binary', '--backend', arm, operation, target, '--workers', '1', '--json'] + (['--low-memory'] if operation == 'scan' else [])
 
 
-def run_container(args, arm, operation, target, tree, case, out, ident, seconds):
+def run_container(args, arm, operation, target, tree, case, out, ident, seconds, expected_scope):
     binary = Path('binaries/cleanup_probe' if arm == 'probe' else 'binaries/freespace').resolve(strict=True)
     dev = os.stat(args.io_device).st_rdev
     config = dict(id=ident, command=command(arm, operation, target), timeout_seconds=seconds,
+                  expected_scope=expected_scope,
                   io_device_number=f'{os.major(dev)}:{os.minor(dev)}',
                   io_limits=dict(rbps=33554432, wbps=33554432, riops=2200, wiops=3600))
     (out / (ident + '.json')).write_text(json.dumps(config, indent=2)+'\n')
@@ -238,7 +239,22 @@ def run(args):
         return min(seconds,1800)
     def execute(arm,op,target,tree,case,ident):
         legacy.flush_caches(out,ident)
-        row=run_container(args,arm,op,target,tree,case,out,ident,remaining())
+        total=fixture['expected_counts']['entries']
+        large=fixture['controls']['group']['files'] + 10
+        # The fixture receipt counts 5 other control files, the raw-name file,
+        # and the group children; adding the small directory cancels that raw file.
+        small=fixture['expected_counts']['files']-fixture['bulk_files']-fixture['controls']['group']['files']-5
+        if large != 74 or small != 100: raise ValueError('fixture subtree contract differs')
+        if arm == 'probe':
+            root_scope = op == 'scan' or target.endswith('/small')
+            scope = dict(visited=2 * (total if root_scope else large),
+                         boundary='/scratch/tree' if root_scope else '/scratch/tree/large',
+                         fallback_full_root=(op == 'refresh' and root_scope))
+        elif op == 'scan':
+            scope = dict(entries=total)
+        else:
+            scope = dict(subtree_entries=small if target.endswith('/small') else large)
+        row=run_container(args,arm,op,target,tree,case,out,ident,remaining(),scope)
         monitor.register_writer_peak(row['sampled_outer_backing_allocated_peak_bytes'])
         if arm == 'probe' and op == 'refresh':
             expected_fallback = target.endswith('/small')

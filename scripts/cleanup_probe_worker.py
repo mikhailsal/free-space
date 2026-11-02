@@ -16,6 +16,15 @@ legacy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(legacy)
 
 
+def scope_errors(report, expected):
+    errors=[]
+    for key, wanted in expected.items():
+        actual=report.get(key)
+        if type(actual) is not type(wanted) or actual != wanted:
+            errors.append(f'{key}: expected {wanted!r}, got {actual!r}')
+    return errors
+
+
 def run(config):
     output = Path('/results') / config['id']
     output.mkdir()
@@ -82,8 +91,10 @@ def run(config):
     reclaim = {key: new_stat.get(key, 0) - old_stat.get(key, 0) for key in ('pgscan', 'pgsteal', 'pgscan_direct', 'pgsteal_direct')}
     pressure = event_max > 0 or any(value > 0 for value in reclaim.values())
     report = json.loads((output/'stdout.json').read_text())
-    valid = process.returncode == 0 and not state['errors'] and report.get('success', True) is True and not report.get('errors') and not report.get('incomplete')
+    work_errors = scope_errors(report, config['expected_scope'])
+    valid = not work_errors and process.returncode == 0 and not state['errors'] and report.get('success', True) is True and not report.get('errors') and not report.get('incomplete')
     record = dict(id=config['id'], command=command, exit_code=process.returncode, validated=valid,
+                  expected_scope=config['expected_scope'], scope_errors=work_errors,
                   elapsed_seconds=elapsed, report=report, time=json.loads((output/'time.json').read_text().splitlines()[-1]),
                   cgroup_before=before, cgroup_after=after, memory_events_max_delta=event_max,
                   reclaim_counter_deltas=reclaim, memory_comparison_inconclusive=pressure, initial_output=start_occupancy,

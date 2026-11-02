@@ -1,10 +1,13 @@
 import copy
+import json
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from cleanup_probe_forecast import forecast as calculate
+from cleanup_probe_forecast import forecast as calculate, main
 
 GIB=1024**3
 
@@ -56,9 +59,33 @@ class ForecastTests(unittest.TestCase):
         with self.assertRaises(ValueError): forecast(smoke(),{'success':True},'source',100,space={})
         with self.assertRaises(ValueError): forecast(smoke(),{'success':True},'source',100,timing={})
 
+    def test_preflight_uses_explicit_assumptions_only(self):
+        timing=dict(setup_seconds=10,step_outer_available_bytes=10*GIB,host_outer_available_bytes=10*GIB,
+                    step_results_available_bytes=10*GIB,host_results_available_bytes=10*GIB)
+        cycle=dict(before_backing_allocated_bytes=100,peak_backing_allocated_bytes=120,after_backing_allocated_bytes=105)
+        space=dict(samples=100,initial_backing_allocated_bytes=100,peak_backing_allocated_bytes=120,
+                   initial_outer_available_bytes=10*GIB,minimum_outer_available_bytes=10*GIB-20,
+                   initial_results_available_bytes=10*GIB,minimum_results_available_bytes=10*GIB-20,
+                   cycles=[dict(cycle) for _ in range(6)],trims=[{'exit_code':0} for _ in range(26)])
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); (root/'measurements').mkdir(); (root/'provenance').mkdir()
+            for name,value in (('measurements/manifest.json',smoke()),('runner-cleanup.json',{'success':True}),
+                               ('measurements/space-monitor.json',space),('provenance/timing.json',timing)):
+                (root/name).write_text(json.dumps(value))
+            args=[str(root/'measurements/manifest.json'),str(root/'forecast.json'),'--preflight',
+                  '--source-sha','source','--job-elapsed-seconds','150','--build-seconds','100',
+                  '--available-bytes',str(10*GIB)]
+            with patch('cleanup_probe_forecast.os.statvfs',side_effect=AssertionError('local disk used')):
+                main(args)
+            result=json.loads((root/'forecast.json').read_text())
+            self.assertEqual(result['admission_mode'],'preflight')
+            self.assertEqual(result['job_elapsed_seconds'],150)
+            self.assertEqual(result['observed_fixed_build_seconds'],100)
+
     def test_over_cap_rejected(self):
         manifest=smoke(); manifest['elapsed_seconds']=1000
         self.assertFalse(forecast(manifest,{'success':True},'source',100)['admitted'])
+        self.assertFalse(forecast(smoke(),{'success':True},'source',7000)['admitted'])
 
 
 if __name__=='__main__': unittest.main()

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Admit screening only using a successful same-source smoke projection."""
+import argparse
 import json
 import math
 import os
 from pathlib import Path
 import sys
+import time
 
 
-def forecast(manifest, cleanup, source_sha, build_seconds, timing, space, available_bytes):
+def forecast(manifest, cleanup, source_sha, job_elapsed_seconds, timing, space, available_bytes, build_context_seconds=None):
+    if not isinstance(job_elapsed_seconds, (int, float)) or not math.isfinite(job_elapsed_seconds) or job_elapsed_seconds < 0:
+        raise ValueError('invalid current or projected elapsed job time')
     if manifest.get('stage') != 'smoke' or manifest.get('source_sha') != source_sha or manifest.get('success') is not True:
         raise ValueError('smoke manifest missing, invalid, or from different source')
     if cleanup.get('success') is not True:
@@ -53,12 +57,13 @@ def forecast(manifest, cleanup, source_sha, build_seconds, timing, space, availa
         raise ValueError('missing setup storage evidence')
     setup_space=max(0,timing[keys[0]]-timing[keys[1]],timing[keys[2]]-timing[keys[3]])
     projected_space=math.ceil((10*growth+20*residual)*1.3)+setup_space
-    time_ok = setup + conservative + 180 + 240 < 5100 and build_seconds + setup + conservative + 180 + 240 + 300 < 7200
+    time_ok = setup + conservative + 180 + 240 < 5100 and job_elapsed_seconds + setup + conservative + 180 + 240 + 300 < 7200
     space_ok = available_bytes - projected_space >= 2 * 1024**3
     return dict(protocol='cleanup-threshold-forecast-v1', source_sha=source_sha, admitted=time_ok and space_ok,
                 smoke_host_seconds=manifest['elapsed_seconds'], smoke_cycle_seconds=cycle_seconds,
                 projected_host_seconds=projected_host, projected_host_with_30pct=conservative,
-                observed_setup_seconds=setup, observed_fixed_build_seconds=build_seconds,
+                observed_setup_seconds=setup, job_elapsed_seconds=job_elapsed_seconds,
+                observed_fixed_build_seconds=build_context_seconds,
                 host_margin_seconds=180, cleanup_reserve_seconds=240, upload_reserve_seconds=300,
                 measured_step_cap_seconds=5100, whole_job_cap_seconds=7200,
                 outer_available_bytes=available_bytes, smoke_outer_peak_growth_bytes=growth,
@@ -69,17 +74,38 @@ def forecast(manifest, cleanup, source_sha, build_seconds, timing, space, availa
                 limitation='Planning projection, not a measured screen time or physical upper bound.')
 
 
-def main():
-    source=Path(sys.argv[1]); target=Path(sys.argv[2]); root=source.parent.parent
-    start=int(Path('cleanup-results/provenance/build-start.epoch').read_text())
-    end=int(Path('cleanup-results/provenance/build-end.epoch').read_text())
-    paths=(os.environ['RUNNER_TEMP'],'cleanup-results')
-    available=min(os.statvfs(p).f_bavail * os.statvfs(p).f_frsize for p in paths)
+def main(argv=None):
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('manifest',type=Path)
+    parser.add_argument('output',type=Path)
+    parser.add_argument('--preflight',action='store_true',help='use explicitly supplied pre-dispatch runner assumptions')
+    parser.add_argument('--source-sha')
+    parser.add_argument('--job-elapsed-seconds',type=float,help='conservative expected job time before measurement')
+    parser.add_argument('--build-seconds',type=float,help='observed or conservative build time for context')
+    parser.add_argument('--available-bytes',type=int,help='conservative expected free outer/results bytes at measurement start')
+    args=parser.parse_args(argv)
+    source=args.manifest; root=source.parent.parent
+    if args.preflight:
+        if any(v is None for v in (args.source_sha,args.job_elapsed_seconds,args.build_seconds,args.available_bytes)):
+            parser.error('--preflight requires --source-sha, --job-elapsed-seconds, --build-seconds and --available-bytes')
+        if args.build_seconds < 0 or not math.isfinite(args.build_seconds) or args.job_elapsed_seconds < args.build_seconds:
+            parser.error('job elapsed must be finite and at least the nonnegative build time')
+        sha=args.source_sha; elapsed=args.job_elapsed_seconds; build=args.build_seconds; available=args.available_bytes
+    else:
+        if any(v is not None for v in (args.source_sha,args.job_elapsed_seconds,args.build_seconds,args.available_bytes)):
+            parser.error('explicit assumptions require --preflight')
+        start=int(Path('cleanup-results/provenance/build-start.epoch').read_text())
+        end=int(Path('cleanup-results/provenance/build-end.epoch').read_text())
+        build=end-start
+        elapsed=time.time()-int(os.environ['CLEANUP_JOB_STARTED_EPOCH'])
+        sha=os.environ['GITHUB_SHA']
+        paths=(os.environ['RUNNER_TEMP'],'cleanup-results')
+        available=min(os.statvfs(p).f_bavail * os.statvfs(p).f_frsize for p in paths)
     result=forecast(json.loads(source.read_text()),json.loads((root/'runner-cleanup.json').read_text()),
-                    os.environ['GITHUB_SHA'],end-start,
-                    json.loads((root/'provenance/timing.json').read_text()),
-                    json.loads((source.parent/'space-monitor.json').read_text()),available)
-    target.write_text(json.dumps(result,indent=2)+'\n')
+                    sha,elapsed,json.loads((root/'provenance/timing.json').read_text()),
+                    json.loads((source.parent/'space-monitor.json').read_text()),available,build)
+    result['admission_mode']='preflight' if args.preflight else 'in-job'
+    args.output.write_text(json.dumps(result,indent=2)+'\n')
     if not result['admitted']: raise SystemExit('screen forecast exceeds budget')
 
 
