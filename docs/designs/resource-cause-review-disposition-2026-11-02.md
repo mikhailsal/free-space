@@ -22,7 +22,7 @@ before source freeze, financial reservation or dispatch.
 | SIGALRM in cleanup | Mask alarm during critical case cleanup; escaped case exception preserves scratch. Outer owns producer/container/loop cleanup within reserved deadline. |
 | Tool versions/base image | Pin official Ubuntu24.04 index digestfe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852; record actual image, host/container Python/SQLite/fio. No claim apt package versions are fixed across runs; each causal comparison uses one image within one run. |
 | Hygiene/lint/function sizes | Ignore pycache; all new source modules<500physical lines. Repository CLAUDE.md limits80-line functions for Rust/TypeScript, not Python. Tiny Python tests and syntax checks are required; adding a new Python linter/size gate is outside this diagnostic and is not falsely claimed. |
-| Workflow filename/existing tests | Preserve representative-bench.yml byte-identical to approved control; use already registered v2-balance.yml slot only on isolated diagnostic branch. All121 old tests and64 new tiny tests pass. Default-branch workflows unchanged. |
+| Workflow filename/existing tests | Preserve representative-bench.yml byte-identical to approved control; use already registered v2-balance.yml slot only on isolated diagnostic branch. All121 old tests and64 new tiny tests passed at that checkpoint (68 new tests after follow-up repairs). Default-branch workflows unchanged. |
 | Workflow-only screen gate | Admission is deliberately root-controlled: reviewed source freeze, valid exact-source smoke, prospective forecast, ledger reserve then a single Actions API call. Raw workflow inputs are not described as protection against intentional trusted caller bypass. No auto-progression or retry. This one-shot research does not require a general autonomous admission service. |
 
 No product source changes, new engine, local app/build/Docker workload, PR,
@@ -51,3 +51,14 @@ RAM reported oneP3, disk threeP3. The finite follow-up is:
 Final closure review must bind these changed bodies to the exact unchanged
 03-reviewed file hashes and close every03 finding before admission. It must
 not describe03's structured pass or review02's timeout as a clean review.
+
+## Closure review04
+
+Actual soleOpus5.5 completed exit0 and explicitly closed all four03 findings;
+noP1/P2 code issue remained. It reported one remainingP3 documentation issue:
+the new older native sequence was called warm/full-size. Correct wording now
+says consecutive and not cache-controlled, exact7,202,464-entry older fixture
+versus canonical7,297,076, and records the first v1 refresh's about1.206GiB GNU
+input count. Near-warm later v1 commands do not justify labelling all commands
+warm. Numeric time/RSS ranges were confirmed exact. Final textual closure must
+cover this correction; no code body changes follow04.
