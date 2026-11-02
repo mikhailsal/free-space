@@ -23,7 +23,7 @@ def forecast(manifest, cleanup, source_sha, build_seconds, **kwargs):
 
 
 def smoke():
-    return {'stage':'smoke', 'source_sha':'source', 'success':True, 'elapsed_seconds':100,
+    return {'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2}, 'stage':'smoke', 'source_sha':'source', 'success':True, 'elapsed_seconds':100,
             'cases':[{'validated':True} for _ in range(30)],
             'phases':[{'name':f'{i}-oracle','success':True,'seconds':1} for i in range(6)] +
                      [{'name':f'{i}-cycle','success':True,'seconds':2} for i in range(6)]}
@@ -46,6 +46,12 @@ class ForecastTests(unittest.TestCase):
         manifest=smoke(); manifest['cases'].pop()
         with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
         manifest=smoke(); manifest['cases'][0]['validated']=False
+        with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
+
+    def test_old_resource_policy_rejected(self):
+        manifest=smoke(); manifest['resource_policy']['memory_mib']=4096
+        with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
+        manifest=smoke(); manifest.pop('protocol')
         with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
 
     def test_bad_oracle_and_missing_cycle(self):
@@ -85,7 +91,7 @@ class ForecastTests(unittest.TestCase):
     def test_over_cap_rejected(self):
         manifest=smoke(); manifest['elapsed_seconds']=1000
         self.assertFalse(forecast(manifest,{'success':True},'source',100)['admitted'])
-        self.assertFalse(forecast(smoke(),{'success':True},'source',7000)['admitted'])
+        self.assertFalse(forecast(smoke(),{'success':True},'source',15000)['admitted'])
 
 
 if __name__=='__main__': unittest.main()

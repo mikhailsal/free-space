@@ -31,7 +31,7 @@ def run(config):
     snapshot = Path('/scratch/snapshot')
     cg = legacy.cgroup()
     before = legacy.cg_read(cg)
-    if before.get('memory.max') != str(4096 * 1024 * 1024) or before.get('memory.swap.max') != '0':
+    if before.get('memory.max') != str(8192 * 1024 * 1024) or before.get('memory.swap.max') != '0':
         raise ValueError('unexpected memory/swap limit')
     quota, period = before['cpu.max'].split()
     if quota == 'max' or int(quota) != 2 * int(period):

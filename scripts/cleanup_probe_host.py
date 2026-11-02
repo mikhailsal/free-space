@@ -42,7 +42,7 @@ def run_container(args, arm, operation, target, tree, case, out, ident, seconds,
     name = 'cleanup-probe-' + uuid.uuid4().hex
     label = 'freespace.benchmark=' + os.environ['FREESPACE_BENCHMARK_RUN_TOKEN']
     cmd = ['docker','run','--name',name,'--label',label,'--network','none','--cpus','2',
-           '--memory','4096m','--memory-swap','4096m','--cgroupns','private','--pids-limit','128',
+           '--memory','8192m','--memory-swap','8192m','--cgroupns','private','--pids-limit','128',
            '--user',f'{os.getuid()}:{os.getgid()}','--entrypoint','python3']
     for src,dst,ro in ((case,'/scratch',False),(tree,'/scratch/tree',True),(out,'/results',False),
                        (Path('scripts').resolve(),'/harness',True),(binary,'/binary',True),
@@ -67,7 +67,7 @@ def oracle(args, cases, out, ident, seconds):
     name = 'cleanup-oracle-' + uuid.uuid4().hex
     label = 'freespace.benchmark=' + os.environ['FREESPACE_BENCHMARK_RUN_TOKEN']
     cmd = ['docker','run','--name',name,'--label',label,'--network','none','--cpus','2',
-           '--memory','4096m','--memory-swap','4096m','--cgroupns','private',
+           '--memory','8192m','--memory-swap','8192m','--cgroupns','private',
            '--user',f'{os.getuid()}:{os.getgid()}','--entrypoint','python3',
            '--mount',f'type=bind,src={cases["v1"] / "snapshot"},dst=/baseline,readonly',
            '--mount',f'type=bind,src={cases["probe"] / "snapshot"},dst=/coarse,readonly',
@@ -216,7 +216,8 @@ def run(args):
     deadline=start+args.budget_seconds
     out=args.output.resolve()
     out.mkdir(parents=True,exist_ok=True)
-    manifest={'stage':args.stage, 'source_sha':os.environ.get('GITHUB_SHA'), 'success':False,
+    manifest={'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2},
+              'stage':args.stage, 'source_sha':os.environ.get('GITHUB_SHA'), 'success':False,
               'cases':[], 'phases':[], 'limitation':'Unchanged common fixture; performance compares full scan, retained refresh, and omitted-ancestor refresh.'}
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     count=100000 if args.stage=='smoke' else 1000000

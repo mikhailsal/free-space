@@ -12,6 +12,8 @@ import time
 def forecast(manifest, cleanup, source_sha, job_elapsed_seconds, timing, space, available_bytes, build_context_seconds=None):
     if not isinstance(job_elapsed_seconds, (int, float)) or not math.isfinite(job_elapsed_seconds) or job_elapsed_seconds < 0:
         raise ValueError('invalid current or projected elapsed job time')
+    if manifest.get('protocol') != 'cleanup-threshold-roomy-v2' or manifest.get('resource_policy') != {'memory_mib':8192, 'swap_mib':0, 'cpus':2}:
+        raise ValueError('smoke resource policy does not match roomy v2')
     if manifest.get('stage') != 'smoke' or manifest.get('source_sha') != source_sha or manifest.get('success') is not True:
         raise ValueError('smoke manifest missing, invalid, or from different source')
     if cleanup.get('success') is not True:
@@ -57,15 +59,15 @@ def forecast(manifest, cleanup, source_sha, job_elapsed_seconds, timing, space, 
         raise ValueError('missing setup storage evidence')
     setup_space=max(0,timing[keys[0]]-timing[keys[1]],timing[keys[2]]-timing[keys[3]])
     projected_space=math.ceil((10*growth+20*residual)*1.3)+setup_space
-    time_ok = setup + conservative + 180 + 240 < 5100 and job_elapsed_seconds + setup + conservative + 180 + 240 + 300 < 7200
+    time_ok = setup + conservative + 180 + 240 < 12600 and job_elapsed_seconds + setup + conservative + 180 + 240 + 300 < 14400
     space_ok = available_bytes - projected_space >= 2 * 1024**3
-    return dict(protocol='cleanup-threshold-forecast-v1', source_sha=source_sha, admitted=time_ok and space_ok,
+    return dict(protocol='cleanup-threshold-forecast-roomy-v2', source_sha=source_sha, admitted=time_ok and space_ok,
                 smoke_host_seconds=manifest['elapsed_seconds'], smoke_cycle_seconds=cycle_seconds,
                 projected_host_seconds=projected_host, projected_host_with_30pct=conservative,
                 observed_setup_seconds=setup, job_elapsed_seconds=job_elapsed_seconds,
                 observed_fixed_build_seconds=build_context_seconds,
                 host_margin_seconds=180, cleanup_reserve_seconds=240, upload_reserve_seconds=300,
-                measured_step_cap_seconds=5100, whole_job_cap_seconds=7200,
+                measured_step_cap_seconds=12600, whole_job_cap_seconds=14400,
                 outer_available_bytes=available_bytes, smoke_outer_peak_growth_bytes=growth,
                 smoke_cycle_residual_growth_bytes=residual, setup_space_bytes=setup_space,
                 projected_outer_growth_bytes=projected_space, outer_reserve_bytes=2*1024**3,

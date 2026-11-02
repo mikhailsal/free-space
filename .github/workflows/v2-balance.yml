@@ -24,7 +24,7 @@ concurrency:
 jobs:
   experiment:
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ inputs.stage == 'screen' && 120 || 60 }}
+    timeout-minutes: ${{ inputs.stage == 'screen' && 240 || 60 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -129,13 +129,13 @@ jobs:
           cmp smoke-evidence/provenance/binaries.sha256 cleanup-results/provenance/binaries.sha256
           python3 scripts/cleanup_probe_forecast.py smoke-evidence/measurements/manifest.json cleanup-results/provenance/screen-forecast.json
       - name: Prepare and measure
-        timeout-minutes: ${{ inputs.stage == 'screen' && 85 || 45 }}
+        timeout-minutes: ${{ inputs.stage == 'screen' && 210 || 45 }}
         env:
           CLEANUP_STAGE: ${{ inputs.stage }}
           CLEANUP_IO: local
           CLEANUP_OUTPUT: ${{ github.workspace }}/cleanup-results
-          STEP_SECONDS: ${{ inputs.stage == 'screen' && 5100 || 2700 }}
-          JOB_SECONDS: ${{ inputs.stage == 'screen' && 7200 || 3600 }}
+          STEP_SECONDS: ${{ inputs.stage == 'screen' && 12600 || 2700 }}
+          JOB_SECONDS: ${{ inputs.stage == 'screen' && 14400 || 3600 }}
           CLEANUP_SMOKE_RUNTIME: ${{ github.workspace }}/smoke-evidence/provenance/runtime.json
           CLEANUP_SMOKE_IMAGE: ${{ github.workspace }}/smoke-evidence/provenance/runtime-image.tar.gz
         run: |

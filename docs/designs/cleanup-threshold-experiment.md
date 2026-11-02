@@ -1,6 +1,6 @@
 # Cleanup threshold: preregistered prototype experiment
 
-Date: 2026-11-02. Status: isolated research implementation, not a product backend.
+Date: 2026-11-02. Revision 2: prospective roomy-v2 follow-up, not a product backend.
 Owner authorization: practically test the configurable 0.1% storage threshold,
 measure its benefit and the integration problems; continue GitHub-first work.
 No installed database, configuration, timer, master branch or release is changed.
@@ -79,13 +79,15 @@ threshold crossing/pruning/promotion tests supply correctness evidence only.
 Smoke has one ordered comparison per scenario/profile: 12 seed commands,
 18 timed commands and six independent semantic phases. Screen has three cyclic
 orders, placing each arm in each position; 12 seed commands, 54 timed commands
-and 18 semantic phases. No automatic retries or post-data changes to policy.
+and 18 semantic phases. No automatic retries or edits to a completed protocol. A prospective revision
+must preserve the prior outcome, freeze its new policy before new measurements,
+and obtain fresh matching controls; it cannot reinterpret a rejected admission.
 Setup, seed copies, evidence compression and observers are outside writer time
 and RAM, but inside whole-job accounting and prospective runtime projection.
 
 ## Measurements, invariants and interpretation
 
-* Fresh private cgroup per writer: 2 CPUs, 4 GiB, no swap, one application worker;
+* Fresh private cgroup per writer: 2 CPUs, 8 GiB, no swap, one application worker;
   actual requested limits must be verified. Capture kernel memory peak/stat/
   events, GNU-time command RSS, wall time, I/O counters and exit/OOM status.
   A memory cap/reclaim event makes an unconstrained-peak inference unavailable.
@@ -118,9 +120,9 @@ and RAM, but inside whole-job accounting and prospective runtime projection.
 ## Admission and stops
 
 Central owner-approved campaign remains capped at 216,000 aggregate runner
-seconds. Root reserves 3,600 seconds for smoke and 7,200 for conditional screen
+seconds. Root reserves 3,600 seconds for a fresh smoke and 14,400 for conditional screen
 in a new ledger namespace; both maxima include setup/build/test/cleanup.
-Smoke measurement step cap is 2,700 seconds; screen is 5,100, with 240 seconds
+Smoke measurement step cap is 2,700 seconds; screen is 12,600, with 240 seconds
 reserved for cleanup. A separately recorded same-source/same-binary successful
 smoke plus raw semantic acceptance is required for screen. Before dispatch,
 project all host time at 10x entry scale and add the two extra screen cycles,
@@ -153,3 +155,29 @@ plus the concrete API/storage/publish/refresh/UI/skill work in
 wins and regressions without predicting unmeasured physical-disk, workload,
 compression or minimum-RAM behavior. The final product and its rollout require
 their own implementation and acceptance work after this research.
+
+## Revision 2 rationale, before any million-scale observations
+
+Original source `d718f11fd3e64e7c8874c49d575d60067a0c9aee`, smoke run
+`41476363033`, succeeded with 30 validated writer commands and six independent
+oracles. It used 4 GiB containers. Its screen forecast is preserved as rejected:
+7,574.33 projected host seconds, 9,846.63 after 30% margin, exceeding the old
+5,100-second measurement cap and 7,200-second job cap. Space projection passed.
+No original screen was dispatched; that reservation is released. The original
+observations remain exploratory and must not be pooled with this revision.
+
+The new source keeps the same 500 GiB volume, threshold, two profile shapes,
+100k/1m scales, seed/command counts, cyclic orders, algorithms, CPU/I/O envelope,
+oracles and 30% forecast margin. It raises the prospective screen job cap to
+240 minutes (14,400 seconds), measurement step to 210 minutes (12,600 seconds),
+and writer/semantic-observer memory ceiling to 8 GiB without swap. This ceiling
+is an experimental allowance, not a claim that the application requires 8 GiB.
+The many-directory pilot already showed substantial total memory that may
+approach the old 4 GiB cap at 10x entry scale. Capture flags remain mandatory.
+
+Require a NEW same-source smoke under `cleanup-threshold-roomy-v2` and exactly
+`resource_policy={memory_mib:8192,swap_mib:0,cpus:2}`. The forecast rejects old
+4 GiB artifacts even if supplied manually. Fresh smoke and screen must match
+source, binary hashes and runtime image. The new aggregate reservation is
+18,000 seconds (3,600+14,400) within the existing owner-approved 216,000-second
+campaign; no automatic dispatch follows a forecast rejection.
