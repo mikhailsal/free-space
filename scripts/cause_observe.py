@@ -242,6 +242,8 @@ def record_inventory(snapshot_dir, pins, *, max_entries=128):
                             os.close(sub)
                     else:
                         excluded.append(dict(path=path, reason="not a regular file/directory"))
+                except FileNotFoundError as error:
+                    errors.append(dict(path=path, error=str(error), race=True))
                 except OSError as error:
                     errors.append(dict(path=path, error=str(error)))
     vfs_before = _filesystem(pins.root_fd)

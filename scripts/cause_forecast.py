@@ -31,9 +31,9 @@ def forecast(root, step_seconds):
     host = duration(status['elapsed_seconds'])
     fixed_host = host - setup - sum(times.values())
     need(fixed_host >= -.01, 'host timing exceeds complete host interval')
-    # Variable metadata/snapshot work grows tenfold. Idle retains four one-second
-    # controls. Scale even fixed host overhead tenfold as a conservative allowance.
-    projected = 10 * (setup + max(0, fixed_host)) + 4 * times['smoke-idle']
+    # Every case copies/hashes/syncs the snapshot. Scale entire idle case too,
+    # including its constant one-second sleep, as a conservative allowance.
+    projected = 10 * (setup + max(0, fixed_host)) + 40 * times['smoke-idle']
     projected += 40 * (times['smoke-names'] + times['smoke-stat'])
     projected += 70 * times['smoke-scan'] + 30 * times['smoke-reserve'] + 10 * times['disk-pin']
     fixed_outer = duration(step_seconds) - host

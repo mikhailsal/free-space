@@ -198,7 +198,8 @@ class LifetimeWatch:
             entries = copy.deepcopy(inventory["entries"])
             named_complete = inventory["complete"]
             for issue in inventory["errors"]:
-                self._issue("errors", "named inventory error", observation=issue)
+                self._issue("races" if issue.get("race") else "errors",
+                            "named inventory error", observation=issue)
             for issue in inventory["excluded"]:
                 self._issue("errors", "named inventory exclusion", observation=issue)
             for row in entries.values():

@@ -184,7 +184,8 @@ runner-seconds were completed, 34,800 reserved for older conditional cases and
 
 The second-stage forecast is computed by `cause_forecast.py` from valid smoke
 fixture/seed and per-case host timings. It scales entry-dependent work by ten,
-uses the fixed screen case multiplicities, retains observed outer setup, and
+uses the fixed screen case multiplicities, conservatively scales the complete
+idle-case host work (including its constant sleep), retains observed outer setup, and
 applies a 30% margin. Require host margin <2100s, whole-step margin <2700s,
 and host margin + observed outer setup +240s cleanup reserve <2700s before
 manual screen admission. A workflow input is not the financial admission gate:
@@ -235,3 +236,10 @@ It is reused at its original binary/toolchain/scale with explicit limits; this
 campaign does not falsely claim new refresh or v2 intervention. Physical bytes
 returned by v2 GC and replacement-engine performance remain unmeasured hypotheses.
 The owner asks for proposed improvement hypotheses, not a shipped engine prototype.
+
+Immediately before each dispatch, root rechecks the upstream ED2 artifact ID,
+run binding, non-expiry and expires_at. Require at least10800s remaining before
+smoke (both3600s jobs plus3600s queue/orchestration margin) and7200s before
+screen (remaining3600s job plus3600s margin). The checked API metadata onNov2
+reports expiry2026-11-08T05:37:09Z; final admission rechecks rather than assuming
+that this earlier response stays current.

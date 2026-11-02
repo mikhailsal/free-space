@@ -29,3 +29,25 @@ No product source changes, new engine, local app/build/Docker workload, PR,
 master merge, installation or optimization qualification is part of this source.
 Only the final reviewed source can be admitted. Archive raw failures and all
 job durations; never replace a failed observation with a preferred rerun.
+
+## Follow-up scoped reviews03
+
+The unchanged0719033 source was split into RAM and disk review packets after
+whole review02 timed out at600s and provided no outside coverage. Both actual
+03 processes completed exit0 with sole claude-opus-5-5; neither was a clean gate.
+RAM reported oneP3, disk threeP3. The finite follow-up is:
+
+* Scale the idle case's entire host duration by10, including copy/hash/sync/
+  integrity work and conservatively its constant sleep. The old forecast's
+  unscaled idle case was nonconservative. Update independent expected totals.
+* Mark disappearing named entries as races in live watching, while keeping
+  quiescent inventories incomplete/fatal on every such observation.
+* Require an existing-to-absent stage transition with the actual pinned device/
+  inode; initial absence no longer satisfies the retirement claim.
+* Root rechecks the upstream artifact expires_at against10800s smoke/7200s
+  screen thresholds immediately before each dispatch. Current API expiry is
+  Nov8, not an assumption based on retention-days alone.
+
+Final closure review must bind these changed bodies to the exact unchanged
+03-reviewed file hashes and close every03 finding before admission. It must
+not describe03's structured pass or review02's timeout as a clean review.

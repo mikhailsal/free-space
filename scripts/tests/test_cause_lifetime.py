@@ -146,6 +146,25 @@ class LifetimeTests(unittest.TestCase):
         self.assertFalse(result["coverage_complete"])
         self.assertTrue(result["errors"])
 
+    def test_vanishing_named_entry_maps_to_watcher_race(self):
+        def vanished_stat(**unused):
+            raise FileNotFoundError("vanished during named traversal")
+        entry = SimpleNamespace(name="vanished", stat=vanished_stat)
+        class Scan:
+            def __enter__(self): return iter([entry])
+            def __exit__(self, *unused): pass
+        original_scandir = os.scandir
+        def scandir(fd):
+            return Scan() if fd == self.pins.root_fd else original_scandir(fd)
+        with patch.object(cause_lifetime.os, "scandir", side_effect=scandir):
+            self.watch.poll()
+        result = self.watch.finish()
+        self.assertFalse(result["coverage_complete"])
+        self.assertEqual(result["counts"]["races"], 1)
+        self.assertEqual(result["errors"][0]["kind"], "races")
+        self.assertTrue(result["errors"][0]["observation"]["race"])
+        self.assertFalse(any(row["kind"] == "errors" for row in result["errors"]))
+
     def test_real_constructor_is_guarded_before_capture(self):
         with patch.dict(os.environ, {}, clear=True), \
              patch.object(cause_lifetime, "capture_cgroup", side_effect=AssertionError("no real reads")):

@@ -302,6 +302,35 @@ class CauseObserveTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 observe.record_inventory(self.root, pins)
 
+    def test_vanishing_entry_stat_or_subdirectory_open_is_a_race(self):
+        vanished = self.snapshot / "vanished"
+        vanished.mkdir()
+        directory_stat = vanished.stat()
+        class Scan:
+            def __init__(self, entry): self.entry = entry
+            def __enter__(self): return iter([self.entry])
+            def __exit__(self, *unused): pass
+        with observe.PinSet(self.snapshot, fixture=self.access) as pins:
+            for phase in ("stat", "subdirectory_open"):
+                with self.subTest(phase=phase):
+                    def entry_stat(**unused):
+                        if phase == "stat":
+                            raise FileNotFoundError("entry disappeared before stat")
+                        return directory_stat
+                    original_open = os.open
+                    def open_directory(path, *args, **kwargs):
+                        if path == "vanished":
+                            raise FileNotFoundError("directory disappeared before open")
+                        return original_open(path, *args, **kwargs)
+                    entry = SimpleNamespace(name="vanished", stat=entry_stat)
+                    with patch.object(observe.os, "scandir", return_value=Scan(entry)), \
+                         patch.object(observe.os, "open", side_effect=open_directory):
+                        row = observe.record_inventory(self.snapshot, pins)
+                    self.assertFalse(row["complete"])
+                    self.assertEqual(len(row["errors"]), 1)
+                    self.assertTrue(row["errors"][0]["race"])
+                    self.assertEqual(row["errors"][0]["path"], "vanished")
+
     def test_dbstat_categories_and_nonempty_wal_rejection(self):
         path = self.database("snapshot.db")
         row = observe.db_breakdown(path, fixture=self.access)

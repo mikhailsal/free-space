@@ -278,7 +278,7 @@ def disk_ok(data):
     need(len(set(identities.values())) == 4, 'expected four distinct database inodes')
 
 
-def lifetime_ok(data, host):
+def lifetime_ok(data, host, disk):
     need(data['available'] is True and data['host_pid'] == host['cgroup_after']['pid']
          and data['cgroup_path'] == host['cgroup_after']['cgroup_path'], 'lifetime cgroup identity')
     counts = data['counts']
@@ -291,5 +291,12 @@ def lifetime_ok(data, host):
         need(inventory['available'] is True and inventory['before']['monotonic_ns'] <= inventory['after']['monotonic_ns'], 'lifetime brackets')
         need(sum(r['observation']['allocated_bytes'] for r in inventory['entries'].values())
              == inventory['allocated_bytes'], 'lifetime unique allocation arithmetic')
-    need(any(row['path'] == 'named:snapshot.stage.tmp' and row['current'].get('state') == 'absent'
-             for row in data['transitions']), 'stage retirement not observed')
+    pinned = disk['held']['pins']['stage']['observation']
+    observed, retired = False, False
+    for row in data['transitions']:
+        if row['path'] != 'named:snapshot.stage.tmp':
+            continue
+        current = row['current']
+        observed |= current.get('inode') == pinned['inode'] and current.get('device') == pinned['device']
+        retired |= observed and current.get('state') == 'absent'
+    need(retired, 'pinned stage existing-to-absent interval not observed')

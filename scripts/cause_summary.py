@@ -69,7 +69,7 @@ def case_result(root, manifest, row):
         disk_ok(disk)
         need(host['lifetime_path'] == ident + '/lifetime.json', 'lifetime receipt path')
         lifetime = load(root, host['lifetime_path'])
-        lifetime_ok(lifetime, host)
+        lifetime_ok(lifetime, host, disk)
     return dict(id=ident, mode=row['mode'], sampler=row['sampler'], group=row['group'], round=row.get('round'),
                 diagnostic_pin=row['pin'], elapsed_seconds=metrics['elapsed_seconds'],
                 kernel_memory_peak_bytes=metrics['kernel_memory_peak_bytes'],

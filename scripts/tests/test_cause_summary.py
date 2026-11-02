@@ -175,7 +175,10 @@ def bundle(root, disk):
             write(root,host['lifetime_path'],dict(available=True,host_pid=123,cgroup_path='/mock-cgroup',
                 counts=dict(polls=1,complete_polls=1,errors=0,races=0,limits=0,transition_records_dropped=0),
                 maxima=dict(named_snapshot=inventory,combined=inventory,open_deleted=None),
-                transitions=[dict(path='named:snapshot.stage.tmp',current=dict(state='absent'))]))
+                transitions=[dict(path='named:snapshot.stage.tmp',previous=None,
+                    current={k:disk['held']['pins']['stage']['observation'][k] for k in ('device','inode')}),
+                    dict(path='named:snapshot.stage.tmp',current=dict(state='absent'),
+                    previous={k:disk['held']['pins']['stage']['observation'][k] for k in ('device','inode')})]))
 
 
 class SummaryTests(unittest.TestCase):
@@ -252,8 +255,8 @@ class SummaryTests(unittest.TestCase):
     def test_screen_forecast_uses_every_fixed_case_and_both_caps(self):
         result = cause_forecast.forecast(self.results, 200)
         self.assertTrue(result['admitted'])
-        self.assertAlmostEqual(result['host_forecast_seconds'], 234)
-        self.assertAlmostEqual(result['whole_step_forecast_seconds'], 424)
+        self.assertAlmostEqual(result['host_forecast_seconds'], 270)
+        self.assertAlmostEqual(result['whole_step_forecast_seconds'], 460)
         self.modify('smoke-stat/host-timing.json', lambda d: d.update(total_seconds=100))
         self.modify('status.json', lambda d: d.update(elapsed_seconds=109))
         result = cause_forecast.forecast(self.results, 300)
@@ -263,6 +266,20 @@ class SummaryTests(unittest.TestCase):
         self.modify('smoke-stat/host-timing.json', lambda d: d.update(total_seconds=.01))
         with self.assertRaises(ValueError):
             cause_forecast.forecast(self.results, 200)
+
+    def test_initial_absence_is_not_a_stage_retirement(self):
+        self.modify('disk-pin/lifetime.json', lambda d: d.update(transitions=[dict(
+            path='named:snapshot.stage.tmp',previous=None,current=dict(state='absent'))]))
+        result = summary.summarize(self.results, True)
+        self.assertFalse(result['valid'])
+        self.assertTrue(result['groups']['ram']['valid'])
+        self.assertTrue(any('existing-to-absent' in s for s in result['issues']))
+
+    def test_unknown_poll_does_not_erase_observed_lifetime_bounds(self):
+        self.modify('disk-pin/lifetime.json', lambda d: d['transitions'].insert(1, dict(
+            path='named:snapshot.stage.tmp',previous=d['transitions'][0]['current'],
+            current=dict(state='unavailable'))))
+        self.assertTrue(summary.summarize(self.results, True)['valid'])
 
 
 if __name__ == '__main__':

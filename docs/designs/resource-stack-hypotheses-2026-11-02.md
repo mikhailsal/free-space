@@ -41,6 +41,19 @@ front changes later IDs, parent references, subtree ranges and index references.
 Replacing the engine while preserving this physical layout cannot promise
 sublinear refresh. Stable identity plus a separate ordering/query representation
 would be a semantic-storage design change requiring its own correctness proof.
+An existing sparse-update algorithm control is already present in v2's SQLite
+writer: it replaces the selected subtree, affected hardlink members and ancestor
+aggregates instead of reconstructing all entries. The original full-size native
+GNU sequence's unchanged18-entry refreshes took0.0169-0.0302s with8.02-8.14MiB
+process RSS, versus26.497-28.929s andabout1.081GiB for v1. These are three warm
+commands in one older sequence, not a fresh-cgroup/canonical performance screen;
+no total-cgroup saving, cold result or promotion is inferred. They make reusing
+v2's sparse algorithm and fixing its full-scan version write set a concrete
+research alternative to building the same stable-key model again. Its full-scan
+history/peak-disk costs still require correction. Raw anchors and identities are
+in [prior evidence](../benchmark-results/resource-causes-prior-evidence-2026-11-02.md),
+with metrics under original command suffixes5-refresh,6-refresh,7-refresh.
+
 Hardlinks can cross the refreshed boundary; changed ownership affects other
 paths and ancestors. Removing a former maximum/minimum requires examining the
 remaining contributing children or maintaining an exact supporting index.
