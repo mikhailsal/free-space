@@ -17,6 +17,7 @@ import time
 import uuid
 
 from cleanup_probe_fixture import build, guard
+from cleanup_probe_resources import capture as capture_resources, require as require_resources
 
 spec = importlib.util.spec_from_file_location('legacy_bench', Path(__file__).with_name('bench-v2-container.py'))
 legacy = importlib.util.module_from_spec(spec)
@@ -64,6 +65,9 @@ def run_container(args, arm, operation, target, tree, case, out, ident, seconds,
 
 
 def oracle(args, cases, out, ident, seconds):
+    resources=capture_resources()
+    (out/(ident+'.host-resource.json')).write_text(json.dumps(resources,indent=2)+'\n')
+    require_resources(resources)
     name = 'cleanup-oracle-' + uuid.uuid4().hex
     label = 'freespace.benchmark=' + os.environ['FREESPACE_BENCHMARK_RUN_TOKEN']
     cmd = ['docker','run','--name',name,'--label',label,'--network','none','--cpus','2',
@@ -216,7 +220,10 @@ def run(args):
     deadline=start+args.budget_seconds
     out=args.output.resolve()
     out.mkdir(parents=True,exist_ok=True)
-    manifest={'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2},
+    resources=capture_resources()
+    (out/'host-resource.json').write_text(json.dumps(resources,indent=2)+'\n')
+    require_resources(resources)
+    manifest={'resource_context':resources, 'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2},
               'stage':args.stage, 'source_sha':os.environ.get('GITHUB_SHA'), 'success':False,
               'cases':[], 'phases':[], 'limitation':'Unchanged common fixture; performance compares full scan, retained refresh, and omitted-ancestor refresh.'}
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
@@ -240,6 +247,9 @@ def run(args):
         return min(seconds,1800)
     def execute(arm,op,target,tree,case,ident):
         legacy.flush_caches(out,ident)
+        resources=capture_resources()
+        (out/(ident+'.host-resource.json')).write_text(json.dumps(resources,indent=2)+'\n')
+        require_resources(resources)
         total=fixture['expected_counts']['entries']
         large=fixture['controls']['group']['files'] + 10
         # The fixture receipt counts 5 other control files, the raw-name file,

@@ -181,3 +181,14 @@ Require a NEW same-source smoke under `cleanup-threshold-roomy-v2` and exactly
 source, binary hashes and runtime image. The new aggregate reservation is
 18,000 seconds (3,600+14,400) within the existing owner-approved 216,000-second
 campaign; no automatic dispatch follows a forecast rejection.
+
+Roomy-v2 host admission is observed, not inferred from a runner label. Capture
+`/proc/meminfo` totals/available bytes and logical CPU count before the build,
+before host work, after each cache flush before each writer, and before every
+semantic observer. Require at least 10 GiB total AND available memory (8 GiB
+container ceiling plus 2 GiB host overhead) and at least two logical CPUs. The
+pre-dispatch forecast validates the fresh smoke receipt; the in-job forecast
+and actual workload admission check the current hosted machine. The repository
+is public, but runner hardware is still checked. Point-in-time headroom does
+not prove an absence of pressure throughout a command; preserve cap/reclaim/
+OOM/swap evidence and mark affected comparisons inconclusive.

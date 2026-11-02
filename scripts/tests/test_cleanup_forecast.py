@@ -23,7 +23,8 @@ def forecast(manifest, cleanup, source_sha, build_seconds, **kwargs):
 
 
 def smoke():
-    return {'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2}, 'stage':'smoke', 'source_sha':'source', 'success':True, 'elapsed_seconds':100,
+    return {'resource_context':{'success':True,'mem_total_bytes':16*GIB,'mem_available_bytes':12*GIB,'cpu_count':4},
+            'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2}, 'stage':'smoke', 'source_sha':'source', 'success':True, 'elapsed_seconds':100,
             'cases':[{'validated':True} for _ in range(30)],
             'phases':[{'name':f'{i}-oracle','success':True,'seconds':1} for i in range(6)] +
                      [{'name':f'{i}-cycle','success':True,'seconds':2} for i in range(6)]}
@@ -47,6 +48,33 @@ class ForecastTests(unittest.TestCase):
         with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
         manifest=smoke(); manifest['cases'][0]['validated']=False
         with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
+
+    def test_original_projection_and_new_cap_boundaries(self):
+        manifest=smoke()
+        manifest['elapsed_seconds']=422.412317624
+        for phase in manifest['phases']:
+            if phase['name'].endswith('-cycle'): phase['seconds']=167.510380595/6
+        timing=dict(setup_seconds=65,step_outer_available_bytes=10*GIB,host_outer_available_bytes=10*GIB,
+                    step_results_available_bytes=10*GIB,host_results_available_bytes=10*GIB)
+        result=forecast(manifest,{'success':True},'source',600,timing=timing)
+        self.assertTrue(result['admitted'])
+        self.assertTrue(result['step_time_admitted'])
+        self.assertTrue(result['job_time_admitted'])
+        self.assertGreater(result['projected_host_with_30pct'],7200)
+        timing['setup_seconds']=12600-result['projected_host_with_30pct']-420+0.01
+        result=forecast(manifest,{'success':True},'source',600,timing=timing)
+        self.assertFalse(result['step_time_admitted'])
+        self.assertTrue(result['job_time_admitted'])
+        timing['setup_seconds']=65
+        elapsed=14400-65-result['projected_host_with_30pct']-720+0.01
+        result=forecast(manifest,{'success':True},'source',elapsed,timing=timing)
+        self.assertTrue(result['step_time_admitted'])
+        self.assertFalse(result['job_time_admitted'])
+
+    def test_smoke_host_headroom_required(self):
+        for field, value in (('mem_total_bytes',10*GIB-1),('mem_available_bytes',10*GIB-1),('cpu_count',1)):
+            manifest=smoke(); manifest['resource_context'][field]=value
+            with self.assertRaises(ValueError): forecast(manifest,{'success':True},'source',100)
 
     def test_old_resource_policy_rejected(self):
         manifest=smoke(); manifest['resource_policy']['memory_mib']=4096
