@@ -1,0 +1,39 @@
+{
+  "protocol": "cleanup-threshold-report-review-proof-v1",
+  "recorded_at": "2026-11-02T19:21:24.587625+00:00",
+  "report": {
+    "path": "cleanup-threshold-screen-2026-11-02.md",
+    "sha256": "90f363f71a7d0353f186da9b4c693d36af6423c48df85c848ac677b212c70adc"
+  },
+  "reviews": [
+    {
+      "id": "01",
+      "packet_sha256": "6370856519be1be18a487656a7d62ed5efbaef75f97d6f5333c38eef28df4d1d",
+      "response_sha256": "e1994907625ee1f11add5f82fae40e891535889a6d1277fab9ea5540daacc08e",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "disposition": "Two P3 clarifications +missing supplied cost/test evidence; closed in02"
+    },
+    {
+      "id": "02",
+      "packet_sha256": "cd6836933fa440b7bf49c0212d4e88678e7040bdc054ab301ca7ba510c9a87ed",
+      "response_sha256": "fe9d5aea985e46add82f0a28db1388ea864e497f8ecb78f5f649dd87f1da418d",
+      "actual_models": [
+        "claude-opus-5-5"
+      ],
+      "disposition": "NO_FINDINGS"
+    }
+  ],
+  "final_review_completed": true,
+  "final_result": "NO_FINDINGS",
+  "capsule": {
+    "path": "cleanup-threshold-report-reviews-2026-11-02.tar.gz",
+    "sha256": "572cb11111682fb3f0422c631d35f67e453c877d8ff19a9f0a67db41cf83312b",
+    "bytes": 160167
+  },
+  "scope": "Controlled research report arithmetic, fourmetricclaims/limitations andintegration assessment. Sourceclosed separately; no productionqualification.",
+  "budget_evidence": "cleanup-threshold-budget-audit-2026-11-02.json",
+  "run_id": 41485277207,
+  "source_revision": "678e998e47020576224337b8fe8ab941f3df2bef"
+}

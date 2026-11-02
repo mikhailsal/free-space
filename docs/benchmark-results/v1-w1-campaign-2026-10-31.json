@@ -60,7 +60,8 @@
     41372382738,
     41373680085,
     41476363033,
-    41482637607
+    41482637607,
+    41485277207
   ],
   "runs": [
     {
@@ -3138,13 +3139,42 @@
       "qualification": false,
       "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41482637607",
       "job_seconds": 706.0
+    },
+    {
+      "run_id": 41485277207,
+      "case_id": "cleanup-threshold-roomy-screen",
+      "revision": "678e998e47020576224337b8fe8ab941f3df2bef",
+      "stage": "screen",
+      "workflow_id": 397616649,
+      "workflow_file": "v2-balance.yml",
+      "branch": "perf/cleanup-threshold-probe",
+      "maximum_job_seconds": 14400,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 7762.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 125413868030,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T16:49:52Z",
+          "completed_at": "2026-11-02T18:59:14Z",
+          "seconds": 7762.0
+        }
+      ],
+      "scientific_kind": "cleanup-threshold-exploratory",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41485277207",
+      "job_seconds": 7762.0
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-02T16:47:45.798377+00:00",
-  "completed_job_seconds": 53441.0,
-  "maximum_committed_seconds": 102641.0,
-  "remaining_unreserved_seconds": 113359.0,
+  "updated_at": "2026-11-02T19:21:24.767550+00:00",
+  "completed_job_seconds": 61203.0,
+  "maximum_committed_seconds": 96003.0,
+  "remaining_unreserved_seconds": 119997.0,
   "candidate_branch": "perf/v1-root-reuse-cache4",
   "forecasts": [
     {
@@ -3183,7 +3213,7 @@
     "automatic_retry": false,
     "full_scale_expansion": false
   },
-  "planned_reserved_seconds": 49200,
+  "planned_reserved_seconds": 34800,
   "previous_candidate_branch": "perf/v1-leaf-fast-path",
   "current_candidate": {
     "name": "Joint SQL plus exact refresh capacity",
@@ -3510,7 +3540,7 @@
     }
   },
   "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 53441.0,
+  "used_runner_seconds_observed": 61203.0,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -3909,12 +3939,12 @@
     {
       "id": "cleanup-threshold-roomy-screen",
       "stage": "screen",
-      "status": "admitted",
+      "status": "completed",
       "branch": "perf/cleanup-threshold-probe",
       "workflow_file": "v2-balance.yml",
       "workflow_id": 397616649,
       "source_revision": "678e998e47020576224337b8fe8ab941f3df2bef",
-      "reservation_seconds": 14400,
+      "reservation_seconds": 0,
       "maximum_job_seconds": 14400,
       "memory_mib": 8192,
       "qualification": false,
@@ -3923,15 +3953,33 @@
       "review_proof": "docs/benchmark-results/cleanup-threshold-roomy-source-freeze-2026-11-02.json",
       "smoke_run_id": 41482637607,
       "pre_dispatch_admission": "docs/benchmark-results/cleanup-threshold-roomy-screen-admission-2026-11-02.json",
-      "forecast_with_margin_seconds": 10219.234829205994
+      "forecast_with_margin_seconds": 10219.234829205994,
+      "dispatch_intent_at": "2026-11-02T16:49:46.918836+00:00",
+      "run_id": 41485277207,
+      "completed_job_seconds": 7762.0,
+      "conclusion": "success",
+      "completed_at": "2026-11-02T18:59:14Z",
+      "scientific_disposition": "Valid54timed/12seed/18oracle controlled1million screen. Fullscan improvements andomitted-refresh regression; notuniformfourmetric/productqualification.",
+      "result_report": "docs/benchmark-results/cleanup-threshold-screen-2026-11-02.md",
+      "raw_proof": "docs/benchmark-results/cleanup-threshold-screen-proof-2026-11-02.json",
+      "report_review": "docs/benchmark-results/cleanup-threshold-report-review-proof-2026-11-02.json"
     }
   ],
   "cleanup_threshold_probe": {
     "goal": "Practically assess configurable0.1percent coarse cleanup storage: four metrics, adversarial semantics and integration cost",
     "authorization": "Owner explicitly requested practical prototype and testing using existing GH-first60h campaign",
-    "status": "Fresh roomy smoke valid; million-entry screen admitted before dispatch, source/binary/runtime checks mandatory in job.",
+    "status": "Research complete: controlled screen, integration audit, actual Opus report review and budget audit finished.",
     "qualification": false,
     "manual_root_accounting": true,
-    "followup_rationale": "Keep1million scale,3cyclicpairs,IO/CPUandchecks; allow4hmaximumscreenjob within owner60hcap and8GiB measurement ceiling to avoid concealing unconstrained peaks in many-directory case. Fresh source/pilot required; no pooling with4GiB pilot."
+    "followup_rationale": "Keep1million scale,3cyclicpairs,IO/CPUandchecks; allow4hmaximumscreenjob within owner60hcap and8GiB measurement ceiling to avoid concealing unconstrained peaks in many-directory case. Fresh source/pilot required; no pooling with4GiB pilot.",
+    "completed_run_ids": [
+      41476363033,
+      41482637607,
+      41485277207
+    ],
+    "study_job_seconds": 9192,
+    "result_report": "docs/benchmark-results/cleanup-threshold-screen-2026-11-02.md",
+    "product_integration": "Not performed; decision/input contract remains separate from research",
+    "budget_audit": "docs/benchmark-results/cleanup-threshold-budget-audit-2026-11-02.json"
   }
 }

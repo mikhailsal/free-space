@@ -1,0 +1,1661 @@
+{
+  "expected_runs": 58,
+  "retrieved_runs": 58,
+  "errors": [],
+  "ledger_aggregate_seconds": 61203.0,
+  "actual_aggregate_seconds": 61203.0,
+  "aggregate_difference_seconds": 0.0,
+  "prototype_seconds": 9192.0,
+  "prototype_run_count": 3,
+  "mismatches": [],
+  "runs": [
+    {
+      "run_id": 41194616353,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124518169333,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T10:54:08Z",
+          "completed_at": "2026-10-31T10:55:53Z",
+          "seconds": 105.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124518514953,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T10:55:55Z",
+          "completed_at": "2026-10-31T10:57:32Z",
+          "seconds": 97.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 202.0,
+      "ledger_seconds": 202.0,
+      "difference_seconds": 0.0,
+      "sha256": "879415195ac961db944e93e8cbf02225a77bed7b88490be9f26939aa220be954"
+    },
+    {
+      "run_id": 41194949486,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124519155581,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T10:59:17Z",
+          "completed_at": "2026-10-31T11:00:25Z",
+          "seconds": 68.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124519385182,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-31T11:00:27Z",
+          "completed_at": "2026-10-31T11:11:03Z",
+          "seconds": 636.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 704.0,
+      "ledger_seconds": 704.0,
+      "difference_seconds": 0.0,
+      "sha256": "cb1ed1eff39d410bb8bf73134ebd51c6f4a1ff97ff479dc1063daf2c37d5cf09"
+    },
+    {
+      "run_id": 41195360648,
+      "jobs_total": 0,
+      "jobs": [],
+      "actual_seconds": 0,
+      "ledger_seconds": 0,
+      "difference_seconds": 0,
+      "sha256": "b3dab5870ff3a8209160335de7c1077b89e461d875d9041ac9d8b8ed7c1666f6"
+    },
+    {
+      "run_id": 41195441593,
+      "jobs_total": 0,
+      "jobs": [],
+      "actual_seconds": 0,
+      "ledger_seconds": 0,
+      "difference_seconds": 0,
+      "sha256": "b3dab5870ff3a8209160335de7c1077b89e461d875d9041ac9d8b8ed7c1666f6"
+    },
+    {
+      "run_id": 41195761328,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124521565258,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:11:07Z",
+          "completed_at": "2026-10-31T11:12:17Z",
+          "seconds": 70.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124521820220,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:12:19Z",
+          "completed_at": "2026-10-31T11:13:42Z",
+          "seconds": 83.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 153.0,
+      "ledger_seconds": 153.0,
+      "difference_seconds": 0.0,
+      "sha256": "26e5f00dc4e292c4a2824659b57eb05bb6c25145ddc13034be339f334852c40a"
+    },
+    {
+      "run_id": 41196033116,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124522269936,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:14:36Z",
+          "completed_at": "2026-10-31T11:15:18Z",
+          "seconds": 42.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124522416982,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:15:21Z",
+          "completed_at": "2026-10-31T11:34:05Z",
+          "seconds": 1124.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1166.0,
+      "ledger_seconds": 1166.0,
+      "difference_seconds": 0.0,
+      "sha256": "1d3c42144a4c0e287491f56d760af5fed53a7950e26040545dfb29bb97430bec"
+    },
+    {
+      "run_id": 41197321746,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124526198910,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:34:07Z",
+          "completed_at": "2026-10-31T11:35:06Z",
+          "seconds": 59.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124526404699,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:35:07Z",
+          "completed_at": "2026-10-31T11:36:32Z",
+          "seconds": 85.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 144.0,
+      "ledger_seconds": 144.0,
+      "difference_seconds": 0.0,
+      "sha256": "44394c11d8afa36979f27c8babf822687e8675511665220f7f2d83fac38cd130"
+    },
+    {
+      "run_id": 41197635230,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124526917122,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:37:40Z",
+          "completed_at": "2026-10-31T11:38:35Z",
+          "seconds": 55.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124527101691,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:38:37Z",
+          "completed_at": "2026-10-31T12:13:13Z",
+          "seconds": 2076.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 2131.0,
+      "ledger_seconds": 2131.0,
+      "difference_seconds": 0.0,
+      "sha256": "45a7aab4b86e3630014dbb20da55471670d0059e806e666b92a2f903f4632c6f"
+    },
+    {
+      "run_id": 41197637087,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124526922397,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:37:41Z",
+          "completed_at": "2026-10-31T11:40:42Z",
+          "seconds": 181.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124527518486,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T11:40:44Z",
+          "completed_at": "2026-10-31T11:59:05Z",
+          "seconds": 1101.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1282.0,
+      "ledger_seconds": 1282.0,
+      "difference_seconds": 0.0,
+      "sha256": "49d6b35bd396682a7496bd93107c92c12cdc232205f95d81f782b35927b4b401"
+    },
+    {
+      "run_id": 41199678638,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124532831916,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T12:07:14Z",
+          "completed_at": "2026-10-31T12:09:44Z",
+          "seconds": 150.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124533359305,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T12:09:46Z",
+          "completed_at": "2026-10-31T12:43:51Z",
+          "seconds": 2045.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 2195.0,
+      "ledger_seconds": 2195.0,
+      "difference_seconds": 0.0,
+      "sha256": "3a779b7d74adbcb915e4252ae773060468f399b697b514a6bfcea5be24d588f9"
+    },
+    {
+      "run_id": 41200958293,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124536494045,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T12:24:26Z",
+          "completed_at": "2026-10-31T12:25:17Z",
+          "seconds": 51.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124536682994,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T12:25:26Z",
+          "completed_at": "2026-10-31T12:26:56Z",
+          "seconds": 90.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 141.0,
+      "ledger_seconds": 141.0,
+      "difference_seconds": 0.0,
+      "sha256": "d7cd00acee3dc4bf70538dc437e8afa26770388d526c5fc101a2fcf314b363bf"
+    },
+    {
+      "run_id": 41206306054,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124551963942,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T13:36:07Z",
+          "completed_at": "2026-10-31T13:37:07Z",
+          "seconds": 60.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124552182394,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T13:37:09Z",
+          "completed_at": "2026-10-31T13:56:57Z",
+          "seconds": 1188.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1248.0,
+      "ledger_seconds": 1248.0,
+      "difference_seconds": 0.0,
+      "sha256": "e22a26478e9ecf80c907d60a4d7fa384be857892961eb25f8e2738b348b24812"
+    },
+    {
+      "run_id": 41208041797,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124557085454,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T13:59:44Z",
+          "completed_at": "2026-10-31T14:03:50Z",
+          "seconds": 246.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124558046989,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T14:03:52Z",
+          "completed_at": "2026-10-31T14:20:35Z",
+          "seconds": 1003.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1249.0,
+      "ledger_seconds": 1249.0,
+      "difference_seconds": 0.0,
+      "sha256": "053d9a96224f9c0ad69db4caf2608b06dd359be34abd7c8f092e52fc9b1162ac"
+    },
+    {
+      "run_id": 41216093276,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124580815472,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T15:42:05Z",
+          "completed_at": "2026-10-31T15:44:59Z",
+          "seconds": 174.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124581490657,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T15:45:01Z",
+          "completed_at": "2026-10-31T16:00:04Z",
+          "seconds": 903.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1077.0,
+      "ledger_seconds": 1077.0,
+      "difference_seconds": 0.0,
+      "sha256": "86afbe1345caa6a294b0dada085b9728aa0f27fd07e42a9e35c1eca5a2fa566d"
+    },
+    {
+      "run_id": 41220168826,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124592888704,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T16:32:29Z",
+          "completed_at": "2026-10-31T16:36:27Z",
+          "seconds": 238.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124593848034,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T16:36:30Z",
+          "completed_at": "2026-10-31T16:51:55Z",
+          "seconds": 925.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1163.0,
+      "ledger_seconds": 1163.0,
+      "difference_seconds": 0.0,
+      "sha256": "04a7c0ff53579e3542a3036d903ec89c61d5841c7c22b2ba2a70fc8c87209630"
+    },
+    {
+      "run_id": 41222190491,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124598906603,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T16:58:05Z",
+          "completed_at": "2026-10-31T16:59:59Z",
+          "seconds": 114.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124599344062,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T17:00:01Z",
+          "completed_at": "2026-10-31T17:29:21Z",
+          "seconds": 1760.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1874.0,
+      "ledger_seconds": 1874.0,
+      "difference_seconds": 0.0,
+      "sha256": "4cb3ea775ed353e447cc5d6d786167e566303fc952085148b6ee8fa5af6610db"
+    },
+    {
+      "run_id": 41223904260,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124603950091,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T17:18:46Z",
+          "completed_at": "2026-10-31T17:23:05Z",
+          "seconds": 259.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124605022328,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T17:23:07Z",
+          "completed_at": "2026-10-31T17:43:31Z",
+          "seconds": 1224.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1483.0,
+      "ledger_seconds": 1483.0,
+      "difference_seconds": 0.0,
+      "sha256": "2a222e4a427fa144ebdc60b26eca1aa4a6002370d0b1d187e8326f2bb9786d15"
+    },
+    {
+      "run_id": 41227692011,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124615176676,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:05:43Z",
+          "completed_at": "2026-10-31T18:08:34Z",
+          "seconds": 171.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124615889504,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:08:36Z",
+          "completed_at": "2026-10-31T18:40:32Z",
+          "seconds": 1916.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 2087.0,
+      "ledger_seconds": 2087.0,
+      "difference_seconds": 0.0,
+      "sha256": "9d185d963b8a02fcae551331ebcf965af17916e01045b39b3b8620972b600f3e"
+    },
+    {
+      "run_id": 41227699497,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124615198513,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:05:48Z",
+          "completed_at": "2026-10-31T18:09:43Z",
+          "seconds": 235.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124616166213,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:09:45Z",
+          "completed_at": "2026-10-31T18:29:38Z",
+          "seconds": 1193.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1428.0,
+      "ledger_seconds": 1428.0,
+      "difference_seconds": 0.0,
+      "sha256": "eb490299527d60da8d9dd67d453b9cdf6bab65fdb8021184051768be97591ad2"
+    },
+    {
+      "run_id": 41230966330,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124624910588,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:45:39Z",
+          "completed_at": "2026-10-31T18:48:21Z",
+          "seconds": 162.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124625544387,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:48:23Z",
+          "completed_at": "2026-10-31T19:35:32Z",
+          "seconds": 2829.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 2991.0,
+      "ledger_seconds": 2991.0,
+      "difference_seconds": 0.0,
+      "sha256": "8adb9a72a8cc1525e1b3528b7427bc424ffcb115e65550850e31577089a9bb1f"
+    },
+    {
+      "run_id": 41231314351,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124625949161,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:50:07Z",
+          "completed_at": "2026-10-31T18:53:53Z",
+          "seconds": 226.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124626826221,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T18:53:55Z",
+          "completed_at": "2026-10-31T18:55:24Z",
+          "seconds": 89.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 315.0,
+      "ledger_seconds": 315.0,
+      "difference_seconds": 0.0,
+      "sha256": "3737a4b4e445e17fc7553f0b92f59d43525a484e527e9d4ec68d062255c8e2ad"
+    },
+    {
+      "run_id": 41232072330,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124628199745,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T19:00:03Z",
+          "completed_at": "2026-10-31T19:02:31Z",
+          "seconds": 148.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124628818001,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T19:02:33Z",
+          "completed_at": "2026-10-31T19:04:05Z",
+          "seconds": 92.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 240.0,
+      "ledger_seconds": 240.0,
+      "difference_seconds": 0.0,
+      "sha256": "d0a2622e9187fb32ee7f30fe54cd31889d79a03aa1ad0385b4aa9c52b5e5e20f"
+    },
+    {
+      "run_id": 41232507959,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124629450469,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T19:05:10Z",
+          "completed_at": "2026-10-31T19:07:57Z",
+          "seconds": 167.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124630140452,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-31T19:07:59Z",
+          "completed_at": "2026-10-31T19:08:11Z",
+          "seconds": 12.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 179.0,
+      "ledger_seconds": 179.0,
+      "difference_seconds": 0.0,
+      "sha256": "5163f53d77a7e670379f307966ec679583d75551ffa9e31bad8cc61c916ddd5b"
+    },
+    {
+      "run_id": 41236396792,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124640984391,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T19:54:40Z",
+          "completed_at": "2026-10-31T19:59:17Z",
+          "seconds": 277.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124642017404,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T19:59:19Z",
+          "completed_at": "2026-10-31T20:00:47Z",
+          "seconds": 88.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 365.0,
+      "ledger_seconds": 365.0,
+      "difference_seconds": 0.0,
+      "sha256": "627bc4fbe4918432cf2abc72c73e97ece5fed208865fd3f5a095081ef1a6912d"
+    },
+    {
+      "run_id": 41237970872,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124645649233,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T20:14:32Z",
+          "completed_at": "2026-10-31T20:17:15Z",
+          "seconds": 163.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124646297468,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T20:17:18Z",
+          "completed_at": "2026-10-31T20:35:50Z",
+          "seconds": 1112.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1275.0,
+      "ledger_seconds": 1275.0,
+      "difference_seconds": 0.0,
+      "sha256": "9a19ba671b7090917573de1162ccfde9bdfd7f56974d59e7ade2344b6a20e8a6"
+    },
+    {
+      "run_id": 41237971343,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124645651049,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T20:14:33Z",
+          "completed_at": "2026-10-31T20:19:07Z",
+          "seconds": 274.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124646727630,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T20:19:09Z",
+          "completed_at": "2026-10-31T20:39:03Z",
+          "seconds": 1194.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1468.0,
+      "ledger_seconds": 1468.0,
+      "difference_seconds": 0.0,
+      "sha256": "5f3bbc3402e7ae1e67ff69b13c42aeb83a59fef926628483a36f10749ab22411"
+    },
+    {
+      "run_id": 41239317973,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124649677081,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-31T20:31:52Z",
+          "completed_at": "2026-10-31T20:33:06Z",
+          "seconds": 74.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124650003080,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-31T20:33:06Z",
+          "completed_at": "2026-10-31T20:33:06Z",
+          "seconds": null,
+          "excluded_reason": "skipped job; timestamps are synthetic and do not indicate execution"
+        }
+      ],
+      "actual_seconds": 74.0,
+      "ledger_seconds": 74.0,
+      "difference_seconds": 0.0,
+      "sha256": "0578548b32b70197934d61e85d2bb31ece7d80e68f816c904a002a4713c6b17b"
+    },
+    {
+      "run_id": 41240117136,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124652083436,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T20:42:02Z",
+          "completed_at": "2026-10-31T20:44:50Z",
+          "seconds": 168.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124652723871,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T20:44:53Z",
+          "completed_at": "2026-10-31T20:58:21Z",
+          "seconds": 808.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 976.0,
+      "ledger_seconds": 976.0,
+      "difference_seconds": 0.0,
+      "sha256": "5dc7a7427cf3d81f69cb5b563200d756d1524fb722adeaa543e2a94db06d28db"
+    },
+    {
+      "run_id": 41240352711,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124652783498,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-31T20:45:08Z",
+          "completed_at": "2026-10-31T20:45:43Z",
+          "seconds": 35.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124652922763,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-31T20:45:43Z",
+          "completed_at": "2026-10-31T20:45:43Z",
+          "seconds": null,
+          "excluded_reason": "skipped job; timestamps are synthetic and do not indicate execution"
+        }
+      ],
+      "actual_seconds": 35.0,
+      "ledger_seconds": 35.0,
+      "difference_seconds": 0.0,
+      "sha256": "6174cf338ced2aff5d816b17840e3e0adc6e504c45075ea0cf02224f0812933e"
+    },
+    {
+      "run_id": 41241552473,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124656319490,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:00:48Z",
+          "completed_at": "2026-10-31T21:03:35Z",
+          "seconds": 167.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124656982593,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:03:37Z",
+          "completed_at": "2026-10-31T21:14:33Z",
+          "seconds": 656.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 823.0,
+      "ledger_seconds": 823.0,
+      "difference_seconds": 0.0,
+      "sha256": "1e2149cd9c77fc327dd24d3ebc5aa102760400f3796a8116a7739578e23105f8"
+    },
+    {
+      "run_id": 41242956623,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124660448054,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-31T21:18:24Z",
+          "completed_at": "2026-10-31T21:19:05Z",
+          "seconds": 41.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124660620492,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-31T21:19:06Z",
+          "completed_at": "2026-10-31T21:19:05Z",
+          "seconds": null,
+          "excluded_reason": "skipped job; timestamps are synthetic and do not indicate execution"
+        }
+      ],
+      "actual_seconds": 41.0,
+      "ledger_seconds": 41,
+      "difference_seconds": 0.0,
+      "sha256": "f4fd2fe98ade08d1bb014a443001c3dfc71a522d03cb57eb9ca23eecfd1ec8e5"
+    },
+    {
+      "run_id": 41243669897,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124662575393,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:27:30Z",
+          "completed_at": "2026-10-31T21:31:00Z",
+          "seconds": 210.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124663383108,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:31:02Z",
+          "completed_at": "2026-10-31T21:32:30Z",
+          "seconds": 88.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 298.0,
+      "ledger_seconds": 298.0,
+      "difference_seconds": 0.0,
+      "sha256": "62dca54f1f3e3cf8f53c34e02a2e6cbb86b61bd824ccb253e12d17faa5ac77ef"
+    },
+    {
+      "run_id": 41244336962,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124664520814,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:35:53Z",
+          "completed_at": "2026-10-31T21:38:52Z",
+          "seconds": 179.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124665183855,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:38:54Z",
+          "completed_at": "2026-10-31T21:49:39Z",
+          "seconds": 645.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 824.0,
+      "ledger_seconds": 824.0,
+      "difference_seconds": 0.0,
+      "sha256": "8aa8770cc873c4baa23e620c5cfba4942c4856ee32d8824eca9c5bd0ea3a32a2"
+    },
+    {
+      "run_id": 41244708164,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124665615962,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:40:51Z",
+          "completed_at": "2026-10-31T21:45:29Z",
+          "seconds": 278.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124666670765,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:45:32Z",
+          "completed_at": "2026-10-31T21:46:54Z",
+          "seconds": 82.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 360.0,
+      "ledger_seconds": 360.0,
+      "difference_seconds": 0.0,
+      "sha256": "ef9a86e332671fbe4ab31c2d97c0acf966318b1099854a71768c92165f1c9d9a"
+    },
+    {
+      "run_id": 41245753697,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124668712144,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:54:36Z",
+          "completed_at": "2026-10-31T21:59:15Z",
+          "seconds": 279.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124669713315,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T21:59:22Z",
+          "completed_at": "2026-10-31T22:12:10Z",
+          "seconds": 768.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1047.0,
+      "ledger_seconds": 1047.0,
+      "difference_seconds": 0.0,
+      "sha256": "13b2747890e78dda770e12cc84b6cbf9bc1066b39580920a296e9bb0a09c70e8"
+    },
+    {
+      "run_id": 41248061322,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124675549827,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T22:24:45Z",
+          "completed_at": "2026-10-31T22:27:41Z",
+          "seconds": 176.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124676207748,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T22:27:44Z",
+          "completed_at": "2026-10-31T22:42:52Z",
+          "seconds": 908.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1084.0,
+      "ledger_seconds": 1084.0,
+      "difference_seconds": 0.0,
+      "sha256": "da2a1d3c6611f29ce240d4f835d3cf792bc1115554965627f1eb7c550781cb39"
+    },
+    {
+      "run_id": 41249609974,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124680173851,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T22:45:42Z",
+          "completed_at": "2026-10-31T22:48:06Z",
+          "seconds": 144.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124680691655,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T22:48:18Z",
+          "completed_at": "2026-10-31T23:02:25Z",
+          "seconds": 847.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 991.0,
+      "ledger_seconds": 991.0,
+      "difference_seconds": 0.0,
+      "sha256": "2786ae7a7565e05d2dc8d480de381c06d2ff232fb188dd029c257acc17fede6f"
+    },
+    {
+      "run_id": 41251341238,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124685327982,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-31T23:09:47Z",
+          "completed_at": "2026-10-31T23:13:04Z",
+          "seconds": 197.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124686048769,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-31T23:13:04Z",
+          "completed_at": "2026-10-31T23:13:04Z",
+          "seconds": null,
+          "excluded_reason": "skipped job; timestamps are synthetic and do not indicate execution"
+        }
+      ],
+      "actual_seconds": 197.0,
+      "ledger_seconds": 197.0,
+      "difference_seconds": 0.0,
+      "sha256": "8c58985388fc9ffe4f38586b77c48ce629e767792663a716c62fec82e2e16a72"
+    },
+    {
+      "run_id": 41252735964,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124689468308,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T23:29:28Z",
+          "completed_at": "2026-10-31T23:34:19Z",
+          "seconds": 291.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124690485515,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T23:34:21Z",
+          "completed_at": "2026-10-31T23:35:44Z",
+          "seconds": 83.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 374.0,
+      "ledger_seconds": 374.0,
+      "difference_seconds": 0.0,
+      "sha256": "12e5fcabef6c76bf288e89cd281b4a48cf38cc0714e688a56fdbb0efd0b81cfc"
+    },
+    {
+      "run_id": 41252744694,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124689496308,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T23:29:36Z",
+          "completed_at": "2026-10-31T23:33:54Z",
+          "seconds": 258.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124690400958,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T23:33:56Z",
+          "completed_at": "2026-11-01T00:42:52Z",
+          "seconds": 4136.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 4394.0,
+      "ledger_seconds": 4394.0,
+      "difference_seconds": 0.0,
+      "sha256": "cc17d1be6309f92517e3a8caa7e28e75d069d44ad597a29763ac10ce62cee83f"
+    },
+    {
+      "run_id": 41253374855,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124691340379,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T23:38:32Z",
+          "completed_at": "2026-10-31T23:43:16Z",
+          "seconds": 284.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124692289785,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-31T23:43:18Z",
+          "completed_at": "2026-11-01T00:04:14Z",
+          "seconds": 1256.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1540.0,
+      "ledger_seconds": 1540.0,
+      "difference_seconds": 0.0,
+      "sha256": "fe5e376275446abac4cffd13cab86a46de3f43d1affe2af0e90c0e2c5dbe78a7"
+    },
+    {
+      "run_id": 41255297627,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124697081504,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T00:06:51Z",
+          "completed_at": "2026-11-01T00:09:24Z",
+          "seconds": 153.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124697653393,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T00:09:26Z",
+          "completed_at": "2026-11-01T00:29:09Z",
+          "seconds": 1183.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1336.0,
+      "ledger_seconds": 1336.0,
+      "difference_seconds": 0.0,
+      "sha256": "9b1b30569060fd17c4a31a9ecfec619638e583f5996e1d3dedfa0c4831e517bb"
+    },
+    {
+      "run_id": 41256220919,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124699837862,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T00:19:14Z",
+          "completed_at": "2026-11-01T00:21:45Z",
+          "seconds": 151.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124700410644,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T00:21:47Z",
+          "completed_at": "2026-11-01T00:35:29Z",
+          "seconds": 822.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 973.0,
+      "ledger_seconds": 973.0,
+      "difference_seconds": 0.0,
+      "sha256": "8eabed67bdc9b0bb35d3cc81a09c3b004d435014d8865650b7a5357b5283ec27"
+    },
+    {
+      "run_id": 41259537703,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124709752929,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T01:04:59Z",
+          "completed_at": "2026-11-01T01:09:55Z",
+          "seconds": 296.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124710837534,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T01:09:57Z",
+          "completed_at": "2026-11-01T01:11:31Z",
+          "seconds": 94.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 390.0,
+      "ledger_seconds": 390.0,
+      "difference_seconds": 0.0,
+      "sha256": "ccf125624e35bc54c6f474c0f5d1ccdaadb94b6cb13eca68474635b19c0e451b"
+    },
+    {
+      "run_id": 41260421846,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124712355398,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T01:16:52Z",
+          "completed_at": "2026-11-01T01:19:48Z",
+          "seconds": 176.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124712985784,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T01:19:50Z",
+          "completed_at": "2026-11-01T01:39:53Z",
+          "seconds": 1203.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1379.0,
+      "ledger_seconds": 1379.0,
+      "difference_seconds": 0.0,
+      "sha256": "76e2467b392ec4946a0a2d40a82d4e38216a080e0aaf5d879b584d60b26c9d25"
+    },
+    {
+      "run_id": 41265785702,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124728201327,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T02:34:53Z",
+          "completed_at": "2026-11-01T02:39:28Z",
+          "seconds": 275.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124729098929,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-11-01T02:39:30Z",
+          "completed_at": "2026-11-01T02:41:04Z",
+          "seconds": 94.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 369.0,
+      "ledger_seconds": 369.0,
+      "difference_seconds": 0.0,
+      "sha256": "44009185312c2c7a6d5f2f8c865b0ea42dbf69188a7d23a6fbc24cec3c00a64a"
+    },
+    {
+      "run_id": 41268681360,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124736751784,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T03:19:02Z",
+          "completed_at": "2026-11-01T03:22:37Z",
+          "seconds": 215.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124737476372,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T03:22:39Z",
+          "completed_at": "2026-11-01T03:24:22Z",
+          "seconds": 103.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 318.0,
+      "ledger_seconds": 318.0,
+      "difference_seconds": 0.0,
+      "sha256": "f68be9d891a94709662e710d4cf1c638bb772da4e829c4a5bc495e125ddb4b29"
+    },
+    {
+      "run_id": 41269627684,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124739544186,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T03:33:10Z",
+          "completed_at": "2026-11-01T03:35:45Z",
+          "seconds": 155.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124740071097,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T03:35:48Z",
+          "completed_at": "2026-11-01T03:49:18Z",
+          "seconds": 810.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 965.0,
+      "ledger_seconds": 965.0,
+      "difference_seconds": 0.0,
+      "sha256": "bf4401b183b01c8a4b3999f7ecc235a120bc20170a9114623f437ac541bbfd47"
+    },
+    {
+      "run_id": 41271696304,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124745608441,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T04:05:30Z",
+          "completed_at": "2026-11-01T04:10:25Z",
+          "seconds": 295.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124746597601,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T04:10:27Z",
+          "completed_at": "2026-11-01T04:27:43Z",
+          "seconds": 1036.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1331.0,
+      "ledger_seconds": 1331.0,
+      "difference_seconds": 0.0,
+      "sha256": "75e5a8134e910a23a7669bcd224582db7d3673182b721be553eddcf31f057aef"
+    },
+    {
+      "run_id": 41273349166,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124750472308,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T04:30:26Z",
+          "completed_at": "2026-11-01T04:35:26Z",
+          "seconds": 300.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124751429114,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T04:35:28Z",
+          "completed_at": "2026-11-01T04:49:42Z",
+          "seconds": 854.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1154.0,
+      "ledger_seconds": 1154.0,
+      "difference_seconds": 0.0,
+      "sha256": "4168fbaef030796b1a0640400c230aff82b51801004997918b4ff50a34f2ee9b"
+    },
+    {
+      "run_id": 41274381403,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124753469863,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T04:46:35Z",
+          "completed_at": "2026-11-01T04:50:16Z",
+          "seconds": 221.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124754128240,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T04:50:18Z",
+          "completed_at": "2026-11-01T04:51:45Z",
+          "seconds": 87.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 308.0,
+      "ledger_seconds": 308.0,
+      "difference_seconds": 0.0,
+      "sha256": "da97934585f46cfa3e5e55144d28ec1d51ae1065b00661dc541766702c7cf4e2"
+    },
+    {
+      "run_id": 41277463149,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124762439940,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T05:34:34Z",
+          "completed_at": "2026-11-01T05:37:13Z",
+          "seconds": 159.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124762949888,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T05:37:16Z",
+          "completed_at": "2026-11-01T05:57:40Z",
+          "seconds": 1224.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1383.0,
+      "ledger_seconds": 1383.0,
+      "difference_seconds": 0.0,
+      "sha256": "9c6dc104829f2cf2581c8666b230f498e186b4e38e9463f44f6359c0e92e6f2a"
+    },
+    {
+      "run_id": 41279047267,
+      "jobs_total": 2,
+      "jobs": [
+        {
+          "id": 124767013719,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T06:00:19Z",
+          "completed_at": "2026-11-01T06:04:18Z",
+          "seconds": 239.0,
+          "excluded_reason": null
+        },
+        {
+          "id": 124767805167,
+          "name": "paired",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-01T06:04:20Z",
+          "completed_at": "2026-11-01T06:19:01Z",
+          "seconds": 881.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1120.0,
+      "ledger_seconds": 1120.0,
+      "difference_seconds": 0.0,
+      "sha256": "7565857afd8ee1a34f714a6518d827bd2b04dd960972a221f49e757eb6608a2e"
+    },
+    {
+      "run_id": 41372382738,
+      "jobs_total": 1,
+      "jobs": [
+        {
+          "id": 125045401941,
+          "name": "diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T01:25:09Z",
+          "completed_at": "2026-11-02T01:26:59Z",
+          "seconds": 110.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 110.0,
+      "ledger_seconds": 110.0,
+      "difference_seconds": 0.0,
+      "sha256": "ed9e3ca4dd65b7df835f377b615927f4cee2c1bdc3b8a62d1f9a9a35c451c1c2"
+    },
+    {
+      "run_id": 41373680085,
+      "jobs_total": 1,
+      "jobs": [
+        {
+          "id": 125049271383,
+          "name": "diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T01:40:15Z",
+          "completed_at": "2026-11-02T02:01:12Z",
+          "seconds": 1257.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 1257.0,
+      "ledger_seconds": 1257.0,
+      "difference_seconds": 0.0,
+      "sha256": "5a6882ad16edde5ca5b204de11184cdfc0ce64ea2e888accf9b18e2702235085"
+    },
+    {
+      "run_id": 41476363033,
+      "jobs_total": 1,
+      "jobs": [
+        {
+          "id": 125382869851,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T15:55:38Z",
+          "completed_at": "2026-11-02T16:07:42Z",
+          "seconds": 724.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 724.0,
+      "ledger_seconds": 724.0,
+      "difference_seconds": 0.0,
+      "sha256": "065cf9c0b84629f8ea02428c1319848460f366b5b81069fc63e5761fd4686305"
+    },
+    {
+      "run_id": 41482637607,
+      "jobs_total": 1,
+      "jobs": [
+        {
+          "id": 125404681652,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T16:33:33Z",
+          "completed_at": "2026-11-02T16:45:19Z",
+          "seconds": 706.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 706.0,
+      "ledger_seconds": 706.0,
+      "difference_seconds": 0.0,
+      "sha256": "1079299078ec09aa865903075a5d875ba3dda607ad875f8733b93e94c2a9e862"
+    },
+    {
+      "run_id": 41485277207,
+      "jobs_total": 1,
+      "jobs": [
+        {
+          "id": 125413868030,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-02T16:49:52Z",
+          "completed_at": "2026-11-02T18:59:14Z",
+          "seconds": 7762.0,
+          "excluded_reason": null
+        }
+      ],
+      "actual_seconds": 7762.0,
+      "ledger_seconds": 7762.0,
+      "difference_seconds": 0.0,
+      "sha256": "84bcdf7d7bd50c28b034e63f3ff27cc9d9c5c6b74bf0bc7fea3ae9427b58cba3"
+    }
+  ]
+}

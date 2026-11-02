@@ -1,0 +1,34 @@
+{
+  "run_id": 41485277207,
+  "source_revision": "678e998e47020576224337b8fe8ab941f3df2bef",
+  "capsule": {
+    "path": "cleanup-threshold-screen-2026-11-02.tar.gz",
+    "sha256": "6e5d17235aad2eafc8355e735ac88fa3ed85e82712103f14d13953d142460055",
+    "bytes": 748568,
+    "files": 913
+  },
+  "github_artifact": {
+    "id": 13169908828,
+    "name": "cleanup-threshold-screen",
+    "size_in_bytes": 92195728,
+    "digest": "sha256:1989f430a5f8ccc155124915616dd03768906af81aad89336258a37b1b92dd17",
+    "expired": false
+  },
+  "full_github_zip_independently_hashed": false,
+  "raw_selected_members": "CRC checked during range extraction; all selected original bytes preserved, SHA256index insidecapsule",
+  "source_validation": {
+    "valid": true,
+    "source_revision": "678e998e47020576224337b8fe8ab941f3df2bef",
+    "captured_source_files": 218,
+    "all_bytes_match_git": true,
+    "smoke_run_id": 41482637607,
+    "same_binary_hashes": true,
+    "same_runtime_identity_and_packages": true,
+    "omitted_large_payloads": "Recorded in original ZIP inventory; not byte-verified locally",
+    "checks": "54timed/12seed/18oracles, exactscopes/counts/totals, hostresources/calibration/cleanup andnoobservedpressure passed independentpostvalidator."
+  },
+  "same_source_smoke_run_id": 41482637607,
+  "qualification": false,
+  "report_review_proof": "cleanup-threshold-report-review-proof-2026-11-02.json",
+  "budget_audit": "cleanup-threshold-budget-audit-2026-11-02.json"
+}

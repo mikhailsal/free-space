@@ -17,6 +17,7 @@ PROFILES = ('files', 'directories')
 SCENARIOS = ('full', 'retained', 'omitted')
 ARMS = ('v1', 'v2', 'probe')
 METRICS = ('cgroup_memory_peak_bytes', 'process_peak_rss_kib', 'worker_elapsed_seconds',
+           'command_elapsed_seconds',
            'sampled_output_peak_estimate_bytes', 'final_allocated_output_bytes')
 
 
@@ -88,6 +89,7 @@ def point(base, case, memory_mib=4096):
     result = {'id': ident, 'cgroup_memory_peak_bytes': number(int(after['memory.peak']), ident),
               'process_peak_rss_kib': number(m['time']['peak_rss_kib'], ident),
               'worker_elapsed_seconds': number(m['elapsed_seconds'], ident),
+              'command_elapsed_seconds': number(m['time']['elapsed_seconds'], ident),
               'sampled_output_peak_estimate_bytes': number(m['output_peak_estimate_bytes'], ident),
               'final_allocated_output_bytes': number(m['final_output']['total']['allocated_bytes'], ident),
               'boundary': report.get('boundary'), 'visited': report.get('visited'),
@@ -254,6 +256,7 @@ def analyze(root, smoke_root=None):
             'optimization_acceptance': 'not evaluated', 'memory_ceiling_mib': memory_mib, 'runtime_provenance': runtime,
             'disk_calibration': disk_calibration, 'fixtures': fixtures, 'groups': groups,
             'notes': ['Output peak is a sampled lower-bound estimate, not exact peak allocation.',
+                      'Worker elapsed includes timeout completion polling (up to about50ms); GNU command elapsed is also retained, with0.01s resolution. Small fast-operation differences need cautious interpretation.',
                       'Memory peak includes the writer container wrapper and sampler.',
                       'Flags preserve observed cap, reclaim, OOM and swap pressure; flagged comparisons are inconclusive.']}
 
