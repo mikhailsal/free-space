@@ -22,6 +22,13 @@ pub enum Plan {
     Range(Slice),
 }
 impl Plan {
+    /// The retained directory this plan rescans from. It has to exist on disk to be rescanned.
+    pub fn region(&self) -> &Path {
+        match self {
+            Self::Retained(path) => path,
+            Self::Range(slice) => &slice.parent,
+        }
+    }
     /// Hardlinked entries the rescanned region held. Their byte ownership depends on paths
     /// outside the region, so a region with links is never refreshed on its own.
     pub fn links(&self, nodes: &[Node]) -> u64 {
@@ -124,6 +131,32 @@ pub fn rebuild(nodes: &mut [Node]) -> R<()> {
     }
     Ok(())
 }
+/// The retained nodes form one tree: a single root, and every other node sits directly
+/// below a retained directory.
+fn check_structure(nodes: &[Node]) -> R<()> {
+    let index = lookup(nodes);
+    let mut roots = 0;
+    for n in nodes {
+        if n.kind > 2 {
+            return Err("unknown node kind".into());
+        }
+        let Some(parent) = &n.parent else {
+            roots += 1;
+            continue;
+        };
+        let owner = index
+            .get(parent)
+            .map(|i| &nodes[*i])
+            .ok_or("retained node missing parent")?;
+        if owner.kind != 1 || n.path.parent() != Some(parent.as_path()) {
+            return Err("node is not a child of its parent directory".into());
+        }
+    }
+    if roots != 1 {
+        return Err("snapshot must have exactly one root".into());
+    }
+    Ok(())
+}
 /// A snapshot read from disk must satisfy the invariants refresh relies on.
 pub fn verify(nodes: &[Node]) -> R<()> {
     let mut seen = HashSet::new();
@@ -137,6 +170,7 @@ pub fn verify(nodes: &[Node]) -> R<()> {
             return Err("non-directory node has buckets".into());
         }
     }
+    check_structure(nodes)?;
     let totals = derived(nodes)?;
     if nodes.iter().zip(&totals).any(|(n, t)| n.total != *t) {
         return Err("snapshot totals do not match their components".into());
@@ -212,6 +246,12 @@ pub fn update_range(
         .ok_or("range is not a bucket of its parent")?;
     node.buckets.splice(at..=at, fresh.buckets);
     validate(&node.buckets)?;
+    if let Some(top) = &fresh.parent {
+        node.own_allocated = top.own_allocated;
+        node.own_apparent = top.own_apparent;
+        node.own_errors = top.own_errors;
+        node.scanned_at = top.scanned_at;
+    }
     old.extend(fresh.nodes);
     check_cap(old)?;
     rebuild(old)?;

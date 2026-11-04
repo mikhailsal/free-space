@@ -7,6 +7,20 @@ import sys
 
 STAMP = 1700000000
 GIB = 1024 ** 3
+CHUNK_CHILDREN = 1000  # children of each bulk chunk directory g000000, g000001, ...
+SMALL_FILES = 99       # empty files in 'small'
+CONTROL_FILES = 5      # below, equalish, above, deep/large and sparse
+GROUP_FILES = 64       # files in 'large/group'
+
+
+def receipt_shape(profile, count):
+    """Entry counts the construction loops of `build` produce, kept apart so the plan's contract tests use them."""
+    bulk_files = count if profile == 'files' else count // 2
+    bulk_directories = 0 if profile == 'files' else count // 2
+    files = bulk_files + SMALL_FILES + CONTROL_FILES + GROUP_FILES + 1  # the last one is the raw-name file
+    dirs = bulk_directories + count // CHUNK_CHILDREN + 7
+    return dict(bulk_files=bulk_files, bulk_directories=bulk_directories,
+                expected_counts=dict(files=files, dirs=dirs, others=0, entries=files + dirs))
 
 
 def guard():
@@ -45,19 +59,13 @@ def build(root, profile, count):
         raise ValueError('inner filesystem capacity is outside the frozen 500 GiB sparse-image envelope')
     block = fs.f_frsize
     rounded = (threshold // block) * block
+    # The counts in receipt_shape come from the construction loops below, including all controls,
+    # directory chunks and the root. No second enumeration is needed.
     receipt = dict(profile=profile, scale=count, capacity_bytes=capacity, threshold_bytes=threshold,
                    block_bytes=block, controls={}, fixed_timestamp=STAMP,
-                   bulk_files=count if profile == 'files' else count // 2,
-                   bulk_directories=0 if profile == 'files' else count // 2,
                    bulk_allocated_files=count // 2 if profile == 'files' else count // 4,
                    bulk_empty_files=count // 2 if profile == 'files' else count // 4,
-                   bulk_allocation_bytes_per_file=4096)
-    # These counts come from the construction loops, including all controls,
-    # directory chunks and the root. No second enumeration is needed.
-    expected_files = receipt['bulk_files'] + 99 + 5 + 64 + 1
-    expected_dirs = receipt['bulk_directories'] + count // 1000 + 7
-    receipt['expected_counts'] = dict(files=expected_files, dirs=expected_dirs,
-                                      others=0, entries=expected_files + expected_dirs)
+                   bulk_allocation_bytes_per_file=4096, **receipt_shape(profile, count))
     # 'bulk' is kept only by the entries rule at 100k scale and by both rules at 1M; 'small' and the wide
     # target chunk stay below both limits, so a refresh below them must be answered from folded buckets.
     receipt['expected_controls'] = {
@@ -68,7 +76,7 @@ def build(root, profile, count):
     small = root / 'small'
     retained = root / 'large'
     small.mkdir(); retained.mkdir()
-    for i in range(99):
+    for i in range(SMALL_FILES):
         (small / f'f{i:03}').touch()
     os.sync()
     before_backing = os.stat(os.environ['CLEANUP_BACKING_FILE']).st_blocks * 512
@@ -92,7 +100,7 @@ def build(root, profile, count):
     receipt['controls']['sparse'] = dict(apparent=ss.st_size, allocated=ss.st_blocks * 512)
     group = retained / 'group'
     group.mkdir()
-    group_count = 64
+    group_count = GROUP_FILES
     group_child_size = ((threshold + group_count * block - 1) // (group_count * block)) * block
     if group_child_size >= threshold: raise ValueError('group child is not subthreshold')
     group_allocated = 0
@@ -112,9 +120,9 @@ def build(root, profile, count):
     shapes.mkdir()
     bulk_allocated = 0
     for i in range(count):
-        if i % 1000 == 0:
+        if i % CHUNK_CHILDREN == 0:
             check_space(root)
-            chunk = shapes / f'g{i // 1000:06}'
+            chunk = shapes / f'g{i // CHUNK_CHILDREN:06}'
             chunk.mkdir()
         path = chunk / f'n{i:09}'
         if profile == 'directories' and i % 2 == 0:

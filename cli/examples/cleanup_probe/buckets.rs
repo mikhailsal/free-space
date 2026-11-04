@@ -1,21 +1,27 @@
 //! Bounded residual buckets: the folded-away children of a retained directory are
 //! spread over hash slots, and contiguous slot ranges are tiled into buckets that hold
-//! about `BUCKET_ENTRIES` entries. Refreshing a folded path rescans one bucket, never
-//! the whole retained directory.
+//! about `BUCKET_ENTRIES` entries. Refreshing a folded path rescans the bucket that
+//! holds it instead of the whole retained directory (a region with hardlinks falls
+//! back to a full rescan, see `main::refresh`).
 use crate::model::{Bucket, R, SLOT_BITS, SLOTS, Stats};
 use std::collections::BTreeMap;
 
 pub type Slots = BTreeMap<u32, Stats>;
 
-/// Stable name hash (FNV-1a, then a Fibonacci mix to use its well-mixed top bits).
-/// The oracle and the tests carry the same constants; changing them is a format change.
-pub fn slot_of(name: &[u8]) -> u32 {
+/// FNV-1a, 64 bit, over the raw bytes of a name (the published algorithm).
+fn fnv1a(name: &[u8]) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in name {
         h ^= u64::from(*byte);
         h = h.wrapping_mul(0x0000_0100_0000_01b3);
     }
-    (h.wrapping_mul(0x9e37_79b9_7f4a_7c15) >> (64 - SLOT_BITS)) as u32
+    h
+}
+
+/// Stable name hash: FNV-1a, then a Fibonacci mix to use its well-mixed top bits.
+/// The oracle and the tests carry the same constants; changing them is a format change.
+pub fn slot_of(name: &[u8]) -> u32 {
+    (fnv1a(name).wrapping_mul(0x9e37_79b9_7f4a_7c15) >> (64 - SLOT_BITS)) as u32
 }
 
 /// Tile `[lo, hi)` greedily. A bucket is closed before the slot that would push it over
@@ -49,7 +55,7 @@ pub fn tile(slots: &Slots, cap: u64, lo: u32, hi: u32) -> R<Vec<Bucket>> {
 }
 
 pub fn find(buckets: &[Bucket], slot: u32) -> Option<usize> {
-    buckets.iter().position(|b| b.lo <= slot && slot < b.hi)
+    buckets.iter().position(|b| (b.lo..b.hi).contains(&slot))
 }
 
 /// The buckets of a directory must be contiguous and cover every slot exactly once.
@@ -166,5 +172,40 @@ mod tests {
         broken.pop();
         assert!(validate(&broken).is_err());
         assert!(validate(&[]).is_err());
+    }
+
+    #[test]
+    fn fnv1a_matches_the_published_vectors() {
+        // Published FNV-1a 64-bit test vectors, independent of this crate; the Python
+        // reference asserts the same values, so the slot vectors above rest on the algorithm.
+        let vectors: [(&[u8], u64); 3] = [
+            (b"", 0xcbf2_9ce4_8422_2325),
+            (b"a", 0xaf63_dc4c_8601_ec8c),
+            (b"foobar", 0x8594_4171_f739_67e8),
+        ];
+        for (name, hash) in vectors {
+            assert_eq!(fnv1a(name), hash, "{name:?}");
+        }
+    }
+
+    #[test]
+    fn wide_windows_match_the_python_reference() {
+        // scripts/tests/test_cleanup_plan.py pins the same windows. The hosted fixture holds
+        // equal 1001-entry chunk directories g000000..; the target's bucket is shared with siblings.
+        for (chunks, lo, hi, entries) in [(100u32, 804, 971, 4004), (1000, 945, 956, 4004)] {
+            let mut slots = Slots::new();
+            for i in 0..chunks {
+                let slot = slot_of(format!("g{i:06}").as_bytes());
+                slots.entry(slot).or_default().add(&stats(1001, 0)).unwrap();
+            }
+            let tiles = tile(&slots, crate::model::BUCKET_ENTRIES, 0, SLOTS).unwrap();
+            validate(&tiles).unwrap();
+            let bucket = &tiles[find(&tiles, slot_of(b"g000050")).unwrap()];
+            assert_eq!(
+                (bucket.lo, bucket.hi, bucket.stats.entries()),
+                (lo, hi, entries),
+                "{chunks} chunks"
+            );
+        }
     }
 }

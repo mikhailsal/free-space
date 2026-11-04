@@ -8,6 +8,9 @@ on:
     branches: [perf/cleanup-bucket-probe]
     paths:
       - 'cli/examples/cleanup_probe/**'
+      - 'cli/Cargo.toml'
+      - 'Cargo.lock'
+      - 'clippy.toml'
       - 'scripts/cleanup_*'
       - 'scripts/tests/test_cleanup*'
       - '.github/workflows/cleanup-ci.yml'
@@ -41,9 +44,9 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: (cd web && bun install --frozen-lockfile)
-      - name: Formatting
-        run: cargo fmt --all --check
-      - name: Lints
-        run: cargo clippy -p freespace --example cleanup_probe --locked -- -D warnings
+      # The repository's own gates: rustfmt, the suppression ban, clippy on every target (the example is a test
+      # target in cli/Cargo.toml, so its tests are linted too) and the file-size and nesting limits.
+      - name: Repository checks
+        run: scripts/check.sh rust size
       - name: Probe tests
         run: cargo test -p freespace --example cleanup_probe --locked

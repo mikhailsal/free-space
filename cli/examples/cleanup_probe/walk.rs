@@ -18,8 +18,7 @@ pub struct Scope {
 }
 impl Scope {
     fn admits(&self, name: &[u8]) -> bool {
-        let slot = slot_of(name);
-        self.lo <= slot && slot < self.hi && !self.skip.contains(name)
+        (self.lo..self.hi).contains(&slot_of(name)) && !self.skip.contains(name)
     }
 }
 fn admitted(scope: Option<&Scope>, name: &std::ffi::OsStr) -> bool {
@@ -71,6 +70,9 @@ pub struct ResultTree {
     pub nodes: Vec<Node>,
     /// Residual buckets of the scanned directory when only a slot range was scanned.
     pub buckets: Vec<Bucket>,
+    /// The scanned directory itself, re-read, when only a slot range was scanned. A directory's
+    /// own size follows its entries, so a range refresh must update it as well.
+    pub parent: Option<Node>,
     pub visited: u64,
     pub has_hardlinks: bool,
 }
@@ -306,16 +308,20 @@ fn scan_inner(root: &Path, threshold: u64, scope: Option<&Scope>) -> R<ResultTre
     }
     let visited = first.count + folded.digest.count;
     let mut nodes = folded.retained;
-    let buckets = match scope {
+    let (buckets, parent) = match scope {
         None => {
             nodes.push(seal(folded.root, &folded.slots)?);
-            Vec::new()
+            (Vec::new(), None)
         }
-        Some(s) => tile(&folded.slots, BUCKET_ENTRIES, s.lo, s.hi)?,
+        Some(s) => (
+            tile(&folded.slots, BUCKET_ENTRIES, s.lo, s.hi)?,
+            Some(folded.root),
+        ),
     };
     Ok(ResultTree {
         nodes,
         buckets,
+        parent,
         visited,
         has_hardlinks: !owners.is_empty(),
     })

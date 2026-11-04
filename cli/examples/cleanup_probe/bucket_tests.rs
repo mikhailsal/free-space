@@ -4,7 +4,7 @@ use crate::buckets::{find, slot_of, validate};
 use crate::model::{BUCKET_ENTRIES, SLOTS};
 
 /// `dirs` directories d000.. holding `files` one-byte files each.
-fn make_tree(root: &Path, dirs: usize, files: usize) {
+pub(crate) fn make_tree(root: &Path, dirs: usize, files: usize) {
     for d in 0..dirs {
         let dir = root.join(format!("d{d:03}"));
         fs::create_dir_all(&dir).unwrap();
@@ -13,11 +13,11 @@ fn make_tree(root: &Path, dirs: usize, files: usize) {
         }
     }
 }
-fn shape(nodes: &[Node], root: &Path) -> (u64, u64, u64, u64) {
+pub(crate) fn shape(nodes: &[Node], root: &Path) -> (u64, u64, u64, u64) {
     let t = &nodes.iter().find(|n| n.path == root).unwrap().total;
     (t.allocated, t.apparent, t.files, t.dirs)
 }
-fn range_of(nodes: &[Node], target: &Path) -> Slice {
+pub(crate) fn range_of(nodes: &[Node], target: &Path) -> Slice {
     match state::plan(nodes, target).unwrap() {
         Plan::Range(slice) => slice,
         Plan::Retained(path) => panic!("expected a range plan, got retained {path:?}"),
@@ -31,7 +31,7 @@ fn grow(dir: &Path) {
         fs::remove_file(dir.join(format!("f{f:03}"))).unwrap();
     }
 }
-fn scan_command(root: &Path, snapshot: &Path) -> Value {
+pub(crate) fn scan_command(root: &Path, snapshot: &Path) -> Value {
     let (root, snapshot, ppm) = (root.to_path_buf(), snapshot.to_path_buf(), 1_000_000);
     execute(Command::Scan {
         root,
@@ -40,7 +40,7 @@ fn scan_command(root: &Path, snapshot: &Path) -> Value {
     })
     .unwrap()
 }
-fn refresh_command(root: &Path, snapshot: &Path, target: &Path) -> Value {
+pub(crate) fn refresh_command(root: &Path, snapshot: &Path, target: &Path) -> Value {
     let (root, snapshot, target) = (
         root.to_path_buf(),
         snapshot.to_path_buf(),

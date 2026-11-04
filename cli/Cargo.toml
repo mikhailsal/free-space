@@ -17,6 +17,12 @@ workspace = true
 name = "freespace"
 path = "src/main.rs"
 
+# Research probe (not shipped). Declaring it a test target puts its unit tests under
+# `cargo clippy --all-targets` too, so the lint and size gates cover them.
+[[example]]
+name = "cleanup_probe"
+test = true
+
 [dependencies]
 freespace-core.workspace = true
 clap = { version = "4.6", features = ["derive", "wrap_help"] }

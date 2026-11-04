@@ -5,6 +5,7 @@ their order and the work each arm must report are fixed here before any measurem
 tuned after results are seen. v2 is not run; its numbers from the earlier screen are only quoted as a reference.
 """
 import cleanup_buckets as cb
+import cleanup_probe_fixture as fx
 
 ARMS = ('v1', 'probe')
 PROFILES = ('files', 'directories')
@@ -17,14 +18,14 @@ SCENARIOS = (('full', 'scan', ROOT),
              ('wide', 'refresh', ROOT + '/bulk/g000050'))
 LARGE_ENTRIES = 74    # 'large': 73 descendants plus itself
 SMALL_ENTRIES = 100   # 'small': 99 empty files plus itself
-CHUNK_ENTRIES = 1001  # one bulk chunk directory plus its 1000 children
+CHUNK_ENTRIES = fx.CHUNK_CHILDREN + 1  # one bulk chunk directory plus its children
 WIDE_TARGET = b'g000050'
 ORDERS = (('v1', 'probe'), ('probe', 'v1'))
 
 
-def order(scenario_index, pair):
-    """Rotate which arm runs first so neither arm always follows the other."""
-    return ORDERS[(scenario_index + pair) % len(ORDERS)]
+def order(scenario_index, pair, profile_index):
+    """Rotate which arm runs first so neither arm always follows the other, in either profile."""
+    return ORDERS[(scenario_index + pair + profile_index) % len(ORDERS)]
 
 
 def expected(stage):
@@ -38,7 +39,7 @@ def expected(stage):
 
 def chunk_names(count):
     """Names of the bulk chunk directories the fixture creates for `count` bulk entries."""
-    return [f'g{i:06}'.encode() for i in range(count // 1000)]
+    return [f'g{i:06}'.encode() for i in range(count // fx.CHUNK_CHILDREN)]
 
 
 def subtree_sizes(fixture):

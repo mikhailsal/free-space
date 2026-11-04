@@ -15,6 +15,11 @@ def stats(entries, allocated=0, newest=None):
 
 
 class SlotHashTests(unittest.TestCase):
+    def test_fnv1a_matches_the_published_vectors(self):
+        # Published FNV-1a 64-bit vectors, independent of this project; buckets.rs asserts the same values.
+        for name, value in ((b'', 0xcbf29ce484222325), (b'a', 0xaf63dc4c8601ec8c), (b'foobar', 0x85944171f73967e8)):
+            self.assertEqual(cb.fnv1a(name), value, name)
+
     def test_vectors_match_the_rust_probe(self):
         # The same vectors are asserted by buckets.rs; a mismatch breaks refresh lookup.
         for name, slot in ((b'', 3979), (b'small', 59), (b'g000500', 3502), (b'raw-\xff', 1228),

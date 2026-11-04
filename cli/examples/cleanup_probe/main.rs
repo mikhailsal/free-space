@@ -84,11 +84,13 @@ fn locked(dir: &Path) -> R<fs::File> {
     }
     Ok(file)
 }
-fn live_ancestor(target: &Path) -> R<PathBuf> {
+/// The deepest existing ancestor of `target` (canonical) and the part of `target` below it
+/// that no longer exists; the remainder is empty when the target exists.
+fn live_ancestor(target: &Path) -> R<(PathBuf, PathBuf)> {
     let mut candidate = target;
     loop {
         match fs::canonicalize(candidate) {
-            Ok(path) => return Ok(path),
+            Ok(path) => return Ok((path, target.strip_prefix(candidate)?.to_path_buf())),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 candidate = candidate.parent().ok_or("missing target ancestor")?
             }
@@ -263,13 +265,24 @@ fn refresh_range(
     })
 }
 fn refresh(root: &Path, meta: &store::Meta, nodes: &mut Vec<Node>, target: &Path) -> R<Outcome> {
-    let target = live_ancestor(target)?;
-    if !target.starts_with(root) {
+    let (live, missing) = live_ancestor(target)?;
+    let requested = if missing.as_os_str().is_empty() {
+        live.clone()
+    } else {
+        live.join(missing)
+    };
+    if !requested.starts_with(root) {
         return Err("refresh target outside root".into());
     }
-    let plan = state::plan(nodes, &target)?;
+    // A target that vanished is planned from the snapshot, which still knows the retained
+    // directory and bucket that held it; rescanning that bucket drops what was deleted. Only
+    // when that directory is gone as well does the nearest surviving ancestor take over.
+    let mut plan = state::plan(nodes, &requested)?;
+    if !live.starts_with(plan.region()) {
+        plan = state::plan(nodes, &live)?;
+    }
     if matches!(&plan, Plan::Retained(b) if b == root) {
-        return rescan_root(root, meta, nodes, 0, target != root);
+        return rescan_root(root, meta, nodes, 0, requested != root);
     }
     if plan.links(nodes) > 0 {
         return rescan_root(root, meta, nodes, 0, true);

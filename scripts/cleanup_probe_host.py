@@ -257,7 +257,7 @@ def run(args):
         manifest['cases'].append(dict(id=ident,arm=arm,operation=op,target=target,elapsed_seconds=row['elapsed_seconds'],validated=row['validated'],memory_comparison_inconclusive=row['memory_comparison_inconclusive'],report=row['report']))
         return row
     try:
-        for profile in plan.PROFILES:
+        for profile_index,profile in enumerate(plan.PROFILES):
             tree=scratch/('fixture-'+profile)
             fixture=phase('fixture-'+profile,lambda: build(tree,profile,count))
             backing = os.stat(os.environ['CLEANUP_BACKING_FILE'])
@@ -284,7 +284,7 @@ def run(args):
                 seeds[arm]=case
             for scenario_index,(scenario,op,target) in enumerate(plan.SCENARIOS):
                 for pair in range(pairs):
-                    arms=plan.order(scenario_index,pair)
+                    arms=plan.order(scenario_index,pair,profile_index)
                     cycle_started=time.monotonic()
                     evidence_seconds=0.0
                     cases={}

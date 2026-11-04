@@ -2,6 +2,8 @@ use super::*;
 use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 
+mod refresh;
+
 #[test]
 fn integer_threshold_rounds_up_and_rejects_bad_inputs() {
     assert_eq!(threshold(1001, 1000).unwrap(), 2);

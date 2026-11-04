@@ -12,13 +12,18 @@ FORMAT = 2
 _MASK = (1 << 64) - 1
 
 
-def slot_of(name):
-    """FNV-1a over the raw name bytes, then a Fibonacci mix; the top SLOT_BITS bits are the slot."""
+def fnv1a(name):
+    """FNV-1a, 64 bit, over the raw bytes of a name (the published algorithm)."""
     h = 0xcbf29ce484222325
     for byte in name:
         h ^= byte
         h = (h * 0x100000001b3) & _MASK
-    return ((h * 0x9e3779b97f4a7c15) & _MASK) >> (64 - SLOT_BITS)
+    return h
+
+
+def slot_of(name):
+    """FNV-1a, then a Fibonacci mix; the top SLOT_BITS bits are the slot."""
+    return ((fnv1a(name) * 0x9e3779b97f4a7c15) & _MASK) >> (64 - SLOT_BITS)
 
 
 class Stats:
