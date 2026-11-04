@@ -57,7 +57,7 @@ jobs:
                      'scripts/bench-v2-container.py','scripts/bench_v2_config.py',
                      'scripts/bench-disk-calibration.py','scripts/bench-v2-container/Dockerfile','web/src','web/index.html',
                      'web/fonts','web/favicon.svg','web/bun.lock','web/package.json',
-                     'scripts/cleanup_probe*','scripts/cleanup_oracle.py','scripts/tests/test_cleanup*',
+                     'scripts/cleanup_probe*','scripts/cleanup_oracle.py','scripts/cleanup_buckets.py','scripts/tests/test_cleanup*',
                      '.github/workflows/v2-balance.yml']
           names=subprocess.check_output(['git','ls-files','-z','--',*selectors]).split(b'\0')
           hashes={}
@@ -87,10 +87,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s scripts/tests -p 'test_cleanup*.py'
-          python3 -m compileall -q scripts/cleanup_probe_*.py scripts/cleanup_oracle.py
+          python3 -m compileall -q scripts/cleanup_probe_*.py scripts/cleanup_oracle.py scripts/cleanup_buckets.py
           bash -n scripts/cleanup_probe_runner.sh
           (cd web && bun install --frozen-lockfile)
           cargo test --workspace --all-targets --locked --target x86_64-unknown-linux-musl
+          cargo test -p freespace --example cleanup_probe --locked --target x86_64-unknown-linux-musl
           cargo build -p freespace --release --locked --target x86_64-unknown-linux-musl --bin freespace --example cleanup_probe
           cp target/x86_64-unknown-linux-musl/release/freespace binaries/freespace
           cp target/x86_64-unknown-linux-musl/release/examples/cleanup_probe binaries/cleanup_probe
@@ -114,7 +115,7 @@ jobs:
           r=json.load(open('cleanup-results/provenance/smoke-run.json'))
           assert r['id']==int(os.environ['SMOKE_RUN_ID']) and r['head_sha']==os.environ['GITHUB_SHA']
           assert r['event']=='workflow_dispatch' and r['conclusion']=='success' and r['run_attempt']==1
-          assert r['workflow_id']==397616649 and r['head_branch']=='perf/cleanup-threshold-probe'
+          assert r['workflow_id']==397616649 and r['head_branch']=='perf/cleanup-bucket-probe'
           PY
       - uses: actions/download-artifact@v4
         if: inputs.stage == 'screen'

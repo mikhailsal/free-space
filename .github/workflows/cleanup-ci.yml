@@ -1,0 +1,49 @@
+name: Cleanup bucket probe CI
+
+# Fast feedback for the research branch: Python contracts, formatting, lints and the probe's own tests.
+# The hosted benchmark (v2-balance.yml) is dispatched by hand and repeats the contracts and probe tests
+# before it measures anything, so a red run here never costs a measurement run.
+on:
+  push:
+    branches: [perf/cleanup-bucket-probe]
+    paths:
+      - 'cli/examples/cleanup_probe/**'
+      - 'scripts/cleanup_*'
+      - 'scripts/tests/test_cleanup*'
+      - '.github/workflows/cleanup-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTUP_TOOLCHAIN: 1.99.1
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python contracts
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_cleanup*.py'
+          python3 -m compileall -q scripts/cleanup_probe_*.py scripts/cleanup_oracle.py scripts/cleanup_buckets.py
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # build.rs bundles web/ with bun
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: (cd web && bun install --frozen-lockfile)
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Lints
+        run: cargo clippy -p freespace --example cleanup_probe --locked -- -D warnings
+      - name: Probe tests
+        run: cargo test -p freespace --example cleanup_probe --locked

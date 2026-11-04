@@ -1,15 +1,19 @@
 //! Research-only coarse snapshot; not an application backend.
+#[cfg(test)]
+mod bucket_tests;
+mod buckets;
 mod model;
 mod mounts;
+mod state;
 mod store;
 #[cfg(test)]
 mod tests;
 mod walk;
 
 use clap::{Parser, Subcommand};
-use model::{MAX_RECORDS, Node, R, hex, now, threshold};
-use serde_json::{Value, json};
-use std::collections::HashMap;
+use model::{Node, R, Stats, hex, now, threshold};
+use serde_json::{Map, Value, json};
+use state::{Plan, Slice};
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -80,107 +84,6 @@ fn locked(dir: &Path) -> R<fs::File> {
     }
     Ok(file)
 }
-fn rebuild(nodes: &mut [Node]) -> R<()> {
-    let mut indices: Vec<usize> = (0..nodes.len()).collect();
-    indices.sort_by_key(|i| std::cmp::Reverse(nodes[*i].path.components().count()));
-    let lookup: HashMap<PathBuf, usize> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.path.clone(), i))
-        .collect();
-    for n in nodes.iter_mut() {
-        let mut t = n.own();
-        t.add(&n.rest)?;
-        n.total = t;
-    }
-    for i in indices {
-        if let Some(parent) = nodes[i].parent.clone() {
-            let j = *lookup.get(&parent).ok_or("retained node missing parent")?;
-            let child = nodes[i].total.clone();
-            nodes[j].total.add(&child)?;
-        }
-    }
-    Ok(())
-}
-fn nearest(nodes: &[Node], target: &Path) -> R<PathBuf> {
-    nodes
-        .iter()
-        .filter(|n| n.kind == 1 && target.starts_with(&n.path))
-        .max_by_key(|n| n.path.components().count())
-        .map(|n| n.path.clone())
-        .ok_or_else(|| "no retained ancestor".into())
-}
-fn update(
-    old: &mut Vec<Node>,
-    boundary: &Path,
-    mut replacement: Vec<Node>,
-    threshold: u64,
-) -> R<()> {
-    let prior = old
-        .iter()
-        .find(|n| n.path == boundary)
-        .ok_or("boundary missing")?
-        .clone();
-    let root = replacement
-        .iter_mut()
-        .find(|n| n.path == boundary)
-        .ok_or("replacement root missing")?;
-    root.parent = prior.parent.clone();
-    let fold = root.total.allocated < threshold && prior.parent.is_some();
-    let new_total = root.total.clone();
-    old.retain(|n| !n.path.starts_with(boundary));
-    if fold {
-        if replacement.len() != 1 {
-            return Err("small subtree contains retained descendant".into());
-        }
-        let parent = old
-            .iter_mut()
-            .find(|n| Some(&n.path) == prior.parent.as_ref())
-            .ok_or("parent missing")?;
-        parent.rest.add(&new_total)?;
-    } else {
-        old.extend(replacement);
-    }
-    if old.len() > MAX_RECORDS {
-        return Err("retained record cap exceeded".into());
-    }
-    rebuild(old)?;
-    prune(old, threshold)
-}
-fn prune(nodes: &mut Vec<Node>, threshold: u64) -> R<()> {
-    let mut candidates: Vec<usize> = nodes
-        .iter()
-        .enumerate()
-        .filter(|(_, n)| n.parent.is_some() && n.total.allocated < threshold)
-        .map(|(i, _)| i)
-        .collect();
-    candidates.sort_by_key(|i| std::cmp::Reverse(nodes[*i].path.components().count()));
-    let lookup: HashMap<PathBuf, usize> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.path.clone(), i))
-        .collect();
-    let mut children: HashMap<PathBuf, usize> = HashMap::new();
-    for node in nodes.iter() {
-        if let Some(parent) = &node.parent {
-            *children.entry(parent.clone()).or_default() += 1;
-        }
-    }
-    let mut removed = std::collections::HashSet::new();
-    for i in candidates {
-        if children.get(&nodes[i].path).copied().unwrap_or(0) != 0 {
-            return Err("small ancestor contains retained child".into());
-        }
-        let parent = nodes[i].parent.as_ref().ok_or("parent missing")?.clone();
-        let j = *lookup.get(&parent).ok_or("parent missing")?;
-        let total = nodes[i].total.clone();
-        nodes[j].rest.add(&total)?;
-        *children.get_mut(&parent).ok_or("child count missing")? -= 1;
-        removed.insert(nodes[i].path.clone());
-    }
-    nodes.retain(|n| !removed.contains(&n.path));
-    rebuild(nodes)
-}
 fn live_ancestor(target: &Path) -> R<PathBuf> {
     let mut candidate = target;
     loop {
@@ -193,31 +96,57 @@ fn live_ancestor(target: &Path) -> R<PathBuf> {
         }
     }
 }
-fn inspect_node(n: &Node) -> Value {
-    json!({"path_hex":hex(&n.path),"parent_hex":n.parent.as_ref().map(|p|hex(p)),"kind":n.kind,
-        "own_allocated":n.own_allocated,"own_apparent":n.own_apparent,"own_errors":n.own_errors,
-        "allocated":n.total.allocated,"apparent":n.total.apparent,"files":n.total.files,"dirs":n.total.dirs,"others":n.total.others,"errors":n.total.errors,
-        "scanned_at":n.scanned_at,"min_scanned_at":n.total.min_scanned_at,"newest_mtime":n.total.newest_mtime,
-        "rest_allocated":n.rest.allocated,"rest_apparent":n.rest.apparent,"rest_files":n.rest.files,"rest_dirs":n.rest.dirs,
-        "rest_others":n.rest.others,"rest_errors":n.rest.errors,"rest_min_scanned_at":n.rest.min_scanned_at,"rest_newest_mtime":n.rest.newest_mtime})
+fn put_stats(fields: &mut Map<String, Value>, prefix: &str, s: &Stats) {
+    let mut put = |name: &str, value: Value| {
+        fields.insert(format!("{prefix}{name}"), value);
+    };
+    put("allocated", s.allocated.into());
+    put("apparent", s.apparent.into());
+    put("files", s.files.into());
+    put("dirs", s.dirs.into());
+    put("others", s.others.into());
+    put("errors", s.errors.into());
+    put("links", s.links.into());
+    put("min_scanned_at", s.min_scanned_at.into());
+    put("newest_mtime", s.newest_mtime.into());
+}
+fn inspect_node(n: &Node, detail: bool) -> R<Value> {
+    let mut fields = Map::new();
+    fields.insert("path_hex".into(), hex(&n.path).into());
+    fields.insert("parent_hex".into(), n.parent.as_deref().map(hex).into());
+    fields.insert("kind".into(), n.kind.into());
+    fields.insert("own_allocated".into(), n.own_allocated.into());
+    fields.insert("own_apparent".into(), n.own_apparent.into());
+    fields.insert("own_errors".into(), n.own_errors.into());
+    fields.insert("scanned_at".into(), n.scanned_at.into());
+    fields.insert("bucket_count".into(), n.buckets.len().into());
+    put_stats(&mut fields, "", &n.total);
+    put_stats(&mut fields, "rest_", &n.rest()?);
+    if detail {
+        let list: Vec<Value> = n
+            .buckets
+            .iter()
+            .map(|b| json!({"lo":b.lo,"hi":b.hi,"entries":b.stats.entries(),"allocated":b.stats.allocated,"links":b.stats.links}))
+            .collect();
+        fields.insert("buckets".into(), Value::Array(list));
+    }
+    Ok(Value::Object(fields))
 }
 fn inspect(snapshot: &Path, path: Option<PathBuf>) -> R<Value> {
     let (m, nodes) = store::read(&snapshot.join("coarse.db"))?;
-    let selected = if let Some(p) = path {
-        let p = fs::canonicalize(p)?;
-        Some(nearest(&nodes, &p)?)
-    } else {
-        None
+    let selected = match path {
+        Some(p) => Some(state::nearest(&nodes, &fs::canonicalize(p)?)?),
+        None => None,
     };
-    let rows: Vec<_> = nodes
+    let rows = nodes
         .iter()
         .filter(|n| {
             selected
                 .as_ref()
                 .is_none_or(|p| &n.path == p || n.parent.as_ref() == Some(p))
         })
-        .map(inspect_node)
-        .collect();
+        .map(|n| inspect_node(n, selected.as_ref() == Some(&n.path)))
+        .collect::<R<Vec<_>>>()?;
     Ok(
         json!({"success":true,"operation":"inspect","meta":{"root_hex":hex(&m.root),"threshold":m.threshold,"ppm":m.ppm,"capacity":m.capacity,"generation":m.generation,"scanned_at":m.scanned_at,"has_hardlinks":m.has_hardlinks},"nodes":rows}),
     )
@@ -233,33 +162,149 @@ fn initial_state(
         if m.root != root {
             return Err("snapshot root mismatch".into());
         }
-        Ok((m, n))
-    } else {
-        let cap = capacity(root)?;
-        let ppm = ppm.ok_or("missing ppm")?;
-        let t = threshold(cap, ppm)?;
-        let generation = if db.exists() {
-            store::read(db)?
-                .0
-                .generation
-                .checked_add(1)
-                .ok_or("generation overflow")?
-        } else {
-            1
-        };
-        Ok((
-            store::Meta {
-                root: root.to_path_buf(),
-                threshold: t,
-                ppm,
-                capacity: cap,
-                generation,
-                scanned_at: now(),
-                has_hardlinks: false,
-            },
-            Vec::new(),
-        ))
+        return Ok((m, n));
     }
+    let cap = capacity(root)?;
+    let ppm = ppm.ok_or("missing ppm")?;
+    let generation = if db.exists() {
+        store::read(db)?
+            .0
+            .generation
+            .checked_add(1)
+            .ok_or("generation overflow")?
+    } else {
+        1
+    };
+    let meta = store::Meta {
+        root: root.to_path_buf(),
+        threshold: threshold(cap, ppm)?,
+        ppm,
+        capacity: cap,
+        generation,
+        scanned_at: now(),
+        has_hardlinks: false,
+    };
+    Ok((meta, Vec::new()))
+}
+
+/// What a scan or refresh actually did, for the report.
+struct Outcome {
+    boundary: PathBuf,
+    scope: &'static str,
+    fallback: bool,
+    visited: u64,
+    /// Slot range, entries it held before and entries it holds now, for range refreshes.
+    range: Option<(u32, u32, u64, u64)>,
+}
+fn rescan_root(
+    root: &Path,
+    meta: &store::Meta,
+    nodes: &mut Vec<Node>,
+    spent: u64,
+    fallback: bool,
+) -> R<Outcome> {
+    let result = walk::scan(root, meta.threshold)?;
+    let visited = spent.checked_add(result.visited).ok_or("visit overflow")?;
+    *nodes = result.nodes;
+    Ok(Outcome {
+        boundary: root.to_path_buf(),
+        scope: "full",
+        fallback,
+        visited,
+        range: None,
+    })
+}
+fn refresh_retained(
+    root: &Path,
+    meta: &store::Meta,
+    nodes: &mut Vec<Node>,
+    boundary: PathBuf,
+) -> R<Outcome> {
+    let result = walk::scan(&boundary, meta.threshold)?;
+    if result.has_hardlinks {
+        return rescan_root(root, meta, nodes, result.visited, true);
+    }
+    let visited = result.visited;
+    state::update(nodes, &boundary, result.nodes, meta.threshold)?;
+    Ok(Outcome {
+        boundary,
+        scope: "retained",
+        fallback: false,
+        visited,
+        range: None,
+    })
+}
+fn refresh_range(
+    root: &Path,
+    meta: &store::Meta,
+    nodes: &mut Vec<Node>,
+    slice: Slice,
+) -> R<Outcome> {
+    let Slice {
+        parent,
+        lo,
+        hi,
+        old,
+    } = slice;
+    let scope = state::scope(nodes, &parent, lo, hi);
+    let result = walk::scan_range(&parent, meta.threshold, &scope)?;
+    if result.has_hardlinks {
+        return rescan_root(root, meta, nodes, result.visited, true);
+    }
+    let fresh: u64 = result.buckets.iter().map(|b| b.stats.entries()).sum();
+    let visited = result.visited;
+    state::update_range(nodes, &parent, &scope, result, meta.threshold)?;
+    Ok(Outcome {
+        boundary: parent,
+        scope: "range",
+        fallback: false,
+        visited,
+        range: Some((lo, hi, old.entries(), fresh)),
+    })
+}
+fn refresh(root: &Path, meta: &store::Meta, nodes: &mut Vec<Node>, target: &Path) -> R<Outcome> {
+    let target = live_ancestor(target)?;
+    if !target.starts_with(root) {
+        return Err("refresh target outside root".into());
+    }
+    let plan = state::plan(nodes, &target)?;
+    if matches!(&plan, Plan::Retained(b) if b == root) {
+        return rescan_root(root, meta, nodes, 0, target != root);
+    }
+    if plan.links(nodes) > 0 {
+        return rescan_root(root, meta, nodes, 0, true);
+    }
+    match plan {
+        Plan::Retained(boundary) => refresh_retained(root, meta, nodes, boundary),
+        Plan::Range(slice) => refresh_range(root, meta, nodes, slice),
+    }
+}
+fn persist(snapshot: &Path, meta: &store::Meta, nodes: &[Node]) -> R<()> {
+    let tmp = snapshot.join(".coarse.tmp");
+    if tmp.exists() {
+        return Err("stale temporary snapshot".into());
+    }
+    let saved = store::write(&tmp, meta, nodes).and_then(|()| store::publish(snapshot, &tmp));
+    if saved.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    saved
+}
+fn report(
+    operation: &str,
+    root: &Path,
+    meta: &store::Meta,
+    nodes: &[Node],
+    o: &Outcome,
+    start: Instant,
+) -> Value {
+    let buckets: usize = nodes.iter().map(|n| n.buckets.len()).sum();
+    let range = o
+        .range
+        .map(|(lo, hi, old, new)| json!({"lo":lo,"hi":hi,"old_entries":old,"new_entries":new}));
+    json!({"success":true,"operation":operation,"root":root.to_string_lossy(),"threshold":meta.threshold,"capacity":meta.capacity,
+        "generation":meta.generation,"visited":o.visited,"retained":nodes.len(),"buckets":buckets,"boundary":o.boundary.to_string_lossy(),
+        "scope":o.scope,"fallback_full_root":o.fallback,"range":range,"elapsed_seconds":start.elapsed().as_secs_f64()})
 }
 fn execute(command: Command) -> R<Value> {
     let start = Instant::now();
@@ -278,58 +323,21 @@ fn execute(command: Command) -> R<Value> {
     };
     let (root, snapshot) = prepare(&root, &snapshot)?;
     let _lock = locked(&snapshot)?;
-    let db = snapshot.join("coarse.db");
-    let (mut meta, mut nodes) = initial_state(operation, &db, &root, ppm)?;
-    let mut boundary = root.clone();
-    let mut fallback = false;
-    if let Some(target) = target {
-        let target = live_ancestor(&target)?;
-        if !target.starts_with(&root) {
-            return Err("refresh target outside root".into());
+    let (mut meta, mut nodes) = initial_state(operation, &snapshot.join("coarse.db"), &root, ppm)?;
+    let outcome = match target {
+        Some(target) => {
+            meta.generation = meta
+                .generation
+                .checked_add(1)
+                .ok_or("generation overflow")?;
+            refresh(&root, &meta, &mut nodes, &target)?
         }
-        boundary = nearest(&nodes, &target)?;
-        if meta.has_hardlinks {
-            boundary = root.clone();
-        }
-        fallback = target != root && boundary == root;
-    }
-    let mut result = walk::scan(&boundary, meta.threshold)?;
-    let mut visited = result.visited;
-    if operation == "refresh" && boundary != root && result.has_hardlinks {
-        fallback = true;
-        boundary = root.clone();
-        result = walk::scan(&boundary, meta.threshold)?;
-        visited = visited
-            .checked_add(result.visited)
-            .ok_or("visit overflow")?;
-    }
-    if operation == "refresh" {
-        meta.generation = meta
-            .generation
-            .checked_add(1)
-            .ok_or("generation overflow")?;
-    }
-    if boundary == root {
-        nodes = result.nodes;
-        meta.has_hardlinks = result.has_hardlinks;
-    } else {
-        update(&mut nodes, &boundary, result.nodes, meta.threshold)?;
-    }
+        None => rescan_root(&root, &meta, &mut nodes, 0, false)?,
+    };
+    meta.has_hardlinks = state::links(&nodes) > 0;
     meta.scanned_at = now();
-    let tmp = snapshot.join(".coarse.tmp");
-    if tmp.exists() {
-        return Err("stale temporary snapshot".into());
-    }
-    let saved = store::write(&tmp, &meta, &nodes).and_then(|()| store::publish(&snapshot, &tmp));
-    if saved.is_err() {
-        let _ = fs::remove_file(&tmp);
-    }
-    saved?;
-    Ok(
-        json!({"success":true,"operation":operation,"root":root.to_string_lossy(),"threshold":meta.threshold,"capacity":meta.capacity,
-        "generation":meta.generation,"visited":visited,"retained":nodes.len(),"boundary":boundary.to_string_lossy(),
-        "fallback_full_root":fallback,"elapsed_seconds":start.elapsed().as_secs_f64()}),
-    )
+    persist(&snapshot, &meta, &nodes)?;
+    Ok(report(operation, &root, &meta, &nodes, &outcome, start))
 }
 fn main() {
     match Cli::try_parse()

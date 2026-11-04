@@ -20,9 +20,10 @@ fn small_children_fold_and_zero_file_counts() {
     let result = walk::scan(&root, u64::MAX).unwrap();
     assert_eq!(result.nodes.len(), 1);
     let n = &result.nodes[0];
+    let rest = n.rest().unwrap();
     assert_eq!((n.total.files, n.total.dirs), (2, 2));
-    assert_eq!((n.rest.files, n.rest.dirs), (2, 1));
-    assert_eq!(n.total.allocated, n.own_allocated + n.rest.allocated);
+    assert_eq!((rest.files, rest.dirs), (2, 1));
+    assert_eq!(n.total.allocated, n.own_allocated + rest.allocated);
 }
 #[test]
 fn retained_hierarchy_conserves_and_handles_sparse() {
@@ -38,7 +39,7 @@ fn retained_hierarchy_conserves_and_handles_sparse() {
         .unwrap()
         .total
         .clone();
-    rebuild(&mut result).unwrap();
+    state::rebuild(&mut result).unwrap();
     let after = &result.iter().find(|n| n.path == root).unwrap().total;
     assert_eq!(
         (before.allocated, before.apparent, before.files, before.dirs),
@@ -75,16 +76,10 @@ fn hardlinks_choose_lexical_owner() {
     assert_eq!(z.total.allocated, 0);
     let coarse = walk::scan(&root, 1).unwrap();
     assert!(!coarse.nodes.iter().any(|n| n.path == root.join("z")));
-    assert_eq!(
-        coarse
-            .nodes
-            .iter()
-            .find(|n| n.path == root)
-            .unwrap()
-            .rest
-            .files,
-        1
-    );
+    let top = coarse.nodes.iter().find(|n| n.path == root).unwrap();
+    let rest = top.rest().unwrap();
+    assert_eq!((rest.files, rest.links), (1, 1));
+    assert_eq!(top.total.links, 2);
 }
 #[test]
 fn refresh_folds_boundary_and_rebuilds_ancestors() {
@@ -96,7 +91,7 @@ fn refresh_folds_boundary_and_rebuilds_ancestors() {
     assert!(before.iter().any(|n| n.path == root.join("child")));
     fs::remove_file(root.join("child/file")).unwrap();
     let replacement = walk::scan(&root.join("child"), u64::MAX).unwrap().nodes;
-    update(&mut before, &root.join("child"), replacement, u64::MAX).unwrap();
+    state::update(&mut before, &root.join("child"), replacement, u64::MAX).unwrap();
     let expected = walk::scan(&root, u64::MAX).unwrap().nodes;
     let a = &before.iter().find(|n| n.path == root).unwrap().total;
     let b = &expected[0].total;
@@ -104,6 +99,7 @@ fn refresh_folds_boundary_and_rebuilds_ancestors() {
         (a.allocated, a.apparent, a.files, a.dirs),
         (b.allocated, b.apparent, b.files, b.dirs)
     );
+    state::verify(&before).unwrap();
 }
 #[test]
 fn store_roundtrip_and_prev_generation() {
@@ -166,14 +162,14 @@ fn refresh_promotes_omitted_directory() {
     assert_eq!(old.len(), 1);
     fs::write(root.join("child/big"), vec![7; 1_100_000]).unwrap();
     let replacement = walk::scan(&root, 1_000_000).unwrap().nodes;
-    update(&mut old, &root, replacement, 1_000_000).unwrap();
+    state::update(&mut old, &root, replacement, 1_000_000).unwrap();
     assert!(old.iter().any(|n| n.path == root.join("child")));
     let total = &old.iter().find(|n| n.path == root).unwrap().total;
     assert_eq!((total.files, total.dirs), (1, 2));
 }
 
 #[test]
-fn refresh_reports_root_fallback_for_omitted_directory() {
+fn refresh_of_omitted_directory_rescans_only_its_bucket() {
     let d = tempfile::tempdir().unwrap();
     let root = d.path().join("tree");
     let snapshot = d.path().join("out");
@@ -200,7 +196,9 @@ fn refresh_reports_root_fallback_for_omitted_directory() {
         target: root.join("small"),
     })
     .unwrap();
-    assert_eq!(small["fallback_full_root"], true);
+    // The omitted folder is found through its bucket: no retained-ancestor rescan, no fallback.
+    assert_eq!(small["fallback_full_root"], false);
+    assert_eq!(small["scope"], "range");
     assert_eq!(small["boundary"], root.to_string_lossy().as_ref());
     assert!(small["visited"].as_u64().unwrap() > 0);
     let large = execute(Command::Refresh {
@@ -259,7 +257,12 @@ fn refresh_new_cross_boundary_hardlink_falls_back_to_root() {
 #[test]
 fn rebuild_merges_and_recomputes_freshness_extrema() {
     let root = PathBuf::from("/root");
-    let mut parent = Node {
+    let folded = model::Stats {
+        min_scanned_at: Some(40),
+        newest_mtime: Some(75),
+        ..Default::default()
+    };
+    let parent = Node {
         path: root.clone(),
         parent: None,
         kind: 1,
@@ -267,11 +270,13 @@ fn rebuild_merges_and_recomputes_freshness_extrema() {
         own_apparent: 0,
         own_errors: 0,
         total: model::Stats::default(),
-        rest: model::Stats::default(),
         scanned_at: 100,
+        buckets: vec![model::Bucket {
+            lo: 0,
+            hi: model::SLOTS,
+            stats: folded,
+        }],
     };
-    parent.rest.min_scanned_at = Some(40);
-    parent.rest.newest_mtime = Some(75);
     let child = Node {
         path: root.join("file"),
         parent: Some(root),
@@ -283,18 +288,18 @@ fn rebuild_merges_and_recomputes_freshness_extrema() {
             newest_mtime: Some(85),
             ..Default::default()
         },
-        rest: model::Stats::default(),
         scanned_at: 90,
+        buckets: Vec::new(),
     };
     let mut nodes = vec![parent, child];
-    rebuild(&mut nodes).unwrap();
+    state::rebuild(&mut nodes).unwrap();
     assert_eq!(nodes[0].total.min_scanned_at, Some(40));
     assert_eq!(nodes[0].total.newest_mtime, Some(85));
-    nodes[0].rest.min_scanned_at = Some(60);
-    nodes[0].rest.newest_mtime = Some(70);
+    nodes[0].buckets[0].stats.min_scanned_at = Some(60);
+    nodes[0].buckets[0].stats.newest_mtime = Some(70);
     nodes[1].scanned_at = 95;
     nodes[1].total.newest_mtime = Some(65);
-    rebuild(&mut nodes).unwrap();
+    state::rebuild(&mut nodes).unwrap();
     assert_eq!(nodes[0].total.min_scanned_at, Some(60));
     assert_eq!(nodes[0].total.newest_mtime, Some(70));
 }

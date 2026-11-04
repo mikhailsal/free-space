@@ -16,6 +16,7 @@ import sys
 import time
 import uuid
 
+import cleanup_probe_plan as plan
 from cleanup_probe_fixture import build, guard
 from cleanup_probe_resources import capture as capture_resources, require as require_resources
 
@@ -75,10 +76,9 @@ def oracle(args, cases, out, ident, seconds):
            '--user',f'{os.getuid()}:{os.getgid()}','--entrypoint','python3',
            '--mount',f'type=bind,src={cases["v1"] / "snapshot"},dst=/baseline,readonly',
            '--mount',f'type=bind,src={cases["probe"] / "snapshot"},dst=/coarse,readonly',
-           '--mount',f'type=bind,src={cases["v2"] / "snapshot"},dst=/v2,readonly',
            '--mount',f'type=bind,src={out / ("fixture-" + ident.split("-")[0] + ".json")},dst=/fixture.json,readonly',
            '--mount',f'type=bind,src={Path("scripts").resolve()},dst=/harness,readonly',
-           args.image,'/harness/cleanup_oracle.py','/baseline/snapshot.db','/coarse/coarse.db','/v2/v2/generations.db','--fixture','/fixture.json']
+           args.image,'/harness/cleanup_oracle.py','/baseline/snapshot.db','/coarse/coarse.db','--fixture','/fixture.json']
     try:
         with (out/(ident+'.json')).open('w') as stdout, (out/(ident+'.log')).open('w') as stderr:
             result=subprocess.run(cmd,stdout=stdout,stderr=stderr,timeout=seconds)
@@ -225,10 +225,11 @@ def run(args):
     require_resources(resources)
     manifest={'resource_context':resources, 'protocol':'cleanup-threshold-roomy-v2', 'resource_policy':{'memory_mib':8192, 'swap_mib':0, 'cpus':2},
               'stage':args.stage, 'source_sha':os.environ.get('GITHUB_SHA'), 'success':False,
-              'cases':[], 'phases':[], 'limitation':'Unchanged common fixture; performance compares full scan, retained refresh, and omitted-ancestor refresh.'}
+              'cases':[], 'phases':[], 'arms':list(plan.ARMS), 'scenarios':[name for name,_,_ in plan.SCENARIOS],
+              'limitation':'Bucketed coarse probe against v1 on an unchanged common fixture; performance compares full scan, retained refresh, omitted-ancestor (single bucket) refresh and a wide-bucket refresh. v2 is not run.'}
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    count=100000 if args.stage=='smoke' else 1000000
-    pairs=1 if args.stage=='smoke' else 3
+    count=plan.STAGES[args.stage]['count']
+    pairs=plan.STAGES[args.stage]['pairs']
     scratch=Path(os.environ['RUNNER_TEMP']).resolve()
     monitor=SpaceMonitor(out)
     def phase(name, fn):
@@ -245,36 +246,18 @@ def run(args):
         seconds=int(deadline-time.monotonic()-180)
         if seconds < 10: raise TimeoutError('host budget exhausted')
         return min(seconds,1800)
-    def execute(arm,op,target,tree,case,ident):
+    def execute(arm,scenario,op,target,tree,case,ident):
         legacy.flush_caches(out,ident)
         resources=capture_resources()
         (out/(ident+'.host-resource.json')).write_text(json.dumps(resources,indent=2)+'\n')
         require_resources(resources)
-        total=fixture['expected_counts']['entries']
-        large=fixture['controls']['group']['files'] + 10
-        # The fixture receipt counts 5 other control files, the raw-name file,
-        # and the group children; adding the small directory cancels that raw file.
-        small=fixture['expected_counts']['files']-fixture['bulk_files']-fixture['controls']['group']['files']-5
-        if large != 74 or small != 100: raise ValueError('fixture subtree contract differs')
-        if arm == 'probe':
-            root_scope = op == 'scan' or target.endswith('/small')
-            scope = dict(visited=2 * (total if root_scope else large),
-                         boundary='/scratch/tree' if root_scope else '/scratch/tree/large',
-                         fallback_full_root=(op == 'refresh' and root_scope))
-        elif op == 'scan':
-            scope = dict(entries=total)
-        else:
-            scope = dict(subtree_entries=small if target.endswith('/small') else large)
-        row=run_container(args,arm,op,target,tree,case,out,ident,remaining(),scope)
+        # The work each arm must report comes from the frozen plan, not from the run itself.
+        row=run_container(args,arm,op,target,tree,case,out,ident,remaining(),plan.scope(arm,scenario,fixture))
         monitor.register_writer_peak(row['sampled_outer_backing_allocated_peak_bytes'])
-        if arm == 'probe' and op == 'refresh':
-            expected_fallback = target.endswith('/small')
-            if row['report'].get('fallback_full_root') is not expected_fallback:
-                raise ValueError('unexpected refresh boundary: '+ident)
         manifest['cases'].append(dict(id=ident,arm=arm,operation=op,target=target,elapsed_seconds=row['elapsed_seconds'],validated=row['validated'],memory_comparison_inconclusive=row['memory_comparison_inconclusive'],report=row['report']))
         return row
     try:
-        for profile in ('files','directories'):
+        for profile in plan.PROFILES:
             tree=scratch/('fixture-'+profile)
             fixture=phase('fixture-'+profile,lambda: build(tree,profile,count))
             backing = os.stat(os.environ['CLEANUP_BACKING_FILE'])
@@ -287,27 +270,21 @@ def run(args):
             if min(fixture['backing_file']['outer_available_bytes'], fixture['backing_file']['results_available_bytes']) < 2 * 1024**3:
                 raise ValueError('outer free-space reserve failed before measurement')
             seeds={}
-            for arm in ('v1','v2','probe'):
+            for arm in plan.ARMS:
                 case=scratch/('seed-'+profile+'-'+arm)
                 (case/'snapshot'/'tmp').mkdir(parents=True)
                 (case/'tree').mkdir()
                 (case/'config.toml').write_text('keep_previous = true\n')
-                for n in (1,2):
-                    phase('seed-'+profile+'-'+arm+'-'+str(n),lambda: execute(arm,'scan','/scratch/tree',tree,case,'seed-'+profile+'-'+arm+'-'+str(n)))
+                for n in range(1,plan.SEED_SCANS+1):
+                    phase('seed-'+profile+'-'+arm+'-'+str(n),lambda: execute(arm,'full','scan','/scratch/tree',tree,case,'seed-'+profile+'-'+arm+'-'+str(n)))
                     time.sleep(1.05)
-                if arm == 'probe':
-                    required = ('coarse.db', 'coarse.prev.db')
-                elif arm == 'v1':
-                    required = ('snapshot.db', 'snapshot.prev.db')
-                else:
-                    required = ('v2/generations.db',)
+                required = ('coarse.db', 'coarse.prev.db') if arm == 'probe' else ('snapshot.db', 'snapshot.prev.db')
                 if any(not (case/'snapshot'/name).is_file() for name in required):
                     raise ValueError('missing seeded snapshot: '+arm)
                 seeds[arm]=case
-            for scenario_index,(scenario,op,target) in enumerate((('full','scan','/scratch/tree'),('retained','refresh','/scratch/tree/large'),('omitted','refresh','/scratch/tree/small'))):
+            for scenario_index,(scenario,op,target) in enumerate(plan.SCENARIOS):
                 for pair in range(pairs):
-                    orders=(('v1','v2','probe'),('v2','probe','v1'),('probe','v1','v2'))
-                    arms=orders[(scenario_index+pair)%len(orders)]
+                    arms=plan.order(scenario_index,pair)
                     cycle_started=time.monotonic()
                     evidence_seconds=0.0
                     cases={}
@@ -318,7 +295,7 @@ def run(args):
                         shutil.copytree(seeds[arm],case)
                         cases[arm]=case
                         ident=f'{profile}-{scenario}-{pair+1}-{arm}'
-                        phase(ident,lambda:execute(arm,op,target,tree,case,ident))
+                        phase(ident,lambda:execute(arm,scenario,op,target,tree,case,ident))
                     ident=f'{profile}-{scenario}-{pair+1}-oracle'
                     phase(ident,lambda: oracle(args,cases,out,ident,remaining()))
                     if scenario == 'full' and pair == 0:
@@ -337,11 +314,11 @@ def run(args):
             shutil.rmtree(tree)
             monitor.trim('fixture-'+profile,scratch.parent)
         comparisons={}
-        for profile in ('files','directories'):
-            for scenario in ('full','retained','omitted'):
+        for profile in plan.PROFILES:
+            for scenario,_,_ in plan.SCENARIOS:
                 key=profile+'/'+scenario
                 comparisons[key]={}
-                for arm in ('v1','v2','probe'):
+                for arm in plan.ARMS:
                     rows=[json.loads((out/c['id']/'metrics.json').read_text()) for c in manifest['cases']
                           if c['id'].startswith(profile+'-'+scenario+'-') and c['arm']==arm]
                     if len(rows)!=pairs: raise ValueError('incomplete comparison '+key+'/'+arm)

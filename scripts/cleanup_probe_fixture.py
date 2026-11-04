@@ -58,10 +58,12 @@ def build(root, profile, count):
     expected_dirs = receipt['bulk_directories'] + count // 1000 + 7
     receipt['expected_counts'] = dict(files=expected_files, dirs=expected_dirs,
                                       others=0, entries=expected_files + expected_dirs)
+    # 'bulk' is kept only by the entries rule at 100k scale and by both rules at 1M; 'small' and the wide
+    # target chunk stay below both limits, so a refresh below them must be answered from folded buckets.
     receipt['expected_controls'] = {
         'retained': ['large', 'large/above', 'large/deep', 'large/deep/deeper',
-                     'large/deep/deeper/large', 'large/group'],
-        'omitted': ['large/below', 'large/sparse'] +
+                     'large/deep/deeper/large', 'large/group', 'bulk'],
+        'omitted': ['large/below', 'large/sparse', 'small', 'bulk/g000050'] +
                    [f'large/group/f{i:06}' for i in range(64)]}
     small = root / 'small'
     retained = root / 'large'

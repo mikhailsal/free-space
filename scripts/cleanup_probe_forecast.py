@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import time
 
+import cleanup_probe_plan as plan
 from cleanup_probe_resources import capture as capture_resources, require as require_resources
 
 
@@ -21,15 +22,16 @@ def forecast(manifest, cleanup, source_sha, job_elapsed_seconds, timing, space, 
         raise ValueError('smoke manifest missing, invalid, or from different source')
     if cleanup.get('success') is not True:
         raise ValueError('smoke runner cleanup was not successful')
+    want = plan.expected('smoke')
     cases = manifest['cases']
-    if len(cases) != 30 or any(c.get('validated') is not True for c in cases):
+    if len(cases) != want['cases'] or any(c.get('validated') is not True for c in cases):
         raise ValueError('incomplete smoke writer cases')
     phases = manifest['phases']
     oracle = [p for p in phases if p['name'].endswith('-oracle')]
     cycles = [p for p in phases if p['name'].endswith('-cycle')]
-    if len(oracle) != 6 or any(p.get('success') is not True for p in oracle):
+    if len(oracle) != want['oracles'] or any(p.get('success') is not True for p in oracle):
         raise ValueError('incomplete or failed smoke semantic oracles')
-    if len(cycles) != 6 or any(p.get('success') is not True or not isinstance(p.get('seconds'), (int,float))
+    if len(cycles) != want['cycles'] or any(p.get('success') is not True or not isinstance(p.get('seconds'), (int,float))
                                or not math.isfinite(p['seconds']) or p['seconds'] < 0 for p in cycles):
         raise ValueError('incomplete repeatable smoke cycles')
     cycle_seconds = sum(p['seconds'] for p in cycles)
@@ -46,7 +48,7 @@ def forecast(manifest, cleanup, source_sha, job_elapsed_seconds, timing, space, 
         raise ValueError('missing or invalid smoke outer-space evidence')
     cycles_space=space.get('cycles',[])
     trims=space.get('trims',[])
-    if (len(cycles_space)!=6 or len(trims)<26 or any(t.get('exit_code') != 0 for t in trims)
+    if (len(cycles_space)!=want['cycles'] or len(trims)<want['trims'] or any(t.get('exit_code') != 0 for t in trims)
             or any(any(type(c.get(k)) is not int or c[k]<0 for k in
                        ('before_backing_allocated_bytes','peak_backing_allocated_bytes','after_backing_allocated_bytes'))
                    for c in cycles_space)):
