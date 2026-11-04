@@ -27,7 +27,7 @@ def scope_errors(report, expected):
 
 def run(config):
     output = Path('/results') / config['id']
-    output.mkdir()
+    output.mkdir(exist_ok=True)
     snapshot = Path('/scratch/snapshot')
     cg = legacy.cgroup()
     before = legacy.cg_read(cg)

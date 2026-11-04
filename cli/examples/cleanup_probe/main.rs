@@ -15,8 +15,9 @@ use model::{Node, R, Stats, hex, now, threshold};
 use serde_json::{Map, Value, json};
 use state::{Plan, Slice};
 use std::ffi::CString;
+use std::io::ErrorKind;
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::{fs, time::Instant};
 
 #[cfg(target_env = "musl")]
@@ -85,13 +86,25 @@ fn locked(dir: &Path) -> R<fs::File> {
     Ok(file)
 }
 /// The deepest existing ancestor of `target` (canonical) and the part of `target` below it
-/// that no longer exists; the remainder is empty when the target exists.
+/// that no longer exists; the remainder is empty when the target exists. A component that
+/// stopped being a directory ends the live part like a missing one, and a relative target
+/// is resolved against the working directory like any other path. `..` is refused: below a
+/// missing component it cannot be resolved, so the root check and the plan would see a
+/// different path than the one the caller meant.
 fn live_ancestor(target: &Path) -> R<(PathBuf, PathBuf)> {
+    if target.components().any(|c| c == Component::ParentDir) {
+        return Err("refresh target must not contain '..'".into());
+    }
     let mut candidate = target;
     loop {
-        match fs::canonicalize(candidate) {
+        let probe = if candidate.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            candidate
+        };
+        match fs::canonicalize(probe) {
             Ok(path) => return Ok((path, target.strip_prefix(candidate)?.to_path_buf())),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Err(e) if matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) => {
                 candidate = candidate.parent().ok_or("missing target ancestor")?
             }
             Err(e) => return Err(e.into()),
@@ -266,20 +279,30 @@ fn refresh_range(
 }
 fn refresh(root: &Path, meta: &store::Meta, nodes: &mut Vec<Node>, target: &Path) -> R<Outcome> {
     let (live, missing) = live_ancestor(target)?;
-    let requested = if missing.as_os_str().is_empty() {
-        live.clone()
-    } else {
+    let vanished = !missing.as_os_str().is_empty();
+    let requested = if vanished {
         live.join(missing)
+    } else {
+        live.clone()
     };
     if !requested.starts_with(root) {
         return Err("refresh target outside root".into());
     }
     // A target that vanished is planned from the snapshot, which still knows the retained
     // directory and bucket that held it; rescanning that bucket drops what was deleted. Only
-    // when that directory is gone as well does the nearest surviving ancestor take over.
+    // when that directory is gone as well, or has been replaced by something that cannot
+    // hold the target, does the nearest surviving path take over.
     let mut plan = state::plan(nodes, &requested)?;
-    if !live.starts_with(plan.region()) {
+    if !live.starts_with(plan.region()) || (vanished && !live.is_dir()) {
         plan = state::plan(nodes, &live)?;
+    }
+    // A retained directory that is now a file cannot be rescanned as one; the directory
+    // around it takes over, exactly as if it had vanished.
+    if let Plan::Retained(path) = &plan
+        && !path.is_dir()
+        && let Some(outer) = path.parent()
+    {
+        plan = state::plan(nodes, outer)?;
     }
     if matches!(&plan, Plan::Retained(b) if b == root) {
         return rescan_root(root, meta, nodes, 0, requested != root);

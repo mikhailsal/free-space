@@ -35,15 +35,19 @@ range (other buckets, retained siblings) is not revisited, as with any partial r
 * A bucket stores allocated and apparent bytes, file/directory/other counts, errors, hardlink count, oldest scan time
   and newest file mtime. Totals of a node are derived: own bytes + buckets + retained children. SQLite schema 2
   records the format, slot bits and bucket cap; a reader rejects other layouts, gaps, overlaps, a snapshot without
-  exactly one root, nodes that are not direct children of a retained directory, and inconsistent totals.
+  exactly one root, a root that is not a directory or differs from the root in the metadata, nodes that are not direct
+  children of a retained directory, and inconsistent totals.
 * Refresh planning: a retained directory target rescans that directory; a retained file target rescans its parent
   directory; any other target resolves to the bucket of its first component below the nearest retained directory and
   rescans only the admitted children of that range (name in range and not a retained child), re-reads the directory's
   own size and scan time, re-tiles the range, and promotes children that became retained. Demoted retained nodes fold
   into the bucket of their own name. A target that no longer exists is planned from the snapshot in the same way (its
-  retained directory and bucket are still known); only when that retained directory is gone as well does the nearest
-  surviving ancestor take over. A region that held, or now shows, hardlinks falls back to a full root rescan and
-  reports `fallback_full_root: true`, as does any plan that ends at the root for a narrower request.
+  retained directory and bucket are still known); only when that retained directory is gone as well, or has been replaced
+  by a file, does the nearest surviving ancestor take over. A relative target, or one below a path that became a file,
+  is resolved from its nearest live ancestor. A target containing `..` is refused: once part of the path is missing it
+  cannot be resolved lexically, and it must neither pick a bucket nor slip past the root check. A region that held, or
+  now shows, hardlinks falls back to a full root rescan and reports `fallback_full_root: true`, as does any plan that
+  ends at the root for a narrower request.
 * Discarded per-path identity of small files and small directories stays discarded; the contract is unchanged from
   revision 2 and is not a lossless or drop-in replacement for the complete catalog.
 
@@ -82,41 +86,90 @@ caches are flushed before each command. No automatic retries.
 
 The oracle replays the complete v1 snapshot of the same cycle in dense preorder and requires the probe snapshot to
 be exactly its folded image: every retained node, every own/total statistic, and **every bucket row** of every
-retained directory (slot range, entry counts, bytes, errors, freshness extrema), recomputed in Python from raw names
+retained directory (slot range, entry counts, bytes, errors, newest mtime), recomputed in Python from raw names
 with a hash and tiling implementation that is independent of the Rust code. Cross-language agreement is pinned by
 shared hash vectors, by published FNV-1a vectors in both languages and by the pinned wide windows. Missing or extra
 nodes, extra or missing buckets, wrong windows, double counting, a directory over 4096 entries that was folded,
-hardlinks in the fixture, or a layout that differs from format 2 all fail the cycle. The hosted cycles refresh
-unchanged trees, where a range refresh re-tiles to the layout of the seed; the oracle therefore requires the
-from-scratch greedy tiling, and the merge on changed trees is covered by the Rust tests only: promotion (by size and by
-entry count), demotion, skipping retained siblings, hardlink fallback, range refresh against a full rescan, deleted
-targets, a re-read parent directory, inconsistent snapshots and structural damage.
+hardlinks in the fixture, or a layout that differs from format 2 all fail the cycle.
 
-## Decision bars (unchanged from the v1 plan, relative to v1)
+That replay checks scan stamps only for internal consistency (a node's oldest stamp equals the oldest of its own, its
+retained children's and its buckets' stamps; a bucket carries a stamp exactly when it holds entries). This cannot show
+that anything was rescanned: every hosted refresh runs on an unchanged tree, so a refresh that republished its seed
+untouched would still equal v1's folded image, which the round-2 review pointed out. **For every refresh cycle the oracle
+therefore also receives the seed snapshot the operation started from** (mounted read-only) and the scope the frozen plan
+expects (`--seed`, `--expect-scope`, `--expect-boundary`, `--expect-window`), and requires: the same root; a generation
+one higher and a newer scan time than the seed's; the same retained nodes and the same bucket layout (an unchanged tree
+re-tiles to the seed's layout); a scan stamp strictly newer than the seed's on exactly the items the scope must have
+rewritten and identical to the seed's on every other node and bucket; and at least one fresh item. The rewritten set is
+everything for a full scan; the boundary and everything below it for a retained refresh; and for a range refresh the
+directory that owns the buckets (its own size and time are re-read) and the buckets inside the window. Stamps are whole
+seconds, so the host pauses 1.05 s after each seed scan, which makes a later stamp strictly newer.
 
-Owner decisions D2-D14 of [the v1 plan](v1-performance-plan.md) apply as written; no bar is moved after seeing results.
+The merge on changed trees is covered by the Rust tests only: promotion (by size and by entry count), demotion,
+skipping retained siblings, hardlink fallback, range refresh against a full rescan, deleted targets, a directory
+replaced by a file, targets with `..` or outside the root, a re-read parent directory, inconsistent snapshots and
+structural damage.
 
-* Peak disk: no increase. Process RSS: no increase.
-* Full scan: at most +15% time, and then only with at least 2x that percentage as a reduction in another metric
-  (a RAM exchange also needs at least 256 MiB absolute savings).
-* Folder refresh: no slowdown, separately for each scenario and profile (retained, omitted, wide).
-* A meaningful benefit needs a confirmed speed gain of at least 15%, or a disk gain of at least 25%, or an RSS gain of
-  at least 25%.
+## Decision bars
 
-**How a bar is judged, fixed here before measurement** (the review of this file made the evidence rule for the
-non-inferiority bars stricter than the plan's "no confirmed increase" wording, which three noisy repeats could satisfy
-despite a real regression):
+Owner decisions D2-D14 of [the v1 plan](v1-performance-plan.md) bind this experiment. Those it uses, quoted verbatim
+from the plan's table of current accepted rules:
 
-* A difference is noise unless it exceeds **both** the relative and the absolute floor: elapsed time 5% and 0.05 s
-  (the timers resolve 0.01 s and the worker polls up to 50 ms), memory 2% and 1 MiB, disk 5% and 4 KiB.
-* A benefit bar (speed 15%, RSS 25%, disk 25%) is passed only when all three paired repeats clear the bar and the median
-  does too (a confirmed benefit).
-* A no-increase or no-slowdown bar is passed only when affirmatively shown: in every paired repeat the probe is at most
-  the v1 value plus the noise floor. One repeat above that floor, or a median above it, fails the bar. A bar with its
-  own explicit tolerance (the +15% full-scan limit) is judged against that tolerance without adding a floor.
-* Any cap, reclaim, OOM or swap flag makes that memory comparison inconclusive, and **inconclusive is not a pass for any
-  bar**, benefit or non-inferiority. Each bar is reported as passed, failed or inconclusive.
-* Total cgroup memory (cache and slab included) is reported separately and is not a substitute for the RSS bar.
+| Decision | Owner answer / binding result |
+| --- | --- |
+| D2 peak disk | No confirmed increase beyond calibrated uncertainty |
+| D3 memory | No confirmed peak-RSS increase or higher minimum tested successful budget |
+| D4 full scan | At most 15% slowdown, conditionally |
+| D5 exchange | Other-metric percentage reduction at least twice full-scan slowdown percentage |
+| D6 folder refresh | No confirmed slowdown per scenario |
+| D8 speed-only benefit | At least 15% confirmed improvement |
+| D9 RSS benefit | At least 25% confirmed reduction |
+| D10 disk benefit | At least 25% confirmed peak-allocation reduction |
+| D11 capacity benefit | Alternative: at least 25% lower tested successful budget, with repeated success and baseline OOM proof |
+| D14 RSS exchange floor | RAM savings justify full-scan slowdown only with both 2:1 percentage gain and at least 256 MiB absolute savings |
+
+The plan does not say what "confirmed" or "calibrated uncertainty" mean for three noisy repeats. This file fixes it
+**before any measurement of this source**, and more strictly than a reading of "no confirmed increase" that three noisy
+repeats could satisfy despite a real regression. The rules below are an explicit pre-registered addition to the plan,
+not a quotation of it. They are implemented, with contract tests that were checked by mutation, in
+`scripts/cleanup_probe_analysis.py`, which the workflow captures and hashes with the rest of the source. No bar is moved
+after seeing results.
+
+* **What is judged.** Only the screen. The smoke has one pair per cell; it decides nothing except that counts, scopes and
+  oracles are right. The screen is judged separately for each profile and scenario (eight cells of three paired repeats,
+  paired by repeat number).
+* **Metrics.** Time: wall seconds of the timed command as GNU `time` reports them (resolution 0.01 s). RSS: the command's
+  peak resident set. Peak disk: see below. Total cgroup memory (cache and slab included) is reported, but it holds
+  reclaimable page cache: it is neither a bar nor an exchange metric and is not a substitute for the RSS bar.
+* **Noise.** In one pair a difference is a change only if it exceeds **both** floors, with v1 as the base: time 5% and
+  0.05 s, memory 2% and 1 MiB, disk 5% and 4 KiB. The allowance is `max(relative x v1, absolute)`; anything inside it is
+  noise. The floors exist because the timers and samplers have finite resolution.
+* **No increase, no slowdown (D2, D3, D6).** Passed only when shown: in every one of the three repeats the probe is at
+  most the v1 value plus the allowance. One repeat above that, or a median above it, fails the bar.
+* **Benefit (D8 time 15%, D9 RSS 25%, D10 disk 25%).** Passed only when every repeat is better than v1 beyond the noise
+  floors by at least the bar and the median is too.
+* **Full scan (D4, D5, D14), per profile.** Every repeat must be at most 15% slower than v1; that tolerance gets no noise
+  allowance. A repeat is a slowdown only beyond the noise floors; when none is, the bar passes without an exchange.
+  Otherwise it needs an exchange: peak disk or process RSS better than v1 beyond noise in every repeat by at least twice
+  the **worst** repeat's slowdown, and for RSS also by at least 256 MiB absolute in every repeat. D5 also names
+  folder-refresh time as an exchange metric; that exchange is deliberately not used, which can only make the bar harder
+  to pass.
+* **Flags.** Any cap, reclaim, OOM, swap or worker flag in either arm of a cell makes that cell's memory comparisons
+  (D3, D9, the RSS exchange) inconclusive; time and disk stay judged. **Inconclusive is not a pass for any bar**, benefit
+  or non-inferiority. Each bar is reported as passed, failed or inconclusive.
+* **Overall.** The experiment succeeds only if D2 and D3 pass in all eight cells, D6 in all six refresh cells, the
+  full-scan bar in both full cells, and at least one benefit bar (D8, D9 or D10) is confirmed in some cell. A gate that no
+  cell reported is not passed.
+
+**Peak disk.** The metric is the output directory's allocated bytes at the start of the command plus the sampled rise of
+its filesystem's used bytes (every 50 ms, and once at the end), or the final allocated bytes if larger; v1's value
+therefore contains its whole existing database. v1 runs for seconds and is sampled many times. A probe refresh can finish
+within one sampling interval, and `store::publish` can hold four snapshot-sized files at once (the current file, the
+previous file, a temporary copy of the previous one and the new temporary file), so the sampled value is a lower bound
+that may show only the end state. **Every probe disk value is therefore multiplied by 4 before any disk comparison** (D2,
+D10 and the disk exchange). v1's sampled value is used as measured, which is a lower bound on its own peak and so
+conservative against the probe. The reported tables keep the observed values (sampled peak, final allocation and their
+maximum); only the bars use the 4x value.
 
 **Not measured, hence not claimed:** the minimum tested successful memory budget. Every writer runs under the same
 8 GiB ceiling, and a low-limit ladder would be dominated by the Python measurement wrapper at small limits. The
@@ -125,12 +178,17 @@ says so. This also means no claim of lower required RAM follows from a lower RSS
 
 ## Predictions, recorded before any run
 
-* Omitted and wide refresh of the probe take well under 1 s and under 10% of v1's roughly 10.7 s.
-* Retained refresh stays below 0.1 s. Full scans stay faster than v1.
-* Process RSS stays under v1's (36.7 MiB earlier). Snapshot pair stays under 1 MiB; bucket rows add tens of KiB.
+Every comparison is against v1's median in the same profile and scenario of the same run; a number from the earlier
+screen is context, never a prediction or a gate.
+
+* Omitted and wide refresh of the probe: median under 10% of v1's and well under 1 s, in both profiles.
+* Retained refresh: median under 10% of v1's and under 0.1 s. Full scans: faster than v1 in both profiles.
+* Process RSS: lower than v1's in every cell. Peak disk: the probe stays inside v1 at four times its observed value in
+  every cell, with a wide margin (v1's value contains its whole database).
+* The probe's snapshot pair stays under 1 MiB; bucket rows add tens of KiB.
 * Any of these failing is reported as a failure of the idea, not explained away.
-* Absolute times and sizes of the earlier screen are a different runner and run; they are context for the numbers, not
-  a prediction and not a gate.
+* The earlier screen (v1 refresh about 10.7 s, RSS 36.7 MiB, probe snapshot 32 KiB) ran on another runner at another
+  time; it is the reason these predictions were made, not evidence for them.
 
 ## Admission and stops
 
@@ -157,10 +215,20 @@ and screen.
   100,000 and buckets to 400,000 (the bucket cap is checked when the snapshot is written), needs its output outside
   the scan root, and keeps the two-name current/previous publish gap. There is no GUI, no complete-catalog query and
   no live drill cache.
-* Not covered by any test: a non-UTF-8 name through scan, store and refresh end to end, a retained target replaced by
-  a file, a target outside the root, and demotion into an over-cap bucket followed by a refresh of that bucket.
+* Not covered by any test: a non-UTF-8 name through scan, store and refresh end to end, and demotion into an over-cap
+  bucket followed by a refresh of that bucket.
 * Synthetic fixture, three repeats, unchanged filesystems between seed and refresh (changed-tree behaviour is covered
   by unit tests only, never by a hosted run), and results about a prototype, not a measurement of the installed system.
+* The arm that runs first alternates so that each arm leads half of all comparisons and half of each scenario over the
+  two profiles. Inside one judged cell (a profile and a scenario) the three screen repeats are ordered 2:1. Caches are
+  flushed before every command and the arms run in separate containers, but an order effect is not estimated separately.
+* The Python harness (plan, host, worker, oracle, verdict) has contract tests, mutation-checked, and a compile check, but no
+  formatter or linter: the repository has none for Python, and its size check counts only languages that have one.
+  Adding one is a repository decision, not part of this experiment.
+* The hosted flow with the oracle's seed mount and the verdict's artifact reading has not run on real artifacts when this
+  file is committed; the smoke is its first run. A layout mistake it exposes in the artifact plumbing is corrected and the
+  smoke repeated; the bar functions are never touched after a result is seen.
+* The minimum-budget clause of D3 and the capacity alternative D11 are not measured (see above).
 
 ## Review
 
@@ -191,3 +259,35 @@ Record, 2026-11-04: the commit `b141a3e` was reviewed by `claude-opus-5-5` (veri
   overclaiming wording: disclosed above and reworded. P3 structural checks in the store reader were added.
 * P3 actions pinned by tag: left as is, consistent with every workflow of this repository (read-only token, no secrets).
 * P3 bucket cap reported late: left, listed above.
+
+Record, round 2, 2026-11-04: the commit `59a977f`, which carried the fixes above, was reviewed again by `claude-opus-5-5`
+(the CLI's init event, every assistant message and `modelUsage` name only that model; tool-less, one turn, complete diff).
+It conceded both disputed round-1 P1 findings, found nothing that would make the smoke fail, mis-report a scope or let a
+failed result pass, and answered **GO for the hosted smoke**, with 4 P2 and 8 P3 findings that must be fixed or disclosed
+before a screen result is reported. It added that any change of captured source needs a new smoke, so all of them were
+fixed before the first smoke was dispatched. Disposition:
+
+* P2 the oracle could not tell a refresh from a no-op (a refresh that republished its seed untouched would have passed,
+  freshness was derived from the probe's own stamps, and the text overclaimed): the oracle now proves exactly which nodes
+  and buckets were rewritten against the seed, as described above, and the text is corrected.
+* P2 the judgment rules were implemented nowhere: `scripts/cleanup_probe_analysis.py` implements them with contract tests,
+  and every rule was checked by mutating the code (thresholds, floors, median against every repeat, exchange sizing, flags,
+  empty gates, the disk factor, the oracle fields) until each mutation failed a test.
+* P2 the full-scan bar was ambiguous: it is now specified point by point, per profile. While freezing it, total cgroup
+  memory was removed from the exchange metrics, which D5 and D14 do not name.
+* P2 peak disk is a sampled lower bound that favours the faster arm: the 4x rule above, and the disclosure.
+* P3 the bullets were presented as the plan's wording, the smoke was not excluded, the allowance was not a formula and the
+  timer justification was wrong: the plan is quoted verbatim, and the three points are stated or corrected.
+* P3 the predictions leaned on another run's absolutes: restated relative to this run.
+* P3 arm order is 2:1 inside a judged cell: accepted and disclosed.
+* P3 `..` in the missing part of a target, relative and not-a-directory targets, and a root not tied to the metadata:
+  fixed with tests, each shown to fail without its fix. Testing these also exposed a retained directory replaced by a
+  file, which failed instead of falling back to its parent; fixed. A target outside the root, which had no test, now has one.
+* P3 no Python linter, narrow CI trigger: the trigger now covers the repository checks' inputs. The review proposed adding
+  a Python linter and type checker to `scripts/check.sh`, the hook and CI; that changes what every contributor must
+  install and what the size rule counts, which is the repository owner's decision, so it is disclosed instead.
+* P3 an early worker failure was hidden by a missing output directory: the real cause is reported, with a test.
+
+The review listed what it did not verify: v1's report fields and snapshot schema as the oracle reads them, the nested-mount
+handling of the bind-mounted scan root, the helper functions of the container worker, and the hash vectors and windows
+(recomputing them was outside its scope; both languages pin them). The smoke is the first check of the first three.

@@ -222,6 +222,13 @@ pub fn read(path: &Path) -> R<(Meta, Vec<Node>)> {
     }
     attach(&mut nodes, rows)?;
     crate::state::verify(&nodes)?;
+    // `verify` guarantees exactly one root; it must be the directory the metadata names.
+    if !nodes
+        .iter()
+        .any(|n| n.parent.is_none() && n.path == meta.root)
+    {
+        return Err("snapshot root differs from its metadata".into());
+    }
     Ok((meta, nodes))
 }
 pub fn publish(dir: &Path, temp: &Path) -> R<()> {

@@ -85,3 +85,15 @@ def probe_scope(scenario, fixture):
 
 def scope(arm, scenario, fixture):
     return (probe_scope if arm == 'probe' else v1_scope)(scenario, fixture)
+
+
+def refresh_expectation(scenario, fixture):
+    """Oracle arguments naming the part of the seeded probe snapshot the timed operation must rewrite.
+
+    They come from this frozen plan, so the oracle's proof of what was rewritten does not rest on the
+    operation's own report."""
+    want = probe_scope(scenario, fixture)
+    args = ['--expect-scope', want['scope'], '--expect-boundary', want['boundary']]
+    if want['range'] is not None:
+        args += ['--expect-window', str(want['range']['lo']), str(want['range']['hi'])]
+    return args

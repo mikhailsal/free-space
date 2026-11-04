@@ -9,10 +9,16 @@ on:
     paths:
       - 'cli/examples/cleanup_probe/**'
       - 'cli/Cargo.toml'
+      - 'core/**'
+      - 'Cargo.toml'
       - 'Cargo.lock'
       - 'clippy.toml'
       - 'scripts/cleanup_*'
       - 'scripts/tests/test_cleanup*'
+      - 'scripts/check.sh'
+      - 'scripts/check-size.sh'
+      - 'scripts/check-rust-suppressions.sh'
+      - '.githooks/**'
       - '.github/workflows/cleanup-ci.yml'
   workflow_dispatch:
 

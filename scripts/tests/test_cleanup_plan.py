@@ -3,6 +3,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import cleanup_oracle as oracle
 import cleanup_probe_fixture as fx
 import cleanup_probe_plan as plan
 
@@ -73,6 +74,29 @@ class PlanTests(unittest.TestCase):
             wide = plan.scope('probe', 'wide', receipt(profile, 100_000))
             self.assertEqual(wide['range'], dict(lo=804, hi=971, old_entries=4004, new_entries=4004))
             self.assertEqual(wide['visited'], 8010)
+
+    def test_oracle_expectations_name_the_planned_scope_for_both_profiles_and_stages(self):
+        for profile in plan.PROFILES:
+            for count, window in ((100_000, ['804', '971']), (1_000_000, ['945', '956'])):
+                fixture = receipt(profile, count)
+                root = ['--expect-boundary', '/scratch/tree']
+                self.assertEqual(plan.refresh_expectation('full', fixture), ['--expect-scope', 'full', *root])
+                self.assertEqual(plan.refresh_expectation('retained', fixture),
+                                 ['--expect-scope', 'retained', '--expect-boundary', '/scratch/tree/large'])
+                self.assertEqual(plan.refresh_expectation('omitted', fixture),
+                                 ['--expect-scope', 'range', *root, '--expect-window', '0', '4096'])
+                self.assertEqual(plan.refresh_expectation('wide', fixture),
+                                 ['--expect-scope', 'range', '--expect-boundary', '/scratch/tree/bulk', '--expect-window', *window])
+
+    def test_the_oracle_command_line_turns_the_plan_arguments_into_its_expectation(self):
+        for profile in plan.PROFILES:
+            for count, window in ((100_000, [804, 971]), (1_000_000, [945, 956])):
+                fixture = receipt(profile, count)
+                for scenario, scope, boundary, bounds in (
+                        ('full', 'full', b'/scratch/tree', None), ('retained', 'retained', b'/scratch/tree/large', None),
+                        ('omitted', 'range', b'/scratch/tree', [0, 4096]), ('wide', 'range', b'/scratch/tree/bulk', window)):
+                    args = oracle.parse(['b.db', 'c.db', '--fixture', 'f.json', '--seed', 's.db', *plan.refresh_expectation(scenario, fixture)])
+                    self.assertEqual(oracle.expectation(args), {'scope': scope, 'window': bounds, 'boundary': boundary}, (profile, count, scenario))
 
     def test_changed_fixture_contract_is_rejected(self):
         fixture = receipt('files', 100_000)

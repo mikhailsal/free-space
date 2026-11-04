@@ -141,6 +141,9 @@ fn check_structure(nodes: &[Node]) -> R<()> {
             return Err("unknown node kind".into());
         }
         let Some(parent) = &n.parent else {
+            if n.kind != 1 {
+                return Err("snapshot root must be a directory".into());
+            }
             roots += 1;
             continue;
         };

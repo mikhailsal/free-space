@@ -40,6 +40,9 @@ def run_container(args, arm, operation, target, tree, case, out, ident, seconds,
                   expected_scope=expected_scope,
                   io_device_number=f'{os.major(dev)}:{os.minor(dev)}',
                   io_limits=dict(rbps=33554432, wbps=33554432, riops=2200, wiops=3600))
+    # Created here, strictly: a reused case id fails loudly, and a worker that dies before it
+    # writes anything still leaves a place for the container state and does not hide its cause.
+    (out / ident).mkdir()
     (out / (ident + '.json')).write_text(json.dumps(config, indent=2)+'\n')
     name = 'cleanup-probe-' + uuid.uuid4().hex
     label = 'freespace.benchmark=' + os.environ['FREESPACE_BENCHMARK_RUN_TOKEN']
@@ -59,13 +62,15 @@ def run_container(args, arm, operation, target, tree, case, out, ident, seconds,
         state = json.loads(subprocess.check_output(['docker','inspect',name],text=True,timeout=15))[0]['State']
         (out/ident/'docker-state.json').write_text(json.dumps(state,indent=2)+'\n')
         if result.returncode or state.get('OOMKilled'):
-            raise RuntimeError('writer failed '+ident)
+            tail=(out/(ident+'.docker.log')).read_text(errors='replace')[-1500:]
+            raise RuntimeError('writer failed '+ident+': '+tail)
         return json.loads((out/ident/'metrics.json').read_text())
     finally:
         subprocess.run(['docker','rm','-f',name],check=True,timeout=30,stdout=subprocess.DEVNULL)
 
 
-def oracle(args, cases, out, ident, seconds):
+def oracle(args, cases, seed, expectation, out, ident, seconds):
+    """Verify both final snapshots, and from the untouched probe seed which part of it the timed run rewrote."""
     resources=capture_resources()
     (out/(ident+'.host-resource.json')).write_text(json.dumps(resources,indent=2)+'\n')
     require_resources(resources)
@@ -76,9 +81,11 @@ def oracle(args, cases, out, ident, seconds):
            '--user',f'{os.getuid()}:{os.getgid()}','--entrypoint','python3',
            '--mount',f'type=bind,src={cases["v1"] / "snapshot"},dst=/baseline,readonly',
            '--mount',f'type=bind,src={cases["probe"] / "snapshot"},dst=/coarse,readonly',
+           '--mount',f'type=bind,src={seed / "snapshot"},dst=/seed,readonly',
            '--mount',f'type=bind,src={out / ("fixture-" + ident.split("-")[0] + ".json")},dst=/fixture.json,readonly',
            '--mount',f'type=bind,src={Path("scripts").resolve()},dst=/harness,readonly',
-           args.image,'/harness/cleanup_oracle.py','/baseline/snapshot.db','/coarse/coarse.db','--fixture','/fixture.json']
+           args.image,'/harness/cleanup_oracle.py','/baseline/snapshot.db','/coarse/coarse.db','--fixture','/fixture.json',
+           '--seed','/seed/coarse.db',*expectation]
     try:
         with (out/(ident+'.json')).open('w') as stdout, (out/(ident+'.log')).open('w') as stderr:
             result=subprocess.run(cmd,stdout=stdout,stderr=stderr,timeout=seconds)
@@ -297,7 +304,8 @@ def run(args):
                         ident=f'{profile}-{scenario}-{pair+1}-{arm}'
                         phase(ident,lambda:execute(arm,scenario,op,target,tree,case,ident))
                     ident=f'{profile}-{scenario}-{pair+1}-oracle'
-                    phase(ident,lambda: oracle(args,cases,out,ident,remaining()))
+                    expectation=plan.refresh_expectation(scenario,fixture)
+                    phase(ident,lambda: oracle(args,cases,seeds['probe'],expectation,out,ident,remaining()))
                     if scenario == 'full' and pair == 0:
                         evidence_started=time.monotonic()
                         phase(profile+'-evidence',lambda: preserve_evidence(cases,out,profile))

@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """Check a bucketed coarse snapshot against an independent full v1 snapshot.
 
-Run outside the measured writer process: cleanup_oracle.py V1_DB COARSE_DB [V2_DB] [--fixture FILE].
+Run outside the measured writer process: cleanup_oracle.py V1_DB COARSE_DB [V2_DB] [--fixture FILE]
+[--seed SEED_DB --expect-scope full|retained|range [--expect-boundary PATH] [--expect-window LO HI]].
 Both snapshots must describe the same filesystem state and root. Memory is bounded by tree depth
 and by the (at most 4096) name-hash slots of each open directory; SQLite performs indexed lookups
 for retained nodes and buckets. The bucket layout is recomputed here from the v1 entries with the
 independent reference in cleanup_buckets.py, not read back from the Rust implementation.
+
+With --seed the coarse snapshot is also compared with the snapshot the timed operation started from.
+The tree is unchanged, so the content is already proven equal to the v1 image; what the comparison adds
+is which items the operation rewrote: their scan stamps must be strictly newer than the seed's (the
+caller leaves more than a second between the seeding scan and the operation, and stamps are whole
+seconds), and every other node and bucket must carry exactly the seeded stamp. The expected scope comes
+from the frozen plan, not from the operation's own report.
 """
 import argparse
 import json
@@ -163,7 +171,67 @@ def check_v2(c, v2, root, fixture, counts):
             raise ValueError('v2 fixture entry counts differ')
 
 
-def verify(baseline, coarse, v2=None, fixture=None):
+def node_rewritten(path, scope, boundary):
+    """Whether an operation with this scope must have rewritten the retained node at `path`."""
+    if scope == 'full':
+        return True
+    if scope == 'retained':
+        return path == boundary or path.startswith(boundary + b'/')
+    return path == boundary  # a range refresh re-reads only the directory that owns the buckets
+
+
+def bucket_rewritten(parent, lo, hi, scope, boundary, window):
+    if scope == 'full':
+        return True
+    if scope == 'retained':
+        return parent == boundary or parent.startswith(boundary + b'/')
+    return parent == boundary and window[0] <= lo and hi <= window[1]
+
+
+def stamp_state(new, old):
+    return 'fresh' if new > old else 'same' if new == old else 'older'
+
+
+def check_refresh(c, seed, expect):
+    """Compare the stored scan stamps with the seed and require exactly the planned items to be newer."""
+    scope, boundary, window = expect['scope'], expect.get('boundary'), expect.get('window')
+    if scope not in ('full', 'retained', 'range') or (scope != 'full' and boundary is None) or (scope == 'range' and window is None):
+        raise ValueError('incomplete refresh expectation')
+    meta_now, meta_seed = (x.execute('SELECT root,generation,scanned_at FROM meta').fetchone() for x in (c, seed))
+    if bytes(meta_now['root']) != bytes(meta_seed['root']):
+        raise ValueError('seed snapshot describes another root')
+    if meta_now['generation'] != meta_seed['generation'] + 1 or meta_now['scanned_at'] <= meta_seed['scanned_at']:
+        raise ValueError('operation did not advance the generation by one and the scan time')
+    old = {bytes(r['path']): r['scanned_at'] for r in seed.execute('SELECT path,scanned_at FROM nodes')}
+    new = {bytes(r['path']): r['scanned_at'] for r in c.execute('SELECT path,scanned_at FROM nodes')}
+    if old.keys() != new.keys():
+        raise ValueError('operation changed the retained nodes of an unchanged tree')
+    fresh_nodes = 0
+    for path, stamp in new.items():
+        wanted = 'fresh' if node_rewritten(path, scope, boundary) else 'same'
+        if stamp_state(stamp, old[path]) != wanted:
+            raise ValueError(f'node {path.hex()} scan stamp is {stamp_state(stamp, old[path])} against the seed, expected {wanted}')
+        fresh_nodes += wanted == 'fresh'
+    bucket_sql = 'SELECT parent,lo,hi,min_scanned_at FROM buckets'
+    old_b = {(bytes(r['parent']), r['lo']): (r['hi'], r['min_scanned_at']) for r in seed.execute(bucket_sql)}
+    new_b = {(bytes(r['parent']), r['lo']): (r['hi'], r['min_scanned_at']) for r in c.execute(bucket_sql)}
+    if old_b.keys() != new_b.keys():
+        raise ValueError('operation changed the bucket layout of an unchanged tree')
+    fresh_buckets = 0
+    for (parent, lo), (hi, stamp) in new_b.items():
+        old_hi, old_stamp = old_b[(parent, lo)]
+        if hi != old_hi or (stamp is None) != (old_stamp is None):
+            raise ValueError(f'bucket {parent.hex()} {lo}-{hi} changed shape on an unchanged tree')
+        if stamp is None:
+            continue  # an empty slot range carries no stamp and cannot show a rewrite
+        wanted = 'fresh' if bucket_rewritten(parent, lo, hi, scope, boundary, window) else 'same'
+        if stamp_state(stamp, old_stamp) != wanted:
+            raise ValueError(f'bucket {parent.hex()} {lo}-{hi} scan stamp is {stamp_state(stamp, old_stamp)} against the seed, expected {wanted}')
+        fresh_buckets += wanted == 'fresh'
+    return {'refresh_checked': True, 'fresh_nodes': fresh_nodes, 'fresh_buckets': fresh_buckets}
+
+
+def verify(baseline, coarse, v2=None, fixture=None, seed=None, expect=None):
     b, c = connect(baseline), connect(coarse)
     b.row_factory = c.row_factory = sqlite3.Row
     meta = read_meta(c, fixture)
@@ -191,21 +259,47 @@ def verify(baseline, coarse, v2=None, fixture=None):
             raise ValueError('fixture controls or expected entry counts differ')
     if v2 is not None:
         check_v2(c, v2, root, fixture, counts)
-    return {'success': True, 'visited': walk.visited, 'retained': walk.retained, 'buckets': walk.buckets,
-            'max_bucket_entries': walk.max_bucket, 'threshold': threshold, 'v2_checked': v2 is not None,
-            'fixture_checked': fixture is not None}
+    result = {'success': True, 'visited': walk.visited, 'retained': walk.retained, 'buckets': walk.buckets,
+              'max_bucket_entries': walk.max_bucket, 'threshold': threshold, 'v2_checked': v2 is not None,
+              'fixture_checked': fixture is not None, 'refresh_checked': False}
+    if seed is not None:
+        s = connect(seed)
+        s.row_factory = sqlite3.Row
+        result.update(check_refresh(c, s, expect))
+    return result
 
 
-def main():
+def parse(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('baseline')
+    parser.add_argument('coarse')
+    parser.add_argument('v2', nargs='?')
+    parser.add_argument('--fixture', type=Path)
+    parser.add_argument('--seed', help='coarse snapshot the timed operation started from')
+    parser.add_argument('--expect-scope', choices=('full', 'retained', 'range'))
+    parser.add_argument('--expect-boundary')
+    parser.add_argument('--expect-window', nargs=2, type=int, metavar=('LO', 'HI'))
+    return parser.parse_args(argv)
+
+
+def expectation(args):
+    """The refresh expectation named on the command line, or None when no seed was given."""
+    if not args.seed:
+        if args.expect_scope or args.expect_boundary or args.expect_window:
+            raise ValueError('--expect-* needs --seed')
+        return None
+    if not args.expect_scope:
+        raise ValueError('--seed needs --expect-scope')
+    return {'scope': args.expect_scope, 'window': args.expect_window,
+            'boundary': args.expect_boundary.encode('utf-8') if args.expect_boundary else None}
+
+
+def main(argv=None):
     try:
-        parser = argparse.ArgumentParser()
-        parser.add_argument('baseline')
-        parser.add_argument('coarse')
-        parser.add_argument('v2', nargs='?')
-        parser.add_argument('--fixture', type=Path)
-        args = parser.parse_args()
+        args = parse(argv)
         fixture = json.loads(args.fixture.read_text()) if args.fixture else None
-        print(json.dumps(verify(args.baseline, args.coarse, args.v2, fixture)))
+        result = verify(args.baseline, args.coarse, args.v2, fixture, args.seed, expectation(args))
+        print(json.dumps(result))
     except (ValueError, KeyError, TypeError, sqlite3.Error, OSError) as error:
         print(json.dumps({'success': False, 'error': str(error)}))
         return 1

@@ -242,5 +242,169 @@ class ManyEntriesTest(unittest.TestCase):
             oracle.verify(self.v1, self.coarse)
 
 
+META_WITH_STAMPS = '''CREATE TABLE meta(singleton INTEGER PRIMARY KEY,root BLOB,threshold INTEGER,ppm INTEGER,capacity INTEGER,generation INTEGER,
+    scanned_at INTEGER,has_hardlinks INTEGER,format INTEGER,slot_bits INTEGER,bucket_entries INTEGER);'''
+NODES_AND_BUCKETS = COARSE_SCHEMA.split("INSERT INTO meta VALUES(x'2f72',10,1000,10000,0,2,12,4096);")[1]
+RP, DP = b'/r', b'/r/d'
+SEED_NODES = {RP: 10, DP: 10}
+SEED_BUCKETS = {(RP, 0, 2048): 10, (RP, 2048, 4096): 10, (DP, 0, 4096): 10}
+
+
+def stamped(path, generation, scanned_at, nodes, buckets, root=b'/r'):
+    c = sqlite3.connect(path)
+    c.executescript(META_WITH_STAMPS + NODES_AND_BUCKETS)
+    c.execute('INSERT INTO meta VALUES(1,?,10,1000,10000,?,?,0,2,12,4096)', (root, generation, scanned_at))
+    for node, stamp in nodes.items():
+        c.execute('INSERT INTO nodes VALUES(?,?,1,0,0,0,?,0,0,0,0,0,0,0,?,NULL)', (node, None if node == RP else RP, stamp, stamp))
+    for (parent, lo, hi), stamp in buckets.items():
+        c.execute('INSERT INTO buckets VALUES(?,?,?,0,0,0,0,0,0,0,?,NULL)', (parent, lo, hi, stamp))
+    c.commit(); c.close()
+
+
+class RefreshStampTest(unittest.TestCase):
+    """The stored scan stamps must show exactly the planned items rewritten, whatever the operation reports."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def check(self, nodes, buckets, expect, generation=3, scanned_at=20, seed=None, seed_root=b'/r'):
+        seed_path, after_path = Path(self.tmp.name) / 'seed.db', Path(self.tmp.name) / 'after.db'
+        for path in (seed_path, after_path):
+            path.unlink(missing_ok=True)
+        stamped(seed_path, 2, 10, *(seed or (SEED_NODES, SEED_BUCKETS)), root=seed_root)
+        stamped(after_path, generation, scanned_at, nodes, buckets)
+        conns = [oracle.connect(p) for p in (after_path, seed_path)]
+        for conn in conns:
+            conn.row_factory = sqlite3.Row
+        return oracle.check_refresh(*conns, expect)
+
+    @staticmethod
+    def stamps(nodes=(), buckets=()):
+        return ({**SEED_NODES, **{n: 20 for n in nodes}}, {**SEED_BUCKETS, **{b: 20 for b in buckets}})
+
+    def test_full_scan_must_rewrite_everything(self):
+        every = self.stamps([RP, DP], SEED_BUCKETS)
+        self.assertEqual(self.check(*every, {'scope': 'full'}), {'refresh_checked': True, 'fresh_nodes': 2, 'fresh_buckets': 3})
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            self.check(*self.stamps(), {'scope': 'full'})  # a no-op publish of the seed
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            self.check(*self.stamps([RP], SEED_BUCKETS), {'scope': 'full'})
+
+    def test_retained_refresh_rewrites_only_the_subtree(self):
+        expect = {'scope': 'retained', 'boundary': DP}
+        self.assertEqual(self.check(*self.stamps([DP], [(DP, 0, 4096)]), expect), {'refresh_checked': True, 'fresh_nodes': 1, 'fresh_buckets': 1})
+        with self.assertRaisesRegex(ValueError, 'expected same'):
+            self.check(*self.stamps([RP, DP], [(DP, 0, 4096)]), expect)  # an ancestor was rewritten too
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            self.check(*self.stamps([DP], []), expect)  # the subtree's bucket was never rewritten
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            self.check(*self.stamps([], [(DP, 0, 4096)]), expect)  # the boundary node itself was not
+        with self.assertRaisesRegex(ValueError, 'expected same'):
+            self.check(*self.stamps([DP], [(DP, 0, 4096), (RP, 0, 2048)]), expect)  # a bucket outside the subtree
+
+    def test_range_refresh_rewrites_the_parent_and_the_planned_window_only(self):
+        expect = {'scope': 'range', 'boundary': RP, 'window': (2048, 4096)}
+        self.assertEqual(self.check(*self.stamps([RP], [(RP, 2048, 4096)]), expect), {'refresh_checked': True, 'fresh_nodes': 1, 'fresh_buckets': 1})
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            self.check(*self.stamps([], [(RP, 2048, 4096)]), expect)  # the parent directory was not re-read
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            self.check(*self.stamps([RP], []), expect)  # the window was not rewritten
+        with self.assertRaisesRegex(ValueError, 'expected same'):
+            self.check(*self.stamps([RP], [(RP, 2048, 4096), (RP, 0, 2048)]), expect)  # more than the window
+        with self.assertRaisesRegex(ValueError, 'expected same'):
+            self.check(*self.stamps([RP, DP], [(RP, 2048, 4096)]), expect)  # a retained sibling was revisited
+
+    def test_older_stamps_and_stale_metadata_are_rejected(self):
+        expect = {'scope': 'full'}
+        nodes, buckets = self.stamps([RP, DP], SEED_BUCKETS)
+        with self.assertRaisesRegex(ValueError, 'is older'):
+            self.check({**nodes, DP: 5}, buckets, expect)
+        with self.assertRaisesRegex(ValueError, 'advance the generation'):
+            self.check(nodes, buckets, expect, generation=2)
+        with self.assertRaisesRegex(ValueError, 'advance the generation'):
+            self.check(nodes, buckets, expect, generation=4)
+        with self.assertRaisesRegex(ValueError, 'advance the generation'):
+            self.check(nodes, buckets, expect, scanned_at=10)
+
+    def test_the_layout_of_an_unchanged_tree_cannot_change(self):
+        expect = {'scope': 'full'}
+        nodes, buckets = self.stamps([RP, DP], SEED_BUCKETS)
+        with self.assertRaisesRegex(ValueError, 'retained nodes'):
+            self.check({**nodes, b'/r/e': 20}, buckets, expect)
+        split = {key: value for key, value in buckets.items() if key != (RP, 2048, 4096)}
+        split[(RP, 2048, 3000)] = split[(RP, 3000, 4096)] = 20
+        with self.assertRaisesRegex(ValueError, 'bucket layout'):
+            self.check(nodes, split, expect)
+        wider = {key: value for key, value in buckets.items() if key != (RP, 0, 2048)}
+        wider[(RP, 0, 2049)] = 20
+        with self.assertRaisesRegex(ValueError, 'changed shape'):
+            self.check(nodes, wider, expect)
+
+    def test_empty_slot_ranges_carry_no_stamp_and_must_stay_empty(self):
+        seeded = ({RP: 10, DP: 10}, {**SEED_BUCKETS, (RP, 0, 2048): None})
+        ok = self.check({RP: 20, DP: 20}, {**SEED_BUCKETS, (RP, 0, 2048): None, (RP, 2048, 4096): 20, (DP, 0, 4096): 20}, {'scope': 'full'}, seed=seeded)
+        self.assertEqual((ok['fresh_nodes'], ok['fresh_buckets']), (2, 2))
+        with self.assertRaisesRegex(ValueError, 'changed shape'):
+            self.check({RP: 20, DP: 20}, {key: 20 for key in SEED_BUCKETS}, {'scope': 'full'}, seed=seeded)
+
+    def test_a_seed_of_another_root_is_rejected(self):
+        nodes, buckets = self.stamps([RP, DP], SEED_BUCKETS)
+        with self.assertRaisesRegex(ValueError, 'another root'):
+            self.check(nodes, buckets, {'scope': 'full'}, seed_root=b'/q')
+
+    def test_incomplete_expectations_are_refused(self):
+        nodes, buckets = self.stamps([RP, DP], SEED_BUCKETS)
+        for expect in ({'scope': 'range', 'boundary': RP}, {'scope': 'retained'}, {'scope': 'partial', 'boundary': RP}):
+            with self.assertRaisesRegex(ValueError, 'incomplete refresh expectation'):
+                self.check(nodes, buckets, expect)
+
+
+class CommandLineTest(unittest.TestCase):
+    def test_expectation_flags_and_seed_belong_together(self):
+        self.assertIsNone(oracle.expectation(oracle.parse(['b', 'c'])))
+        with self.assertRaisesRegex(ValueError, 'needs --seed'):
+            oracle.expectation(oracle.parse(['b', 'c', '--expect-scope', 'full']))
+        with self.assertRaisesRegex(ValueError, 'needs --seed'):
+            oracle.expectation(oracle.parse(['b', 'c', '--expect-window', '1', '2']))
+        with self.assertRaisesRegex(ValueError, 'needs --expect-scope'):
+            oracle.expectation(oracle.parse(['b', 'c', '--seed', 's']))
+        args = oracle.parse(['b', 'c', '--seed', 's', '--expect-scope', 'range', '--expect-boundary', '/r', '--expect-window', '4', '9'])
+        self.assertEqual(oracle.expectation(args), {'scope': 'range', 'window': [4, 9], 'boundary': b'/r'})
+
+    def test_main_reports_a_rejected_snapshot_as_json_and_a_failing_status(self):
+        import contextlib, io, json
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            status = oracle.main(['/nonexistent/baseline.db', '/nonexistent/coarse.db', '--seed', 's'])
+        self.assertEqual(status, 1)
+        self.assertEqual(json.loads(out.getvalue())['success'], False)
+
+
+class RefreshThroughVerifyTest(unittest.TestCase):
+    """verify() reports the check and refuses a snapshot that equals its seed."""
+
+    def setUp(self):
+        OracleTest.setUp(self)  # the small tree: a v1 image and its exact coarse fold, stamped 20
+        with sqlite3.connect(self.coarse) as c:
+            c.executescript('ALTER TABLE meta ADD COLUMN generation INTEGER DEFAULT 3; ALTER TABLE meta ADD COLUMN scanned_at INTEGER DEFAULT 20;')
+        self.seed = Path(self.tmp.name) / 'seed.db'
+        self.seed.write_bytes(self.coarse.read_bytes())
+        with sqlite3.connect(self.seed) as c:
+            c.executescript('UPDATE nodes SET scanned_at=10,min_scanned_at=10; UPDATE buckets SET min_scanned_at=10; '
+                            'UPDATE meta SET generation=2,scanned_at=10;')
+
+    def test_reports_the_rewritten_items(self):
+        result = oracle.verify(self.v1, self.coarse, seed=self.seed, expect={'scope': 'full'})
+        self.assertEqual((result['refresh_checked'], result['fresh_nodes'], result['fresh_buckets']), (True, 2, 2))
+        self.assertFalse(oracle.verify(self.v1, self.coarse)['refresh_checked'])
+
+    def test_a_snapshot_equal_to_its_seed_is_not_a_refresh(self):
+        with sqlite3.connect(self.coarse) as c:
+            c.executescript('UPDATE nodes SET scanned_at=10,min_scanned_at=10; UPDATE buckets SET min_scanned_at=10; UPDATE meta SET scanned_at=20;')
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):
+            oracle.verify(self.v1, self.coarse, seed=self.seed, expect={'scope': 'full'})
+
+
 if __name__ == '__main__':
     unittest.main()
