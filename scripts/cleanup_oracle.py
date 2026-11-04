@@ -171,12 +171,17 @@ def check_v2(c, v2, root, fixture, counts):
             raise ValueError('v2 fixture entry counts differ')
 
 
+def inside(path, boundary):
+    """Whether `path` is the (normalised) boundary or lies below it."""
+    return path == boundary or path.startswith(boundary.rstrip(b'/') + b'/')
+
+
 def node_rewritten(path, scope, boundary):
     """Whether an operation with this scope must have rewritten the retained node at `path`."""
     if scope == 'full':
         return True
     if scope == 'retained':
-        return path == boundary or path.startswith(boundary + b'/')
+        return inside(path, boundary)
     return path == boundary  # a range refresh re-reads only the directory that owns the buckets
 
 
@@ -184,7 +189,7 @@ def bucket_rewritten(parent, lo, hi, scope, boundary, window):
     if scope == 'full':
         return True
     if scope == 'retained':
-        return parent == boundary or parent.startswith(boundary + b'/')
+        return inside(parent, boundary)
     return parent == boundary and window[0] <= lo and hi <= window[1]
 
 
@@ -197,6 +202,8 @@ def check_refresh(c, seed, expect):
     scope, boundary, window = expect['scope'], expect.get('boundary'), expect.get('window')
     if scope not in ('full', 'retained', 'range') or (scope != 'full' and boundary is None) or (scope == 'range' and window is None):
         raise ValueError('incomplete refresh expectation')
+    if boundary is not None:
+        boundary = boundary.rstrip(b'/') or b'/'
     meta_now, meta_seed = (x.execute('SELECT root,generation,scanned_at FROM meta').fetchone() for x in (c, seed))
     if bytes(meta_now['root']) != bytes(meta_seed['root']):
         raise ValueError('seed snapshot describes another root')
@@ -206,6 +213,8 @@ def check_refresh(c, seed, expect):
     new = {bytes(r['path']): r['scanned_at'] for r in c.execute('SELECT path,scanned_at FROM nodes')}
     if old.keys() != new.keys():
         raise ValueError('operation changed the retained nodes of an unchanged tree')
+    if scope != 'full' and boundary not in new:
+        raise ValueError('the refresh boundary is not a retained node of the snapshots')
     fresh_nodes = 0
     for path, stamp in new.items():
         wanted = 'fresh' if node_rewritten(path, scope, boundary) else 'same'
@@ -217,6 +226,10 @@ def check_refresh(c, seed, expect):
     new_b = {(bytes(r['parent']), r['lo']): (r['hi'], r['min_scanned_at']) for r in c.execute(bucket_sql)}
     if old_b.keys() != new_b.keys():
         raise ValueError('operation changed the bucket layout of an unchanged tree')
+    if scope == 'range':
+        planned = old_b.get((boundary, window[0]))
+        if planned is None or planned[0] != window[1] or planned[1] is None:
+            raise ValueError('the refresh window is not a non-empty bucket of the boundary in the seed')
     fresh_buckets = 0
     for (parent, lo), (hi, stamp) in new_b.items():
         old_hi, old_stamp = old_b[(parent, lo)]
@@ -228,6 +241,8 @@ def check_refresh(c, seed, expect):
         if stamp_state(stamp, old_stamp) != wanted:
             raise ValueError(f'bucket {parent.hex()} {lo}-{hi} scan stamp is {stamp_state(stamp, old_stamp)} against the seed, expected {wanted}')
         fresh_buckets += wanted == 'fresh'
+    if fresh_nodes + fresh_buckets == 0:
+        raise ValueError('the operation rewrote nothing, so it proves nothing about a refresh')
     return {'refresh_checked': True, 'fresh_nodes': fresh_nodes, 'fresh_buckets': fresh_buckets}
 
 

@@ -268,12 +268,12 @@ class RefreshStampTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
-    def check(self, nodes, buckets, expect, generation=3, scanned_at=20, seed=None, seed_root=b'/r'):
+    def check(self, nodes, buckets, expect, generation=3, scanned_at=20, seed=None, seed_root=b'/r', root=b'/r'):
         seed_path, after_path = Path(self.tmp.name) / 'seed.db', Path(self.tmp.name) / 'after.db'
         for path in (seed_path, after_path):
             path.unlink(missing_ok=True)
         stamped(seed_path, 2, 10, *(seed or (SEED_NODES, SEED_BUCKETS)), root=seed_root)
-        stamped(after_path, generation, scanned_at, nodes, buckets)
+        stamped(after_path, generation, scanned_at, nodes, buckets, root=root)
         conns = [oracle.connect(p) for p in (after_path, seed_path)]
         for conn in conns:
             conn.row_factory = sqlite3.Row
@@ -358,6 +358,54 @@ class RefreshStampTest(unittest.TestCase):
         for expect in ({'scope': 'range', 'boundary': RP}, {'scope': 'retained'}, {'scope': 'partial', 'boundary': RP}):
             with self.assertRaisesRegex(ValueError, 'incomplete refresh expectation'):
                 self.check(nodes, buckets, expect)
+
+    def test_the_boundary_must_be_a_retained_node_of_the_snapshots(self):
+        missing = b'/r/missing'
+        for expect in ({'scope': 'retained', 'boundary': missing}, {'scope': 'range', 'boundary': missing, 'window': (0, 4096)}):
+            with self.assertRaisesRegex(ValueError, 'not a retained node'):
+                self.check(*self.stamps([RP], [(RP, 0, 2048)]), expect)  # nothing below a missing boundary can be told apart
+        self.assertEqual(self.check(*self.stamps([RP, DP], SEED_BUCKETS), {'scope': 'full'})['fresh_nodes'], 2)  # a full scan names none
+
+    def test_the_window_must_be_a_non_empty_bucket_of_the_boundary_in_the_seed(self):
+        for window in ((2048, 4000), (2000, 4096), (0, 4096), (4096, 8192)):  # short, shifted, spanning two buckets, beyond the tiling
+            with self.assertRaisesRegex(ValueError, 'not a non-empty bucket'):
+                self.check(*self.stamps([RP], [(RP, 2048, 4096)]), {'scope': 'range', 'boundary': RP, 'window': window})
+        emptied = ({RP: 10, DP: 10}, {**SEED_BUCKETS, (RP, 0, 2048): None})  # the slot range exists but holds no entries
+        with self.assertRaisesRegex(ValueError, 'not a non-empty bucket'):
+            self.check({RP: 20, DP: 10}, {**emptied[1], (RP, 2048, 4096): 10}, {'scope': 'range', 'boundary': RP, 'window': (0, 2048)}, seed=emptied)
+        with self.assertRaisesRegex(ValueError, 'not a non-empty bucket'):  # the window belongs to another directory's buckets
+            self.check(*self.stamps([DP], [(DP, 0, 4096)]), {'scope': 'range', 'boundary': DP, 'window': (2048, 4096)})
+        self.assertEqual(self.check(*self.stamps([DP], [(DP, 0, 4096)]), {'scope': 'range', 'boundary': DP, 'window': [0, 4096]})['fresh_buckets'], 1)
+
+    def test_a_boundary_is_normalised_before_it_is_compared(self):
+        self.assertEqual(self.check(*self.stamps([DP], [(DP, 0, 4096)]), {'scope': 'retained', 'boundary': b'/r/d/'})['fresh_nodes'], 1)
+        ranged = {'scope': 'range', 'boundary': b'/r//', 'window': (2048, 4096)}
+        self.assertEqual(self.check(*self.stamps([RP], [(RP, 2048, 4096)]), ranged), {'refresh_checked': True, 'fresh_nodes': 1, 'fresh_buckets': 1})
+
+    def test_a_sibling_that_shares_the_boundary_prefix_is_outside_it(self):
+        sibling = b'/r/dx'
+        seeded = ({**SEED_NODES, sibling: 10}, {**SEED_BUCKETS, (sibling, 0, 4096): 10})
+        nodes, buckets = {**seeded[0], DP: 20}, {**seeded[1], (DP, 0, 4096): 20}
+        expect = {'scope': 'retained', 'boundary': DP}
+        self.assertEqual(self.check(nodes, buckets, expect, seed=seeded), {'refresh_checked': True, 'fresh_nodes': 1, 'fresh_buckets': 1})
+        with self.assertRaisesRegex(ValueError, 'expected same'):
+            self.check({**nodes, sibling: 20}, buckets, expect, seed=seeded)
+        with self.assertRaisesRegex(ValueError, 'expected same'):
+            self.check(nodes, {**buckets, (sibling, 0, 4096): 20}, expect, seed=seeded)
+
+    def test_the_root_boundary_covers_every_retained_node(self):
+        top, below = b'/', b'/d'
+        seeded = ({top: 10, below: 10}, {(top, 0, 4096): 10, (below, 0, 4096): 10})
+        fresh = ({top: 20, below: 20}, {(top, 0, 4096): 20, (below, 0, 4096): 20})
+        for boundary in (b'/', b'//'):
+            result = self.check(*fresh, {'scope': 'retained', 'boundary': boundary}, seed=seeded, seed_root=b'/', root=b'/')
+            self.assertEqual(result, {'refresh_checked': True, 'fresh_nodes': 2, 'fresh_buckets': 2})
+        with self.assertRaisesRegex(ValueError, 'expected fresh'):  # a node below the root was not rewritten
+            self.check({top: 20, below: 10}, fresh[1], {'scope': 'retained', 'boundary': b'/'}, seed=seeded, seed_root=b'/', root=b'/')
+
+    def test_an_operation_that_rewrote_nothing_proves_nothing(self):
+        with self.assertRaisesRegex(ValueError, 'rewrote nothing'):
+            self.check({}, {}, {'scope': 'full'}, seed=({}, {}))
 
 
 class CommandLineTest(unittest.TestCase):

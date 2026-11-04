@@ -1,4 +1,3 @@
-import copy
 import json
 import tempfile
 from unittest.mock import patch

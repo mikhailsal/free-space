@@ -18,18 +18,23 @@ import math
 import re
 import statistics
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 PROFILES = ('files', 'directories')
 SCENARIOS = ('full', 'retained', 'omitted', 'wide')
 ARMS = ('v1', 'probe')
+CELLS = tuple(f'{p}/{s}' for p in PROFILES for s in SCENARIOS)
 METRICS = ('cgroup_memory_peak_bytes', 'process_peak_rss_kib', 'worker_elapsed_seconds', 'command_elapsed_seconds',
            'sampled_output_peak_estimate_bytes', 'final_allocated_output_bytes', 'peak_disk_bytes')
 MIB, KIB = 1024 ** 2, 1024
 # Noise floors: a difference counts only when it exceeds BOTH the relative and the absolute floor, which is the same as
-# allowing max(relative * v1, absolute) of difference.
-FLOORS = {'time': (0.05, 0.05), 'memory': (0.02, MIB), 'disk': (0.05, 4 * KIB)}
-BAR = {'speed': 0.15, 'rss': 0.25, 'disk': 0.25, 'full_scan_slowdown': 0.15, 'ram_exchange_bytes': 256 * MIB}
+# allowing max(relative * v1, absolute) of difference. Every comparison is exact (Fractions of the decimal values as
+# written), so a tie such as 1.05 s against 1.00 s is a tie and not a float rounding error beyond the floor.
+FLOORS = {'time': (Fraction('0.05'), Fraction('0.05')), 'memory': (Fraction('0.02'), Fraction(MIB)),
+          'disk': (Fraction('0.05'), Fraction(4 * KIB))}
+BAR = {'speed': Fraction('0.15'), 'rss': Fraction('0.25'), 'disk': Fraction('0.25'), 'full_scan_slowdown': Fraction('0.15'),
+       'ram_exchange_bytes': 256 * MIB}
 # The sampler looks at the output filesystem every 50 ms, so a transient shorter than that can be missed. Publishing a
 # snapshot holds at most four snapshot-sized files at once (current, previous, the copy that becomes previous, and the
 # new one), so the probe's disk is judged at four times its observed value; v1 is judged at its observed value, which can
@@ -64,6 +69,13 @@ def number(value, label):
 
 # ---------------------------------------------------------------- the bars (pure functions, frozen with the source)
 
+def exact(value):
+    """The number as written: a float is read through its shortest repr, so 0.07 is 7/100 and not a binary neighbour."""
+    if isinstance(value, Fraction):
+        return value
+    return Fraction(str(value)) if isinstance(value, float) else Fraction(value)
+
+
 def metric_value(row, kind, arm):
     """Value of a metric as a bar judges it, in its natural unit (seconds, bytes)."""
     if kind == 'disk':
@@ -78,6 +90,7 @@ def floors_kind(kind):
 def direction(base, probe, kind):
     """+1 when the probe is worse beyond noise, -1 when better beyond noise, 0 when within the floors."""
     relative, absolute = FLOORS[floors_kind(kind)]
+    base, probe = exact(base), exact(probe)
     diff = probe - base
     if abs(diff) <= absolute or (base > 0 and abs(diff) / base <= relative):
         return 0
@@ -85,7 +98,8 @@ def direction(base, probe, kind):
 
 
 def change(base, probe):
-    return None if base == 0 else (probe - base) / base
+    base = exact(base)
+    return None if base == 0 else (exact(probe) - base) / base
 
 
 def non_inferior(pairs, kind):
@@ -95,6 +109,7 @@ def non_inferior(pairs, kind):
 
 def confirmed_benefit(pairs, kind, bar):
     """All repeats better beyond noise, each by at least `bar`, and so is the median."""
+    bar = exact(bar)
     changes = [change(b, p) for b, p in pairs]
     return (all(c is not None and -c >= bar for c in changes) and all(direction(b, p, kind) < 0 for b, p in pairs)
             and -statistics.median(changes) >= bar)
@@ -119,7 +134,7 @@ def full_scan_bar(pairs_time, others, memory_flagged=False):
         if kind != 'disk' and memory_flagged:
             continue
         if confirmed_benefit(pairs, kind, 2 * worst) and all(b - p >= saved for b, p in pairs):
-            return 'passed', f'exchange: confirmed {name} reduction of at least {2 * worst:.1%} (twice the worst slowdown)'
+            return 'passed', f'exchange: confirmed {name} reduction of at least {float(2 * worst):.1%} (twice the worst slowdown)'
     if memory_flagged:
         return 'inconclusive', 'slowdown beyond noise; memory exchanges cannot be judged under a memory flag'
     return 'failed', 'slowdown beyond noise without a qualifying exchange'
@@ -148,22 +163,62 @@ def judge_group(rows_by_arm, scenario):
         out['D4_reason'] = why
     else:
         out['D6_refresh_no_slowdown'] = verdict(non_inferior(pairs['time'], 'time'), False)
-    out['median_change'] = {k: statistics.median([change(b, p) for b, p in v]) if all(b for b, _ in v) else None for k, v in pairs.items()}
+    # Reports only. `judged` carries the probe's disk at the 4x factor the bars use; `observed` carries it as measured.
+    out['judged_median_change'] = median_changes(pairs)
+    out['observed_median_change'] = median_changes({**pairs, 'disk': [(a['peak_disk_bytes'], b['peak_disk_bytes']) for a, b in zip(v1, probe)]})
     return out
 
 
+def median_changes(pairs):
+    """Median relative change per metric as plain floats for the report; no bar reads it."""
+    return {kind: float(statistics.median([change(b, p) for b, p in v])) if all(b for b, _ in v) else None for kind, v in pairs.items()}
+
+
+def gate_status(verdicts):
+    """One gate over its cells: failed if any failed, passed only if every one passed, otherwise inconclusive (also empty)."""
+    if any(v == 'failed' for v in verdicts):
+        return 'failed'
+    return 'passed' if verdicts and all(v == 'passed' for v in verdicts) else 'inconclusive'
+
+
 def overall(groups):
-    """The pre-registered success rule: every non-inferiority bar passed everywhere, and one benefit bar confirmed."""
+    """The pre-registered success rule: every non-inferiority bar passed in every cell it applies to, and one benefit bar
+    confirmed. All eight profile/scenario cells must be present, so no gate can pass by being left out."""
+    require(set(groups) == set(CELLS), 'every profile and scenario must be judged exactly once')
     gates = ('D2_peak_disk_no_increase', 'D3_rss_no_increase', 'D6_refresh_no_slowdown', 'D4_full_scan_limit_and_exchange')
     status = {gate: [g[gate] for g in groups.values() if gate in g] for gate in gates}
-    non_inferiority = {gate: ('failed' if any(v == 'failed' for v in vals) else
-                              'passed' if vals and all(v == 'passed' for v in vals) else 'inconclusive')
-                       for gate, vals in status.items()}
+    non_inferiority = {gate: gate_status(vals) for gate, vals in status.items()}
     benefits = sorted({f'{name}:{bar}' for name, g in groups.items() for bar in
                        ('D8_speed_benefit_15pct', 'D9_rss_benefit_25pct', 'D10_disk_benefit_25pct') if g[bar] == 'passed'})
     return {'non_inferiority': non_inferiority, 'confirmed_benefits': benefits,
             'success': all(v == 'passed' for v in non_inferiority.values()) and bool(benefits),
             'open_by_design': ['D3 minimum tested successful memory budget (not measured)', 'D11 capacity alternative (not measured)']}
+
+
+def report_bars(groups, judged):
+    """Per-bar verdicts as reported. The smoke has one pair per cell and judges nothing, so it must never print 'passed'."""
+    return groups if judged else {cell: 'not judged: the smoke has one pair per cell' for cell in groups}
+
+
+def predictions(tables):
+    """The predictions recorded before any run, scored hit or miss per cell on the medians of the same run. They are
+    reported beside `overall` and never change it: `overall` is the verdict, a miss here is a surprise about the idea."""
+    scored = {}
+    for cell, t in tables.items():
+        scenario = cell.split('/')[1]
+        v1, probe = t['v1'], t['probe']
+        v1_time, probe_time = exact(v1['command_elapsed_seconds']), exact(probe['command_elapsed_seconds'])
+        checks = {'rss_lower_than_v1': exact(probe['process_peak_rss_kib']) < exact(v1['process_peak_rss_kib']),
+                  'disk_at_4x_under_a_tenth_of_v1': exact(probe['peak_disk_bytes']) * PROBE_DISK_FACTOR * 10 < exact(v1['peak_disk_bytes']),
+                  'snapshot_pair_under_1_mib': exact(probe['final_allocated_output_bytes']) < MIB}
+        if scenario == 'full':
+            checks['faster_than_v1'] = probe_time < v1_time
+        elif scenario == 'retained':
+            checks['under_a_tenth_of_v1_and_0.1_s'] = probe_time * 10 < v1_time and probe_time < Fraction(1, 10)
+        else:
+            checks['under_a_tenth_of_v1_and_1_s'] = probe_time * 10 < v1_time and probe_time < 1
+        scored[cell] = checks
+    return {'cells': scored, 'all_hit': all(all(c.values()) for c in scored.values())}
 
 
 # ---------------------------------------------------------------- artifact validation and plumbing
@@ -342,11 +397,11 @@ def check_arm_row(row, arm, scenario, fixture, stage, ident, oracle):
         require(got == want, f'{ident}: unexpected scope {got} != {want}')
         require(row['reported_retained_nodes'] == oracle['retained'], ident + ': retained count differs from independent oracle')
         require(row['reported_buckets'] == oracle['buckets'], ident + ': bucket count differs from independent oracle')
-    else:
+    elif scenario == 'full':
         require(row['reported_entries'] == entries, ident + ': wrong full entry count')
-        if scenario != 'full':
-            want = {'retained': 74, 'omitted': 100, 'wide': 1001}[scenario]
-            require(row['reported_subtree_entries'] == want, ident + ': wrong refresh size')
+    else:  # a v1 refresh reports the size of the refreshed subtree; the plan asks the worker for nothing else
+        want = {'retained': 74, 'omitted': 100, 'wide': 1001}[scenario]
+        require(row['reported_subtree_entries'] == want, ident + ': wrong refresh size')
 
 
 def analyze(root, smoke_root=None):
@@ -397,8 +452,10 @@ def analyze(root, smoke_root=None):
     return {'valid': True, 'stage': stage, 'source_sha': manifest.get('source_sha'), 'timed_cases': len(expected),
             'seed_cases_excluded': len(seeds), 'rounds': rounds, 'bars_are_judged': judged,
             'memory_ceiling_mib': 8192, 'runtime_provenance': runtime, 'disk_calibration': disk_calibration,
-            'fixtures': fixtures, 'medians_and_repeats': tables, 'bars': groups,
+            'fixtures': fixtures, 'medians_and_repeats': tables,
+            'bars': report_bars(groups, judged),
             'overall': overall(groups) if judged else 'not evaluated (the smoke checks the protocol only; one pair cannot confirm a bar)',
+            'predictions': predictions(tables) if judged else 'not scored (the smoke has one pair per cell)',
             'notes': ['Elapsed time is the GNU command wall time (0.01 s resolution); worker elapsed time is kept alongside.',
                       f'Peak disk is the larger of the sampled output peak (a lower bound) and the final allocated output; the probe is judged at {PROBE_DISK_FACTOR}x that value.',
                       'RSS is the writer process peak; cgroup memory includes cache and slab and is reported separately.',

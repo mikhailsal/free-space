@@ -41,6 +41,14 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_cleanup*.py'
           python3 -m compileall -q scripts/cleanup_probe_*.py scripts/cleanup_oracle.py scripts/cleanup_buckets.py
+      # The repository has no Python linter, so this probe's scripts get pyflakes (unused names, undefined names,
+      # shadowed tests). Scoped to the probe's own files; the version is pinned, the virtualenv is needed because
+      # the runner's system Python refuses pip installs.
+      - name: Python lint
+        run: |
+          python3 -m venv "$RUNNER_TEMP/lint"
+          "$RUNNER_TEMP/lint/bin/pip" install --quiet pyflakes==3.3.2
+          "$RUNNER_TEMP/lint/bin/python" -m pyflakes scripts/cleanup_*.py scripts/tests/test_cleanup*.py
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt, clippy

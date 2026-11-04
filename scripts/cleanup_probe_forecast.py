@@ -5,7 +5,6 @@ import json
 import math
 import os
 from pathlib import Path
-import sys
 import time
 
 import cleanup_probe_plan as plan

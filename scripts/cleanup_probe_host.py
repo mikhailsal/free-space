@@ -33,6 +33,32 @@ def command(arm, operation, target):
     return ['/binary', '--backend', arm, operation, target, '--workers', '1', '--json'] + (['--low-memory'] if operation == 'scan' else [])
 
 
+def container_state(name):
+    """`State` of the named container, or None when `docker run` died before any container existed."""
+    done = subprocess.run(['docker','inspect',name],capture_output=True,text=True,timeout=15)
+    return json.loads(done.stdout)[0]['State'] if done.returncode == 0 else None
+
+
+def remove_container(name):
+    """Best effort from a `finally`: it must not hide the error in flight. The runner's label cleanup is the backstop."""
+    try:
+        done = subprocess.run(['docker','rm','-f',name],timeout=30,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+    except subprocess.TimeoutExpired:
+        print(f'warning: docker rm -f {name} timed out',file=sys.stderr)
+    else:
+        if done.returncode:
+            print(f'warning: docker rm -f {name} failed: {done.stderr.strip()}',file=sys.stderr)
+
+
+def read_verdict(path):
+    """The oracle's JSON verdict; output that is not a JSON object (docker died first) counts as no verdict."""
+    try:
+        verdict = json.loads(path.read_text())
+    except ValueError:
+        return {}
+    return verdict if isinstance(verdict, dict) else {}
+
+
 def run_container(args, arm, operation, target, tree, case, out, ident, seconds, expected_scope):
     binary = Path('binaries/cleanup_probe' if arm == 'probe' else 'binaries/freespace').resolve(strict=True)
     dev = os.stat(args.io_device).st_rdev
@@ -59,14 +85,16 @@ def run_container(args, arm, operation, target, tree, case, out, ident, seconds,
     try:
         with (out/(ident+'.docker.log')).open('w') as log:
             result = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, timeout=seconds+90)
-        state = json.loads(subprocess.check_output(['docker','inspect',name],text=True,timeout=15))[0]['State']
-        (out/ident/'docker-state.json').write_text(json.dumps(state,indent=2)+'\n')
-        if result.returncode or state.get('OOMKilled'):
+        state = container_state(name)
+        if state is not None:
+            (out/ident/'docker-state.json').write_text(json.dumps(state,indent=2)+'\n')
+        if result.returncode or state is None or state.get('OOMKilled'):
+            why = 'no such container' if state is None else 'out of memory' if state.get('OOMKilled') else f'exit status {result.returncode}'
             tail=(out/(ident+'.docker.log')).read_text(errors='replace')[-1500:]
-            raise RuntimeError('writer failed '+ident+': '+tail)
+            raise RuntimeError(f'writer failed {ident} ({why}): {tail}')
         return json.loads((out/ident/'metrics.json').read_text())
     finally:
-        subprocess.run(['docker','rm','-f',name],check=True,timeout=30,stdout=subprocess.DEVNULL)
+        remove_container(name)
 
 
 def oracle(args, cases, seed, expectation, out, ident, seconds):
@@ -89,10 +117,12 @@ def oracle(args, cases, seed, expectation, out, ident, seconds):
     try:
         with (out/(ident+'.json')).open('w') as stdout, (out/(ident+'.log')).open('w') as stderr:
             result=subprocess.run(cmd,stdout=stdout,stderr=stderr,timeout=seconds)
-        if result.returncode or json.loads((out/(ident+'.json')).read_text()).get('success') is not True:
-            raise ValueError('oracle rejected '+ident)
+        verdict=read_verdict(out/(ident+'.json'))
+        if result.returncode or verdict.get('success') is not True:
+            detail=verdict.get('error') or (out/(ident+'.log')).read_text(errors='replace')[-1500:].strip() or 'no verdict'
+            raise ValueError(f'oracle rejected {ident}: {detail}')
     finally:
-        subprocess.run(['docker','rm','-f',name],check=True,timeout=30,stdout=subprocess.DEVNULL)
+        remove_container(name)
 
 
 def preserve_evidence(cases, out, profile):
