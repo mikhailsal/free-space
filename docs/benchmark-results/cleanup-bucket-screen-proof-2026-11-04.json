@@ -1,0 +1,207 @@
+{
+  "experiment": "cleanup-bucket-probe",
+  "protocol": "cleanup-threshold-roomy-v2",
+  "source_revision": "ba8281f0a035509019f49459ff69b6a7b5bd2e11",
+  "source_branch": "perf/cleanup-bucket-probe",
+  "baseline_revision": "afce6fdfc007a2c6914cab61aab4d84daccbb99b",
+  "workflow": {
+    "file": "v2-balance.yml",
+    "workflow_id": 397616649
+  },
+  "smoke": {
+    "run_id": 41912961869,
+    "job_seconds": 565,
+    "github_artifact": {
+      "id": 13363812270,
+      "name": "cleanup-threshold-smoke",
+      "size_in_bytes": 95727845,
+      "digest": "sha256:47ec099c3b9aae92f8f84320871adfce368e87e324be55ec22dd89a6e00e8265",
+      "expired": false
+    },
+    "full_github_zip_independently_hashed": false,
+    "capsule": "cleanup-bucket-smoke-2026-11-04.tar.gz",
+    "analysis": "cleanup-bucket-smoke-analysis-2026-11-04.json",
+    "judged": false,
+    "run_attempt": 1,
+    "head_sha": "ba8281f0a035509019f49459ff69b6a7b5bd2e11"
+  },
+  "screen": {
+    "run_id": 41916505663,
+    "job_id": 126877516823,
+    "job_started_at": "2026-11-04T21:29:09Z",
+    "job_completed_at": "2026-11-04T22:44:07Z",
+    "job_seconds": 4498,
+    "measured_step_seconds": 4238,
+    "manifest_elapsed_seconds": 4191.4739992429995,
+    "conclusion": "success",
+    "run_attempt": 1,
+    "github_artifact": {
+      "id": 13369613690,
+      "name": "cleanup-threshold-screen",
+      "size_in_bytes": 92197922,
+      "digest": "sha256:b950e6e2fd66973971a0890eec477213185efa916452880b91901c17ba5d36b2",
+      "expired": false
+    },
+    "full_github_zip_independently_hashed": true,
+    "zip_sha256_matches_github_digest": true,
+    "capsule": {
+      "path": "cleanup-bucket-screen-2026-11-04.tar.gz",
+      "sha256": "27a745bcca41c56c28cd8d5abbaf04c26cf1a1227ee7ecf3b09ff76b6e6a76b8",
+      "bytes": 154447,
+      "contents": "every artifact member under 300 KB except source/ (which is byte-identical to git), SHA256SUMS of the members and ZIP-INVENTORY.txt (sizes and CRC-32 of every member of the original ZIP, including the omitted payloads)",
+      "omitted_large_payloads": [
+        "measurements/snapshot-evidence/files-v1.db.gz (v1 snapshot of the files profile, 46,456,126 bytes)",
+        "measurements/snapshot-evidence/directories-v1.db.gz (v1 snapshot of the directories profile, 48,113,728 bytes)",
+        "provenance/freespace (10,558,208 bytes)",
+        "provenance/cleanup_probe (3,769,536 bytes)"
+      ]
+    },
+    "analysis": "cleanup-bucket-screen-analysis-2026-11-04.json",
+    "points": "cleanup-bucket-screen-points-2026-11-04.csv",
+    "in_job_admission": {
+      "admitted": true,
+      "projected_host_seconds": 4419.822406099999,
+      "projected_host_with_30pct": 5745.769127929999,
+      "measured_step_cap_seconds": 12600,
+      "whole_job_cap_seconds": 14400
+    },
+    "head_sha": "ba8281f0a035509019f49459ff69b6a7b5bd2e11"
+  },
+  "preflight_admission": "cleanup-bucket-screen-preflight-2026-11-04.json",
+  "preregistration": {
+    "path": "cleanup-bucket-preregistration-2026-11-04.md",
+    "sha256": "ebc013259b64f9772a1475cab7483f6a680935a6d239cba2ed3e15f444fbe979",
+    "identical_to": "docs/designs/cleanup-bucket-experiment.md at commit ba8281f on perf/cleanup-bucket-probe",
+    "committed_before_any_measurement_of_this_source": true
+  },
+  "frozen_analysis_script": {
+    "path": "cleanup-bucket-analysis-2026-11-04.py",
+    "sha256": "b7aa8ba3a2bb3aca5bc041633949de935bfe103875d702b66654953a6031323b",
+    "identical_in": [
+      "git commit ba8281f (scripts/cleanup_probe_analysis.py)",
+      "smoke artifact source/scripts/cleanup_probe_analysis.py",
+      "screen artifact source/scripts/cleanup_probe_analysis.py"
+    ],
+    "invocation": "python3 scripts/cleanup_probe_analysis.py <screen artifact root> --smoke-root <smoke artifact root>",
+    "modified_after_results": false
+  },
+  "source_validation": {
+    "captured_source_files": 229,
+    "all_bytes_match_git_at_source_revision": true,
+    "same_binary_hashes_in_smoke_and_screen": true,
+    "binaries": {
+      "freespace": "4458acb6609ca7ce9e635675a19c607441e0e73d85410b752a85cde1e05a33d7",
+      "cleanup_probe": "ca4f3e3c7a559438409335ae608087c604e548355c2a00482e35cc480f5dcd04"
+    },
+    "same_runtime_image_id_in_smoke_and_screen": true,
+    "runtime_image_id": "sha256:d26357cae7781ad64f692bddfee50867a7a00d9f2d568f024eac0f4427a05698",
+    "smoke_and_screen_captured_source_identical": true,
+    "v1_source_unchanged_against_master": {
+      "master": "afce6fdfc007a2c6914cab61aab4d84daccbb99b",
+      "changed_top_level_paths": "docs/, scripts/, .github/workflows/, cli/examples/cleanup_probe/, cli/Cargo.toml (six-line [[example]] entry); nothing under core/, cli/src/ or web/, no dependency or lockfile change",
+      "check": "git diff --name-only afce6fd ba8281f"
+    }
+  },
+  "integrity": {
+    "analysis_valid": true,
+    "timed_cases": 48,
+    "seed_cases_excluded": 8,
+    "cases_in_manifest": 56,
+    "cases_validated": 56,
+    "memory_comparison_inconclusive_cases": 0,
+    "scope_or_sampler_errors": 0,
+    "non_zero_exit_codes": 0,
+    "memory_cap_or_reclaim_events": 0,
+    "per_case_checks": "read directly from the 56 measurements/<id>/metrics.json files: scope_errors, sample_errors, exit_code, memory_events_max_delta, reclaim_counter_deltas and memory_comparison_inconclusive are all empty, zero or false; validated is true in all 56",
+    "oracle_verdicts": 24,
+    "oracle_success": 24,
+    "oracle_refresh_checked": 24,
+    "retained_nodes_per_snapshot": 9,
+    "buckets_per_snapshot": 259,
+    "runner_cleanup": {
+      "success": true,
+      "exit_code": 0
+    },
+    "io_envelope": "direct-loop calibration within the requested 32 MiB/s and 2,200/3,600 read/write IOPS ceiling; physical equivalence to a local disk is not inferred",
+    "probe_disk_per_run": "Judged peak estimate per probe run: 20 of 24 at 77,824 B (76 KiB), three at 73,728 B (72 KiB: directories retained repeat 1, omitted repeat 2, wide repeat 2), one at 94,208 B (92 KiB: directories wide repeat 3, a sampled in-flight publication that ended at 77,824 B). Final allocation: 21 runs at 77,824 B, three at 73,728 B. Output is coarse.db (36,864 or 40,960 B) plus coarse.prev.db (36,864 B); two runs also sampled .coarse.tmp/.coarse.tmp-journal in flight; the zero-byte .coarse.lock allocates nothing.",
+    "retained_nodes_both_profiles": [
+      "/scratch/tree (root)",
+      "bulk",
+      "large",
+      "large/above",
+      "large/deep",
+      "large/deep/deeper",
+      "large/deep/deeper/large",
+      "large/equalish",
+      "large/group"
+    ],
+    "retained_nodes_source": "nodes table of the preserved snapshot-evidence probe databases (files-probe.db.gz and directories-probe.db.gz): 9 nodes and 259 bucket rows, 2 of them empty, in each profile",
+    "non_utf8_fixture_name": "large/raw-\\xff (raw_name_hex in the analysis fixtures); an omitted child of large, hence folded into a bucket; walked by every full scan and every retained refresh of large",
+    "container_cpu": "docker run --cpus 2 in scripts/cleanup_probe_host.py; cgroup cpu.max \"200000 100000\" in the recorded per-case cgroup files",
+    "job_calibration": "artifact disk-calibration.json (benchmark label freespace.benchmark=41916505663-1-experiment): write 33,530,960 of 33,554,432 B/s, read 33,517,562 of 33,554,432 B/s, randwrite 3,599.38 of 3,600 IOPS, randread 2,199.66 of 2,200 IOPS; largest shortfall 0.11%; \"profile: local\" names the I/O profile, scope \"runner-only direct I/O; synthetic envelope, not local calibration\"",
+    "probe_file_logical_sizes": "coarse.db and coarse.prev.db are 36,864 B logical in all 24 probe runs and the final logical total is 73,728 B in all 24; only the allocation varies (one extra 4 KiB block on coarse.db in most runs)",
+    "report_tables_checked_against_analysis_json": "80 absolute, 40 matched-change and 56 bar cells of the final report compared by script with the analysis JSON: 0 mismatches; the per-repeat time sentence, the quoted script hash and image id abbreviation also match",
+    "per_repeat_consistency": "paired per-repeat changes in time, RSS and judged disk have the same sign and the same pass/fail against the 15/25/25% benefit thresholds in all three repeats of all eight cells; directories/full time changes are -8.18, -8.18 and -8.02%",
+    "seed_sharing": "host builds one seed per arm per profile (two full scans) and copies it before every timed command; all twelve timed commands of an arm in a profile share it"
+  },
+  "verdict": {
+    "overall_success": true,
+    "D2_D3_all_eight_cells": "passed",
+    "D6_six_refresh_cells": "passed",
+    "D4_two_full_scan_cells": "passed (no slowdown beyond noise; no exchange needed)",
+    "confirmed_benefit_bars": "23 of 24 (D8 not confirmed for directories/full: -8.2% against the 15% bar)",
+    "predictions_hit": "31 of 32 (miss: directories/wide, median 1.07 s is 9.8% of v1's 10.91 s but not under 1 s)",
+    "open_by_design": [
+      "D3 minimum tested successful memory budget (not measured)",
+      "D11 capacity alternative (not measured)"
+    ]
+  },
+  "runner_seconds": {
+    "experiment_dispatches": 5063,
+    "dev_ci_runs": 229,
+    "total": 5292,
+    "note": "dev CI runs 41862794363 (75 s), 41867971081 (46 s), 41886334191 (54 s) and 41912449392 (54 s) are counted here although the earlier threshold experiment's ledger entries did not count CI runs"
+  },
+  "qualification": false,
+  "reviews": {
+    "source_review_archive": "cleanup-bucket-reviews-2026-11-04.tar.gz",
+    "model": "claude-opus-5-5",
+    "rounds": 5,
+    "round_4": {
+      "when": "after the runs",
+      "scope": "the results report with its evidence and, for the first time, the ba8281f delta over 0942a50",
+      "verdict_A": "publish after the listed fixes (1 P1, 7 P2, 7 P3); applied to the report, with two of them (the evidence-list wording and the cell count parenthesis) completed after round 5 found them incomplete",
+      "verdict_B": "nothing in the delta puts the reported verdict in doubt (9 P3, disclosed in the report)",
+      "model_verification": "init event, every assistant message and modelUsage name only claude-opus-5-5; one turn; no permission denials"
+    },
+    "archive": {
+      "path": "cleanup-bucket-reviews-2026-11-04.tar.gz",
+      "sha256": "ffc8e2ec80592b15fb182d0c0beaff4a1f32f5bf7f36d1389f1b0d5a1e664965",
+      "bytes": 844329,
+      "members": "prompt, input, extracted result and raw claude output for each of rounds 1 to 5 (roundN-prompt.txt, roundN-input.txt, roundN-result.md, roundN-claude-output.json); the inputs are what the reviewer saw, so the round-5 input contains the report before the round-5 fixes"
+    },
+    "model_verification_all_rounds": "for rounds 1 to 5, re-checked from the archived claude outputs: init event, every assistant message and modelUsage name only claude-opus-5-5; num_turns 1; no tools available at init and none used; no permission denials; no error",
+    "round_5": {
+      "when": "after the corrections made for round 4",
+      "scope": "the corrected report against the round-4 findings, with the analysis JSON, points, proof, pre-registration, independent check with its output and a list of author-checked facts (no code delta)",
+      "round_4_disposition": "13 fixed, 1 fixed but worded incorrectly, 1 partly fixed",
+      "decision": "publish after the listed fixes: 12 new findings (3 P2, 9 P3), all wording or disclosure; the reviewer found no table, bar, overall or prediction error and judged the verdict section faithful to the pre-registration",
+      "applied": "all 12 new findings applied to the report; the resulting text was checked by the author against the artifacts but not model-reviewed",
+      "verified_by_author_after_the_review": [
+        "the nine retained nodes",
+        "the 2-CPU limit",
+        "the job calibration",
+        "the logical sizes of the two probe database files",
+        "the model identity, turn count and tool absence of all five rounds"
+      ]
+    }
+  },
+  "independent_check": {
+    "path": "cleanup-bucket-independent-check-2026-11-04.py",
+    "sha256": "3d539f5e879f11b1209b006fb1006183f1b0cdacd89bb53a6ff5fd1d0bb7d18b",
+    "result": "extraction: 48 rows x 7 fields re-derived from the raw time.json and metrics.json files of the capsule, no mismatch; verdict: 48 bar verdicts and 32 predictions recomputed from the points file, no disagreement; overall success agrees; the single prediction miss is directories/wide",
+    "reproduction": "unpack cleanup-bucket-screen-2026-11-04.tar.gz into a directory and run the script with --capsule <directory> from the docs directory",
+    "reviewed_by_model": "the verdict half (as /tmp/independent_recompute.py, reading the points file) was part of the round-4 review input; the extraction half and the path parametrisation were added afterwards; the whole script and its output were part of the round-5 input, whose reviewer did not have the raw per-case files the extraction half reads",
+    "not_implemented": "the exchange branch of D4 and the memory-flag rule; neither was reached in this run (no repeat slower beyond noise, no memory flag)"
+  }
+}

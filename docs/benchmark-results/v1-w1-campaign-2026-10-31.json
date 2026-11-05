@@ -61,7 +61,13 @@
     41373680085,
     41476363033,
     41482637607,
-    41485277207
+    41485277207,
+    41862794363,
+    41867971081,
+    41886334191,
+    41912449392,
+    41912961869,
+    41916505663
   ],
   "runs": [
     {
@@ -3168,13 +3174,187 @@
       "qualification": false,
       "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41485277207",
       "job_seconds": 7762.0
+    },
+    {
+      "run_id": 41862794363,
+      "case_id": "cleanup-bucket-probe-ci-1",
+      "revision": "b141a3e6ac90f0002f934bf0de835b1ad481c773",
+      "stage": "dev-ci",
+      "workflow_id": 407106048,
+      "workflow_file": "cleanup-ci.yml",
+      "branch": "perf/cleanup-bucket-probe",
+      "maximum_job_seconds": 1800,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 75.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 126688953173,
+          "name": "probe",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-04T15:56:43Z",
+          "completed_at": "2026-11-04T15:57:58Z",
+          "seconds": 75.0
+        }
+      ],
+      "scientific_kind": "development-ci",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41862794363",
+      "job_seconds": 75.0
+    },
+    {
+      "run_id": 41867971081,
+      "case_id": "cleanup-bucket-probe-ci-2",
+      "revision": "59a977f0e1e941ddcb7c76b17d8cf2b7d4f3fcc0",
+      "stage": "dev-ci",
+      "workflow_id": 407106048,
+      "workflow_file": "cleanup-ci.yml",
+      "branch": "perf/cleanup-bucket-probe",
+      "maximum_job_seconds": 1800,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 46.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 126707049681,
+          "name": "probe",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-04T16:30:54Z",
+          "completed_at": "2026-11-04T16:31:40Z",
+          "seconds": 46.0
+        }
+      ],
+      "scientific_kind": "development-ci",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41867971081",
+      "job_seconds": 46.0
+    },
+    {
+      "run_id": 41886334191,
+      "case_id": "cleanup-bucket-probe-ci-3",
+      "revision": "0942a50118cdf1ef4e9236d3c98050fe818e454d",
+      "stage": "dev-ci",
+      "workflow_id": 407106048,
+      "workflow_file": "cleanup-ci.yml",
+      "branch": "perf/cleanup-bucket-probe",
+      "maximum_job_seconds": 1800,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 54.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 126771680228,
+          "name": "probe",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-04T18:21:29Z",
+          "completed_at": "2026-11-04T18:22:23Z",
+          "seconds": 54.0
+        }
+      ],
+      "scientific_kind": "development-ci",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41886334191",
+      "job_seconds": 54.0
+    },
+    {
+      "run_id": 41912449392,
+      "case_id": "cleanup-bucket-probe-ci-4",
+      "revision": "ba8281f0a035509019f49459ff69b6a7b5bd2e11",
+      "stage": "dev-ci",
+      "workflow_id": 407106048,
+      "workflow_file": "cleanup-ci.yml",
+      "branch": "perf/cleanup-bucket-probe",
+      "maximum_job_seconds": 1800,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 54.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 126863277984,
+          "name": "probe",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-04T21:03:35Z",
+          "completed_at": "2026-11-04T21:04:29Z",
+          "seconds": 54.0
+        }
+      ],
+      "scientific_kind": "development-ci",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41912449392",
+      "job_seconds": 54.0
+    },
+    {
+      "run_id": 41912961869,
+      "case_id": "cleanup-bucket-smoke",
+      "revision": "ba8281f0a035509019f49459ff69b6a7b5bd2e11",
+      "stage": "smoke",
+      "workflow_id": 397616649,
+      "workflow_file": "v2-balance.yml",
+      "branch": "perf/cleanup-bucket-probe",
+      "maximum_job_seconds": 3600,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 565.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 126865054677,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-04T21:06:44Z",
+          "completed_at": "2026-11-04T21:16:09Z",
+          "seconds": 565.0
+        }
+      ],
+      "scientific_kind": "cleanup-bucket-exploratory",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41912961869",
+      "job_seconds": 565.0
+    },
+    {
+      "run_id": 41916505663,
+      "case_id": "cleanup-bucket-screen",
+      "revision": "ba8281f0a035509019f49459ff69b6a7b5bd2e11",
+      "stage": "screen",
+      "workflow_id": 397616649,
+      "workflow_file": "v2-balance.yml",
+      "branch": "perf/cleanup-bucket-probe",
+      "maximum_job_seconds": 14400,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_job_seconds": 4498.0,
+      "running_job_seconds_observed": 0.0,
+      "jobs": [
+        {
+          "id": 126877516823,
+          "name": "experiment",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-04T21:29:09Z",
+          "completed_at": "2026-11-04T22:44:07Z",
+          "seconds": 4498.0
+        }
+      ],
+      "scientific_kind": "cleanup-bucket-exploratory",
+      "qualification": false,
+      "html_url": "https://github.com/mikhailsal/free-space/actions/runs/41916505663",
+      "job_seconds": 4498.0
     }
   ],
   "accounting": "Sum all job started-to-completed durations including build/setup/observers/failures and concurrent jobs. Reserve queued/planned envelopes. Current owner cap60aggregate runner-hours; prior6-hour caps in old receipts are historical.",
-  "updated_at": "2026-11-02T19:21:24.767550+00:00",
-  "completed_job_seconds": 61203.0,
-  "maximum_committed_seconds": 96003.0,
-  "remaining_unreserved_seconds": 119997.0,
+  "updated_at": "2026-11-05T00:28:01.516963+00:00",
+  "completed_job_seconds": 66495.0,
+  "maximum_committed_seconds": 101295.0,
+  "remaining_unreserved_seconds": 114705.0,
   "candidate_branch": "perf/v1-root-reuse-cache4",
   "forecasts": [
     {
@@ -3540,7 +3720,7 @@
     }
   },
   "running_job_seconds_observed": 0,
-  "used_runner_seconds_observed": 61203.0,
+  "used_runner_seconds_observed": 66495.0,
   "superseded_planned_dispatches": [
     {
       "baseline": "e8265778ef78ec4acd9da1375eedb0be37a123f5",
@@ -3981,5 +4161,85 @@
     "result_report": "docs/benchmark-results/cleanup-threshold-screen-2026-11-02.md",
     "product_integration": "Not performed; decision/input contract remains separate from research",
     "budget_audit": "docs/benchmark-results/cleanup-threshold-budget-audit-2026-11-02.json"
+  },
+  "cleanup_bucket_probe_cases": [
+    {
+      "id": "cleanup-bucket-smoke",
+      "stage": "smoke",
+      "status": "completed",
+      "branch": "perf/cleanup-bucket-probe",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "source_revision": "ba8281f0a035509019f49459ff69b6a7b5bd2e11",
+      "reservation_seconds": 0,
+      "memory_mib": 8192,
+      "qualification": false,
+      "automatic_retry": false,
+      "depends_on": "Pre-registration committed at ba8281f before the first run; source review rounds 1 to 3 (claude-opus-5-5) and normal hooks; the screen also needed a successful same-source smoke, the same binaries and runtime image, and an admitted forecast (local preflight and in-job admission)",
+      "review_proof": "docs/benchmark-results/cleanup-bucket-reviews-2026-11-04.tar.gz",
+      "maximum_job_seconds": 3600,
+      "run_id": 41912961869,
+      "run_created_at": "2026-11-04T21:06:40Z",
+      "completed_job_seconds": 565.0,
+      "conclusion": "success",
+      "completed_at": "2026-11-04T21:16:09Z",
+      "scientific_disposition": "Valid one-pair smoke on ba8281f; judges nothing.",
+      "result_report": "docs/benchmark-results/cleanup-bucket-screen-2026-11-04.md",
+      "raw_proof": "docs/benchmark-results/cleanup-bucket-screen-proof-2026-11-04.json"
+    },
+    {
+      "id": "cleanup-bucket-screen",
+      "stage": "screen",
+      "status": "completed",
+      "branch": "perf/cleanup-bucket-probe",
+      "workflow_file": "v2-balance.yml",
+      "workflow_id": 397616649,
+      "source_revision": "ba8281f0a035509019f49459ff69b6a7b5bd2e11",
+      "reservation_seconds": 0,
+      "memory_mib": 8192,
+      "qualification": false,
+      "automatic_retry": false,
+      "depends_on": "Pre-registration committed at ba8281f before the first run; source review rounds 1 to 3 (claude-opus-5-5) and normal hooks; the screen also needed a successful same-source smoke, the same binaries and runtime image, and an admitted forecast (local preflight and in-job admission)",
+      "review_proof": "docs/benchmark-results/cleanup-bucket-reviews-2026-11-04.tar.gz",
+      "maximum_job_seconds": 14400,
+      "smoke_run_id": 41912961869,
+      "pre_dispatch_admission": "docs/benchmark-results/cleanup-bucket-screen-preflight-2026-11-04.json",
+      "forecast_with_margin_seconds": 5745.769127929999,
+      "run_id": 41916505663,
+      "run_created_at": "2026-11-04T21:29:05Z",
+      "completed_job_seconds": 4498.0,
+      "conclusion": "success",
+      "completed_at": "2026-11-04T22:44:07Z",
+      "scientific_disposition": "Valid 48-timed, 8-seed, 24-oracle controlled 1.0-million-entry screen on ba8281f: overall.success true (D2 and D3 in 8 of 8 cells, D6 in 6 of 6, D4 in 2 of 2, 23 of 24 benefit bars; D8 failed for directories/full), 31 of 32 predictions (directories/wide missed). Research prototype with a changed information contract, unchanged trees only; not a product qualification.",
+      "result_report": "docs/benchmark-results/cleanup-bucket-screen-2026-11-04.md",
+      "raw_proof": "docs/benchmark-results/cleanup-bucket-screen-proof-2026-11-04.json",
+      "report_review": "docs/benchmark-results/cleanup-bucket-reviews-2026-11-04.tar.gz"
+    }
+  ],
+  "cleanup_bucket_probe": {
+    "goal": "Test whether bucketed residual summaries (omitted small files and folders folded into name-hash buckets of at most 4,096 entries) keep a very small coarse snapshot and make refresh of omitted paths fast on million-entry trees, against the v1 baseline",
+    "authorization": "Owner request to continue the performance research with the idea of grouping small files and folders; heavy runs on GitHub-hosted runners only; fully autonomous",
+    "status": "Research complete: pre-registered smoke and screen finished and judged; overall success true; 31 of 32 predictions (directories/wide missed); five review rounds with claude-opus-5-5 (three on the source before the runs, two after on the report and the delta).",
+    "qualification": false,
+    "manual_root_accounting": true,
+    "completed_run_ids": [
+      41862794363,
+      41867971081,
+      41886334191,
+      41912449392,
+      41912961869,
+      41916505663
+    ],
+    "ci_run_ids_included": [
+      41862794363,
+      41867971081,
+      41886334191,
+      41912449392
+    ],
+    "study_job_seconds": 5292.0,
+    "result_report": "docs/benchmark-results/cleanup-bucket-screen-2026-11-04.md",
+    "raw_proof": "docs/benchmark-results/cleanup-bucket-screen-proof-2026-11-04.json",
+    "product_integration": "Not performed; the probe changes the information contract (no identity for small items), which needs an explicit owner decision",
+    "budget_audit": "Totals are differences of GitHub job started_at/completed_at; the four dev-CI runs are counted conservatively although earlier ledger entries did not count CI runs; see \"Cost and protocol history\" in the report"
   }
 }
