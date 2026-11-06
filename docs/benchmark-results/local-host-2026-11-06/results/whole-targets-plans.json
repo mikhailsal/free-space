@@ -1,0 +1,55 @@
+{
+ "calibration-dir": {
+  "target": "<repo>/core/src/refresh",
+  "plan": "range",
+  "ancestor": "<repo>",
+  "region_entries": 4085,
+  "links": 2401,
+  "fallback": true
+ },
+ "retained-small": {
+  "target": "<home-path-redacted>",
+  "plan": "retained",
+  "region_entries": 8001,
+  "links": 0,
+  "fallback": false
+ },
+ "retained-large": {
+  "target": "<home-path-redacted>",
+  "plan": "retained",
+  "region_entries": 98794,
+  "links": 0,
+  "fallback": false
+ },
+ "omitted": {
+  "target": "<home-path-redacted>",
+  "plan": "range",
+  "ancestor": "<home-path-redacted>",
+  "region_entries": 671,
+  "links": 0,
+  "fallback": false
+ },
+ "wide": {
+  "target": "<home-path-redacted>",
+  "plan": "range",
+  "ancestor": "<home-path-redacted>",
+  "region_entries": 3023,
+  "links": 0,
+  "fallback": false
+ },
+ "hardlinked-region": {
+  "target": "<home-path-redacted>",
+  "plan": "range",
+  "ancestor": "<home-path-redacted>",
+  "region_entries": 4065,
+  "links": 3352,
+  "fallback": true
+ },
+ "job-checkout": {
+  "target": "<home-path-redacted>",
+  "plan": "retained",
+  "region_entries": 7402,
+  "links": 0,
+  "fallback": false
+ }
+}

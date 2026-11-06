@@ -1,0 +1,104 @@
+{
+ "targets": 6,
+ "all_match": true,
+ "hardlinked_candidates": 68,
+ "plain_candidates": 35982,
+ "results": [
+  {
+   "target": "/usr/lib/modules/5.15.0-136-generic/kernel/crypto/async_tx",
+   "predicted": {
+    "plan": "range",
+    "region_entries": 1568,
+    "links": 85,
+    "fallback": true
+   },
+   "exit_code": 0,
+   "actual_fallback": true,
+   "visited": 1094618,
+   "scope": "full",
+   "elapsed_seconds": 13.765351445,
+   "match": true,
+   "stderr": ""
+  },
+  {
+   "target": "/usr/lib/modules/5.15.0-136-generic/kernel/drivers/gpu/drm/ttm",
+   "predicted": {
+    "plan": "range",
+    "region_entries": 4051,
+    "links": 37,
+    "fallback": true
+   },
+   "exit_code": 0,
+   "actual_fallback": true,
+   "visited": 1094618,
+   "scope": "full",
+   "elapsed_seconds": 8.209701878,
+   "match": true,
+   "stderr": ""
+  },
+  {
+   "target": "/usr/lib/modules/5.15.0-136-generic/kernel/drivers/input/gameport",
+   "predicted": {
+    "plan": "range",
+    "region_entries": 1572,
+    "links": 13,
+    "fallback": true
+   },
+   "exit_code": 0,
+   "actual_fallback": true,
+   "visited": 1094618,
+   "scope": "full",
+   "elapsed_seconds": 8.234807239,
+   "match": true,
+   "stderr": ""
+  },
+  {
+   "target": "/usr/share/libreoffice/help/it/text/sbasic/shared/03",
+   "predicted": {
+    "plan": "range",
+    "region_entries": 2600,
+    "links": 0,
+    "fallback": false
+   },
+   "exit_code": 0,
+   "actual_fallback": false,
+   "visited": 5202,
+   "scope": "range",
+   "elapsed_seconds": 0.057515855,
+   "match": true,
+   "stderr": ""
+  },
+  {
+   "target": "/usr/include/xfs",
+   "predicted": {
+    "plan": "range",
+    "region_entries": 4040,
+    "links": 0,
+    "fallback": false
+   },
+   "exit_code": 0,
+   "actual_fallback": false,
+   "visited": 8082,
+   "scope": "range",
+   "elapsed_seconds": 0.083910329,
+   "match": true,
+   "stderr": ""
+  },
+  {
+   "target": "/usr/share/cmake-3.22/Help/release/dev",
+   "predicted": {
+    "plan": "range",
+    "region_entries": 4083,
+    "links": 0,
+    "fallback": false
+   },
+   "exit_code": 0,
+   "actual_fallback": false,
+   "visited": 8168,
+   "scope": "range",
+   "elapsed_seconds": 0.081235462,
+   "match": true,
+   "stderr": ""
+  }
+ ]
+}

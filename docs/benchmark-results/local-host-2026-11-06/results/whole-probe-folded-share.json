@@ -1,0 +1,23 @@
+{
+ "root_allocated": 444436725760,
+ "folded_bucket_bytes": 314664525824,
+ "folded_share": 0.7080074790982098,
+ "folded_entries": 9772914,
+ "buckets": 5551,
+ "retained_own_by_kind": [
+  [
+   0,
+   96,
+   129739116544
+  ],
+  [
+   1,
+   3593,
+   33083392
+  ]
+ ],
+ "buckets_ge_100mib": [
+  551,
+  241347031040
+ ]
+}

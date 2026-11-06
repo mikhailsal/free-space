@@ -1,0 +1,3 @@
+freespace scan / /boot/efi: started, 1 workers, snapshot dir /tmp/fsbench/whole/v1/snapshot
+freespace scan / /boot/efi: generation 1 published, 9.8 M entries, 1.4 G in 2684.3 s (walk 1650.7 s, write 1033.2 s)
+warning: 1 directory could not be read, sizes under them are unknown: /tmp/RustDesk/cliprdr-server

@@ -1,0 +1,10 @@
+{
+ "last_error": null,
+ "last_success_ts": 1793926529,
+ "prev_generation": null,
+ "current_generation": 1,
+ "warnings": [
+  "1 directory could not be read, sizes under them are unknown: /tmp/RustDesk/cliprdr-server"
+ ],
+ "last_scan_seconds": 2684.345860157
+}

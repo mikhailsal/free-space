@@ -1,0 +1,16 @@
+{
+ "phase": "start",
+ "tree": "/usr",
+ "started": "2026-11-06 01:11:14+0300",
+ "phases": [
+  "seeds",
+  "scan",
+  "refresh"
+ ],
+ "free": 8825815040,
+ "hashes": {
+  "hosted": "4458acb6609ca7ce9e635675a19c607441e0e73d85410b752a85cde1e05a33d7",
+  "probe": "ca4f3e3c7a559438409335ae608087c604e548355c2a00482e35cc480f5dcd04",
+  "installed": "32d948fb2981b4829edbcc30304e382cb79f202cfe64fb7524ffe54fa271277a"
+ }
+}

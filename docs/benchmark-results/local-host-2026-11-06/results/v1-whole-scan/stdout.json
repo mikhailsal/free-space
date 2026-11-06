@@ -1,0 +1,23 @@
+{
+ "generation": 1,
+ "prev_generation": null,
+ "entries": 9776275,
+ "roots": [
+  "/",
+  "/boot/efi"
+ ],
+ "workers": 1,
+ "walk_seconds": 1650.65060069,
+ "finalize_seconds": 0.0,
+ "insert_seconds": 986.441164218,
+ "index_seconds": 46.74687283,
+ "publish_seconds": 0.00692076,
+ "total_seconds": 2684.347619996,
+ "snapshot_bytes": 1468616704,
+ "snapshot_path": "/tmp/fsbench/whole/v1/snapshot/snapshot.db",
+ "errors": 1,
+ "incomplete": true,
+ "unknown_subtrees": [
+  "/tmp/RustDesk/cliprdr-server"
+ ]
+}

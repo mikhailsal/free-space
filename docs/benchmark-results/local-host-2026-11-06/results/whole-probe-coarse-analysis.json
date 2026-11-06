@@ -1,0 +1,55 @@
+{
+ "file": "/tmp/fsbench/whole/probe/snapshot/coarse.db",
+ "logical_bytes": 3158016,
+ "allocated_bytes": 3162112,
+ "page_size": 4096,
+ "page_count": 771,
+ "freelist": 0,
+ "meta": {
+  "root": "/",
+  "threshold": 473918424,
+  "ppm": 1000,
+  "capacity": 473918423040,
+  "generation": 1,
+  "has_hardlinks": 1
+ },
+ "nodes": 3689,
+ "nodes_by_kind": {
+  "dir": 3593,
+  "file": 96,
+  "other": 0
+ },
+ "buckets": 5551,
+ "root_total": {
+  "allocated": 444436688896,
+  "apparent": 437808703566,
+  "files": 7518482,
+  "dirs": 2095538,
+  "others": 162582,
+  "entries": 9776602,
+  "links": 1709017,
+  "errors": 0
+ },
+ "hardlink_exposure": {
+  "buckets_with_links": 1464,
+  "buckets_total": 5551,
+  "folded_entries_total": 9772913,
+  "folded_entries_in_linked_buckets": 2480899,
+  "folded_entry_share_falling_back": 0.25385460813986577,
+  "retained_dirs": 3592,
+  "retained_dirs_with_links": 1851,
+  "retained_dir_share_falling_back": 0.5153118040089086,
+  "root_links": 1709017
+ },
+ "bucket_window_entries": {
+  "p50": 1419,
+  "p90": 4056,
+  "p99": 4095
+ },
+ "retained_dir_entries": {
+  "p50": 8635,
+  "p90": 25467,
+  "p99": 229234
+ },
+ "avg_bytes_per_retained_node_and_bucket": 341.7766233766234
+}
