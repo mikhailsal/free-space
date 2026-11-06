@@ -1,0 +1,10 @@
+probe       /tmp/fsbench/loop-mnt/A cap= 1024M ok=True  exit=  0 oom=0 wall=   47.6s rss=   12.1MiB cgroup_peak= 1024.0MiB (anon=4 file=215 slab_recl=805) limit_hits=4051 pgsteal=200332 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=  512M ok=True  exit=  0 oom=0 wall=   52.8s rss=   12.6MiB cgroup_peak=  512.0MiB (anon=4 file=157 slab_recl=350) limit_hits=5752 pgsteal=313179 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=  256M ok=True  exit=  0 oom=0 wall=   52.0s rss=   12.7MiB cgroup_peak=  256.0MiB (anon=4 file=67 slab_recl=185) limit_hits=8855 pgsteal=368390 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=  192M ok=True  exit=  0 oom=0 wall=   52.4s rss=   12.7MiB cgroup_peak=  192.0MiB (anon=4 file=63 slab_recl=125) limit_hits=8816 pgsteal=387023 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=  128M ok=True  exit=  0 oom=0 wall=   52.5s rss=   12.7MiB cgroup_peak=  128.0MiB (anon=4 file=34 slab_recl=90) limit_hits=9276 pgsteal=397223 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=   96M ok=True  exit=  0 oom=0 wall=   53.5s rss=   12.7MiB cgroup_peak=   96.1MiB (anon=4 file=12 slab_recl=79) limit_hits=9154 pgsteal=407783 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=   64M ok=True  exit=  0 oom=0 wall=   57.9s rss=   12.7MiB cgroup_peak=   64.0MiB (anon=4 file=7 slab_recl=53) limit_hits=9953 pgsteal=416431 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=   48M ok=True  exit=  0 oom=0 wall=   64.7s rss=   12.7MiB cgroup_peak=   48.0MiB (anon=4 file=10 slab_recl=34) limit_hits=9388 pgsteal=423615 entries=2009002 snap=0.0MiB
+probe       /tmp/fsbench/loop-mnt/A cap=   32M ok=False exit= -9 oom=0 wall=   14.1s rss=   12.7MiB cgroup_peak=   32.0MiB (anon=4 file=8 slab_recl=20) limit_hits=2377 pgsteal=102210 entries=None snap=0.0MiB
+   FAILED: 

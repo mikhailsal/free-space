@@ -1,0 +1,3 @@
+probe       /tmp/fsbench/loop-mnt/A cap= 6144M ok=True  exit=  0 oom=0 wall=   36.1s rss=   12.2MiB cgroup_peak= 1603.0MiB (anon=6 file=263 slab_recl=1334) limit_hits=0 pgsteal=11354 entries=2009002 snap=0.0MiB
+v1-low      /tmp/fsbench/loop-mnt/A cap= 6144M ok=True  exit=  0 oom=0 wall=   73.7s rss=   35.5MiB cgroup_peak= 1747.4MiB (anon=29 file=443 slab_recl=1272) limit_hits=0 pgsteal=2592 entries=1004501 snap=112.8MiB
+v1-default  /tmp/fsbench/loop-mnt/A cap= 6144M ok=True  exit=  0 oom=0 wall=   11.6s rss=  217.2MiB cgroup_peak= 1858.1MiB (anon=136 file=370 slab_recl=1337) limit_hits=0 pgsteal=0 entries=1004501 snap=106.1MiB

@@ -1,0 +1,12 @@
+{
+  "what": "Max RSS of the probe measured without a Python parent: /usr/bin/time -f %M around nice, ionice and the probe, run from a shell on 2026-11-06 (warm caches, no cap). The Python harness that produced memory.jsonl is itself about 10.5-13 MiB, and Linux keeps the larger of the pre-exec parent's peak and the new program's, so any harness reading at or below about 13 MiB is a floor, not a measurement.",
+  "binary": "probe-live build, sha256 972c9d6e8b0a49303b9d354524ab1ca944a245c68f2ea5043d85f6f40e29067b",
+  "measurements_kib": {
+    "probe --help (idle process)": 5392,
+    "probe scan --root /usr/include (12,776 entries, 25,552 visits, 0.59 s)": 8672,
+    "probe scan --root /usr (547,309 entries, 1,094,618 visits, 25.5 s)": 8620,
+    "probe refresh --target /usr/include in the /usr snapshot (0.19 s)": 10712,
+    "python3 -c pass (the harness's own floor)": 10512
+  },
+  "note": "Fixture A scans through the harness read 12.1-12.7 MiB and refreshes 13.1 MiB; those are the floor. The true values are at most those and, by the rows above, about 8.6 MiB (scan) and 10.7 MiB (refresh) on a 0.5 M-entry tree without many hardlinks."
+}

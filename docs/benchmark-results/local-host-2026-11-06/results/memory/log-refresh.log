@@ -1,0 +1,11 @@
+v1 scan ok rss=35.2MiB wall=69.7s
+v1     refresh cap=  6G ok=True  exit=  0 wall=   5.1s rss=  350.4MiB cgroup_peak=  286.0MiB limit_hits=0
+v1     refresh cap=512M ok=True  exit=  0 wall=   4.9s rss=  350.6MiB cgroup_peak=  290.4MiB limit_hits=0
+v1     refresh cap=256M ok=False exit= -9 wall=   2.8s rss=  350.4MiB cgroup_peak=  256.0MiB limit_hits=54
+   FAILED: freespace refresh /tmp/fsbench/loop-mnt/A/d0042: started, 1 workers
+probe scan ok rss=13.1MiB wall=24.4s
+probe  refresh cap=  6G ok=True  exit=  0 wall=   0.2s rss=   13.1MiB cgroup_peak=   16.7MiB limit_hits=0
+probe  refresh cap=256M ok=True  exit=  0 wall=   0.2s rss=   13.1MiB cgroup_peak=   16.5MiB limit_hits=0
+probe  refresh cap=128M ok=True  exit=  0 wall=   0.2s rss=   13.1MiB cgroup_peak=   16.6MiB limit_hits=0
+probe  refresh cap= 64M ok=True  exit=  0 wall=   0.2s rss=   13.1MiB cgroup_peak=   14.6MiB limit_hits=0
+probe  refresh cap= 48M ok=True  exit=  0 wall=   0.2s rss=   13.1MiB cgroup_peak=   14.4MiB limit_hits=0

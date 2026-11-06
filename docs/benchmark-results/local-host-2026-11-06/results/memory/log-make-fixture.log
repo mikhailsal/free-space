@@ -1,0 +1,16 @@
+A dirs 500/4500 6s
+A dirs 1000/4500 11s
+A dirs 1500/4500 17s
+A dirs 2000/4500 22s
+A dirs 2500/4500 28s
+A dirs 3000/4500 33s
+A dirs 3500/4500 39s
+A dirs 4000/4500 45s
+A dirs 4500/4500 51s
+B dirs 50/300 56s
+B dirs 100/300 61s
+B dirs 150/300 65s
+B dirs 200/300 70s
+B dirs 250/300 74s
+B dirs 300/300 79s
+done in 79s
