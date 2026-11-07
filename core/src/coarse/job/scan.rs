@@ -11,6 +11,7 @@ use crate::coarse::export::{self, Built};
 use crate::coarse::merge;
 use crate::coarse::model::Model;
 use crate::coarse::roots;
+use crate::config::{COARSE_PPM_RANGE, coarse_ppm_range_text};
 use crate::error::{Error, Result};
 use crate::fault;
 use crate::job::{Previous, ScanReport, expected_entries, has_required_schema, next_generation};
@@ -39,10 +40,11 @@ pub struct ScanOutcome {
 }
 
 pub fn run_scan(req: ScanRequest) -> Result<ScanOutcome> {
-    if !(1..=1_000_000).contains(&req.ppm) {
-        return Err(Error::usage(
-            "the folding threshold must be between 1 and 1000000 parts per million",
-        ));
+    if !COARSE_PPM_RANGE.contains(&req.ppm) {
+        return Err(Error::usage(format!(
+            "the folding threshold must be {} parts per million",
+            coarse_ppm_range_text()
+        )));
     }
     let label = req
         .roots

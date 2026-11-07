@@ -5,6 +5,7 @@
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
+use crate::config::PPM;
 use crate::error::{Error, ErrorCode, Result};
 use crate::platform::FsStats;
 use crate::scan::{Kind, flags};
@@ -194,7 +195,7 @@ pub fn threshold(capacity: u64, ppm: u32) -> Result<u64> {
         ));
     }
     let bytes = u128::from(capacity) * u128::from(ppm);
-    Ok(u64::try_from(bytes.div_ceil(1_000_000))
+    Ok(u64::try_from(bytes.div_ceil(u128::from(PPM)))
         .unwrap_or(u64::MAX)
         .max(1))
 }

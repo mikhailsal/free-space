@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use freespace_core::coarse;
-use freespace_core::config::{Backend, Loaded};
+use freespace_core::config::{Backend, COARSE_PPM_RANGE, Loaded, coarse_ppm_range_text};
 use freespace_core::format;
 use freespace_core::job::{self, ScanReport, ScanRequest};
 use freespace_core::platform;
@@ -136,9 +136,12 @@ fn check_flags(a: &ScanArgs, backend: Backend) -> Result<()> {
         .with_fix("name the other filesystem as a root of its own: freespace scan / /mnt/data"));
     }
     if let Some(ppm) = a.coarse_ppm
-        && !(1..=1_000_000).contains(&ppm)
+        && !COARSE_PPM_RANGE.contains(&ppm)
     {
-        return Err(Error::usage("--coarse-ppm must be between 1 and 1000000"));
+        return Err(Error::usage(format!(
+            "--coarse-ppm must be {}",
+            coarse_ppm_range_text()
+        )));
     }
     Ok(())
 }

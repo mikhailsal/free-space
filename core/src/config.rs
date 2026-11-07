@@ -1,6 +1,7 @@
 //! `/etc/freespace/config.toml`. Missing file → defaults; unknown keys and
 //! bad values → CONFIG (exit 2) naming the key.
 
+use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,20 @@ pub const DEFAULT_SNAPSHOT_DIR: &str = "/var/lib/freespace";
 /// Coarse backend: entries below this share of the filesystem size are folded
 /// into buckets (parts per million; 1000 = 0.1%).
 pub const DEFAULT_COARSE_PPM: u32 = 1000;
+/// Parts per million that make up a whole filesystem.
+pub const PPM: u32 = 1_000_000;
+/// The folding thresholds the coarse backend accepts, from one part per million up to the
+/// whole filesystem. The config file, the command line and the scan job all enforce it.
+pub const COARSE_PPM_RANGE: RangeInclusive<u32> = 1..=PPM;
+
+/// The range as every refusal of a threshold words it, so that they cannot drift apart.
+pub fn coarse_ppm_range_text() -> String {
+    format!(
+        "between {} and {}",
+        COARSE_PPM_RANGE.start(),
+        COARSE_PPM_RANGE.end()
+    )
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -155,8 +170,11 @@ fn validate(c: &Config, path: &Path) -> Result<()> {
     if c.workers == Some(0) {
         return bad("workers", "must be at least 1");
     }
-    if !(1..=1_000_000).contains(&c.coarse_ppm) {
-        return bad("coarse_ppm", "must be between 1 and 1000000");
+    if !COARSE_PPM_RANGE.contains(&c.coarse_ppm) {
+        return bad(
+            "coarse_ppm",
+            &format!("must be {}", coarse_ppm_range_text()),
+        );
     }
     if !matches!(c.interval.as_str(), "hourly" | "daily" | "weekly") {
         return bad("interval", "must be hourly, daily or weekly");
