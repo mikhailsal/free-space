@@ -13,6 +13,8 @@ export interface Header {
   snapshot_id: string;
   incomplete: boolean;
   unknown_subtrees: string[];
+  /** Coarse snapshot: entries below this many bytes are folded into `[small items]` entries. */
+  folded_below?: number | null;
 }
 
 export interface MountOut {
@@ -36,6 +38,8 @@ export interface Entry {
   errors: number;
   scanned_at: number;
   denied?: boolean;
+  /** Coarse snapshot: a `[small items]` entry standing for many small ones; `items` counts them. */
+  folded?: boolean;
   hardlink_alias?: boolean;
   hardlink_owner?: string;
   mount?: MountOut;
