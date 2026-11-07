@@ -8,6 +8,7 @@ use crate::coarse::testing::{
     KIB, fingerprint, model_of, naive, nested_model, put, sample, walk_mounted, walk_with,
 };
 use crate::coarse::walk::{Boundary, Walk, scan};
+use crate::error::ErrorCode;
 use crate::scan::Kind;
 
 const THRESHOLD: u64 = 100 * KIB;
@@ -345,4 +346,32 @@ fn only_a_root_and_its_mount_point_entry_may_share_a_path() {
         refused.message.contains("path of a scan root"),
         "{refused:?}"
     );
+}
+
+#[test]
+fn a_root_whose_filesystem_is_gone_from_its_mount_point_is_refused_with_the_way_out() {
+    let tmp = tempfile::tempdir().unwrap();
+    let top = tmp.path();
+    let (mut model, inner) = nested(top);
+    let before = fingerprint(&model);
+
+    // unmounted: the walk of the outer root finds an ordinary folder on the root's path
+    let outer = walk_mounted(top, true, THRESHOLD, &[]);
+    let refused = replace_root(&mut model, top, outer.nodes).unwrap_err();
+    assert_eq!(refused.code, ErrorCode::Usage);
+    let named = format!("{} is no longer a mount point", inner.display());
+    assert!(refused.message.contains(&named), "{refused:?}");
+    assert!(refused.message.contains("run a full scan"), "{refused:?}");
+
+    let folder = top.join("a");
+    let walked = walk_mounted(&folder, false, THRESHOLD, &[]);
+    let refused = update(&mut model, &folder, walked.nodes).unwrap_err();
+    assert_eq!(refused.code, ErrorCode::Usage);
+    assert!(refused.message.contains(&named), "{refused:?}");
+    assert_eq!(
+        fingerprint(&model),
+        before,
+        "a refused merge changes nothing"
+    );
+    verify(&model).unwrap();
 }

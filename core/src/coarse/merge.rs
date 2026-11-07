@@ -209,8 +209,26 @@ fn drop_below(model: &mut Model, top: &Path, owned_by: &Path) {
     nodes.retain(|n| !(n.path.starts_with(top) && owner(roots, n) == Some(owned_by)));
 }
 
+/// A scan root nested in another one was a mount point when it was scanned. If a fresh walk
+/// finds an ordinary entry on its path, its filesystem is no longer mounted there, and the
+/// snapshot cannot hold both that entry and the root.
+fn check_mounted(roots: &[RootMeta], fresh: &[Node]) -> Result<()> {
+    let unmounted = fresh
+        .iter()
+        .filter(|n| !n.root && n.kind != Kind::Mount)
+        .find_map(|n| roots.iter().find(|r| r.path == n.path));
+    match unmounted {
+        None => Ok(()),
+        Some(root) => Err(Error::usage(format!(
+            "{} is no longer a mount point, so the part of the snapshot that holds it cannot be refreshed; run a full scan",
+            root.path.display()
+        ))),
+    }
+}
+
 /// Replace everything below scan root `root` by a fresh walk of it.
 pub fn replace_root(model: &mut Model, root: &Path, fresh: Vec<Node>) -> Result<()> {
+    check_mounted(&model.roots, &fresh)?;
     drop_below(model, root, root);
     model.nodes.extend(fresh);
     check_cap(&model.nodes)?;
@@ -232,6 +250,7 @@ pub fn update(model: &mut Model, boundary: &Path, mut fresh: Vec<Node>) -> Resul
     top.root = prior.root;
     let stays = prior.root || top.pinned() || has_descendants || large(&top.total, threshold);
     let folded = top.total.clone();
+    check_mounted(&model.roots, &fresh)?;
     drop_below(model, boundary, &owned_by);
     if stays {
         model.nodes.extend(fresh);

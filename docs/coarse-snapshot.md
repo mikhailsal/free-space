@@ -100,7 +100,8 @@ may be outside the part, so such a refresh rescans the whole scan root (the note
 If other roots lie on the same filesystem, the first path may be in one of them, so a root
 with hardlinks is rescanned together with all the roots on its filesystem, and the note names
 them. A root without hardlinks, or alone on its filesystem, is rescanned alone. If a folder
-is gone and a scan root was inside it, the refresh stops and asks for a full scan.
+is gone and a scan root was inside it, or a nested scan root is no longer a mount point, the
+refresh stops and asks for a full scan.
 
 Refresh publishes a new generation and never rotates `prev`, as in v1.
 
