@@ -293,6 +293,23 @@ export const writeStub = (dir: string, name: string, body: string) => {
   chmodSync(join(dir, name), 0o755);
 };
 
+// uutils' timeout as the ubuntu-latest runner has it since Ubuntu 26.04: it names itself, and refuses what the scripts ask
+// of it (the exit status 125 it gives for an argument that is not UTF-8)
+export const UUTILS_TIMEOUT = `#!/bin/sh
+[ "$1" = --version ] && { echo "timeout (uutils coreutils) 0.10.0"; exit 0; }
+echo "error: invalid UTF-8 was detected in one or more arguments" >&2
+exit 125
+`;
+
+// The GNU timeout of this host, whichever name it goes by (Ubuntu 25.10 and later keep it as gnutimeout).
+export const gnuTimeout = () => {
+  for (const name of ["timeout", "gnutimeout"]) {
+    const path = Bun.which(name);
+    if (path && Bun.spawnSync([path, "--version"]).stdout.toString().startsWith("timeout (GNU coreutils)")) return path;
+  }
+  throw new Error("no GNU timeout on this host");
+};
+
 // Every run: the stub's server needs bun and its code; one folder per level keeps the wide part of the trees small; the
 // caller's proxy and XDG folders, which the script keeps from curl and from the CLI.
 const NO_SUCH_PROXY = "http://127.0.0.1:9";

@@ -127,10 +127,17 @@
     "scripts/rust-diff/install-kept.sh": [
       "web/tests/unit/rust-diff-install.test.ts"
     ],
+    "scripts/rust-diff/gnu.sh": [
+      "web/tests/unit/rust-diff.test.ts",
+      "web/tests/unit/rust-diff-process.test.ts",
+      "web/tests/unit/rust-diff-tree.test.ts",
+      "web/tests/unit/rust-diff-install.test.ts"
+    ],
     "web/tests/unit/rust-diff-stub.ts": [
       "web/tests/unit/rust-diff.test.ts",
       "web/tests/unit/rust-diff-process.test.ts",
-      "web/tests/unit/rust-diff-tree.test.ts"
+      "web/tests/unit/rust-diff-tree.test.ts",
+      "web/tests/unit/rust-diff-install.test.ts"
     ],
     "scripts/test-files.sh": [
       "web/tests/unit/test-files.test.ts"
