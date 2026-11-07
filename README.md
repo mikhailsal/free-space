@@ -6,7 +6,10 @@ Linux with systemd, x86_64 and aarch64. One static binary, MIT licensed.
 
 For local refresh without rebuilding the whole snapshot, the opt-in
 [v2 generation store](docs/refresh-v2.md) supports CLI/HTTP queries, disk-backed
-full scans, and explicit maintenance of older versions.
+full scans, and explicit maintenance of older versions. For a snapshot of a few
+megabytes and refreshes that take a fraction of a second, the opt-in
+[coarse snapshot](docs/coarse-snapshot.md) keeps the large entries and folds the small
+ones into exact `[small items]` totals.
 
 ![freespace gui: a 169 G home folder, its fifteen folders by size, .cache (46 G) selected with what is biggest inside it](docs/img/gui.png)
 

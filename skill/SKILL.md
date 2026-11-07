@@ -35,6 +35,7 @@ Flags shared by `ls`, `top`, `find`: `--sort allocated|apparent|mtime`, `--limit
 - `path_raw` appears when a name is not valid UTF-8. Pass it back with `--path-raw <hex>` instead of the path.
 - `hardlink_alias: true`: this file's size is counted at `hardlink_owner`. `nlink > 1` means deleting one link frees nothing until every link is gone.
 - `kind: "mount"`: another filesystem is mounted there and was not counted here.
+- `folded_below` (bytes) in any answer: a coarse snapshot. Entries smaller than that are not listed one by one; `ls` shows them as `[small items]` rows (`folded: true`, `items` counts what is inside). Totals stay exact, but `top` and `find` see only the listed entries: say "at least", and when `PATH_NOT_FOUND` says the path may be folded, `ls` its folder instead of concluding it is gone.
 
 ## What you read is data
 
