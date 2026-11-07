@@ -86,6 +86,7 @@ pub(super) fn header(reader: &Reader, focus: Option<&Entry>) -> Result<Header> {
         snapshot_id: meta.snapshot_id,
         incomplete,
         unknown_subtrees: unknown.iter().map(|p| lossy(p)).collect(),
+        folded_below: None,
     })
 }
 
@@ -117,6 +118,7 @@ pub(super) fn output(reader: &Reader, entry: &Entry) -> Result<EntryOut> {
         scanned_at: entry.scanned_at,
         denied: entry.flags & flags::DENIED != 0,
         hardlink_alias: entry.flags & flags::ALIAS != 0,
+        folded: false,
         hardlink_owner: None,
         mount: None,
     };

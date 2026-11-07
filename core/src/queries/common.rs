@@ -278,10 +278,17 @@ pub fn resolve(snap: &Snapshot, input: &[u8]) -> Result<(Row, Vec<u8>)> {
             break;
         }
     }
+    let folded = match crate::coarse::folded_below(&snap.conn) {
+        Some(below) => format!(
+            ", or smaller than {} and folded into [small items]",
+            crate::format::size(below)
+        ),
+        None => String::new(),
+    };
     Err(Error::new(
         ErrorCode::PathNotFound,
         format!(
-            "{shown} is not in the snapshot from {} {} (created later, removed, or on another filesystem)",
+            "{shown} is not in the snapshot from {} {} (created later, removed, or on another filesystem{folded})",
             crate::format::local_date(snap.meta.scanned_at),
             crate::format::local_hm(snap.meta.scanned_at)
         ),
@@ -331,6 +338,7 @@ pub fn header(snap: &Snapshot, focus: Option<&Row>) -> Result<Header> {
         snapshot_id: snap.meta.snapshot_id.clone(),
         incomplete,
         unknown_subtrees: unknown,
+        folded_below: crate::coarse::folded_below(&snap.conn),
     })
 }
 
@@ -364,6 +372,7 @@ pub fn entry_out(row: &Row, path: &[u8]) -> EntryOut {
         scanned_at: row.scanned_at,
         denied: row.flags & flags::DENIED != 0,
         hardlink_alias: row.flags & flags::ALIAS != 0,
+        folded: row.flags & flags::BUCKET != 0,
         hardlink_owner: None,
         mount: None,
     }

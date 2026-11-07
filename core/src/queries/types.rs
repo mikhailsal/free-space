@@ -26,6 +26,11 @@ pub struct Header {
     /// Report this to the user before any numbers.
     pub incomplete: bool,
     pub unknown_subtrees: Vec<String>,
+    /// Coarse snapshot (backend `coarse`): entries below this many bytes are not listed one
+    /// by one. They are folded into `[small items]` entries (`folded`) whose totals are
+    /// exact. Absent for a full snapshot, which lists everything.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folded_below: Option<u64>,
 }
 
 /// One snapshot entry.
@@ -59,6 +64,11 @@ pub struct EntryOut {
     /// Hardlink counted under another path (`allocated` is 0 here).
     #[serde(default, skip_serializing_if = "is_false")]
     pub hardlink_alias: bool,
+    /// Coarse snapshot: a `[small items]` entry that stands for many small entries which are
+    /// not listed one by one. `allocated` and `apparent` are their exact totals and `items`
+    /// counts them.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub folded: bool,
     /// For `nlink > 1`: the path that carries the size.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hardlink_owner: Option<String>,

@@ -65,8 +65,8 @@ Every Look command takes --json. Errors under --json are JSON on stdout too.
     help_template = HELP_TEMPLATE
 )]
 struct Cli {
-    /// Snapshot backend (v2 is experimental and uses a separate database)
-    #[arg(long, global = true, value_parser = ["v1", "v2"])]
+    /// Snapshot backend (v2 and coarse are experimental and keep their snapshots apart from v1's)
+    #[arg(long, global = true, value_parser = ["v1", "v2", "coarse"])]
     backend: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,

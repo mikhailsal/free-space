@@ -10,7 +10,14 @@
 # 2. refresh of the mount point is a usage error that says why, and records
 #    nothing in state.json;
 # 3. refresh of its parent walks up to the mount again and keeps it a mount;
-# 4. refresh of a sibling folder keeps both mounts.
+# 4. refresh of a sibling folder keeps both mounts;
+# 5. mounts made after the scan stay outside it: refreshing them is refused and
+#    leaves both snapshots and the state as they were;
+# 6. --cross-mounts lets a late foreign filesystem in, and still not a bind mount;
+# 7. the coarse backend keeps a root that is a mount point inside another root, and
+#    the mount entry of the outer tree, through scans and refreshes; once that
+#    filesystem is unmounted, a refresh that reaches the folder is refused and
+#    changes nothing.
 set -eu
 
 # Re-exec before creating any fixture: even SIGKILL cannot propagate our
@@ -195,3 +202,49 @@ refuse_late "$a/b/child"
 "$bin" ls "$a/m" --json | jq -e '.entries | any(.name == "foreign" and .apparent == 2097152)' > /dev/null ||
     fail "cross-mounts did not import the permitted foreign file"
 echo "ok: late mounts preserve scan policy and refusal leaves both snapshots and state intact"
+
+# The coarse backend keeps a root that is itself a mount point of another root as two
+# things: the mount entry in the outer tree and the root of its own tree, on one path.
+echo "7. coarse backend: a root that is a mount point inside another root"
+coarse() { "$bin" --backend coarse "$@"; }
+coarse_mount_row() {
+    coarse ls "$a" --json 2> /dev/null | jq -c '.entries[] | select(.name == "m") | [.kind, .allocated, .mount.fs_type]'
+}
+coarse_inside_has() {
+    coarse ls "$a/m" --json 2> /dev/null | jq -e --arg name "$1" '.entries | any(.name == $name and .apparent > 0)' > /dev/null ||
+        fail "coarse: $a/m does not list $1: $(coarse ls "$a/m" --json 2>&1)"
+}
+coarse_check() {
+    [ "$(coarse_mount_row)" = '["mount",0,"tmpfs"]' ] || fail "coarse, $1: mount row $(coarse_mount_row)"
+    coarse_inside_has foreign
+}
+mkdir "$t/links"
+head -c 8192 /dev/zero > "$t/links/one"
+ln "$t/links/one" "$t/links/two"
+coarse scan "$t/root" "$a/m" "$t/links" --coarse-ppm 1 2> "$t/err" || fail "coarse scan: $(cat "$t/err")"
+coarse_check "scan"
+coarse refresh "$t/root" 2> "$t/err" || fail "coarse refresh of the outer root: $(cat "$t/err")"
+coarse_check "refresh of the outer root"
+head -c 4096 /dev/zero > "$a/m/added"
+coarse refresh "$a/m" 2> "$t/err" || fail "coarse refresh of the inner root: $(cat "$t/err")"
+coarse_check "refresh of the inner root"
+coarse_inside_has added
+coarse refresh "$a" 2> "$t/err" || fail "coarse refresh of the folder with the mount: $(cat "$t/err")"
+coarse_check "refresh of the folder with the mount"
+coarse_inside_has added
+# a root with hardlinks is refreshed together with the roots on its filesystem, among them the outer one
+coarse refresh "$t/links" 2> "$t/err" || fail "coarse refresh of the root with hardlinks: $(cat "$t/err")"
+coarse_check "refresh of the root with hardlinks"
+# The filesystem of the nested root goes away. No refresh may walk the path it was mounted on,
+# wherever it starts, and whether or not a large file lies under the mount point.
+refuse_unmounted() {
+    if coarse refresh "$1" 2> "$t/err"; then fail "coarse: a refresh of $1 over an unmounted nested root should stop"; fi
+    grep -q 'no longer a mount point' "$t/err" || fail "coarse: the refusal for $1 does not say why: $(cat "$t/err")"
+    coarse_check "refused refresh of $1 after the unmount"
+}
+umount "$a/m"
+for target in "$t/root" "$a" "$a/m" "$t/links"; do refuse_unmounted "$target"; done
+head -c 4194304 /dev/zero > "$a/m/underneath"
+for target in "$t/root" "$a" "$a/m" "$t/links"; do refuse_unmounted "$target"; done
+coarse status --json 2> /dev/null | jq -e '.last_error == null' > /dev/null || fail "coarse status: $(coarse status --json 2>&1)"
+echo "ok: a root on a mount point keeps its tree and the outer tree keeps the mount entry"

@@ -17,7 +17,7 @@ use crate::platform::now_secs;
 pub struct Progress {
     pub op: String,
     pub path: String,
-    /// "walk", "write" or "publish"
+    /// "walk", "links" (coarse backend: finding hardlink owners), "write" or "publish"
     pub stage: String,
     pub started_at: i64,
     pub updated_at: i64,
@@ -43,10 +43,12 @@ pub type ProgressCallback = Box<dyn Fn(&Progress) + Send>;
 pub const STAGE_WALK: u8 = 0;
 pub const STAGE_WRITE: u8 = 1;
 pub const STAGE_PUBLISH: u8 = 2;
+pub const STAGE_LINKS: u8 = 3;
 
 fn stage_name(s: u8) -> &'static str {
     match s {
         STAGE_WALK => "walk",
+        STAGE_LINKS => "links",
         STAGE_WRITE => "write",
         _ => "publish",
     }

@@ -92,6 +92,15 @@
           },
           "type": "array"
         },
+        "folded_below": {
+          "description": "Coarse snapshot (backend `coarse`): entries below this many bytes are not listed one\nby one. They are folded into `[small items]` entries (`folded`) whose totals are\nexact. Absent for a full snapshot, which lists everything.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "generation": {
           "format": "uint64",
           "minimum": 0,
@@ -285,6 +294,10 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "folded": {
+          "description": "Coarse snapshot: a `[small items]` entry that stands for many small entries which are\nnot listed one by one. `allocated` and `apparent` are their exact totals and `items`\ncounts them.",
+          "type": "boolean"
         },
         "hardlink_alias": {
           "description": "Hardlink counted under another path (`allocated` is 0 here).",
@@ -565,6 +578,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "folded": {
+          "description": "Coarse snapshot: a `[small items]` entry that stands for many small entries which are\nnot listed one by one. `allocated` and `apparent` are their exact totals and `items`\ncounts them.",
+          "type": "boolean"
+        },
         "hardlink_alias": {
           "description": "Hardlink counted under another path (`allocated` is 0 here).",
           "type": "boolean"
@@ -663,6 +680,15 @@
             "$ref": "#/$defs/FindEntry"
           },
           "type": "array"
+        },
+        "folded_below": {
+          "description": "Coarse snapshot (backend `coarse`): entries below this many bytes are not listed one\nby one. They are folded into `[small items]` entries (`folded`) whose totals are\nexact. Absent for a full snapshot, which lists everything.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "generation": {
           "format": "uint64",
@@ -857,6 +883,15 @@
         "entry": {
           "$ref": "#/$defs/EntryOut"
         },
+        "folded_below": {
+          "description": "Coarse snapshot (backend `coarse`): entries below this many bytes are not listed one\nby one. They are folded into `[small items]` entries (`folded`) whose totals are\nexact. Absent for a full snapshot, which lists everything.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "generation": {
           "format": "uint64",
           "minimum": 0,
@@ -1024,7 +1059,7 @@
           ]
         },
         "stage": {
-          "description": "\"walk\", \"write\" or \"publish\"",
+          "description": "\"walk\", \"links\" (coarse backend: finding hardlink owners), \"write\" or \"publish\"",
           "type": "string"
         },
         "started_at": {
@@ -1383,6 +1418,15 @@
             "$ref": "#/$defs/EntryOut"
           },
           "type": "array"
+        },
+        "folded_below": {
+          "description": "Coarse snapshot (backend `coarse`): entries below this many bytes are not listed one\nby one. They are folded into `[small items]` entries (`folded`) whose totals are\nexact. Absent for a full snapshot, which lists everything.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "generation": {
           "format": "uint64",

@@ -4,6 +4,10 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in coarse snapshots (`--backend coarse`, or `backend = "coarse"` in the config) keep the entries above a share of the filesystem (`--coarse-ppm`, default 0.1 %) and fold the rest into exact `[small items]` totals. On the author's 9.8-million-entry disk a prototype wrote a 3.0 MiB snapshot instead of 1.37 GiB and refreshed a folder in 0.3 to 2.4 s instead of 66.6 s; the scan took 22 % longer. The snapshots live in `<snapshot_dir>/coarse/`, v1 stays the default, and answers carry `folded_below` and `folded` so that readers know what is not listed. See `docs/coarse-snapshot.md`.
+
 ## [0.2.0] - 2026-10-27
 
 ### Added

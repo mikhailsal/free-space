@@ -61,6 +61,9 @@ pub mod flags {
     pub const ALIAS: u8 = 2;
     /// `lstat` of this entry failed; sizes are 0.
     pub const STAT_ERROR: u8 = 4;
+    /// Pseudo entry of the coarse backend: it stands for the small entries
+    /// folded into one bucket of its parent, and `items` counts them.
+    pub const BUCKET: u8 = 8;
     /// In-memory only: the entry was dropped by `refresh` (never written).
     pub const REMOVED: u8 = 0x80;
 }
@@ -222,6 +225,10 @@ pub struct Finalized {
     pub hardlinks: Vec<HardlinkRow>,
     /// new ids with the DENIED flag, ascending
     pub denied: Vec<u32>,
+    /// By new id: the last row inside the entry's subtree. Empty means "derive
+    /// it from `items`", which holds while every descendant has a row of its
+    /// own; the coarse backend folds descendants away and fills this in.
+    pub subtree_end: Vec<u32>,
 }
 
 /// Hardlink attribution overrides used by `refresh` (T19, OV-11). Keys are (dev, ino).
@@ -290,6 +297,7 @@ impl Tree {
             path_hash: walk.path_hash,
             hardlinks,
             denied,
+            subtree_end: Vec::new(),
         }
     }
 

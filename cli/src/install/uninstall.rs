@@ -21,7 +21,7 @@ pub(super) fn uninstall(a: &InstallArgs) -> output::Result<()> {
     if let Ok(loaded) = crate::backend::load() {
         c.backend = loaded.config.backend;
     }
-    super::lifecycle::validate_v2_base(&c)?;
+    super::lifecycle::validate_backend_base(&c)?;
     let mut removed: Vec<String> = Vec::new();
     let mut kept: Vec<String> = Vec::new();
 
@@ -121,10 +121,30 @@ fn remove_empty_dir(p: &Path, removed: &mut Vec<String>, kept: &mut Vec<String>)
 
 fn remove_snapshots(c: &Config, removed: &mut Vec<String>, kept: &mut Vec<String>) {
     let dir = SnapshotDir::new(&c.snapshot_dir);
-    if c.backend == config::Backend::V2 {
-        remove_v2_snapshots(&dir, removed, kept);
+    match c.backend {
+        config::Backend::V2 => remove_v2_snapshots(&dir, removed, kept),
+        config::Backend::Coarse => remove_coarse_snapshots(&dir, removed, kept),
+        config::Backend::V1 => {
+            remove_v1_files(&dir, removed);
+            remove_empty_dir(dir.as_path(), removed, kept);
+        }
+    }
+}
+
+/// The coarse backend writes v1 snapshot files into a directory of its own.
+fn remove_coarse_snapshots(base: &SnapshotDir, removed: &mut Vec<String>, kept: &mut Vec<String>) {
+    let dir = SnapshotDir::new(base.path.join("coarse"));
+    // Never follow a replaced/symlinked backend directory during cleanup.
+    if dir.path.is_symlink() {
+        kept.push(format!("{}/", dir.path.display()));
         return;
     }
+    remove_v1_files(&dir, removed);
+    remove_empty_dir(dir.as_path(), removed, kept);
+    remove_empty_dir(base.as_path(), removed, kept);
+}
+
+fn remove_v1_files(dir: &SnapshotDir, removed: &mut Vec<String>) {
     for f in [
         dir.current(),
         dir.prev(),
@@ -145,7 +165,6 @@ fn remove_snapshots(c: &Config, removed: &mut Vec<String>, kept: &mut Vec<String
             }
         }
     }
-    remove_empty_dir(dir.as_path(), removed, kept);
 }
 
 fn remove_v2_snapshots(base: &SnapshotDir, removed: &mut Vec<String>, kept: &mut Vec<String>) {

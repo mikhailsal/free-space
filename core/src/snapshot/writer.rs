@@ -272,6 +272,10 @@ fn insert_entries(
         } else {
             Some(fin.rank[n.parent as usize] as i64)
         };
+        let end = fin
+            .subtree_end
+            .get(new)
+            .map_or(new as i64 + n.items as i64, |&end| i64::from(end));
         let new = new as i64;
         ins.execute(params![
             new,
@@ -287,7 +291,7 @@ fn insert_entries(
             n.items as i64,
             n.errors as i64,
             n.scanned_at,
-            new + n.items as i64,
+            end,
             n.min_scanned_at,
             n.newest_mtime,
         ])

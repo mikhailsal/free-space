@@ -40,7 +40,7 @@ pub fn gather(dir: &SnapshotDir) -> Result<Summary> {
 
 pub fn gather_loaded(loaded: &freespace_core::config::Loaded) -> Result<Summary> {
     let dir = crate::backend::dir(loaded);
-    if loaded.config.backend == freespace_core::config::Backend::V1 {
+    if loaded.config.backend != freespace_core::config::Backend::V2 {
         return gather(&dir);
     }
     let reader = match crate::backend::reader(&dir) {
