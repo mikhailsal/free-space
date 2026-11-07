@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Sourced by the disposable-runner install comparator; independently testable without root.
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=gnu.sh
+. "$(dirname "${BASH_SOURCE[0]}")/gnu.sh"
+# Looked up once, here: run() is called in $(...) subshells, which cannot hand a lookup back (each would ask again, a
+# process of its own every time). install_check_inputs asks again and refuses when it finds none.
+gnu_timeout=$(gnu_tool timeout) || gnu_timeout=
 install_report() { # <raw-json> <source-binary>: only the source path and scheduled clock vary
   local next canonical
   next=$(jq -r 'if (.next_run | type) == "string" then .next_run else empty end' "$1")
@@ -84,8 +90,9 @@ install_remove_empty_parents() { # directories in parent-before-child order; nev
 # Operational boundaries shared by take(), capture() and the base/head comparison.
 run() {
   local home=${home:?} human=${human:?}
+  [ -n "$gnu_timeout" ] || fail "$gnu_timeout_needed"
   env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME="$home" SUDO_USER="$human" TZ=UTC LC_ALL=C \
-    timeout -k 10 120 "$@" </dev/null
+    "$gnu_timeout" -k 10 120 "$@" </dev/null
 }
 
 unit_state() {
@@ -131,9 +138,10 @@ install_require_runner() {
 }
 install_check_inputs() {
   local base=${base:?} head=${head:?} out=${out:?} scratch=${scratch:?} tool
-  for tool in jq getfacl setfacl systemctl systemd-analyze groupadd groupdel getent timeout find sort stat cmp perl grep wc date; do
+  for tool in jq getfacl setfacl systemctl systemd-analyze groupadd groupdel getent find sort stat cmp perl grep wc date; do
     command -v "$tool" >/dev/null || fail "$tool required (install acl and standard Ubuntu system tools)"
   done
+  gnu_timeout=$(gnu_tool timeout) || fail "$gnu_timeout_needed"
   [[ -x $base && -x $head ]] || fail 'both builds must be executable'
   [ "$(realpath -e "$(dirname "$scratch")")" = "$(realpath -e "${RUNNER_TEMP:?RUNNER_TEMP required}")" ] || fail 'scratch must be directly inside RUNNER_TEMP'
   [[ $scratch != *[[:space:]]* ]] || fail 'scratch path must contain no whitespace'
