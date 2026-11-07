@@ -19,7 +19,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gone, guard, HOLD, STUB_ENV, scanFails, script, stub, until, writeStub } from "./rust-diff-stub";
+import { gnuTimeout, gone, guard, HOLD, STUB_ENV, scanFails, script, stub, UUTILS_TIMEOUT, until, writeStub } from "./rust-diff-stub";
 
 let tmp = "";
 
@@ -155,7 +155,8 @@ test("a diff that cannot compare is a harness error, exit 5", async () => {
 
 // Value: protects=a missing tool, any of the six, missing time zones, or a run as root stops the job before anything
 //   runs: exit 2, no out dir; fails_when=a tool leaves the check (the job then dies midway at a command not found), the
-//   zone check goes (without tzdata the C library takes UTC and TZ_QUERIES test nothing), or the root check goes
+//   zone check goes or asks date (without tzdata the C library takes UTC and TZ_QUERIES test nothing, and uutils' date,
+//   the ubuntu-latest runner's since 26.04, has zones of its own, so it says +0530 without them), or the root check goes
 //   (install-timer would install the build on this host); why_new=nothing ran these checks, then only one tool was left
 //   out (testing review of A0), and no zone was checked (red team of A0); seam=PATH, TZDIR; no_claim=a real run as root
 //   (a stub `id` says 0) or a host without tzdata (an empty TZDIR stands in)
@@ -174,7 +175,15 @@ test("a missing tool, missing time zones or a run as root stop the job before an
   writeStub(root, "id", "#!/bin/sh\necho 0\n");
   const zones = join(tmp, "no-zones");
   mkdirSync(zones, { recursive: true });
-  cases.push([{ TZDIR: zones }, "tzdata is required"], [{ PATH: `${root}:${process.env.PATH}` }, "run it as a user, not root"]);
+  // uutils' date carries a zone database of its own and ignores TZDIR: a date that always says +0530 stands in for it
+  const liar = join(tmp, "path-date-with-its-own-zones");
+  mkdirSync(liar, { recursive: true });
+  writeStub(liar, "date", "#!/bin/sh\necho +0530\n");
+  cases.push(
+    [{ TZDIR: zones }, "tzdata is required"],
+    [{ TZDIR: zones, PATH: `${liar}:${process.env.PATH}` }, "tzdata is required"],
+    [{ PATH: `${root}:${process.env.PATH}` }, "run it as a user, not root"],
+  );
   for (const [extra, said] of cases) {
     const out = join(tmp, `checked-${said.split(" ")[0]}`);
     const r = Bun.spawnSync([Bun.which("bash") ?? "bash", script, join(tmp, "base"), join(tmp, "base"), out], {
@@ -185,6 +194,51 @@ test("a missing tool, missing time zones or a run as root stop the job before an
     expect(r.stderr.toString()).toContain(said);
     expect(existsSync(out)).toBe(false);
   }
+});
+
+// Value: protects=with uutils' timeout first on PATH the job runs its calls under GNU's, the one the runner keeps as
+//   gnutimeout: the first call of the base shows it as its parent, and the job gets past it; fails_when=run_prefix names
+//   timeout again (on the ubuntu-latest runner since 26.04 every call with a name that is not UTF-8 answers 125, a TERM
+//   to the job answers 124, and twenty-seven tests of the harness and the job itself go red), or the lookup takes the
+//   first timeout on PATH without asking whose it is; why_new=the runner changed under the harness and no test had a
+//   timeout that is not GNU's; seam=PATH (a uutils look-alike first, GNU's linked as gnutimeout); no_claim=real uutils
+//   (the look-alike only names itself and refuses), the whole job on that runner
+test("with a uutils timeout first on PATH the calls run under GNU's, found as gnutimeout", async () => {
+  const dir = join(tmp, "uutils-first");
+  mkdirSync(dir, { recursive: true });
+  writeStub(dir, "timeout", UUTILS_TIMEOUT);
+  symlinkSync(gnuTimeout(), join(dir, "gnutimeout"));
+  // a base that writes down the command line of the call it is in (its parent is timeout) and fails: the job ends there
+  writeStub(dir, "records", '#!/bin/sh\ntr "\\0" " " < "/proc/$PPID/cmdline" > "$STUB_SEEN"\nexit 7\n');
+  const seen = join(dir, "seen");
+  const r = await guard(dir, "records", "records", { PATH: `${dir}:${process.env.PATH}`, STUB_SEEN: seen });
+  expect(r.code, r.stderr).toBe(1);
+  expect(r.stderr).toContain("base could not make the fixture snapshot (scan 1)");
+  expect(readFileSync(seen, "utf8")).toStartWith(`${join(dir, "gnutimeout")} --foreground -k 10 300 `);
+  expect(r.left, "the work dir, removed").toEqual([]);
+}, 60_000);
+
+// Value: protects=a host with no GNU timeout (uutils' under the name timeout, and no gnutimeout) stops the job before
+//   anything runs: exit 2, the message names what is missing, no out dir; fails_when=the lookup is dropped (the job then
+//   dies midway on the first call, or reports twenty-seven stale questions as a harness that needs fixing), or takes
+//   a timeout without asking whose it is; why_new=see the test above; seam=PATH (the tools the job needs before that
+//   point, and a uutils look-alike); no_claim=a host where GNU's is somewhere off PATH
+test("without a GNU timeout the job stops with exit 2 before anything runs", () => {
+  const dir = join(tmp, "path-uutils-only");
+  mkdirSync(dir, { recursive: true });
+  // the six tools the job checks first, and the three commands it runs before the lookup
+  for (const tool of ["jq", "curl", "script", "flock", "perl", "sqlite3", "id", "dirname", "realpath"]) {
+    symlinkSync(Bun.which(tool) ?? tool, join(dir, tool));
+  }
+  writeStub(dir, "timeout", UUTILS_TIMEOUT);
+  const out = join(tmp, "checked-gnu-timeout");
+  const r = Bun.spawnSync([Bun.which("bash") ?? "bash", script, join(tmp, "base"), join(tmp, "base"), out], {
+    env: { ...process.env, PATH: dir },
+    stderr: "pipe",
+  });
+  expect(r.exitCode).toBe(2);
+  expect(r.stderr.toString()).toContain("GNU coreutils timeout is required");
+  expect(existsSync(out)).toBe(false);
 });
 
 // bash runs a trap when the foreground command ends, so the signal is sent first and the stub released after it.

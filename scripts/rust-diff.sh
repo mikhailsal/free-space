@@ -49,7 +49,8 @@
 # too). A version bump alone is no difference: each binary's own version (from
 # its --version) is masked in its answers. The normalized answers stay in
 # <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
-# Needs jq, curl, script and flock (util-linux), perl, sqlite3 and tzdata. JSON
+# Needs jq, curl, script and flock (util-linux), perl, sqlite3, tzdata and GNU
+# coreutils' timeout (rust-diff/gnu.sh: gnutimeout where /usr/bin/timeout is uutils'). JSON
 # is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4, from
 # 1 to 9) sets the wide part of the trees.
 # shellcheck source-path=SCRIPTDIR
@@ -74,6 +75,9 @@ for tool in jq curl script flock perl sqlite3; do
 done
 if [ "$(id -u)" = 0 ]; then echo "$0: run it as a user, not root: install-timer would install a build on this host" >&2; exit 2; fi
 here=$(dirname "$(realpath "$0")")
+# shellcheck source=rust-diff/gnu.sh
+. "$here/rust-diff/gnu.sh"
+gnu_timeout=$(gnu_tool timeout) || { echo "$0: $gnu_timeout_needed" >&2; exit 2; }
 # shellcheck source=rust-diff/tree.sh
 . "$here/rust-diff/tree.sh"
 # shellcheck source=rust-diff/questions.sh
@@ -86,8 +90,9 @@ here=$(dirname "$(realpath "$0")")
 . "$here/rust-diff/gui.sh"
 # shellcheck source=rust-diff/kept.sh
 . "$here/rust-diff/kept.sh"
-# without the zone (no tzdata) the C library falls back to UTC, and TZ_QUERIES test nothing
-if [ "$(TZ=$TZ_OTHER date -d @1704067200 +%z)" != +0530 ]; then
+# without the zone (no tzdata) the C library falls back to UTC, and TZ_QUERIES test nothing; perl asks the C library, as
+# the CLI does, where uutils date carries a zone database of its own and ignores TZDIR
+if [ "$(TZ=$TZ_OTHER perl -MPOSIX -e 'POSIX::tzset(); print POSIX::strftime("%z", localtime(1704067200))')" != +0530 ]; then
   echo "$0: tzdata is required: TZ=$TZ_OTHER must be UTC+05:30" >&2
   exit 2
 fi
@@ -130,7 +135,7 @@ base=$work/bin/base/freespace head=$work/bin/head/freespace
 run_prefix() { # sets argv: the command line a call starts with
   argv=(env -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_RUNTIME_DIR -u DISPLAY -u WAYLAND_DISPLAY
     TZ="${tz:-UTC}" LC_ALL=C HOME="$work/home" FREESPACE_CONFIG="${config:-$work/none.toml}"
-    FREESPACE_UNIT_DIR="$work/units" timeout --foreground -k 10 "${RUST_DIFF_TIMEOUT:-300}")
+    FREESPACE_UNIT_DIR="$work/units" "$gnu_timeout" --foreground -k 10 "${RUST_DIFF_TIMEOUT:-300}")
 }
 run() { # <bin> <args...>
   local argv

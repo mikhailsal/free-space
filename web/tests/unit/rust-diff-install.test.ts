@@ -2,7 +2,8 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { gnuTimeout, UUTILS_TIMEOUT, writeStub } from "./rust-diff-stub";
 
 const repo = resolve(import.meta.dir, "../../..");
 const helper = join(repo, "scripts/rust-diff/install-kept.sh");
@@ -13,8 +14,14 @@ beforeAll(() => {
 afterAll(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
+// env: what the shell starts with (the helper looks for GNU's timeout on the PATH it is sourced under)
+function shellWith(env: Record<string, string>, code: string, ...args: string[]) {
+  return Bun.spawnSync(["bash", "-c", `set -euo pipefail; . "$1"; shift; ${code}`, "test", helper, ...args], {
+    env: { ...process.env, ...env },
+  });
+}
 function shell(code: string, ...args: string[]) {
-  return Bun.spawnSync(["bash", "-c", `set -euo pipefail; . "$1"; shift; ${code}`, "test", helper, ...args]);
+  return shellWith({}, code, ...args);
 }
 
 // Value: masks only the real scheduled time and exact input path; schema/value regressions remain visible.
@@ -457,7 +464,58 @@ test("run isolates environment and invokes the fixed timeout policy while preser
   const failed = shell('home=$1 human=owned-human; run "$2" <<< caller-input; echo must-not-reach', tmp, command);
   expect(failed.exitCode).toBe(37);
   expect(failed.stderr.toString()).toBe("owned failure\n");
-  expect(failed.stdout.toString().trim().split("\n")).toEqual(["timeout", "-k", "10", "120", command]);
+  const [timeoutBin = "", ...policy] = failed.stdout.toString().trim().split("\n");
+  // GNU's timeout, at the path the lookup found: timeout, or gnutimeout where the first is uutils'
+  expect(["timeout", "gnutimeout"]).toContain(basename(timeoutBin));
+  expect(policy).toEqual(["-k", "10", "120", command]);
+});
+
+// The scripts' tools of GNU coreutils may sit under a gnu prefix (Ubuntu 25.10 and later, uutils' as the plain names).
+const timeoutDirs = () => {
+  const dir = (name: string) => {
+    const path = join(tmp, name);
+    rmSync(path, { recursive: true, force: true });
+    mkdirSync(path, { recursive: true });
+    return path;
+  };
+  const gnu = dir("timeout-gnu");
+  symlinkSync(gnuTimeout(), join(gnu, "timeout"));
+  const twin = dir("timeout-twin");
+  writeStub(twin, "timeout", UUTILS_TIMEOUT);
+  symlinkSync(gnuTimeout(), join(twin, "gnutimeout"));
+  const uutils = dir("timeout-uutils");
+  writeStub(uutils, "timeout", UUTILS_TIMEOUT);
+  return { gnu, twin, uutils };
+};
+
+// Value: protects=gnu_tool names GNU's tool and not merely the first of that name: timeout itself when it is GNU's, the
+//   gnu-prefixed twin when timeout is uutils', nothing when neither is; fails_when=the version is not asked (uutils' is
+//   taken, as every call with a name that is not UTF-8 then answers 125 on the ubuntu-latest runner since 26.04), the
+//   twin is not tried, or a tool that is not there ends the lookup with an error of its own; why_new=the runner moved
+//   to uutils under the scripts; seam=PATH (GNU's linked in, a uutils look-alike); no_claim=real uutils, other tools
+test("gnu_tool names GNU's timeout: itself, its gnu-prefixed twin where timeout is uutils', or nothing", () => {
+  const { gnu, twin, uutils } = timeoutDirs();
+  const asked = (dir: string) => shell("PATH=$1; gnu_tool timeout", dir);
+  expect(asked(gnu).stdout.toString()).toBe(`${join(gnu, "timeout")}\n`);
+  expect(asked(twin).stdout.toString()).toBe(`${join(twin, "gnutimeout")}\n`);
+  const none = asked(uutils);
+  expect(none.exitCode).toBe(1);
+  expect(none.stdout.toString()).toBe("");
+  const absent = shell("PATH=/nonexistent; gnu_tool timeout");
+  expect(absent.exitCode).toBe(1);
+});
+
+// Value: protects=run starts its call under GNU's timeout even with uutils' first on PATH; fails_when=run names timeout
+//   again (the call then answers 125 where the runner has uutils' timeout); why_new=see the test above; seam=PATH;
+//   no_claim=what the timeout does to the call (the test above that one)
+test("run starts the call under GNU's gnutimeout where timeout is uutils'", () => {
+  const { twin } = timeoutDirs();
+  const command = join(tmp, "owned-command-twin");
+  writeFileSync(command, '#!/bin/bash\ntr "\\0" "\\n" < "/proc/$PPID/cmdline"\n', { mode: 0o755 });
+  const got = shellWith({ PATH: `${twin}:${process.env.PATH}` }, 'home=$1 human=owned-human; run "$2"', tmp, command);
+  expect(got.exitCode).toBe(0);
+  // the command line of its parent: the timeout that started it, then the policy
+  expect(got.stdout.toString().trim().split("\n")).toEqual([join(twin, "gnutimeout"), "-k", "10", "120", command]);
 });
 
 // Value: protects=prerequisite/executable/confinement refusals and runner/user context contracts before writes;
@@ -474,9 +532,18 @@ test("preflight validates tools, executable inputs, confined fresh paths and run
   const dangling = join(root, "dangling");
   symlinkSync(join(root, "missing-target"), dangling);
   const defaults = { base: "/bin/true", out: join(root, "out"), scratch: join(root, "scratch") };
+  // every other tool the check asks for, and a timeout that is uutils': the lookup of GNU's is what refuses
+  const withoutGnu = join(root, "path-without-gnu-timeout");
+  mkdirSync(withoutGnu);
+  const others = ["jq", "getfacl", "setfacl", "systemctl", "systemd-analyze", "groupadd", "groupdel", "getent"];
+  for (const tool of [...others, "find", "sort", "stat", "cmp", "perl", "grep", "wc", "date"]) {
+    symlinkSync(Bun.which(tool) ?? tool, join(withoutGnu, tool));
+  }
+  writeStub(withoutGnu, "timeout", UUTILS_TIMEOUT);
   const cases = [
     { ...defaults, code: 0, says: "" },
     { ...defaults, code: 2, says: "jq required", prefix: 'PATH="";' },
+    { ...defaults, code: 2, says: "GNU coreutils timeout is required", prefix: `PATH=${withoutGnu};` },
     { ...defaults, base: blocked, code: 2, says: "both builds must be executable" },
     { ...defaults, base: blocked, code: 2, says: "both builds must be executable", prefix: "head=$base; base=/bin/true;" },
     { ...defaults, base: join(root, "missing-bin"), code: 2, says: "both builds must be executable" },
