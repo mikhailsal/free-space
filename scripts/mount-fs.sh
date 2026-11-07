@@ -15,7 +15,9 @@
 #    leaves both snapshots and the state as they were;
 # 6. --cross-mounts lets a late foreign filesystem in, and still not a bind mount;
 # 7. the coarse backend keeps a root that is a mount point inside another root, and
-#    the mount entry of the outer tree, through scans and refreshes.
+#    the mount entry of the outer tree, through scans and refreshes; once that
+#    filesystem is unmounted, a refresh that reaches the folder is refused and
+#    changes nothing.
 set -eu
 
 # Re-exec before creating any fixture: even SIGKILL cannot propagate our
@@ -227,5 +229,11 @@ coarse_inside_has added
 coarse refresh "$a" 2> "$t/err" || fail "coarse refresh of the folder with the mount: $(cat "$t/err")"
 coarse_check "refresh of the folder with the mount"
 coarse_inside_has added
+# the filesystem of the nested root goes away and a large file lies under its mount point
+umount "$a/m"
+head -c 4194304 /dev/zero > "$a/m/underneath"
+if coarse refresh "$a" 2> "$t/err"; then fail "coarse: a refresh over an unmounted nested root should stop"; fi
+grep -q 'no longer a mount point' "$t/err" || fail "coarse: the refusal does not say why: $(cat "$t/err")"
+coarse_check "refused refresh after the unmount"
 coarse status --json 2> /dev/null | jq -e '.last_error == null' > /dev/null || fail "coarse status: $(coarse status --json 2>&1)"
 echo "ok: a root on a mount point keeps its tree and the outer tree keeps the mount entry"
