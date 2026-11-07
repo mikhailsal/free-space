@@ -154,7 +154,7 @@ pub fn next_generation(dir: &SnapshotDir) -> (u64, Option<u64>) {
     (base + 1, cur)
 }
 
-fn has_required_schema(snapshot: &Snapshot) -> bool {
+pub(crate) fn has_required_schema(snapshot: &Snapshot) -> bool {
     use std::collections::HashSet;
     crate::snapshot::schema::REQUIRED_COLUMNS
         .iter()
@@ -175,14 +175,14 @@ fn has_required_schema(snapshot: &Snapshot) -> bool {
 
 /// How a successful scan publishes its previous generation. Only snapshots
 /// this binary can open are eligible; unreadable current files never replace prev.
-enum Previous {
+pub(crate) enum Previous {
     Rotate(u64),
     Retain(u64),
     Drop,
 }
 
 impl Previous {
-    fn for_scan(dir: &SnapshotDir, keep: bool, current: Option<u64>) -> Self {
+    pub(crate) fn for_scan(dir: &SnapshotDir, keep: bool, current: Option<u64>) -> Self {
         if !keep {
             return Self::Drop;
         }
@@ -198,7 +198,7 @@ impl Previous {
         }
     }
 
-    fn generation(&self) -> Option<u64> {
+    pub(crate) fn generation(&self) -> Option<u64> {
         match self {
             Self::Rotate(generation) | Self::Retain(generation) => Some(*generation),
             Self::Drop => None,

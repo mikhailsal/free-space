@@ -9,6 +9,9 @@ use crate::error::{Error, ErrorCode, Result};
 
 pub const DEFAULT_CONFIG: &str = "/etc/freespace/config.toml";
 pub const DEFAULT_SNAPSHOT_DIR: &str = "/var/lib/freespace";
+/// Coarse backend: entries below this share of the filesystem size are folded
+/// into buckets (parts per million; 1000 = 0.1%).
+pub const DEFAULT_COARSE_PPM: u32 = 1000;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -16,6 +19,29 @@ pub enum Backend {
     #[default]
     V1,
     V2,
+    /// Experimental: keeps only large entries and folds the rest into buckets.
+    Coarse,
+}
+
+impl Backend {
+    /// Name used by `--backend` and `backend = "…"`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Backend::V1 => "v1",
+            Backend::V2 => "v2",
+            Backend::Coarse => "coarse",
+        }
+    }
+
+    /// Directory below `snapshot_dir` that holds this backend's files; v1 uses
+    /// `snapshot_dir` itself, the experimental backends keep their own.
+    pub fn subdir(self) -> Option<&'static str> {
+        match self {
+            Backend::V1 => None,
+            Backend::V2 => Some("v2"),
+            Backend::Coarse => Some("coarse"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,6 +57,9 @@ pub struct Config {
     pub workers: Option<usize>,
     /// Use disk-backed staging for full scans.
     pub low_memory: bool,
+    /// Coarse backend only: share of the filesystem size, in parts per million,
+    /// below which entries are folded into buckets.
+    pub coarse_ppm: u32,
     /// `serve`/`gui` port; 0 = random.
     pub port: u16,
     pub interval: String,
@@ -46,6 +75,7 @@ impl Default for Config {
             keep_previous: true,
             workers: None,
             low_memory: false,
+            coarse_ppm: DEFAULT_COARSE_PPM,
             port: 0,
             interval: "daily".into(),
             at: "02:00".into(),
@@ -125,6 +155,9 @@ fn validate(c: &Config, path: &Path) -> Result<()> {
     if c.workers == Some(0) {
         return bad("workers", "must be at least 1");
     }
+    if !(1..=1_000_000).contains(&c.coarse_ppm) {
+        return bad("coarse_ppm", "must be between 1 and 1000000");
+    }
     if !matches!(c.interval.as_str(), "hourly" | "daily" | "weekly") {
         return bad("interval", "must be hourly, daily or weekly");
     }
@@ -181,8 +214,11 @@ pub fn render(c: &Config) -> String {
         "snapshot_dir = {:?}\n",
         c.snapshot_dir.display().to_string()
     ));
-    if c.backend == Backend::V2 {
-        s.push_str("backend = \"v2\"\n");
+    if c.backend != Backend::V1 {
+        s.push_str(&format!("backend = {:?}\n", c.backend.name()));
+    }
+    if c.backend == Backend::Coarse {
+        s.push_str(&format!("coarse_ppm = {}\n", c.coarse_ppm));
     }
     s.push_str(&format!("keep_previous = {}\n", c.keep_previous));
     if let Some(w) = c.workers {
@@ -211,6 +247,18 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(parse(&render(&c), p).unwrap(), c);
+        let coarse = Config {
+            backend: Backend::Coarse,
+            coarse_ppm: 250,
+            ..Default::default()
+        };
+        let text = render(&coarse);
+        assert!(
+            text.contains("backend = \"coarse\"\ncoarse_ppm = 250\n"),
+            "{text}"
+        );
+        assert_eq!(parse(&text, p).unwrap(), coarse);
+        assert!(!render(&Config::default()).contains("coarse_ppm"));
     }
 
     #[test]
@@ -227,6 +275,11 @@ mod tests {
         assert!(e.message.contains("roots"));
         let e = parse("low_memory = \"auto\"", p).unwrap_err();
         assert!(e.message.contains("low_memory"));
+        for text in ["coarse_ppm = 0", "coarse_ppm = 1000001"] {
+            let e = parse(text, p).unwrap_err();
+            assert_eq!(e.code, ErrorCode::Config);
+            assert!(e.message.contains("coarse_ppm"), "{}", e.message);
+        }
     }
 
     #[test]

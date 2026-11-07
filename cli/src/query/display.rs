@@ -20,6 +20,8 @@ pub(super) fn stamp(ts: i64) -> String {
 pub(super) fn items(e: &EntryOut) -> String {
     match e.kind {
         Kind::Dir | Kind::Mount => count(e.items),
+        // a folded entry stands for that many small ones
+        _ if e.folded => count(e.items),
         _ => String::new(),
     }
 }

@@ -1,4 +1,6 @@
-//! Explicit backend dispatch. V2 never opens or migrates the v1 database.
+//! Explicit backend dispatch. V2 never opens or migrates the v1 database. The coarse
+//! backend writes ordinary v1 snapshot files into a directory of its own, so everything
+//! that reads a snapshot treats it as v1; only scan and refresh differ.
 use freespace_core::{
     Error, ErrorCode, Result,
     config::{self, Backend, Loaded},
@@ -10,10 +12,10 @@ use std::sync::OnceLock;
 static OVERRIDE: OnceLock<Backend> = OnceLock::new();
 pub fn select(value: Option<&str>) {
     if let Some(value) = value {
-        let _ = OVERRIDE.set(if value == "v2" {
-            Backend::V2
-        } else {
-            Backend::V1
+        let _ = OVERRIDE.set(match value {
+            "v2" => Backend::V2,
+            "coarse" => Backend::Coarse,
+            _ => Backend::V1,
         });
     }
 }
@@ -25,9 +27,9 @@ pub fn load() -> Result<Loaded> {
     Ok(loaded)
 }
 pub fn dir(loaded: &Loaded) -> SnapshotDir {
-    match loaded.config.backend {
-        Backend::V1 => loaded.snapshot_dir(),
-        Backend::V2 => SnapshotDir::new(loaded.config.snapshot_dir.join("v2")),
+    match loaded.config.backend.subdir() {
+        None => loaded.snapshot_dir(),
+        Some(name) => SnapshotDir::new(loaded.config.snapshot_dir.join(name)),
     }
 }
 pub fn database(dir: &SnapshotDir) -> std::path::PathBuf {
@@ -52,7 +54,7 @@ impl Session {
     pub fn open(loaded: &Loaded) -> Result<Self> {
         let dir = dir(loaded);
         match loaded.config.backend {
-            Backend::V1 => Snapshot::open_current(&dir).map(Self::V1),
+            Backend::V1 | Backend::Coarse => Snapshot::open_current(&dir).map(Self::V1),
             Backend::V2 => reader(&dir).map(Self::V2),
         }
     }
@@ -78,12 +80,12 @@ impl Session {
 pub fn diff(loaded: &Loaded, p: &DiffParams) -> Result<DiffResponse> {
     let dir = dir(loaded);
     match loaded.config.backend {
-        Backend::V1 => queries::diff(&dir, p),
+        Backend::V1 | Backend::Coarse => queries::diff(&dir, p),
         Backend::V2 => queries::v2::diff(&reader(&dir)?, p),
     }
 }
 pub fn status(backend: Backend, dir: &SnapshotDir, allow_missing: bool) -> Result<StatusResponse> {
-    if backend == Backend::V1 {
+    if backend != Backend::V2 {
         return if allow_missing {
             queries::status::status_page(dir)
         } else {

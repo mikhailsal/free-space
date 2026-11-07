@@ -403,7 +403,7 @@ fn start_scan_if_needed(
     backend: config::Backend,
 ) -> Result<(bool, Option<String>)> {
     let opened = match backend {
-        config::Backend::V1 => Snapshot::open_current(dir).map(|_| ()),
+        config::Backend::V1 | config::Backend::Coarse => Snapshot::open_current(dir).map(|_| ()),
         config::Backend::V2 => crate::backend::reader(dir)
             .and_then(|reader| reader.meta(false))
             .map(|_| ()),

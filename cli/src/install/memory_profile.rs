@@ -65,6 +65,14 @@ fn selected(low_memory: bool, reason: &str) -> Decision {
 }
 
 fn automatic(backend: Backend, memory: MemoryAvailability, entries: Option<u64>) -> Decision {
+    if backend == Backend::Coarse {
+        // The coarse walk streams the tree: its memory follows the retained entries and
+        // the depth of the tree, not the number of entries, and it never stages on disk.
+        return selected(
+            false,
+            "auto: the coarse backend streams the tree and does not use disk staging",
+        );
+    }
     let Some(available) = memory.available_bytes else {
         return selected(
             true,
@@ -78,7 +86,7 @@ fn automatic(backend: Backend, memory: MemoryAvailability, entries: Option<u64>)
         );
     };
     let per_entry = match backend {
-        Backend::V1 => 384,
+        Backend::V1 | Backend::Coarse => 384,
         Backend::V2 => 1024,
     };
     let Some(estimate) = entries

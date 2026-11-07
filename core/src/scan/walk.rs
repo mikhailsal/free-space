@@ -108,7 +108,7 @@ pub fn dev_string(dev: u64) -> String {
     format!("{major}:{minor}")
 }
 
-fn normalize_root(p: &Path) -> io::Result<PathBuf> {
+pub(crate) fn normalize_root(p: &Path) -> io::Result<PathBuf> {
     let c = fs::canonicalize(p)?;
     if !c.is_dir() {
         return Err(io::Error::new(
@@ -249,7 +249,7 @@ pub(super) fn prepare_roots(
     Ok((root_paths, root_ctx))
 }
 
-fn validate_root_nesting(path: &Path, roots: &[PathBuf], dev: u64) -> io::Result<()> {
+pub(crate) fn validate_root_nesting(path: &Path, roots: &[PathBuf], dev: u64) -> io::Result<()> {
     for other in roots {
         if other != path && path.starts_with(other) && fs::metadata(other)?.dev() == dev {
             return Err(io::Error::new(

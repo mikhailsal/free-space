@@ -409,7 +409,7 @@ fn update_fs_stats(tree: &mut Tree, xpath: &[u8]) {
     }
 }
 
-fn precheck(dir: &SnapshotDir, entries: u64) -> Result<publish::PrecheckInfo> {
+pub(crate) fn precheck(dir: &SnapshotDir, entries: u64) -> Result<publish::PrecheckInfo> {
     publish::precheck(dir, Some(entries), 2).map_err(|mut e| {
         e.last_error = Some(state::LastError {
             ts: platform::now_secs(),
@@ -420,7 +420,12 @@ fn precheck(dir: &SnapshotDir, entries: u64) -> Result<publish::PrecheckInfo> {
     })
 }
 
-fn refresh_meta(snap: &Snapshot, generation: u64, xpath: &[u8], started: i64) -> Result<WriteMeta> {
+pub(crate) fn refresh_meta(
+    snap: &Snapshot,
+    generation: u64,
+    xpath: &[u8],
+    started: i64,
+) -> Result<WriteMeta> {
     let mut meta = WriteMeta::new(generation, snap.meta.prev_generation, snap.meta.scanned_at);
     meta.one_file_system = snap.meta.one_file_system;
     meta.host = snap.meta.host.clone();

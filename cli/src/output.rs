@@ -174,8 +174,19 @@ fn first_line(e: &clap::Error) -> String {
         .to_owned()
 }
 
-/// D13: an incomplete snapshot is reported before any numbers.
+/// D13: an incomplete snapshot is reported before any numbers. So is a coarse one, which
+/// lists only the larger entries by design.
 pub fn warn_incomplete(h: &Header) {
+    warn_unknown(h);
+    if let Some(below) = h.folded_below {
+        eprintln!(
+            "note: coarse snapshot, entries smaller than {} are folded into [small items] rows",
+            freespace_core::format::size(below)
+        );
+    }
+}
+
+fn warn_unknown(h: &Header) {
     if !h.incomplete {
         return;
     }
