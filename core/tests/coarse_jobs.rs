@@ -570,3 +570,28 @@ fn roots_on_one_filesystem_share_their_hardlinks_through_a_refresh() {
     assert_eq!(out.rescanned.with, [two.clone(), three.clone()]);
     f.agrees_on_roots(&roots);
 }
+
+#[test]
+fn a_root_with_hardlinks_is_refreshed_beside_a_root_that_is_gone_from_disk() {
+    let Some(f) = fx() else { return };
+    let (one, two) = (f.path("one"), f.path("two"));
+    f.big("one/shared.bin");
+    f.big("two/own.bin");
+    fs::hard_link(one.join("shared.bin"), two.join("link.bin")).unwrap();
+    coarse::run_scan(f.request(vec![one.clone(), two.clone()], f.ppm, true)).unwrap();
+    let before = f.ls("two").entry;
+
+    // two cannot hold a link any more, so one is rescanned without it; what the snapshot
+    // knows of two stays as it was until two is scanned again
+    fs::remove_dir_all(&two).unwrap();
+    f.big("one/more.bin");
+    let out = f.refresh("one").unwrap();
+    assert_eq!(out.rescanned.part, Part::Root);
+    assert!(out.rescanned.with.is_empty(), "{:?}", out.rescanned.with);
+    f.agrees_on_roots(std::slice::from_ref(&one));
+    let after = f.ls("two").entry;
+    assert_eq!(
+        (after.allocated, after.items),
+        (before.allocated, before.items)
+    );
+}
