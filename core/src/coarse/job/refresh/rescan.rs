@@ -2,6 +2,7 @@
 //! (together with the roots that share its hardlinks), each merged back into the model.
 
 use std::fs;
+use std::io::ErrorKind;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
@@ -14,7 +15,7 @@ use crate::coarse::plan::{Plan, Slice, scope};
 use crate::coarse::walk::{self, Boundary};
 use crate::error::{Error, Result};
 use crate::platform::{self, MountInfo};
-use crate::scan::walk::statvfs_safe;
+use crate::scan::walk::{statvfs_safe, validate_root_nesting};
 
 pub(super) struct Done {
     pub visited: u64,
@@ -56,6 +57,30 @@ fn links_of(model: &Model, root: &Path) -> u64 {
         .map_or(0, |n| n.total.links)
 }
 
+/// A scan root nested in another one was scanned as a mount point of its own filesystem, and
+/// a snapshot never holds two roots of one filesystem inside each other. If the path of a
+/// root inside `within` now lies on the filesystem of a root that holds it, that filesystem
+/// has been unmounted: the rescan would see an ordinary folder there, and the snapshot would
+/// hold it twice, once in the outer tree and once as the root. A full scan puts that right.
+/// A root that cannot be examined is left to the walk.
+fn check_nested(model: &Model, within: &Path) -> Result<()> {
+    let paths: Vec<PathBuf> = model.roots.iter().map(|r| r.path.clone()).collect();
+    for root in model.roots.iter().filter(|r| r.path.starts_with(within)) {
+        let Ok(meta) = fs::metadata(&root.path) else {
+            continue;
+        };
+        if let Err(e) = validate_root_nesting(&root.path, &paths, meta.dev())
+            && e.kind() == ErrorKind::InvalidInput
+        {
+            return Err(Error::usage(format!(
+                "{} is no longer a mount point of its own filesystem, so the part of the snapshot that holds it cannot be refreshed; run a full scan",
+                root.path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// The other scan roots on the filesystem of `root`: a hardlink can join an entry of one to
 /// an entry of another, and the bytes of such an inode are carried by whichever path of
 /// all of them sorts first. A root that is gone from disk cannot hold a link any more.
@@ -84,6 +109,7 @@ pub(super) fn rescan_root(
     mounts: &[MountInfo],
     seen: &AtomicU64,
 ) -> Result<Done> {
+    check_nested(model, root)?;
     let peers = peers_of(model, root)?;
     if !peers.is_empty() && links_of(model, root) > 0 {
         return rescan_together(model, root, peers, spent, mounts, seen);
@@ -123,6 +149,9 @@ fn rescan_together(
         .cloned()
         .ok_or_else(|| invariant("path is not a scan root"))?;
     let group: Vec<RootMeta> = std::iter::once(own).chain(peers).collect();
+    for meta in &group {
+        check_nested(model, &meta.path)?;
+    }
     let mut visited = spent;
     for (meta, found) in group.iter().zip(walk_group(&group, mounts, seen, None)?) {
         visited += found.visited;
@@ -145,6 +174,7 @@ fn rescan_folder(
     mounts: &[MountInfo],
     seen: &AtomicU64,
 ) -> Result<Done> {
+    check_nested(model, &path)?;
     let threshold = merge::threshold_for(&model.roots, &path)?;
     let boundary = boundary(&path, mounts)?;
     let w = walk_of(&boundary, threshold, seen);
@@ -212,3 +242,6 @@ pub(super) fn update_fs_stats(model: &mut Model, target: &Path) {
         root.stats = stats;
     }
 }
+
+#[cfg(test)]
+mod tests;

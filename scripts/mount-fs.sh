@@ -218,7 +218,10 @@ coarse_check() {
     [ "$(coarse_mount_row)" = '["mount",0,"tmpfs"]' ] || fail "coarse, $1: mount row $(coarse_mount_row)"
     coarse_inside_has foreign
 }
-coarse scan "$t/root" "$a/m" --coarse-ppm 1 2> "$t/err" || fail "coarse scan: $(cat "$t/err")"
+mkdir "$t/links"
+head -c 8192 /dev/zero > "$t/links/one"
+ln "$t/links/one" "$t/links/two"
+coarse scan "$t/root" "$a/m" "$t/links" --coarse-ppm 1 2> "$t/err" || fail "coarse scan: $(cat "$t/err")"
 coarse_check "scan"
 coarse refresh "$t/root" 2> "$t/err" || fail "coarse refresh of the outer root: $(cat "$t/err")"
 coarse_check "refresh of the outer root"
@@ -229,11 +232,19 @@ coarse_inside_has added
 coarse refresh "$a" 2> "$t/err" || fail "coarse refresh of the folder with the mount: $(cat "$t/err")"
 coarse_check "refresh of the folder with the mount"
 coarse_inside_has added
-# the filesystem of the nested root goes away and a large file lies under its mount point
+# a root with hardlinks is refreshed together with the roots on its filesystem, among them the outer one
+coarse refresh "$t/links" 2> "$t/err" || fail "coarse refresh of the root with hardlinks: $(cat "$t/err")"
+coarse_check "refresh of the root with hardlinks"
+# The filesystem of the nested root goes away. No refresh may walk the path it was mounted on,
+# wherever it starts, and whether or not a large file lies under the mount point.
+refuse_unmounted() {
+    if coarse refresh "$1" 2> "$t/err"; then fail "coarse: a refresh of $1 over an unmounted nested root should stop"; fi
+    grep -q 'no longer a mount point' "$t/err" || fail "coarse: the refusal for $1 does not say why: $(cat "$t/err")"
+    coarse_check "refused refresh of $1 after the unmount"
+}
 umount "$a/m"
+for target in "$t/root" "$a" "$a/m" "$t/links"; do refuse_unmounted "$target"; done
 head -c 4194304 /dev/zero > "$a/m/underneath"
-if coarse refresh "$a" 2> "$t/err"; then fail "coarse: a refresh over an unmounted nested root should stop"; fi
-grep -q 'no longer a mount point' "$t/err" || fail "coarse: the refusal does not say why: $(cat "$t/err")"
-coarse_check "refused refresh after the unmount"
+for target in "$t/root" "$a" "$a/m" "$t/links"; do refuse_unmounted "$target"; done
 coarse status --json 2> /dev/null | jq -e '.last_error == null' > /dev/null || fail "coarse status: $(coarse status --json 2>&1)"
 echo "ok: a root on a mount point keeps its tree and the outer tree keeps the mount entry"
