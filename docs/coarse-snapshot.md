@@ -61,10 +61,10 @@ on one filesystem is counted once, in the root that holds the first path.
 
 ## What the answers say about it
 
-Every answer of a coarse snapshot carries `folded_below`, the size under which entries are
-folded, and `ls` marks the stand-in rows with `folded: true` (`items` counts the entries
-inside). Terminal output prints a note before the numbers, as it does for an incomplete
-scan.
+Every `ls`, `top`, `find` and `diff` answer of a coarse snapshot carries `folded_below`, the
+size under which entries are folded, and `ls` marks the stand-in rows with `folded: true`
+(`items` counts the entries inside). Terminal output prints a note before the numbers, as it
+does for an incomplete scan.
 
 - **Totals are exact.** A folder's `allocated`, `apparent` and `items` equal what a full
   scan reports, folded entries included.
