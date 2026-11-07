@@ -1,11 +1,14 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 
 use super::*;
 use crate::coarse::plan::{Plan, plan, scope};
-use crate::coarse::testing::{KIB, fingerprint, model_of, naive, put, sample, walk_with};
+use crate::coarse::testing::{
+    KIB, fingerprint, model_of, naive, nested_model, put, sample, walk_mounted, walk_with,
+};
 use crate::coarse::walk::{Boundary, Walk, scan};
+use crate::scan::Kind;
 
 const THRESHOLD: u64 = 100 * KIB;
 
@@ -225,5 +228,121 @@ fn pruning_folds_what_no_longer_qualifies_and_keeps_what_still_does() {
     assert_eq!(
         (root.total.allocated, root.total.entries),
         (allocated, entries)
+    );
+}
+
+/// `top` with a mount point at `a/m` that is also scanned as a root of its own.
+fn nested(top: &Path) -> (Model, PathBuf) {
+    put(top, "a/big.bin", 300 * 1024);
+    put(top, "a/m/inner.bin", 200 * 1024);
+    put(top, "a/m/note.txt", 10);
+    put(top, "z.bin", 1024 * 1024);
+    let inner = top.join("a/m");
+    (nested_model(top, &inner, THRESHOLD), inner)
+}
+
+#[test]
+fn a_nested_root_shares_its_path_with_the_mount_point_entry_of_the_outer_tree() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (model, inner) = nested(tmp.path());
+    verify(&model).unwrap();
+    let there: Vec<(Kind, bool)> = model
+        .nodes
+        .iter()
+        .filter(|n| n.path == inner)
+        .map(|n| (n.kind, n.root))
+        .collect();
+    assert_eq!(there.len(), 2, "{there:?}");
+    assert!(there.contains(&(Kind::Mount, false)) && there.contains(&(Kind::Dir, true)));
+    // what lies below the path hangs from the root; the mount point entry counts as one
+    // entry of the outer tree and the root as the first of its own
+    let totals: Vec<u64> = model
+        .nodes
+        .iter()
+        .filter(|n| n.root)
+        .map(|n| n.total.entries)
+        .collect();
+    assert_eq!(totals, [5, 3]);
+}
+
+#[test]
+fn replacing_either_root_keeps_the_other_and_the_mount_point_entry() {
+    let tmp = tempfile::tempdir().unwrap();
+    let top = tmp.path();
+    let (mut model, inner) = nested(top);
+
+    put(top, "y.bin", 500 * 1024);
+    let outer = walk_mounted(top, true, THRESHOLD, &[&inner]);
+    replace_root(&mut model, top, outer.nodes).unwrap();
+    verify(&model).unwrap();
+    assert_eq!(
+        fingerprint(&model),
+        fingerprint(&nested_model(top, &inner, THRESHOLD))
+    );
+
+    put(&inner, "more.bin", 400 * 1024);
+    let inside = walk_mounted(&inner, true, THRESHOLD, &[]);
+    replace_root(&mut model, &inner, inside.nodes).unwrap();
+    verify(&model).unwrap();
+    assert_eq!(
+        fingerprint(&model),
+        fingerprint(&nested_model(top, &inner, THRESHOLD))
+    );
+}
+
+#[test]
+fn refreshing_a_folder_that_holds_a_nested_root_leaves_its_tree_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let top = tmp.path();
+    let (mut model, inner) = nested(top);
+    put(top, "a/extra.bin", 250 * 1024);
+    let folder = top.join("a");
+    let walked = walk_mounted(&folder, false, THRESHOLD, &[&inner]);
+    update(&mut model, &folder, walked.nodes).unwrap();
+    verify(&model).unwrap();
+    assert_eq!(
+        fingerprint(&model),
+        fingerprint(&nested_model(top, &inner, THRESHOLD))
+    );
+}
+
+#[test]
+fn a_refresh_of_a_nested_root_plans_the_root_and_not_the_mount_point_entry() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (model, inner) = nested(tmp.path());
+    let planned = plan(&model.nodes, &inner).unwrap();
+    assert!(matches!(&planned, Plan::Retained(path) if *path == inner));
+    assert_eq!(planned.entries(&model.nodes), 3);
+    assert_eq!(planned.links(&model.nodes), 0);
+    // a folded name inside it is the root's bucket, not the outer folder's
+    let folded = plan(&model.nodes, &inner.join("note.txt")).unwrap();
+    assert!(matches!(&folded, Plan::Range(slice) if slice.parent == inner));
+}
+
+#[test]
+fn only_a_root_and_its_mount_point_entry_may_share_a_path() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (model, _) = nested(tmp.path());
+
+    let mut twice = model.clone();
+    let mount = twice.nodes.iter().find(|n| n.kind == Kind::Mount).unwrap();
+    twice.nodes.push(mount.clone());
+    let refused = verify(&twice).unwrap_err();
+    assert!(
+        refused.message.contains("duplicate node path"),
+        "{refused:?}"
+    );
+
+    let mut file = model;
+    let mount = file
+        .nodes
+        .iter_mut()
+        .find(|n| n.kind == Kind::Mount)
+        .unwrap();
+    mount.kind = Kind::File;
+    let refused = verify(&file).unwrap_err();
+    assert!(
+        refused.message.contains("path of a scan root"),
+        "{refused:?}"
     );
 }

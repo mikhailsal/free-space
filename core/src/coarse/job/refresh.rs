@@ -237,10 +237,16 @@ fn vanished(target: &Path, model: &Model, label: &str) -> Result<Live> {
         }
         missing = parent;
     };
-    if !live.starts_with(&root.path) {
+    // a scan root that was inside the missing part is gone with it
+    let gone = if live.starts_with(&root.path) {
+        model.roots.iter().find(|r| r.path.starts_with(missing))
+    } else {
+        Some(root)
+    };
+    if let Some(gone) = gone {
         return Err(Error::usage(format!(
             "root {} no longer exists, so {label} cannot be refreshed; run a full scan",
-            root.path.display()
+            gone.path.display()
         )));
     }
     Ok(Live::Gone {
@@ -402,3 +408,6 @@ fn update_fs_stats(model: &mut Model, target: &Path) {
         root.stats = stats;
     }
 }
+
+#[cfg(test)]
+mod tests;

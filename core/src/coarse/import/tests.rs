@@ -8,7 +8,10 @@ use super::*;
 use crate::ErrorCode;
 use crate::coarse::export::build;
 use crate::coarse::merge::rebuild;
-use crate::coarse::testing::{KIB, NOTHING, fingerprint, model_of, put, sample, snapshot_of};
+use crate::coarse::testing::{
+    KIB, NOTHING, fingerprint, model_of, nested_model, put, sample, snapshot_of,
+};
+use crate::queries::{self, params::LsParams};
 use crate::scan::{self, WalkOptions};
 use crate::snapshot::writer::{self, Reserve, WriteMeta};
 
@@ -46,6 +49,16 @@ fn same_scan_times(back: &Model, model: &Model) {
             "{}",
             node.path.display()
         );
+    }
+}
+
+/// Like `same_scan_times`, for models where two nodes share a path: compared by position.
+fn same_scan_times_by_index(back: &Model, model: &Model) {
+    assert_eq!(back.nodes.len(), model.nodes.len());
+    let key = |n: &Node| (n.path.clone(), n.root);
+    for node in &model.nodes {
+        let twin = back.nodes.iter().find(|n| key(n) == key(node)).unwrap();
+        assert_eq!(twin.total.min_scanned_at, node.total.min_scanned_at);
     }
 }
 
@@ -110,6 +123,44 @@ fn links_scan_times_and_mounts_survive_the_round_trip() {
     );
     assert!(mnt.pinned());
     same_scan_times(&back, &model);
+}
+
+#[test]
+fn a_root_nested_in_a_mount_point_reads_back_beside_the_entry_that_shares_its_path() {
+    let tmp = tempfile::tempdir().unwrap();
+    let top = tmp.path().join("tree");
+    put(&top, "a/big.bin", 300 * 1024);
+    put(&top, "a/m/inner.bin", 200 * 1024);
+    let inner = top.join("a/m");
+    let model = nested_model(&top, &inner, THRESHOLD);
+    let snap = snapshot_of(&model, &tmp.path().join("c.db"));
+    let back = load(&snap).unwrap();
+    assert_eq!(fingerprint(&back), fingerprint(&model));
+    let roots: Vec<&Path> = back.roots.iter().map(|r| r.path.as_path()).collect();
+    assert_eq!(roots, [top.as_path(), inner.as_path()]);
+    assert_eq!(back.nodes.iter().filter(|n| n.path == inner).count(), 2);
+    same_scan_times_by_index(&back, &model);
+
+    // the query layer lists the mount point in the outer folder and, at the same path, what
+    // the root holds, as it does for a v1 snapshot of the two roots
+    let ls = |path: &Path| {
+        let params = LsParams {
+            path: Some(path.display().to_string()),
+            ..Default::default()
+        };
+        queries::ls(&snap, &params).unwrap()
+    };
+    let outer = ls(&top.join("a"));
+    let mount = outer.entries.iter().find(|e| e.name == "m").unwrap();
+    assert_eq!(mount.allocated, 0);
+    let names: Vec<String> = ls(&inner).entries.into_iter().map(|e| e.name).collect();
+    assert_eq!(names, ["inner.bin"]);
+
+    // the order of the nodes in memory decides nothing
+    let mut flipped = model.clone();
+    flipped.nodes.reverse();
+    let snap = snapshot_of(&flipped, &tmp.path().join("flipped.db"));
+    assert_eq!(fingerprint(&load(&snap).unwrap()), fingerprint(&model));
 }
 
 #[test]

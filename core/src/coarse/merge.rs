@@ -9,6 +9,7 @@ use super::buckets::{find, slot_of, validate};
 use super::model::{MAX_NODES, Model, Node, RootMeta, Stats, invariant, large};
 use super::walk::{Scope, Walked};
 use crate::error::{Error, Result};
+use crate::scan::Kind;
 
 fn depth(node: &Node) -> usize {
     node.path
@@ -20,12 +21,17 @@ fn depth(node: &Node) -> usize {
 }
 
 /// Index of the retained parent of every node; `None` for scan roots.
+///
+/// A scan root that is a mount point inside another root shares its path with the mount
+/// point entry the outer tree keeps there. Only the root has children, so the path stands
+/// for the directory.
 fn parents(nodes: &[Node]) -> Result<Vec<Option<usize>>> {
-    let index: HashMap<&Path, usize> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.path.as_path(), i))
-        .collect();
+    let mut index: HashMap<&Path, usize> = HashMap::with_capacity(nodes.len());
+    for (i, n) in nodes.iter().enumerate() {
+        if n.is_dir() || !index.contains_key(n.path.as_path()) {
+            index.insert(n.path.as_path(), i);
+        }
+    }
     nodes
         .iter()
         .map(|n| match n.parent() {
@@ -103,11 +109,22 @@ pub fn settle(nodes: &mut [Node]) -> Result<()> {
 /// The retained nodes form one tree per root, and every other node sits directly below
 /// a retained directory. A directory tiles all slots; nothing else has buckets.
 pub fn verify(model: &Model) -> Result<()> {
+    let root_paths: HashSet<&Path> = model
+        .nodes
+        .iter()
+        .filter(|n| n.root)
+        .map(|n| n.path.as_path())
+        .collect();
     let mut seen = HashSet::new();
     let mut roots = 0;
     for n in &model.nodes {
-        if !seen.insert(&n.path) {
+        // One node per path, but a root inside another root's mount point shares its path
+        // with the mount point entry the outer tree keeps there (and nothing else may).
+        if !seen.insert((&n.path, n.root)) {
             return Err(invariant("duplicate node path"));
+        }
+        if !n.root && n.kind != Kind::Mount && root_paths.contains(n.path.as_path()) {
+            return Err(invariant("entry on the path of a scan root"));
         }
         if n.is_dir() {
             validate(&n.buckets)?;
@@ -165,16 +182,36 @@ fn slot_in(node: &Node) -> Result<u32> {
         .ok_or_else(|| invariant("node has no name"))
 }
 
+/// The retained directory at `path`: for the path of a nested scan root, the root and not
+/// the mount point entry of the outer tree.
 fn position(nodes: &[Node], path: &Path) -> Result<usize> {
     nodes
         .iter()
-        .position(|n| n.path == path)
+        .position(|n| n.is_dir() && n.path == path)
         .ok_or_else(|| invariant("node missing"))
+}
+
+/// The scan root whose tree holds `node`: the deepest root at or above its path. An entry
+/// on the very path of a root that is not that root is the mount point the outer tree
+/// shows there, so it belongs to the root outside.
+fn owner<'a>(roots: &'a [RootMeta], node: &Node) -> Option<&'a Path> {
+    roots
+        .iter()
+        .filter(|r| node.path.starts_with(&r.path) && (node.root || node.path != r.path))
+        .max_by_key(|r| r.path.as_os_str().len())
+        .map(|r| r.path.as_path())
+}
+
+/// Remove what the tree of root `owned_by` holds at or below `top`. A root nested below
+/// `top` keeps its own tree.
+fn drop_below(model: &mut Model, top: &Path, owned_by: &Path) {
+    let Model { roots, nodes, .. } = model;
+    nodes.retain(|n| !(n.path.starts_with(top) && owner(roots, n) == Some(owned_by)));
 }
 
 /// Replace everything below scan root `root` by a fresh walk of it.
 pub fn replace_root(model: &mut Model, root: &Path, fresh: Vec<Node>) -> Result<()> {
-    model.nodes.retain(|n| !n.path.starts_with(root));
+    drop_below(model, root, root);
     model.nodes.extend(fresh);
     check_cap(&model.nodes)?;
     rebuild(&mut model.nodes)
@@ -183,6 +220,9 @@ pub fn replace_root(model: &mut Model, root: &Path, fresh: Vec<Node>) -> Result<
 /// Merge the rescan of retained directory `boundary` into the snapshot.
 pub fn update(model: &mut Model, boundary: &Path, mut fresh: Vec<Node>) -> Result<()> {
     let prior = model.nodes[position(&model.nodes, boundary)?].clone();
+    let owned_by = owner(&model.roots, &prior)
+        .ok_or_else(|| invariant("entry outside every scan root"))?
+        .to_path_buf();
     let threshold = threshold_for(&model.roots, boundary)?;
     let has_descendants = fresh.len() > 1;
     let top = fresh
@@ -192,7 +232,7 @@ pub fn update(model: &mut Model, boundary: &Path, mut fresh: Vec<Node>) -> Resul
     top.root = prior.root;
     let stays = prior.root || top.pinned() || has_descendants || large(&top.total, threshold);
     let folded = top.total.clone();
-    model.nodes.retain(|n| !n.path.starts_with(boundary));
+    drop_below(model, boundary, &owned_by);
     if stays {
         model.nodes.extend(fresh);
     } else {

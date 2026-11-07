@@ -72,17 +72,51 @@ pub fn walk_with(top: &Path, threshold: u64, scope: Option<&Scope>) -> (Walked, 
     scan(top, true, &w).unwrap()
 }
 
+fn root_meta(top: &Path, threshold: u64) -> RootMeta {
+    RootMeta {
+        path: top.to_path_buf(),
+        fs_type: String::new(),
+        stats: FsStats::default(),
+        threshold,
+    }
+}
+
 /// A model of the tree at `top`, scanned the way `freespace scan` scans a root.
 pub fn model_of(top: &Path, threshold: u64) -> Model {
     let (walked, _) = walk_with(top, threshold, None);
     Model {
-        roots: vec![RootMeta {
-            path: top.to_path_buf(),
-            fs_type: String::new(),
-            stats: FsStats::default(),
-            threshold,
-        }],
+        roots: vec![root_meta(top, threshold)],
         nodes: walked.nodes,
+        ppm: 1000,
+    }
+}
+
+/// Walk `top` as a scan root (or as a folder of one), with `mounts` standing in for mount
+/// points inside it. A second filesystem needs privileges; the walker is told instead.
+pub fn walk_mounted(top: &Path, root: bool, threshold: u64, mounts: &[&Path]) -> Walked {
+    let mut boundary = Boundary::of(top, &[]).unwrap();
+    boundary
+        .bind_mounts
+        .extend(mounts.iter().map(|m| m.to_path_buf()));
+    let seen = AtomicU64::new(0);
+    let w = Walk {
+        boundary: &boundary,
+        threshold,
+        scope: None,
+        seen: &seen,
+    };
+    scan(top, root, &w).unwrap().0
+}
+
+/// A model of `outer` and `inner`, a folder below it that is scanned as a root of its own
+/// and that the walk of `outer` takes for a mount point: its tree keeps the placeholder
+/// entry there, on the same path as the root of `inner`.
+pub fn nested_model(outer: &Path, inner: &Path, threshold: u64) -> Model {
+    let mut nodes = walk_mounted(outer, true, threshold, &[inner]).nodes;
+    nodes.extend(walk_mounted(inner, true, threshold, &[]).nodes);
+    Model {
+        roots: vec![root_meta(outer, threshold), root_meta(inner, threshold)],
+        nodes,
         ppm: 1000,
     }
 }

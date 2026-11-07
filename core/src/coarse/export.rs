@@ -72,11 +72,17 @@ fn collect<'a>(model: &'a Model) -> Result<Vec<Row<'a>>> {
             kids.entry(parent).or_default().push(node);
         }
     }
-    let by_path: HashMap<&Path, &Node> =
-        model.nodes.iter().map(|n| (n.path.as_path(), n)).collect();
+    // Roots only: a root inside another root's mount point shares its path with the mount
+    // point entry the outer tree keeps there, and the tree to write is the root's.
+    let roots: HashMap<&Path, &Node> = model
+        .nodes
+        .iter()
+        .filter(|n| n.root)
+        .map(|n| (n.path.as_path(), n))
+        .collect();
     let mut rows: Vec<Row<'a>> = Vec::new();
     for root in &model.roots {
-        let node = *by_path
+        let node = *roots
             .get(root.path.as_path())
             .ok_or_else(|| invariant("root node missing"))?;
         let name = Cow::Borrowed(root.path.as_os_str().as_bytes());

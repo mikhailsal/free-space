@@ -38,10 +38,7 @@ impl Plan {
     /// Entries the rescanned region held: what a refresh of it has to read.
     pub fn entries(&self, nodes: &[Node]) -> u64 {
         match self {
-            Self::Retained(path) => nodes
-                .iter()
-                .find(|n| n.path == *path)
-                .map_or(0, |n| n.total.entries),
+            Self::Retained(path) => directory(nodes, path).map_or(0, |n| n.total.entries),
             Self::Range(slice) => slice.old.entries,
         }
     }
@@ -50,13 +47,16 @@ impl Plan {
     /// outside the region, so a region with links is never refreshed on its own.
     pub fn links(&self, nodes: &[Node]) -> u64 {
         match self {
-            Self::Retained(path) => nodes
-                .iter()
-                .find(|n| n.path == *path)
-                .map_or(0, |n| n.total.links),
+            Self::Retained(path) => directory(nodes, path).map_or(0, |n| n.total.links),
             Self::Range(slice) => slice.old.links,
         }
     }
+}
+
+/// The retained directory at `path`. A scan root that is a mount point inside another root
+/// shares its path with the mount point entry of the outer tree; the directory is the root.
+fn directory<'a>(nodes: &'a [Node], path: &Path) -> Option<&'a Node> {
+    nodes.iter().find(|n| n.is_dir() && n.path == path)
 }
 
 /// The deepest retained directory that contains `target` (or is it).

@@ -33,8 +33,10 @@ sudo freespace --backend coarse scan --coarse-ppm 500
 The default, 1000, is 0.1 % (440 MB on a 440 GB disk). Smaller values keep more entries
 and make the snapshot larger. `--cross-mounts` is not available: a coarse scan stops at
 every other filesystem and shows it as a `mount` entry, so name it as a root of its own
-(`freespace scan / /mnt/data`). `--workers` and `--low-memory` do not apply either: the
-walk is one thread and never stages entries on disk.
+(`freespace scan / /mnt/data`). A root that is a mount point inside another root appears
+twice, as in v1: as a `mount` entry of 0 bytes in the outer tree and as the root of its own
+tree. `--workers` and `--low-memory` do not apply either: the walk is one thread and never
+stages entries on disk.
 
 ## What is kept and what is folded
 
@@ -94,6 +96,8 @@ The result is merged into the current snapshot, so a refresh costs what the resc
 costs. The command prints a note when it rescanned more than the path. A part that contains
 hardlinked files is the exception: their bytes belong to whichever path sorts first, which
 may be outside the part, so such a refresh rescans the whole scan root (the note says so).
+If a folder is gone and a scan root was inside it, the refresh stops and asks for a full
+scan.
 
 Refresh publishes a new generation and never rotates `prev`, as in v1.
 
