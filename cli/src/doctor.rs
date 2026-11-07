@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use clap::Args;
+use freespace_core::coarse::FIRST_SCAN_ROWS;
 use freespace_core::config;
 use freespace_core::format;
 use freespace_core::platform::{self, now_secs};
@@ -94,7 +95,8 @@ pub fn run(a: &DoctorArgs) -> output::Result<bool> {
     if cfg.backend == config::Backend::V2 {
         checks.extend(v2_snapshot_checks(&dir));
     } else {
-        checks.extend(snapshot_checks(&dir, cfg.keep_previous, &roots));
+        let found = snapshot_checks(&dir, cfg.keep_previous, &roots, cfg.backend);
+        checks.extend(found);
     }
     checks.push(skill_version());
 
@@ -266,7 +268,12 @@ fn unit_paths(snapshot_dir: &Path) -> Check {
     }
 }
 
-fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) -> Vec<Check> {
+fn snapshot_checks(
+    dir: &SnapshotDir,
+    keep_previous: bool,
+    roots: &[PathBuf],
+    backend: config::Backend,
+) -> Vec<Check> {
     let mut v = Vec::new();
     let snap = Snapshot::open_current(dir);
     match &snap {
@@ -325,9 +332,11 @@ fn snapshot_checks(dir: &SnapshotDir, keep_previous: bool, roots: &[PathBuf]) ->
 
     // the next scan's precheck, computed the same way scan does it; before the
     // first snapshot, from the inodes in use on the roots (the fallback, 2 % of
-    // the used space, asked for 8.1 G per snapshot where the real one is 1 G)
+    // the used space, asked for 8.1 G per snapshot where the real one is 1 G); a coarse
+    // snapshot holds a few rows, not one per inode
     let entries = match &snap {
         Ok(s) => Some(s.meta.entries),
+        Err(_) if backend == config::Backend::Coarse => Some(FIRST_SCAN_ROWS),
         Err(_) => freespace_core::job::expected_entries(roots),
     };
     if let Some(check) = next_scan_space_check(dir, entries, keep_previous) {

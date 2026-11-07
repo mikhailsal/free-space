@@ -1,4 +1,5 @@
-//! The backend-specific installation manifest. V2 stays separate from v1.
+//! The backend-specific installation manifest. V2 and coarse stay separate from v1: each
+//! keeps its snapshot in a directory of its own below the configured snapshot directory.
 use freespace_core::{
     Error, Result,
     config::{Backend, Config},
@@ -27,15 +28,22 @@ pub(super) fn v2_files(dir: &SnapshotDir) -> Vec<PathBuf> {
 
 pub(super) fn prepare_backend_dirs(config: &Config) -> Result<SnapshotDir> {
     let base = SnapshotDir::new(&config.snapshot_dir);
-    if config.backend == Backend::V1 {
+    let Some(name) = config.backend.subdir() else {
         super::prepare_snapshot_dir(&base)?;
         return Ok(base);
-    }
+    };
     // The base grants traversal; do not re-secure v1 snapshot files in it.
     prepare_directory(base.as_path())?;
-    let dir = SnapshotDir::new(base.path.join("v2"));
+    let dir = SnapshotDir::new(base.path.join(name));
     if dir.path.is_symlink() {
-        return Err(Error::generic("refusing a symlinked v2 snapshot directory"));
+        return Err(Error::generic(format!(
+            "refusing a symlinked {name} snapshot directory"
+        )));
+    }
+    if config.backend == Backend::Coarse {
+        // Its files are v1 snapshot files: same modes, same list.
+        super::prepare_snapshot_dir(&dir)?;
+        return Ok(dir);
     }
     prepare_directory(dir.as_path())?;
     for file in v2_files(&dir) {
@@ -53,24 +61,24 @@ pub(super) fn prepare_backend_dirs(config: &Config) -> Result<SnapshotDir> {
     Ok(dir)
 }
 
-/// Reject symlinked components before v2 install or uninstall touches paths
+/// Reject symlinked components before a v2 or coarse install or uninstall touches paths
 /// beneath the configured snapshot base. V1 keeps its established behavior.
-pub(super) fn validate_v2_base(config: &Config) -> Result<()> {
-    if config.backend != Backend::V2 {
+pub(super) fn validate_backend_base(config: &Config) -> Result<()> {
+    let Some(name) = config.backend.subdir() else {
         return Ok(());
-    }
+    };
     let mut path = PathBuf::new();
     for component in config.snapshot_dir.components() {
         path.push(component);
         reject_symlink(&path)?;
     }
-    let dir = SnapshotDir::new(config.snapshot_dir.join("v2"));
+    let dir = SnapshotDir::new(config.snapshot_dir.join(name));
     reject_symlink(dir.as_path())?;
     Ok(())
 }
 
 pub(super) fn validate_v2_install_files(config: &Config) -> Result<()> {
-    validate_v2_base(config)?;
+    validate_backend_base(config)?;
     if config.backend != Backend::V2 {
         return Ok(());
     }
@@ -84,7 +92,7 @@ pub(super) fn validate_v2_install_files(config: &Config) -> Result<()> {
 fn reject_symlink(path: &Path) -> Result<()> {
     match std::fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::generic(format!(
-            "refusing symlinked v2 snapshot path {}",
+            "refusing symlinked snapshot path {}",
             path.display()
         ))),
         Ok(_) => Ok(()),
