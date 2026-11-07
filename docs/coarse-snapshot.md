@@ -68,7 +68,9 @@ scan.
 - **`ls` shows the kept entries and the buckets.** The buckets sort among them by size.
 - **`top` and `find` see only kept entries.** A folded file is not listed and not matched
   by `find --name`; report counts as "at least" and do not conclude that a name does not
-  exist. `top --kind dir --older-than` works on kept folders.
+  exist. The `[small items]` rows are notes on what was folded, not entries: no filter
+  matches them and no count includes them. `top --kind dir --older-than` works on kept
+  folders.
 - **A folded path is `PATH_NOT_FOUND`**, and the message says it may be folded; `fix` names
   the nearest kept folder, whose `ls` shows the bucket.
 - **Counts differ in one place.** `status` shows the rows the snapshot file keeps as its

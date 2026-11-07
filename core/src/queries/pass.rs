@@ -18,6 +18,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use super::params::{KindFilter, SortKey};
 use super::types::Total;
 use crate::error::Result;
+use crate::scan::flags;
 use crate::snapshot::reader::{self, Snapshot};
 
 /// Rows per range below which another thread is not worth a connection.
@@ -82,6 +83,9 @@ fn sql(f: &Filter, index: &str) -> String {
         KindFilter::Dir => sql.push_str(" AND kind = 1"),
         KindFilter::Any => {}
     }
+    // A coarse snapshot's [small items] rows stand for entries it folded away. `ls` lists them
+    // so the totals add up, but they are not entries of the disk: no filter may match one.
+    sql.push_str(&format!(" AND flags & {} = 0", flags::BUCKET));
     sql.push_str(" AND allocated >= ?3");
     let date = "(CASE WHEN kind = 1 THEN newest_mtime ELSE mtime END)";
     if f.older.is_some() {

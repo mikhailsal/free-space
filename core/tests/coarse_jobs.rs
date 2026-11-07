@@ -252,6 +252,31 @@ fn queries_list_what_is_kept_and_say_so_about_what_is_not() {
         found("note*").entries.is_empty(),
         "folded notes are not listed"
     );
+    // The [small items] row is a note on what was folded, not an entry of the disk: a
+    // pattern that fits its name does not match it, with or without a size floor.
+    let all = found("*");
+    assert_eq!(all.total.count, 2, "big and huge.bin: {:?}", all.entries);
+    assert!(
+        all.entries.iter().all(|e| !e.entry.folded),
+        "{:?}",
+        all.entries
+    );
+    let sized = queries::find(
+        &snap,
+        &FindParams {
+            path: Some(f.text("")),
+            kind: Some("any".into()),
+            min_size: Some("1".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(sized.total.count, 2, "{:?}", sized.entries);
+    assert!(
+        sized.entries.iter().all(|e| !e.entry.folded),
+        "{:?}",
+        sized.entries
+    );
 
     let missing = queries::ls(
         &snap,
