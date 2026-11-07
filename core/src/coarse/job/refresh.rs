@@ -11,19 +11,20 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::time::Instant;
 
+mod rescan;
+
+use self::rescan::{execute, update_fs_stats};
 use super::{floor_of, precheck, record_failure, record_success, warnings, write_tmp};
 use crate::coarse::model::{Model, invariant};
-use crate::coarse::plan::{Plan, Slice, plan, scope};
-use crate::coarse::walk::{self, Boundary, Walk};
+use crate::coarse::plan::{Plan, plan};
 use crate::coarse::{export, import, merge};
 use crate::error::{Error, ErrorCode, Result};
 use crate::fault;
 use crate::job::next_generation;
-use crate::platform::{self, MountInfo};
+use crate::platform;
 use crate::queries::common::{lossy, normalize, shell_path_word};
 use crate::refresh::{RefreshReport, mounts, refresh_meta};
 use crate::scan::RootInfo;
-use crate::scan::walk::statvfs_safe;
 use crate::snapshot::progress::{self, ProgressCallback, ProgressWriter};
 use crate::snapshot::reader::Snapshot;
 use crate::snapshot::writer::Reserve;
@@ -51,6 +52,9 @@ pub enum Part {
 pub struct Rescanned {
     pub path: PathBuf,
     pub part: Part,
+    /// Other scan roots rescanned in the same pass (only with `Part::Root`): they share the
+    /// filesystem of `path`, and a hardlink can tie their bytes to its.
+    pub with: Vec<PathBuf>,
 }
 
 pub struct RefreshOutcome {
@@ -274,139 +278,6 @@ fn locate(model: &mut Model, target: &Path, live: &Live) -> Result<Plan> {
         return Ok(Plan::Retained(root.path.clone()));
     }
     plan(&model.nodes, missing)
-}
-
-struct Done {
-    visited: u64,
-    rescanned: Rescanned,
-}
-
-fn execute(model: &mut Model, plan: Plan, mounts: &[MountInfo], seen: &AtomicU64) -> Result<Done> {
-    let root = model
-        .root_of(plan.region())
-        .map(|r| r.path.clone())
-        .ok_or_else(|| invariant("region outside every scan root"))?;
-    if plan.links(&model.nodes) > 0 {
-        return rescan_root(model, &root, 0, mounts, seen);
-    }
-    match plan {
-        Plan::Retained(path) if path == root => rescan_root(model, &root, 0, mounts, seen),
-        Plan::Retained(path) => rescan_folder(model, &root, path, mounts, seen),
-        Plan::Range(slice) => rescan_bucket(model, &root, &slice, mounts, seen),
-    }
-}
-
-fn boundary<'a>(path: &Path, mounts: &'a [MountInfo]) -> Result<Boundary<'a>> {
-    Boundary::of(path, mounts).map_err(|e| Error::io(format!("stat {}", path.display()), e))
-}
-
-fn rescan_root(
-    model: &mut Model,
-    root: &Path,
-    spent: u64,
-    mounts: &[MountInfo],
-    seen: &AtomicU64,
-) -> Result<Done> {
-    let threshold = merge::threshold_for(&model.roots, root)?;
-    let boundary = boundary(root, mounts)?;
-    let w = Walk {
-        boundary: &boundary,
-        threshold,
-        scope: None,
-        seen,
-    };
-    let (walked, _) = walk::scan(root, true, &w)?;
-    let visited = spent + walked.visited;
-    merge::replace_root(model, root, walked.nodes)?;
-    Ok(Done {
-        visited,
-        rescanned: Rescanned {
-            path: root.to_path_buf(),
-            part: Part::Root,
-        },
-    })
-}
-
-fn rescan_folder(
-    model: &mut Model,
-    root: &Path,
-    path: PathBuf,
-    mounts: &[MountInfo],
-    seen: &AtomicU64,
-) -> Result<Done> {
-    let threshold = merge::threshold_for(&model.roots, &path)?;
-    let boundary = boundary(&path, mounts)?;
-    let w = Walk {
-        boundary: &boundary,
-        threshold,
-        scope: None,
-        seen,
-    };
-    let (walked, links) = walk::scan(&path, false, &w)?;
-    if links {
-        return rescan_root(model, root, walked.visited, mounts, seen);
-    }
-    let visited = walked.visited;
-    merge::update(model, &path, walked.nodes)?;
-    Ok(Done {
-        visited,
-        rescanned: Rescanned {
-            path,
-            part: Part::Folder,
-        },
-    })
-}
-
-fn rescan_bucket(
-    model: &mut Model,
-    root: &Path,
-    slice: &Slice,
-    mounts: &[MountInfo],
-    seen: &AtomicU64,
-) -> Result<Done> {
-    let threshold = merge::threshold_for(&model.roots, &slice.parent)?;
-    let boundary = boundary(&slice.parent, mounts)?;
-    let range = scope(&model.nodes, &slice.parent, slice.lo, slice.hi);
-    let w = Walk {
-        boundary: &boundary,
-        threshold,
-        scope: Some(&range),
-        seen,
-    };
-    let (walked, links) = walk::scan(&slice.parent, false, &w)?;
-    if walked.unreadable {
-        // the folder cannot be listed any more: it is kept as an unreadable folder
-        return rescan_folder(model, root, slice.parent.clone(), mounts, seen);
-    }
-    if links {
-        return rescan_root(model, root, walked.visited, mounts, seen);
-    }
-    let visited = walked.visited;
-    merge::update_range(model, &slice.parent, &range, walked)?;
-    Ok(Done {
-        visited,
-        rescanned: Rescanned {
-            path: slice.parent.clone(),
-            part: Part::Bucket,
-        },
-    })
-}
-
-/// A refresh usually follows a cleanup: the free space shown "at scan" should move with it.
-fn update_fs_stats(model: &mut Model, target: &Path) {
-    let Some(root) = model
-        .roots
-        .iter_mut()
-        .filter(|r| target.starts_with(&r.path))
-        .max_by_key(|r| r.path.as_os_str().len())
-    else {
-        return;
-    };
-    if statvfs_safe(&root.fs_type)
-        && let Ok(stats) = platform::statvfs(&root.path)
-    {
-        root.stats = stats;
-    }
 }
 
 #[cfg(test)]

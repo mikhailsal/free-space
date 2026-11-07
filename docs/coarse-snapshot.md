@@ -56,7 +56,8 @@ buckets of at most 4096 entries. Each non-empty bucket becomes one row, `[small 
 bytes, the number of entries and the oldest scan time of what it holds.
 
 Hardlinks are counted as in v1: the path that sorts first carries the bytes, the others
-show 0, even when they are folded.
+show 0, even when they are folded. The same holds across roots: a file linked from two roots
+on one filesystem is counted once, in the root that holds the first path.
 
 ## What the answers say about it
 
@@ -96,8 +97,10 @@ The result is merged into the current snapshot, so a refresh costs what the resc
 costs. The command prints a note when it rescanned more than the path. A part that contains
 hardlinked files is the exception: their bytes belong to whichever path sorts first, which
 may be outside the part, so such a refresh rescans the whole scan root (the note says so).
-If a folder is gone and a scan root was inside it, the refresh stops and asks for a full
-scan.
+If other roots lie on the same filesystem, the first path may be in one of them, so a root
+with hardlinks is rescanned together with all the roots on its filesystem, and the note names
+them. A root without hardlinks, or alone on its filesystem, is rescanned alone. If a folder
+is gone and a scan root was inside it, the refresh stops and asks for a full scan.
 
 Refresh publishes a new generation and never rotates `prev`, as in v1.
 

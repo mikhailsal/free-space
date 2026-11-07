@@ -134,10 +134,10 @@ impl Fx {
         queries::ls(&self.snapshot(), &params).unwrap()
     }
 
-    /// The root as a full v1 scan sees it right now.
-    fn truth(&self) -> EntryOut {
+    /// The roots as a full v1 scan sees them right now.
+    fn truth_of(&self, roots: &[PathBuf]) -> Vec<EntryOut> {
         job::run_scan(ScanRequest {
-            roots: vec![self.root.clone()],
+            roots: roots.to_vec(),
             low_memory: false,
             one_file_system: true,
             workers: 2,
@@ -147,11 +147,21 @@ impl Fx {
         })
         .unwrap();
         let snap = Snapshot::open_current(&self.full).unwrap();
-        let params = LsParams {
-            path: Some(self.text("")),
-            ..Default::default()
-        };
-        queries::ls(&snap, &params).unwrap().entry
+        roots
+            .iter()
+            .map(|root| {
+                let params = LsParams {
+                    path: Some(root.to_str().unwrap().to_owned()),
+                    ..Default::default()
+                };
+                queries::ls(&snap, &params).unwrap().entry
+            })
+            .collect()
+    }
+
+    /// The root as a full v1 scan sees it right now.
+    fn truth(&self) -> EntryOut {
+        self.truth_of(std::slice::from_ref(&self.root)).remove(0)
     }
 
     /// The coarse snapshot says what a full scan says about the root.
@@ -161,6 +171,26 @@ impl Fx {
         assert_eq!(got.apparent, want.apparent, "apparent");
         assert_eq!(got.items, want.items, "items");
         assert_eq!(got.errors, want.errors, "errors");
+    }
+
+    /// The coarse snapshot says what a full scan of all `roots` says about each of them,
+    /// the bytes of a file linked from two roots included.
+    fn agrees_on_roots(&self, roots: &[PathBuf]) {
+        let params = |root: &Path| LsParams {
+            path: Some(root.to_str().unwrap().to_owned()),
+            ..Default::default()
+        };
+        let snap = self.snapshot();
+        for (root, want) in roots.iter().zip(self.truth_of(roots)) {
+            let got = queries::ls(&snap, &params(root)).unwrap().entry;
+            let seen = (got.allocated, got.apparent, got.items);
+            assert_eq!(
+                seen,
+                (want.allocated, want.apparent, want.items),
+                "{}",
+                root.display()
+            );
+        }
     }
 }
 
@@ -495,4 +525,48 @@ fn a_scan_leaves_no_temporary_files_and_a_v1_directory_alone() {
         !f.full.path.exists(),
         "the coarse scan must not create a v1 directory"
     );
+}
+
+#[test]
+fn roots_on_one_filesystem_share_their_hardlinks_through_a_refresh() {
+    let Some(f) = fx() else { return };
+    let (one, two, three) = (f.path("one"), f.path("two"), f.path("three"));
+    f.big("one/shared.bin");
+    f.big("two/own.bin");
+    f.big("three/plain.bin");
+    fs::hard_link(one.join("shared.bin"), two.join("link.bin")).unwrap();
+    let roots = vec![one.clone(), two.clone(), three.clone()];
+    coarse::run_scan(f.request(roots.clone(), f.ppm, true)).unwrap();
+    // one holds the first path of the shared inode, so it carries the bytes once
+    f.agrees_on_roots(&roots);
+
+    // two holds the other link: rescanned alone it would take the bytes for itself
+    let out = f.refresh("two").unwrap();
+    assert_eq!(out.rescanned.part, Part::Root);
+    assert_eq!(out.rescanned.path, two);
+    assert_eq!(out.rescanned.with, [one.clone(), three.clone()]);
+    f.agrees_on_roots(&roots);
+
+    // a root with no link at all has nothing to settle with the others
+    let out = f.refresh("three").unwrap();
+    assert_eq!(out.rescanned.part, Part::Root);
+    assert!(out.rescanned.with.is_empty(), "{:?}", out.rescanned.with);
+    f.agrees_on_roots(&roots);
+
+    // a link made since the scan is found by the refresh of the root that now holds it
+    fs::hard_link(three.join("plain.bin"), one.join("plain-link.bin")).unwrap();
+    let out = f.refresh("three").unwrap();
+    assert_eq!(out.rescanned.with, [one.clone(), two.clone()]);
+    f.agrees_on_roots(&roots);
+
+    // a folder that turns out to hold a link is rescanned as the root it belongs to, and
+    // that root together with the roots beside it
+    f.big("one/sub/inner.bin");
+    f.refresh("one").unwrap();
+    fs::hard_link(two.join("own.bin"), one.join("sub/alias.bin")).unwrap();
+    let out = f.refresh("one/sub").unwrap();
+    assert_eq!(out.rescanned.part, Part::Root);
+    assert_eq!(out.rescanned.path, one);
+    assert_eq!(out.rescanned.with, [two.clone(), three.clone()]);
+    f.agrees_on_roots(&roots);
 }

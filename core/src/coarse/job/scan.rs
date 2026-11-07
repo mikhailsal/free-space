@@ -2,15 +2,15 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::time::Instant;
 
+use super::group::walk_group;
 use super::{ScanState, floor_of, precheck, record_failure, record_success, warnings, write_tmp};
 use crate::coarse::export::{self, Built};
 use crate::coarse::merge;
 use crate::coarse::model::Model;
 use crate::coarse::roots;
-use crate::coarse::walk::{Boundary, Owners, Walk, fold, link_owners};
 use crate::error::{Error, Result};
 use crate::fault;
 use crate::job::{Previous, ScanReport, expected_entries, has_required_schema, next_generation};
@@ -132,37 +132,10 @@ fn walk_roots(
     seen: &AtomicU64,
     pw: &ProgressWriter,
 ) -> Result<()> {
-    let boundaries = model
-        .roots
-        .iter()
-        .map(|r| {
-            Boundary::of(&r.path, mounts)
-                .map_err(|e| Error::io(format!("stat {}", r.path.display()), e))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let mut owners = Owners::new();
-    pw.set_stage(progress::STAGE_LINKS);
-    for (root, boundary) in model.roots.iter().zip(&boundaries) {
-        let w = walk_of(boundary, root.threshold, seen);
-        link_owners(&root.path, &w, &mut owners);
-    }
-    seen.store(0, Ordering::Relaxed);
-    pw.set_stage(progress::STAGE_WALK);
-    for (root, boundary) in model.roots.iter().zip(&boundaries) {
-        let w = walk_of(boundary, root.threshold, seen);
-        let walked = fold(&root.path, true, &w, &mut owners)?;
+    for walked in walk_group(&model.roots, mounts, seen, Some(pw))? {
         model.nodes.extend(walked.nodes);
     }
     Ok(())
-}
-
-fn walk_of<'a>(boundary: &'a Boundary<'a>, threshold: u64, seen: &'a AtomicU64) -> Walk<'a> {
-    Walk {
-        boundary,
-        threshold,
-        scope: None,
-        seen,
-    }
 }
 
 struct Published {

@@ -147,16 +147,23 @@ fn execute(
 fn rescan_note(requested: &std::path::Path, r: &Rescanned) -> Option<String> {
     let at = r.path.display();
     match r.part {
-        Part::Folder | Part::Root if r.path == requested => None,
+        Part::Folder | Part::Root if r.path == requested && r.with.is_empty() => None,
         Part::Folder => Some(format!(
             "{at} was rescanned, the folder that lists the path"
         )),
         Part::Bucket => Some(format!(
             "the path is folded into the small items of {at}; that bucket was rescanned"
         )),
-        Part::Root => Some(format!(
+        Part::Root if r.with.is_empty() => Some(format!(
             "the whole root {at} was rescanned: the part to refresh holds hardlinks, whose sizes depend on other folders"
         )),
+        Part::Root => {
+            let others: Vec<String> = r.with.iter().map(|p| p.display().to_string()).collect();
+            Some(format!(
+                "the whole root {at} was rescanned together with {}: the roots of one filesystem share their hardlinks, whose sizes depend on each other",
+                others.join(", ")
+            ))
+        }
     }
 }
 

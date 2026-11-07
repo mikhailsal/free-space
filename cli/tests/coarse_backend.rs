@@ -196,6 +196,54 @@ fn text_output_and_notes_say_what_is_folded() {
 }
 
 #[test]
+fn a_refresh_says_when_it_rescanned_the_roots_that_share_a_hardlink() {
+    let e = Env::new();
+    std::fs::create_dir_all(e.root()).unwrap();
+    let (ppm, threshold) = sizing(&e.root());
+    if threshold > 64 * 1024 * KIB {
+        return;
+    }
+    let (one, two) = (e.root().join("one"), e.root().join("two"));
+    write(&one.join("shared.bin"), 2 * threshold);
+    write(&two.join("own.bin"), 2 * threshold);
+    std::fs::hard_link(one.join("shared.bin"), two.join("link.bin")).unwrap();
+    let (one, two) = (text(&one), text(&two));
+    let first = coarse(&e, &["scan", &one, &two, "--coarse-ppm", &ppm.to_string()]);
+    assert_eq!(first["generation"], 1);
+
+    // the bytes of the shared file belong to one path of both roots, so neither root can be
+    // rescanned without the other; the note names the one that was not asked for
+    let note = coarse_notes(&e, &["refresh", &two]);
+    assert!(
+        note.contains(&format!("rescanned together with {one}")),
+        "{note}"
+    );
+    assert!(note.contains("share their hardlinks"), "{note}");
+    let note = coarse_notes(&e, &["refresh", &one]);
+    assert!(
+        note.contains(&format!("rescanned together with {two}")),
+        "{note}"
+    );
+    // and the answer for each root is what a full scan of both says: counted once
+    let both = coarse(&e, &["ls", &one])["entry"]["allocated"]
+        .as_u64()
+        .unwrap()
+        + coarse(&e, &["ls", &two])["entry"]["allocated"]
+            .as_u64()
+            .unwrap();
+    let v1 = Env::new();
+    let full = answer(&v1, &["scan", &one, &two, "--json"]);
+    assert_eq!(full["generation"], 1);
+    let truth = answer(&v1, &["ls", &one, "--json"])["entry"]["allocated"]
+        .as_u64()
+        .unwrap()
+        + answer(&v1, &["ls", &two, "--json"])["entry"]["allocated"]
+            .as_u64()
+            .unwrap();
+    assert_eq!(both, truth);
+}
+
+#[test]
 fn config_opts_in_and_the_flag_overrides_it() {
     let e = Env::new();
     let Some((ppm, threshold)) = fixture(&e) else {

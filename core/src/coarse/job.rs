@@ -3,6 +3,7 @@
 //! the model export, so a crash, a full disk or a concurrent reader behaves as it does
 //! for v1 snapshots.
 
+mod group;
 mod refresh;
 mod scan;
 
