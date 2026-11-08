@@ -28,6 +28,7 @@ export class Sheet {
       scope: app.scope,
       place: app.place,
       folderSize: app.view?.folder.allocated ?? 0,
+      foldedBelow: app.foldedBelow,
       now: now(),
       biggest: (p) => this.biggest(p),
       hide: (r) => cmd.hide(r),

@@ -1,11 +1,12 @@
 // One row shape for all four modes; the table and the inspector read only this.
 
+import { FOLDED_LABEL } from "./coarse";
 import type { DiffEntry, DiffStatus, Entry, FindEntry, Kind, MountOut } from "./types";
 
 export interface Row {
   path: string;
   raw?: string;
-  /** Shown name: the entry name, or the path relative to the scope (Find). */
+  /** Shown name: the entry name, or the path relative to the scope (Find); "small items" for a folded row. */
   label: string;
   name: string;
   /** Second line (Top: parent path relative to the scope). */
@@ -30,13 +31,15 @@ export interface Row {
   allocatedPrev?: number;
   /** Hidden until the next scan, shown dimmed while "show hidden" is on. */
   hidden: boolean;
+  /** Coarse snapshot: stands for many small entries, `items` counts them and `name` is its own, hash range included. */
+  folded: boolean;
 }
 
 export function fromEntry(e: Entry | FindEntry, label = e.name, sub?: string): Row {
   return {
     path: e.path,
     raw: e.path_raw,
-    label,
+    label: e.folded ? FOLDED_LABEL : label,
     name: e.name,
     sub,
     kind: e.kind,
@@ -53,6 +56,7 @@ export function fromEntry(e: Entry | FindEntry, label = e.name, sub?: string): R
     mount: e.mount,
     nested: "nested" in e ? e.nested : undefined,
     hidden: false,
+    folded: !!e.folded,
   };
 }
 
@@ -77,6 +81,7 @@ export function fromDiff(e: DiffEntry): Row {
     deltaItems: e.items - e.items_prev,
     allocatedPrev: e.allocated_prev,
     hidden: false,
+    folded: false,
   };
 }
 

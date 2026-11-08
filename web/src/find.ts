@@ -3,9 +3,10 @@
 
 import * as api from "./api";
 import type { App } from "./app";
+import { findHint } from "./coarse";
 import { h } from "./dom";
 import * as fmt from "./format";
-import { DEFAULT_LIMIT, folderEntry, pathParams, stateBox, type ViewController } from "./page";
+import { DEFAULT_LIMIT, folderAnswer, folderEntry, pathParams, stateBox, type ViewController } from "./page";
 import { relative, type Route } from "./router";
 import { fromEntry } from "./rows";
 import type { FindResponse } from "./types";
@@ -157,6 +158,7 @@ function chips(app: App): HTMLElement[] {
 function findSummary(f: FindResponse, app: App): Node[] {
   const r = app.route;
   const noun = (r.kind ?? "any") === "file" ? (f.total_count === 1 ? "file" : "files") : f.total_count === 1 ? "match" : "matches";
+  const hint = findHint(f.folded_below, r.min);
   const parts: Node[] = [
     h(
       "div",
@@ -175,6 +177,7 @@ function findSummary(f: FindResponse, app: App): Node[] {
         f.truncated ? `Showing the largest ${fmt.count(f.entries.length)}. ` : "",
         "Total includes all matches; nested folders counted once.",
       ),
+      hint ? h("p", { class: "muted", text: hint }) : null,
     ),
   ];
   const list = chips(app);
@@ -184,7 +187,10 @@ function findSummary(f: FindResponse, app: App): Node[] {
 
 export const find: ViewController = {
   async fetch(r, sid, signal) {
-    if (!findSubmitted(r)) return { route: r, folder: await folderEntry(r, sid, signal), idle: true };
+    if (!findSubmitted(r)) {
+      const ls = await folderAnswer(r, sid, signal);
+      return { route: r, folder: ls.entry, idle: true, foldedBelow: ls.folded_below ?? null };
+    }
     const [folder, found] = await Promise.all([
       folderEntry(r, sid, signal),
       api.get<FindResponse>(

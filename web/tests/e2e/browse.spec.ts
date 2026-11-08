@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { aborted, allRead, DAY, dir, file, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
+import { aborted, allRead, DAY, dir, file, folded, loseAborts, M, MockApi, NOW, url, watchAsks } from "./mock";
 
 const rows = (page: import("@playwright/test").Page) => page.locator("table.grid tbody tr");
 const selected = (page: import("@playwright/test").Page) => page.locator('table.grid tbody tr[aria-selected="true"]');
@@ -296,4 +296,87 @@ test("a mount point the snapshot does not cover offers no way in", async ({ page
   expect(await parts(page)).toEqual(["section.head", "p.note", "div.actions"]);
   await expect(page.locator("aside .head .big")).toHaveCount(0);
   await expect(page.locator("aside .cmd")).toHaveCount(0);
+});
+
+// A coarse snapshot of the mock: entries below 452 M are folded, and /home/tass holds one such row.
+function coarseApi(unreadable = false): MockApi {
+  const api = new MockApi(unreadable);
+  api.foldedBelow = 452 * M;
+  api.kids("/home/tass").push(folded("[small items 0-4095]", 300 * M, 3068));
+  return api;
+}
+
+// Value: protects=a coarse snapshot's page says so (the threshold, what it limits) and shows a folded row as "small items" with its
+//   entry count, muted, the hash range only in the tooltip; fails_when=the notice, the label, the Items count or the muted class goes
+//   missing, or the hash range becomes the label; why_new=the page read no coarse field before; seam=none;
+//   no_claim=the folding itself (the mock reports the rows as a scan would)
+test("a coarse snapshot: a notice with the threshold, small items rows with their count", async ({ page }) => {
+  await coarseApi().install(page);
+  await page.goto(url());
+  await expect(page.locator('[data-notice="coarse"]')).toContainText(
+    "Coarse snapshot: entries smaller than 452 M are folded into “small items” rows.",
+  );
+  const row = rows(page).filter({ hasText: "small items" });
+  await expect(row).toHaveClass(/folded/);
+  await expect(row.locator(".label")).toHaveAttribute("title", "[small items 0-4095]");
+  await expect(row.locator("td.items")).toHaveText("3\u202f068");
+  await expect(row).not.toContainText("0-4095");
+});
+
+test("a folded row's details explain it, offer no path, and name the folder around it", async ({ page }) => {
+  await coarseApi().install(page);
+  await page.goto(url());
+  await rows(page).filter({ hasText: "small items" }).click();
+  await expect(page.locator("aside .title")).toHaveText("small items");
+  await expect(page.locator("aside .path")).toHaveText("/home/tass/[small items 0-4095]");
+  await expect(page.locator("aside .note")).toHaveText(
+    "3\u202f068 entries smaller than 452 M, folded into one row. The total is exact; the names are not in the snapshot.",
+  );
+  expect(await parts(page)).toEqual(["section.head", "p.note", "dl", "div.actions"]);
+  await expect(page.locator("aside dl")).toContainText("3\u202f068");
+  await expect(page.locator("aside .cmdline code")).toHaveText("freespace ls /home/tass --json");
+  await expect(page.locator("aside").getByRole("button", { name: "Copy path" })).toHaveCount(0);
+  await expect(page.locator("aside").getByRole("button", { name: "Copy refresh command" })).toBeVisible();
+});
+
+test("Biggest inside lists a folded entry as small items, its own name as the tooltip", async ({ page }) => {
+  const api = coarseApi();
+  api.kids("/home/tass/old").push(folded("[small items 0-17]", 120 * M, 40));
+  await api.install(page);
+  await page.goto(url("/home/tass?sel=/home/tass/old"));
+  const names = page.locator("aside .minirow .nm");
+  await expect(names).toHaveText(["backup.tar.gz", "small items"]);
+  await expect(names.nth(1)).toHaveAttribute("title", "[small items 0-17]");
+  await expect(names.first()).not.toHaveAttribute("title", /.+/);
+});
+
+test("the coarse notice can be dismissed, and stays away for the same threshold", async ({ page }) => {
+  await coarseApi().install(page);
+  await page.goto(url());
+  const notice = page.locator('[data-notice="coarse"]');
+  await expect(notice).toBeVisible();
+  await notice.getByRole("button", { name: "Dismiss" }).click();
+  await expect(notice).toHaveCount(0);
+  await page.evaluate(() => {
+    location.hash = "/home/tass/Downloads";
+  });
+  await expect(page.locator(".crumbs h1")).toHaveText("Downloads");
+  await expect(notice).toHaveCount(0);
+});
+
+test("the coarse notice waits behind an incomplete scan's", async ({ page }) => {
+  await coarseApi(true).install(page);
+  await page.goto(url());
+  await expect(page.locator(".notice")).toHaveCount(1);
+  await expect(page.locator(".notice")).toHaveAttribute("data-notice", "incomplete");
+  await page.getByRole("button", { name: "+1 notice" }).click();
+  await expect(page.locator('[data-notice="coarse"]')).toBeVisible();
+});
+
+test("a full snapshot shows no coarse notice and mutes no row as folded", async ({ page }) => {
+  await new MockApi(false).install(page);
+  await page.goto(url());
+  await expect(rows(page).first()).toBeVisible();
+  await expect(page.locator('[data-notice="coarse"]')).toHaveCount(0);
+  await expect(page.locator("table.grid tbody tr.folded")).toHaveCount(0);
 });

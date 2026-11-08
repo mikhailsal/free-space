@@ -21,6 +21,8 @@ export interface View {
   diff?: DiffResponse;
   /** Find mode before the first submit. */
   idle?: boolean;
+  /** Find mode before the first submit holds no answer of its own: the fold threshold its folder's answer reported. */
+  foldedBelow?: number | null;
 }
 
 /** One per mode. The request coordinator (load.ts) calls fetch and applies the view it returns; a controller never applies one (D19). */
@@ -48,9 +50,13 @@ export function sameSnapshot(id: string, sid: string): void {
   if (id !== sid) throw new ApiError("api", 409, { code: "ROTATED", exit: 4, message: "snapshot rotated", fix: null, docs: "" });
 }
 
+/** The folder's own `ls` answer, one entry long: the folder, and the header every answer carries. */
+export function folderAnswer(r: Route, sid: string, signal: AbortSignal): Promise<LsResponse> {
+  return api.get<LsResponse>("ls", { ...pathParams(r), limit: 1, snapshot: sid }, signal);
+}
+
 export async function folderEntry(r: Route, sid: string, signal: AbortSignal): Promise<Entry> {
-  const ls = await api.get<LsResponse>("ls", { ...pathParams(r), limit: 1, snapshot: sid }, signal);
-  return ls.entry;
+  return (await folderAnswer(r, sid, signal)).entry;
 }
 
 export function stateBox(text: string, action: Action | null, d?: ErrorDetail): HTMLElement {

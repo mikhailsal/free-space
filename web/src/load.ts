@@ -5,6 +5,7 @@
 import * as api from "./api";
 import { ApiError } from "./api";
 import type { App } from "./app";
+import { foldedBelowOf } from "./coarse";
 import { h, replace } from "./dom";
 import { WHEN_RE } from "./find";
 import { controllers } from "./modes";
@@ -35,6 +36,7 @@ export class Loader {
       const view = await controllers[route.mode].fetch(route, must(app.status?.snapshot_id, "the snapshot"), ac.signal);
       if (seq !== this.seq) return;
       app.view = view;
+      app.foldedBelow = foldedBelowOf(view);
       app.bodyState = null;
       app.fieldError = null;
       app.cmd.buildRows();

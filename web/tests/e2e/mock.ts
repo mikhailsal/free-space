@@ -13,12 +13,14 @@ const M = 2 ** 20;
 
 export interface Node {
   name: string;
-  kind?: "dir" | "file";
+  kind?: "dir" | "file" | "other";
   allocated?: number;
   mtime?: number;
   denied?: boolean;
-  /** Entries below this folder beyond its modelled children (screenshots). */
+  /** Entries below this folder beyond its modelled children (screenshots); for a folded row, the entries it stands for. */
   items?: number;
+  /** Coarse snapshot: a `[small items]` row. `freespace` reports it as kind "other"; no `top`, `find` or `diff` lists it. */
+  folded?: boolean;
   children?: Node[];
 }
 
@@ -36,6 +38,15 @@ type Pager = <T>(all: T[]) => { entries: T[]; total_count: number; truncated: bo
 
 const dir = (name: string, children: Node[], mtime = NOW - 10 * DAY): Node => ({ name, kind: "dir", children, mtime });
 const file = (name: string, allocated: number, mtime = NOW - 40 * DAY): Node => ({ name, kind: "file", allocated, mtime });
+/** A coarse snapshot's `[small items A-B]` row: `items` entries folded together. */
+const folded = (name: string, allocated: number, items: number, mtime = NOW - 60 * DAY): Node => ({
+  name,
+  kind: "other",
+  folded: true,
+  allocated,
+  items,
+  mtime,
+});
 
 /** /home/tass with a few folders and big files (the mockup's shape). */
 export function homeTree(unreadable = true): Node {
@@ -55,21 +66,24 @@ export function homeTree(unreadable = true): Node {
   ]);
 }
 
+/** A node's own numbers, before its children are added: a file's, a folded row's (it stands for its `items`), or a folder's. */
+function own(n: Node, path: string): Flat {
+  if (n.folded) return { path, node: n, allocated: n.allocated ?? 0, items: n.items ?? 0, newest: n.mtime ?? 0, errors: 0 };
+  if (n.kind === "file") return { path, node: n, allocated: n.allocated ?? 0, items: 0, newest: n.mtime ?? 0, errors: 0 };
+  return { path, node: n, allocated: 0, items: n.items ?? 0, newest: 0, errors: n.denied ? 1 : 0 };
+}
+
 function flatten(root: Node): Map<string, Flat> {
   const out = new Map<string, Flat>();
   const walk = (n: Node, path: string): Flat => {
-    let f: Flat;
-    if (n.kind === "file") {
-      f = { path, node: n, allocated: n.allocated ?? 0, items: 0, newest: n.mtime ?? 0, errors: 0 };
-    } else {
-      f = { path, node: n, allocated: 0, items: n.items ?? 0, newest: 0, errors: n.denied ? 1 : 0 };
-      for (const c of n.children ?? []) {
-        const cf = walk(c, path === "/" ? `/${c.name}` : `${path}/${c.name}`);
-        f.allocated += cf.allocated;
-        f.items += cf.items + 1;
-        f.newest = Math.max(f.newest, cf.newest);
-        f.errors += cf.errors;
-      }
+    const f = own(n, path);
+    for (const c of n.children ?? []) {
+      const cf = walk(c, path === "/" ? `/${c.name}` : `${path}/${c.name}`);
+      f.allocated += cf.allocated;
+      // a folded row is not an entry itself: its `items` are the entries it stands for
+      f.items += cf.items + (c.folded ? 0 : 1);
+      f.newest = Math.max(f.newest, cf.newest);
+      f.errors += cf.errors;
     }
     out.set(path, f);
     return f;
@@ -212,6 +226,8 @@ export class MockApi {
   /** Status only: the running scan's progress, left out of the answer when null. */
   progress: { stage: string; entries_seen: number; entries_expected: number | null; percent: number | null } | null = null;
   lastError: { ts: number; op: string; message: string } | null = null;
+  /** Coarse snapshot: the fold threshold in bytes that every answer's header reports; null for a full snapshot. */
+  foldedBelow: number | null = null;
   /** Every request answers 403 without JSON, like a restarted server. */
   sessionGone = false;
   /** Every request answers this error body. */
@@ -248,6 +264,7 @@ export class MockApi {
       snapshot_id: this.snapshotId,
       incomplete: unknown.length > 0,
       unknown_subtrees: unknown,
+      ...(this.foldedBelow === null ? {} : { folded_below: this.foldedBelow }),
     };
   }
 
@@ -266,6 +283,7 @@ export class MockApi {
       errors: f.errors,
       scanned_at: NOW - 7 * 3600,
       ...(n.denied ? { denied: true } : {}),
+      ...(n.folded ? { folded: true } : {}),
     };
   }
 
@@ -428,6 +446,7 @@ export class MockApi {
     const older = cutoff(q.get("older_than"));
     const all = [...this.flat().values()]
       .filter((x) => x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`) && (x.node.kind ?? "dir") === kind)
+      .filter((x) => !x.node.folded)
       .filter((x) => x.allocated >= min && (older === null || (kind === "dir" ? x.newest : (x.node.mtime ?? 0)) < older))
       .sort((a, b) => b.allocated - a.allocated);
     const total = all.reduce((s, x) => s + x.allocated, 0);
@@ -466,7 +485,7 @@ export class MockApi {
     const kind = q.get("kind") ?? "any";
     const all = [...this.flat().values()]
       .filter((x) => x.path !== f.path && x.path.startsWith(f.path === "/" ? "/" : `${f.path}/`))
-      .filter((x) => kind === "any" || (x.node.kind ?? "dir") === kind)
+      .filter((x) => !x.node.folded && (kind === "any" || (x.node.kind ?? "dir") === kind))
       .filter((x) => (!re || re.test(x.node.name)) && x.allocated >= min)
       .filter((x) => (older === null || (x.node.mtime ?? 0) < older) && (newer === null || (x.node.mtime ?? 0) >= newer))
       .sort((a, b) => b.allocated - a.allocated);
@@ -552,6 +571,6 @@ export class MockApi {
   }
 }
 
-export { dir, file, G, M, DAY };
+export { dir, file, folded, G, M, DAY };
 
 export const url = (hash = "/home/tass") => `/#${hash}${hash.includes("?") ? "&" : "?"}t=${TOKEN}`;

@@ -1,9 +1,10 @@
 // The page's notices (D5 table): an incomplete scan, the last refresh that
-// failed, an API error, a lost server and a newer snapshot. notices.ts draws
-// them into the one slot.
+// failed, an API error, a lost server, a newer snapshot and a coarse one.
+// notices.ts draws them into the one slot.
 
 import type { App } from "./app";
 import { SCAN_COMMAND } from "./cli";
+import { noticeText } from "./coarse";
 import { h } from "./dom";
 import * as fmt from "./format";
 import { must } from "./must";
@@ -35,8 +36,33 @@ export class PageNotices {
     const s = must(this.app.status, "the status");
     const live = this.app.latest ?? s;
     const scan = { label: `Copy: ${SCAN_COMMAND}`, run: () => void copy(SCAN_COMMAND, "Command copied") };
-    const all = [this.incomplete(s, scan), this.lastError(s, live, scan), this.error(scan), this.failure(), this.newer(s, live)];
+    const all = [
+      this.incomplete(s, scan),
+      this.lastError(s, live, scan),
+      this.error(scan),
+      this.failure(),
+      this.newer(s, live),
+      this.coarse(),
+    ];
     return all.filter((n): n is Notice => n !== null);
+  }
+
+  /** What a coarse snapshot leaves out; the least urgent notice, and one the reader can dismiss for this threshold. */
+  private coarse(): Notice | null {
+    const app = this.app;
+    const below = app.foldedBelow;
+    if (below === null || app.dismissedCoarse === below) return null;
+    return {
+      id: "coarse",
+      priority: 4,
+      tone: "neutral",
+      body: [h("b", { text: "Coarse snapshot:" }), noticeText(below)],
+      actions: [],
+      dismiss: () => {
+        app.dismissedCoarse = below;
+        this.render();
+      },
+    };
   }
 
   private incomplete(s: Status, scan: Action): Notice | null {

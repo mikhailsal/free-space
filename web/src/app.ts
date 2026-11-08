@@ -41,6 +41,13 @@ export class App {
   failure = false;
   errorNotice: ErrorDetail | null = null;
   dismissedNewer: string | null = null;
+  /**
+   * Coarse snapshot: the fold threshold in bytes the last answer reported, null for a full one. The server keeps one
+   * backend while it runs, so a new snapshot is coarse too and its next answer only updates the number.
+   */
+  foldedBelow: number | null = null;
+  /** The threshold whose notice was dismissed. */
+  dismissedCoarse: number | null = null;
   noticesExpanded = false;
   unreadableOpen = false;
   bodyState: HTMLElement | null = null;
