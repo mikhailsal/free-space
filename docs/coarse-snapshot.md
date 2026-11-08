@@ -80,6 +80,13 @@ does for an incomplete scan.
   `entries`; a folder's `items` and the `entries` of `scan --json` count everything on disk.
 - **`diff` compares kept entries.** An entry that grows past the threshold appears as new
   and its old bucket shrinks; the totals of every folder still add up.
+- **The web page says what is folded.** It reads `folded_below` from every answer and shows
+  a dismissible notice with the threshold (behind the notice of an incomplete scan, which
+  matters more). A stand-in row reads `small items` in a muted style with its entry count in
+  the Items column and its hash range as the tooltip; its details explain that the total is
+  exact and the names are not in the snapshot, and offer no path to copy, since there is
+  none. *Top files* and *Find* add a line that folded entries are not listed; Top files
+  leaves it out once the size chosen is at or above the threshold.
 
 ## Refresh
 
