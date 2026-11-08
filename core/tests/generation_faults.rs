@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{OnceLock, mpsc},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 fn shim() -> &'static Path {
@@ -242,9 +242,26 @@ impl Fixture {
             Reader::open(&self.db).unwrap().generations.current,
             before + 1
         );
-        assert!(!store.maintain(1000, true).unwrap().readers_blocking);
+        maintain_when_the_lease_is_free(&mut store);
         drop(store);
         self.accounting();
+    }
+}
+
+// Maintenance is deliberately nonblocking: it reports `readers_blocking` while any copy of a reader
+// lease is open, and an flock belongs to the open file description, not to the process. The tests
+// of this file run on parallel threads and spawn children, and a child keeps a copy of every
+// descriptor the process has open until its exec closes them (`upkeep` in generation_retention.rs
+// waits for the same reason). So a lease this thread has just closed can stay held for that moment.
+// A lease that outlived the killed writer would stay held for good, so the wait fails the test then.
+fn maintain_when_the_lease_is_free(store: &mut Store) {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while store.maintain(1000, true).unwrap().readers_blocking {
+        assert!(
+            Instant::now() < deadline,
+            "the reader lease stayed held 2 s after the writer was killed"
+        );
+        std::thread::sleep(Duration::from_millis(1));
     }
 }
 
