@@ -4,6 +4,10 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+
+- `sudo freespace scan` gives the user who ran `sudo` read access to the snapshot when no timer is installed, that is on a machine without systemd or one installed with `--no-timer`: an ACL, else the `freespace` group. Before, such a scan left a snapshot that only root could read, and `freespace status` stopped with `SNAPSHOT_ACCESS`; the fix it printed, `sudo freespace install-timer`, refuses to run without systemd. A scan that has no sudo user (cron, the timer) grants nothing, and neither does a machine where `install-timer` has set the timer up and chosen the reader.
+
 ## [0.3.0] - 2026-11-08
 
 ### Added

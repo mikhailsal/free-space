@@ -21,6 +21,7 @@ use freespace_core::{Error, ErrorCode, Result};
 
 use crate::output;
 
+pub(crate) mod access;
 mod lifecycle;
 mod memory_profile;
 mod report;
