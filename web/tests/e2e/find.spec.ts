@@ -187,6 +187,19 @@ test("Find says matches among folded entries are not found", async ({ page }) =>
   );
 });
 
+// Value: protects=Find drops its coarse hint once Min size reaches the threshold, as nothing it could match is folded then;
+//   fails_when=the hint stays under the results found with 1 G on a 452 M threshold; why_new=Find's hint ignored its size filter, which
+//   Top files' honours; seam=none; no_claim=what the server matches (the mock filters by size)
+test("Find drops the coarse hint once Min size reaches the threshold", async ({ page }) => {
+  const api = new MockApi(false);
+  api.foldedBelow = 452 * M;
+  await api.install(page);
+  await page.goto(url("/home/tass?mode=find&name=*.mp4&min=1G&run=1"));
+  const summary = page.locator(".summary");
+  await expect(summary).toContainText("1 match");
+  await expect(summary).not.toContainText("Coarse snapshot");
+});
+
 test("on a full snapshot Top files and Find add no coarse hint", async ({ page }) => {
   await new MockApi(false).install(page);
   await page.goto(url("/home/tass?mode=top"));

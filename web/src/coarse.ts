@@ -35,15 +35,20 @@ export function foldedNote(items: number, below: number | null): string {
   return `${n}${limit}, folded into one row. The total is exact; the names are not in the snapshot.`;
 }
 
+/** A size filter at or above the threshold lets no folded entry through; a size this reader cannot parse is not assumed to. */
+function reachesThreshold(below: number, min: string | undefined): boolean {
+  const bytes = min === undefined ? null : sizeBytes(min);
+  return bytes !== null && bytes >= below;
+}
+
 /** Under Top files; null when the chosen size is at or above the threshold, as nothing the list could hold is folded then. */
 export function topHint(below: number | null | undefined, min: string): string | null {
-  if (!below) return null;
-  const bytes = sizeBytes(min);
-  if (bytes !== null && bytes >= below) return null;
+  if (!below || reachesThreshold(below, min)) return null;
   return `Coarse snapshot: entries smaller than ${fmt.size(below)} are folded and not listed.`;
 }
 
-/** Under Find: a name inside a folded entry cannot match. */
-export function findHint(below: number | null | undefined): string | null {
-  return below ? `Coarse snapshot: entries smaller than ${fmt.size(below)} are folded, so matches among them are not found.` : null;
+/** Under Find: a name inside a folded entry cannot match; null when Min size is at or above the threshold, as nothing could then. */
+export function findHint(below: number | null | undefined, min?: string): string | null {
+  if (!below || reachesThreshold(below, min)) return null;
+  return `Coarse snapshot: entries smaller than ${fmt.size(below)} are folded, so matches among them are not found.`;
 }

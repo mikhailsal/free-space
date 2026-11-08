@@ -158,7 +158,7 @@ function chips(app: App): HTMLElement[] {
 function findSummary(f: FindResponse, app: App): Node[] {
   const r = app.route;
   const noun = (r.kind ?? "any") === "file" ? (f.total_count === 1 ? "file" : "files") : f.total_count === 1 ? "match" : "matches";
-  const hint = findHint(f.folded_below);
+  const hint = findHint(f.folded_below, r.min);
   const parts: Node[] = [
     h(
       "div",

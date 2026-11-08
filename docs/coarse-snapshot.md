@@ -85,8 +85,9 @@ does for an incomplete scan.
   matters more). A stand-in row reads `small items` in a muted style with its entry count in
   the Items column and its hash range as the tooltip; its details explain that the total is
   exact and the names are not in the snapshot, and offer no path to copy, since there is
-  none. *Top files* and *Find* add a line that folded entries are not listed; Top files
-  leaves it out once the size chosen is at or above the threshold.
+  none. *Top files* and *Find* add a line that folded entries are not listed; both leave
+  it out once the size chosen (the size menu of Top files, the Min size of Find) is at or
+  above the threshold.
 
 ## Refresh
 

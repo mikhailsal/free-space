@@ -82,9 +82,15 @@ test("Top files hints only when the chosen size is below the threshold", () => {
   expect(topHint(undefined, "100M")).toBeNull();
 });
 
-test("Find hints on a coarse snapshot only", () => {
-  expect(findHint(300 * M)).toBe("Coarse snapshot: entries smaller than 300 M are folded, so matches among them are not found.");
-  expect(findHint(null)).toBeNull();
+test("Find hints on a coarse snapshot, until the size chosen reaches the threshold", () => {
+  const note = "Coarse snapshot: entries smaller than 300 M are folded, so matches among them are not found.";
+  expect(findHint(300 * M)).toBe(note);
+  expect(findHint(300 * M, "100M")).toBe(note);
+  expect(findHint(300 * M, "300M")).toBeNull();
+  expect(findHint(300 * M, "1G")).toBeNull();
+  // a size this reader cannot parse is not assumed to be large
+  expect(findHint(300 * M, "1.5G")).toBe(note);
+  expect(findHint(null, "1G")).toBeNull();
   expect(findHint(undefined)).toBeNull();
 });
 
