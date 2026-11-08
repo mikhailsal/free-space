@@ -184,7 +184,8 @@ table.grid {
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
-.grid tr.hiddenrow td {
+.grid tr.hiddenrow td,
+.grid tr.folded td {
   color: var(--muted);
 }
 .grid tbody tr.sel {

@@ -4,6 +4,7 @@
 import * as api from "./api";
 import type { App } from "./app";
 import { months, untouched } from "./cli";
+import { topHint } from "./coarse";
 import { h } from "./dom";
 import * as fmt from "./format";
 import { DEFAULT_LIMIT, folderEntry, pathParams, sameSnapshot, stateBox, type ViewController } from "./page";
@@ -71,6 +72,7 @@ function topSummary(t: TopResponse, r: Route): HTMLElement {
   const kind = topKind(r);
   const noun = kind === "dir" ? (t.total_count === 1 ? "folder" : "folders") : t.total_count === 1 ? "file" : "files";
   const u = untouched(r);
+  const hint = topHint(t.folded_below, r.min ?? "100M");
   return h(
     "div",
     { class: "total" },
@@ -82,6 +84,7 @@ function topSummary(t: TopResponse, r: Route): HTMLElement {
       h("b", { class: "mono", text: fmt.size(t.total_allocated) }),
     ),
     t.truncated ? h("p", { class: "muted", text: `Showing the largest ${fmt.count(t.entries.length)}` }) : null,
+    hint ? h("p", { class: "muted", text: hint }) : null,
   );
 }
 

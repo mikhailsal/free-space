@@ -31,7 +31,8 @@ function nameCell(r: Row, sub = false): Node {
     h(
       "span",
       { class: "nm" },
-      h("span", { class: "label", text: r.label }),
+      // a folded row's own name, hash range included, is what the CLI calls it
+      h("span", { class: "label", text: r.label, title: r.folded ? r.name : null }),
       sub && r.sub ? h("span", { class: "sub mono", text: r.sub }) : null,
     ),
     lowerBound(r) ? h("span", { class: "q", title: "Some folders inside could not be read: sizes are lower bounds", text: "?" }) : null,
@@ -72,7 +73,7 @@ const items: Column = {
   key: "items",
   label: "Items",
   cls: "num items",
-  cell: (r) => (r.kind === "dir" ? ge(r, fmt.count(r.items)) : "—"),
+  cell: (r) => (r.kind === "dir" || r.folded ? ge(r, fmt.count(r.items)) : "—"),
 };
 
 export function columns(mode: Mode, topKind: string | undefined): Column[] {

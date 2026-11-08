@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { MockApi, url } from "./mock";
+import { folded, M, MockApi, url } from "./mock";
 
 for (const [w, h] of [
   [1280, 800],
@@ -72,4 +72,19 @@ test("reduced motion: no fill animation, static progress line", async ({ page })
   await page.goto(url());
   const t = await page.locator(".fillline i").evaluate((el) => getComputedStyle(el).transitionDuration);
   expect(t).toBe("0s");
+});
+
+test("axe finds nothing on a coarse snapshot: the notice, a muted small items row, its details", async ({ page }) => {
+  const api = new MockApi(false);
+  api.foldedBelow = 452 * M;
+  api.kids("/home/tass").push(folded("[small items 0-4095]", 300 * M, 3068));
+  await api.install(page);
+  await page.goto(url());
+  await expect(page.locator('[data-notice="coarse"]')).toBeVisible();
+  const violations = async () =>
+    (await new AxeBuilder({ page }).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" ")}`);
+  expect(await violations()).toEqual([]);
+  await page.locator("table.grid tbody tr").filter({ hasText: "small items" }).click();
+  await expect(page.locator("aside .note")).toContainText("folded into one row");
+  expect(await violations()).toEqual([]);
 });

@@ -1,6 +1,7 @@
 // The details panel (Pass 7 "Inspector per kind", mockup B order, D11 actions).
 
 import { command, refreshCommand, SCAN_COMMAND } from "./cli";
+import { FOLDED_LABEL, foldedNote } from "./coarse";
 import { h } from "./dom";
 import * as fmt from "./format";
 import { parentPlace, type Place, type Route } from "./router";
@@ -14,6 +15,8 @@ export interface InspectorHost {
   /** The scope with its raw bytes. */
   place: Place;
   folderSize: number;
+  /** Coarse snapshot: entries smaller than this many bytes are folded; null for a full one. */
+  foldedBelow: number | null;
   now: number;
   biggest(path: string): Promise<Entry[] | null>;
   hide(r: Row): void;
@@ -63,7 +66,8 @@ function biggestInside(host: InspectorHost, r: Row): HTMLElement {
         h(
           "div",
           { class: "minirow", style: { "--w": `${w}%` } },
-          h("span", { class: "nm", text: e.name }),
+          // a folded entry reads as it does in the table; the raw name is its tooltip
+          h("span", { class: "nm", text: e.folded ? FOLDED_LABEL : e.name, title: e.folded ? e.name : null }),
           h("span", { class: "num", text: fmt.size(e.allocated) }),
         ),
       );
@@ -76,6 +80,7 @@ export function inspector(host: InspectorHost, r: Row | null): HTMLElement[] {
   if (!r) return [h("p", { class: "muted empty", text: "Nothing selected." })];
   const out = [head(host, r), ...changeNotes(r)];
   if (r.mount) return [...out, ...mountPanel(host, r, r.mount)];
+  if (r.folded) return [...out, ...foldedPanel(host, r)];
   out.push(...cautions(host, r));
   const dl = facts(host, r);
   if (dl.childElementCount) out.push(dl);
@@ -100,7 +105,7 @@ function head(host: InspectorHost, r: Row): HTMLElement {
   return h(
     "section",
     { class: "head" },
-    h("div", { class: "title", text: r.name }),
+    h("div", { class: "title", text: r.folded ? r.label : r.name }),
     sizeLine,
     h("div", { class: "path mono", text: r.path }),
   );
@@ -135,6 +140,12 @@ function mountPanel(host: InspectorHost, r: Row, m: MountOut): HTMLElement[] {
   }
   out.push(actions(host, r, false));
   return out;
+}
+
+/** A folded row is no path on disk: what it holds, that its total is exact, and the way to the folder around it. */
+function foldedPanel(host: InspectorHost, r: Row): HTMLElement[] {
+  const dl = h("dl", null, h("dt", { text: "Items" }), h("dd", null, h("span", { class: "num", text: fmt.count(r.items) })));
+  return [h("p", { class: "note", text: foldedNote(r.items, host.foldedBelow) }), dl, actions(host, r, true)];
 }
 
 /** Unreadable as root, hardlinks, and the biggest children of a folder. */
@@ -212,7 +223,8 @@ function actions(host: InspectorHost, r: Row, withCli: boolean): HTMLElement {
     h(
       "div",
       { class: "links" },
-      h("button", { type: "button", class: "link", onclick: () => copy(r.path, "Path copied"), text: "Copy path" }),
+      // a folded row's path exists only in the snapshot
+      r.folded ? null : h("button", { type: "button", class: "link", onclick: () => copy(r.path, "Path copied"), text: "Copy path" }),
       h("button", {
         type: "button",
         class: "link",

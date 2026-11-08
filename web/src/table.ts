@@ -87,6 +87,7 @@ export class Table {
         r.kind === "dir" ? "dir" : "",
         r.status === "gone" ? "ghost" : "",
         r.hidden ? "hiddenrow" : "",
+        r.folded ? "folded" : "",
       ]
         .filter(Boolean)
         .join(" ");
