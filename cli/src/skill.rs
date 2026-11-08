@@ -27,6 +27,7 @@ pub struct SkillArgs {
 pub enum SkillCmd {
     /// Write SKILL.md and schema.json to ~/.claude/skills/freespace (or --dir)
     Install {
+        /// Skill folder to write (default ~/.claude/skills/freespace)
         #[arg(long, value_hint = clap::ValueHint::DirPath)]
         dir: Option<PathBuf>,
     },
@@ -34,6 +35,7 @@ pub enum SkillCmd {
     Print,
     /// Remove the installed skill files
     Uninstall {
+        /// Skill folder to clean (default ~/.claude/skills/freespace)
         #[arg(long, value_hint = clap::ValueHint::DirPath)]
         dir: Option<PathBuf>,
     },

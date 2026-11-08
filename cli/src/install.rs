@@ -66,6 +66,7 @@ pub struct InstallArgs {
     /// Remove the timer, config, snapshots, completions, the skill and the binary
     #[arg(long)]
     pub uninstall: bool,
+    /// Print the installation (or uninstall) report as JSON on stdout
     #[arg(long)]
     pub json: bool,
 }
