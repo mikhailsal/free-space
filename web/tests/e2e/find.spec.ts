@@ -160,3 +160,54 @@ for (const lost of [false, true]) {
     await expect(rows(page)).toContainText("big.log");
   });
 }
+
+// Value: protects=on a coarse snapshot Top files says folded entries are not listed, and drops the hint once the size chosen reaches the
+//   threshold; fails_when=the hint is missing under 100 M, stays at 1 G, or shows on a full snapshot; why_new=the list never said
+//   what a coarse snapshot leaves out; seam=none; no_claim=what the server lists (the mock lists every file)
+test("Top files says folded entries are not listed, until the size chosen reaches the threshold", async ({ page }) => {
+  const api = new MockApi(false);
+  api.foldedBelow = 452 * M;
+  await api.install(page);
+  await page.goto(url("/home/tass?mode=top"));
+  const summary = page.locator(".summary");
+  await expect(summary).toContainText("larger than 100 M");
+  await expect(summary).toContainText("Coarse snapshot: entries smaller than 452 M are folded and not listed.");
+  await page.locator("#t-min").selectOption("1G");
+  await expect(summary).toContainText("larger than 1 G");
+  await expect(summary).not.toContainText("Coarse snapshot");
+});
+
+test("Find says matches among folded entries are not found", async ({ page }) => {
+  const api = new MockApi(false);
+  api.foldedBelow = 452 * M;
+  await api.install(page);
+  await page.goto(url("/home/tass?mode=find&name=*.mp4&run=1"));
+  await expect(page.locator(".summary")).toContainText(
+    "Coarse snapshot: entries smaller than 452 M are folded, so matches among them are not found.",
+  );
+});
+
+test("on a full snapshot Top files and Find add no coarse hint", async ({ page }) => {
+  await new MockApi(false).install(page);
+  await page.goto(url("/home/tass?mode=top"));
+  await expect(page.locator(".summary")).toContainText("larger than 100 M");
+  await expect(page.locator(".summary")).not.toContainText("Coarse snapshot");
+  await page.getByRole("tab", { name: "Find" }).click();
+  await page.locator("#f-name").fill("*.mp4");
+  await page.locator("#f-name").press("Enter");
+  await expect(page.locator(".summary")).toContainText("1 match");
+  await expect(page.locator(".summary")).not.toContainText("Coarse snapshot");
+});
+
+// Value: protects=Find's first screen, loaded directly, holds no answer of its own yet still carries the coarse notice;
+//   fails_when=the notice waits for the first search; why_new=the notice is read from answers, and this screen has none;
+//   seam=none; no_claim=the search itself
+test("Find's first screen already says the snapshot is coarse", async ({ page }) => {
+  const api = new MockApi(false);
+  api.foldedBelow = 452 * M;
+  await api.install(page);
+  await page.goto(url("/home/tass?mode=find"));
+  await expect(page.locator("#f-name")).toBeVisible();
+  expect(api.count("find")).toBe(0);
+  await expect(page.locator('[data-notice="coarse"]')).toContainText("entries smaller than 452 M");
+});
