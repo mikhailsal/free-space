@@ -4,6 +4,12 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-09
+
+### Changed
+
+- `--help` describes every option. Fifteen options showed a flag and nothing else: `--json` of `ls`, `top`, `find`, `diff`, `status`, `doctor`, `maintain` and `install-timer`, `--limit` of `top`, `find` and `diff`, `--min-size` and `--snapshot` of `find`, and `--dir` of `skill install` and `skill uninstall`. A test now fails when any option of any command has no description.
+
 ### Fixed
 
 - `sudo freespace install-timer --uninstall` works on a machine without systemd. It stopped with "systemd is not running here" before removing anything, so a machine installed with `--no-timer` could not be uninstalled with the documented command.
@@ -62,7 +68,8 @@ First public release.
 - Error contract: every error has a stable code, exit number, `fix`, `recovery` hint and a `docs` link into the README.
 - `install.sh`: one-line install, upgrade and rollback (`--version X`) from GitHub Releases with sha256 checks; static musl builds for x86_64 and aarch64.
 
-[Unreleased]: https://github.com/mikhailsal/free-space/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mikhailsal/free-space/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mikhailsal/free-space/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mikhailsal/free-space/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mikhailsal/free-space/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mikhailsal/free-space/compare/v0.1.0...v0.1.1
