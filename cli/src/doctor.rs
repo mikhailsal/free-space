@@ -27,6 +27,7 @@ pub const STALE_SECONDS: i64 = 26 * 3600;
 
 #[derive(Args)]
 pub struct DoctorArgs {
+    /// Print the checks as JSON on stdout (shape: `freespace schema`)
     #[arg(long)]
     pub json: bool,
 }
