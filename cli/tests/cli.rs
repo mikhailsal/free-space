@@ -276,6 +276,32 @@ fn scan_and_refresh_without_write_access_say_sudo() {
     );
 }
 
+/// Read access is something root grants after a manual scan (tests/scan_access.rs). Anyone
+/// else scans into a directory of their own and must neither be told nor touched, whatever
+/// `$SUDO_USER` says.
+#[test]
+fn a_scan_by_a_normal_user_leaves_access_alone() {
+    if euid_is_root() {
+        return;
+    }
+    let who = Command::new("id").arg("-un").output().unwrap();
+    let who = String::from_utf8_lossy(&who.stdout).trim().to_owned();
+    let e = Env::new();
+    e.fixture();
+    let o = e
+        .cmd(&["scan", s(&e.root()), "--json"])
+        .env("SUDO_USER", &who)
+        // a machine with a timer would hide the check: the unit's own directory is empty here
+        .env("FREESPACE_UNIT_DIR", e.tmp.path().join("units"))
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(o.status.success(), "{err}");
+    for word in ["read access", "can read", "groupadd", "ACL"] {
+        assert!(!err.contains(word), "{word} in\n{err}");
+    }
+}
+
 fn euid_is_root() -> bool {
     Command::new("id")
         .arg("-u")

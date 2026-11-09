@@ -112,6 +112,8 @@ pub fn run(a: ScanArgs) -> output::Result<()> {
             format::size(f.below)
         );
     }
+    // No timer to have granted it: the user behind `sudo` reads what they just scanned.
+    crate::install::access::after_scan(&loaded.config);
     if a.json {
         output::print_json(&report(&rep, &roots, workers, &dir, backend))?;
     }
