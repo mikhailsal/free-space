@@ -22,6 +22,7 @@ pub struct MaintainArgs {
     /// Persist the WAL admission threshold in bytes, even if cleanup is deferred
     #[arg(long, value_parser = clap::value_parser!(u64).range(1..=i64::MAX as u64))]
     pub max_wal_bytes: Option<u64>,
+    /// Print the maintenance report as JSON on stdout
     #[arg(long)]
     pub json: bool,
 }
