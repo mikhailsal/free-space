@@ -66,6 +66,8 @@ curl -fsSL https://raw.githubusercontent.com/mikhailsal/free-space/master/instal
 
 `--version X` installs a given release, `--no-timer` skips the nightly scan, and everything after a second `--` goes to `freespace install-timer` (see `freespace install-timer --help`). Without a terminal for the sudo prompt (an agent running it), the installer stops and prints the line for a human to run.
 
+Without systemd (a container, a minimal init) there is no timer: install with `--no-timer`, and run `sudo freespace scan` whenever you want a fresh snapshot. That scan gives the user who ran `sudo` read access to the snapshot (an ACL, else the `freespace` group and one re-login), so `freespace status` works without `sudo` afterwards. A scan from cron has no sudo user and leaves the snapshot readable by root only.
+
 ## The first minute
 
 ```sh
@@ -181,7 +183,7 @@ Every error names a code. The `docs` link in an error points here:
 | <a id="error-lock"></a>`LOCK` | 6 | A scan or refresh is already running. | Wait; `freespace status` shows its progress. |
 | <a id="error-hash-collision"></a>`HASH_COLLISION` | 7 | A `diff` pair failed raw path verification. | [Report it](https://github.com/mikhailsal/free-space/issues); `ls` and `top` are not affected. |
 | <a id="error-no-snapshot"></a>`NO_SNAPSHOT` | 8 | Nothing scanned yet. | Install with the one-liner above, or `sudo freespace scan`. If `freespace status` shows a scan running, wait for it. |
-| <a id="error-snapshot-access"></a>`SNAPSHOT_ACCESS` | 9 | The snapshot exists but this user cannot read it. | `sudo freespace install-timer` gives the sudo user read access (`--user NAME` for someone else). For v2, use `sudo freespace --backend v2 install-timer`. |
+| <a id="error-snapshot-access"></a>`SNAPSHOT_ACCESS` | 9 | The snapshot exists but this user cannot read it. | `sudo freespace install-timer` gives the sudo user read access (`--user NAME` for someone else). For v2, use `sudo freespace --backend v2 install-timer`. Without systemd, run `sudo freespace scan` instead: it gives the sudo user the same access. |
 | <a id="error-not-root"></a>`NOT_ROOT` | 1 | `scan`, `refresh` and `install-timer` need root. | Run it with `sudo`. |
 | <a id="error-not-supported"></a>`NOT_SUPPORTED` | 1 | Not available here, e.g. no systemd for the timer. | Run `sudo freespace scan` from cron or by hand. |
 
