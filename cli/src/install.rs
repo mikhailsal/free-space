@@ -66,6 +66,7 @@ pub struct InstallArgs {
     /// Remove the timer, config, snapshots, completions, the skill and the binary
     #[arg(long)]
     pub uninstall: bool,
+    /// Print the installation (or uninstall) report as JSON on stdout
     #[arg(long)]
     pub json: bool,
 }
@@ -76,10 +77,12 @@ pub fn run(a: InstallArgs) -> output::Result<()> {
             .with_fix("sudo freespace install-timer")
             .into());
     }
-    systemd::check_supported()?;
+    // Cleanup only removes files and ignores a missing `systemctl`, so it needs no systemd:
+    // a machine installed with `--no-timer` must be able to uninstall as well.
     if a.uninstall {
         return uninstall(&a);
     }
+    systemd::check_supported()?;
     let cfg_path = config::config_path();
     let (c, text, memory) = installation_config(&a, &cfg_path)?;
 

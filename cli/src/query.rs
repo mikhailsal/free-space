@@ -44,6 +44,7 @@ pub struct LsArgs {
     /// Fail with ROTATED unless the current snapshot has this snapshot_id
     #[arg(long, value_name = "ID")]
     pub snapshot: Option<String>,
+    /// Print the answer as JSON on stdout (shape: `freespace schema`)
     #[arg(long)]
     pub json: bool,
 }
@@ -64,8 +65,10 @@ pub struct TopArgs {
     /// allocated | apparent | mtime (oldest first)
     #[arg(long, value_name = "KEY", value_parser = ["allocated", "apparent", "mtime"])]
     pub sort: Option<String>,
+    /// Rows to show (default 30, max 10000)
     #[arg(long)]
     pub limit: Option<u32>,
+    /// Print the answer as JSON on stdout (shape: `freespace schema`)
     #[arg(long)]
     pub json: bool,
 }
@@ -86,6 +89,7 @@ pub struct FindArgs {
     /// Modified after: same forms as --older-than
     #[arg(long, value_name = "AGE")]
     pub newer_than: Option<String>,
+    /// Only entries at least this big: 500M, 1G, 2T
     #[arg(long, value_name = "SIZE")]
     pub min_size: Option<String>,
     /// file | dir | any (default any)
@@ -94,10 +98,13 @@ pub struct FindArgs {
     /// allocated | apparent | mtime (oldest first)
     #[arg(long, value_name = "KEY", value_parser = ["allocated", "apparent", "mtime"])]
     pub sort: Option<String>,
+    /// Rows to show (default 30, max 10000)
     #[arg(long)]
     pub limit: Option<u32>,
+    /// Fail with ROTATED unless the current snapshot has this snapshot_id
     #[arg(long, value_name = "ID")]
     pub snapshot: Option<String>,
+    /// Print the answer as JSON on stdout (shape: `freespace schema`)
     #[arg(long)]
     pub json: bool,
 }
@@ -112,8 +119,10 @@ pub struct DiffArgs {
     /// dir (default) | file | any
     #[arg(long, value_parser = ["file", "dir", "any"])]
     pub kind: Option<String>,
+    /// Rows to show (default 30, max 10000)
     #[arg(long)]
     pub limit: Option<u32>,
+    /// Print the answer as JSON on stdout (shape: `freespace schema`)
     #[arg(long)]
     pub json: bool,
 }
