@@ -4,6 +4,10 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+
+- `sudo freespace install-timer --uninstall` works on a machine without systemd. It stopped with "systemd is not running here" before removing anything, so a machine installed with `--no-timer` could not be uninstalled with the documented command.
+
 ## [0.3.0] - 2026-11-08
 
 ### Added

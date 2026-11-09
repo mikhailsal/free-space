@@ -212,4 +212,15 @@ printf own > "$scratch/v1/snapshot.db"
 printf unrelated > "$scratch/v1/unrelated"
 "$binary" install-timer --uninstall --user root --json > "$scratch/v1-uninstall.json"
 [ ! -f "$scratch/v1/snapshot.db" ] && [ -f "$scratch/v1/unrelated" ]
+# Uninstall needs no systemd: a machine installed with --no-timer has none, and
+# must still be able to remove what freespace wrote. Installing needs it.
+"$binary" install-timer --no-start --roots "$scratch/root" --snapshot-dir "$scratch/nosd" --user root --json > "$scratch/nosd-install.json"
+printf own > "$scratch/nosd/snapshot.db"
+rmdir /run/systemd/system
+if "$binary" install-timer --no-start --user root --json > "$scratch/nosd-timer.json" 2> /dev/null; then
+  echo 'install-timer succeeded without systemd' >&2; exit 1
+fi
+python3 -c "import json,sys; assert json.load(open(sys.argv[1]))['error']['code'] == 'NOT_SUPPORTED'" "$scratch/nosd-timer.json"
+"$binary" install-timer --uninstall --user root --json > "$scratch/nosd-uninstall.json"
+[ ! -e "$scratch/nosd" ] && [ ! -e "$scratch/config.toml" ] && [ ! -e /usr/local/bin/freespace ]
 printf 'isolated v2 lifecycle passed\n'
