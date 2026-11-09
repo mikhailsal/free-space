@@ -4,12 +4,12 @@ Where did my disk go? `freespace` keeps a snapshot of the whole filesystem tree,
 
 Linux with systemd, x86_64 and aarch64. One static binary, MIT licensed.
 
-For local refresh without rebuilding the whole snapshot, the opt-in
-[v2 generation store](docs/refresh-v2.md) supports CLI/HTTP queries, disk-backed
-full scans, and explicit maintenance of older versions. For a snapshot of a few
-megabytes and refreshes that take a fraction of a second, the opt-in
-[coarse snapshot](docs/coarse-snapshot.md) keeps the large entries and folds the small
-ones into exact `[small items]` totals.
+<!-- no-run -->
+```sh
+curl -fsSL https://raw.githubusercontent.com/mikhailsal/free-space/master/install.sh | sh
+```
+
+[Install](#install) lists what that does before it asks for your sudo password; [Build from source](#from-source) is the alternative.
 
 ![freespace gui: a 169 G home folder, its fifteen folders by size, .cache (46 G) selected with what is biggest inside it](docs/img/gui.png)
 
@@ -56,7 +56,7 @@ Before it asks for your sudo password, the installer prints what it will do:
 3. run `sudo freespace install-timer`: a nightly scan at 02:00 (`freespace.timer`, idle CPU and I/O priority), read access to the snapshots for you (an ACL, so no re-login; on a filesystem without ACLs, the `freespace` group and one re-login), and the first scan right away;
 4. install the Claude Code skill in `~/.claude/skills/freespace`.
 
-It ends with a line like "freespace 0.1.0 installed in 18 s · Open: freespace gui". Options go after `sh -s --`:
+It ends with a line like "freespace 0.3.0 installed in 18 s · Open: freespace gui". Options go after `sh -s --`:
 
 <!-- no-run -->
 ```sh
@@ -97,7 +97,7 @@ freespace diff /
 
 <!-- output -->
 ```
-/home/tass  95 G · 5 items · snapshot 7 h old
+/home/alex  95 G · 5 items · snapshot 7 h old
 ALLOCATED  SHARE  ITEMS  MODIFIED    NAME
      83 G   88 %      4  2026-10-04  .cache/
     8.0 G    8 %      3  2026-10-04  Downloads/
@@ -141,7 +141,7 @@ A `top` answer, trimmed:
   "older_than": 1776890000,
   "entries": [
     {
-      "path": "/home/tass/.cache/pip",
+      "path": "/home/alex/.cache/pip",
       "name": "pip",
       "kind": "dir",
       "allocated": 23622320128,
@@ -249,6 +249,15 @@ Use `--low-memory true` (or bare `--low-memory`) to force disk staging, or
 `install.sh` after its `--` separator. Automatic selection is an installation-time
 heuristic, described in [the memory policy](docs/install-memory.md); it does not
 change modes during a scan.
+
+### Opt-in snapshot backends
+
+For local refresh without rebuilding the whole snapshot, the opt-in
+[v2 generation store](docs/refresh-v2.md) supports CLI/HTTP queries, disk-backed
+full scans, and explicit maintenance of older versions. For a snapshot of a few
+megabytes and refreshes that take a fraction of a second, the opt-in
+[coarse snapshot](docs/coarse-snapshot.md) keeps the large entries and folds the small
+ones into exact `[small items]` totals.
 
 ## <a id="from-source"></a>Build from source
 
