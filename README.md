@@ -221,6 +221,15 @@ at = "02:00"
 
 Change it with `sudo freespace install-timer --roots / /home --interval daily --at 03:30` rather than by hand: that also rewrites the timer.
 
+For large scans on machines with limited RAM, use `freespace scan /path --low-memory`
+or set `low_memory = true` in the config for scheduled scans. This mode stores the
+walk in a temporary SQLite database, uses one walker regardless of `workers`, and
+trades scan time and temporary disk space for a smaller working set. It produces
+the same snapshot format and supports the usual queries and refresh command.
+Refresh itself still uses the in-memory pipeline. See [memory measurements and
+benchmark instructions](docs/benchmarks.md#disk-backed-full-scan) before selecting
+a machine memory budget.
+
 On first installation, `install-timer` chooses `low_memory` from the estimated
 scan size and available RAM, including visible container memory limits. It saves
 the result and preserves it on subsequent installations, including an explicit
@@ -257,13 +266,3 @@ How it works, in short: one parallel walk of the tree, written into a new SQLite
 ## License
 
 [MIT](LICENSE).
-
-
-For large scans on machines with limited RAM, use `freespace scan /path --low-memory`
-or set `low_memory = true` in the config for scheduled scans. This mode stores the
-walk in a temporary SQLite database, uses one walker regardless of `workers`, and
-trades scan time and temporary disk space for a smaller working set. It produces
-the same snapshot format and supports the usual queries and refresh command.
-Refresh itself still uses the in-memory pipeline. See [memory measurements and
-benchmark instructions](docs/benchmarks.md#disk-backed-full-scan) before selecting
-a machine memory budget.
