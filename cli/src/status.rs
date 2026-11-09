@@ -14,6 +14,7 @@ use crate::scan::count;
 
 #[derive(Args)]
 pub struct StatusArgs {
+    /// Print the status as JSON on stdout (shape: `freespace schema`)
     #[arg(long)]
     pub json: bool,
 }
