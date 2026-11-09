@@ -324,6 +324,22 @@ export const STUB_ENV = {
 };
 
 export type Run = { out: string; code: number; stdout: string; stderr: string; left: string[] };
+
+// What a run printed, for the message of an assertion on its exit status. A run that stops as unreliable (exit 3) names
+// the lines that differ between base's two runs on stdout and the reason on stderr; an assertion on the status alone
+// drops both, and the work dir that held the answers is gone by then.
+export const said = (r: Run) => {
+  const out = r.stdout.split("\n");
+  const err = r.stderr.split("\n");
+  return [
+    `the job exited ${r.code}`,
+    `--- stdout (first 60 of ${out.length} lines)`,
+    ...out.slice(0, 60),
+    `--- stderr (last 20 of ${err.length} lines)`,
+    ...err.slice(-20),
+  ].join("\n");
+};
+
 let runs = 0;
 // One run of the job in TMP, base and head named by their stub files there; the out dir is new for each run. With
 // `tty`, the job runs under script(1), its stdin a terminal as from a shell, its stdout and stderr in files beside the
