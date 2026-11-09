@@ -49,7 +49,7 @@
 # too). A version bump alone is no difference: each binary's own version (from
 # its --version) is masked in its answers. The normalized answers stay in
 # <out-dir>/{base,base2,head}/{fixture,start,fresh,config}.txt.
-# Needs jq, curl, script and flock (util-linux), perl, sqlite3, tzdata and GNU
+# Needs jq, curl, script and flock (util-linux), ss (iproute2), perl, sqlite3, tzdata and GNU
 # coreutils' timeout (rust-diff/gnu.sh: gnutimeout where /usr/bin/timeout is uutils'). JSON
 # is compared as jq prints it, keys in the CLI's order. RUST_DIFF_FAN (4, from
 # 1 to 9) sets the wide part of the trees.
@@ -70,7 +70,7 @@ if [[ ! ${RUST_DIFF_TIMEOUT:-300} =~ ^[1-9][0-9]*$ ]]; then
   echo "$0: RUST_DIFF_TIMEOUT must be whole seconds from 1, not ${RUST_DIFF_TIMEOUT}" >&2
   exit 2
 fi
-for tool in jq curl script flock perl sqlite3; do
+for tool in jq curl script flock ss perl sqlite3; do
   command -v "$tool" >/dev/null || { echo "$0: $tool is required" >&2; exit 2; }
 done
 if [ "$(id -u)" = 0 ]; then echo "$0: run it as a user, not root: install-timer would install a build on this host" >&2; exit 2; fi

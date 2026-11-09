@@ -69,22 +69,13 @@ wait_for() { # <var> <ERE> <file> <pid>: into var, the first match in the file, 
   printf -v "$1" '%s' "$got"
 }
 
-listening() { # <port>: the addresses a socket listens on at that port (IPv4 dotted, IPv6 as /proc writes it)
-  local hex file _ local_addr state a
-  printf -v hex '%04X' "$1"
+listening() { # <port>: the addresses a socket listens on at that port, one `tcp <address>` line each (IPv6 in brackets)
   echo "== $http_phase listens on"
-  for file in tcp tcp6; do
-    [ -r "/proc/net/$file" ] || continue
-    while read -r _ local_addr _ state _; do
-      if [ "$state" != 0A ] || [ "${local_addr#*:}" != "$hex" ]; then continue; fi
-      a=${local_addr%:*}
-      if [ "$file" = tcp ]; then
-        printf 'tcp %d.%d.%d.%d\n' "0x${a:6:2}" "0x${a:4:2}" "0x${a:2:2}" "0x${a:0:2}"
-      else
-        echo "tcp6 $a"
-      fi
-    done <"/proc/net/$file"
-  done | LC_ALL=C sort
+  # ss asks the kernel for this port's listeners alone. A shell loop over /proc/net/tcp went wrong beside other runs that
+  # open and close sockets: bash seeks that file back after every line, each seek reads it again from the start, and a
+  # change in between made the loop skip the server's own socket or list it twice (and took seconds on a busy host), so
+  # base answered two runs differently: exit 3
+  ss -H -ltn "sport = :$1" | sed -E 's/^[^ ]+ +[^ ]+ +[^ ]+ +([^ ]+):[0-9]+ .*$/tcp \1/' | LC_ALL=C sort
 }
 
 refusals() { # <addr> <token>: what the server must refuse, and what it must not

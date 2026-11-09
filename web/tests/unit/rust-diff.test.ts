@@ -10,7 +10,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
-import { gone, guard, type Run, repo, stub, writeStub } from "./rust-diff-stub";
+import { gone, guard, type Run, repo, said, stub, writeStub } from "./rust-diff-stub";
 
 // One pass of the questions is about 310 stub calls and 29 requests, each normalized, and a full run makes three (base,
 // base again, head). The fourteen runs start together in beforeAll, four of them full, the others stopped after one or
@@ -141,7 +141,7 @@ test(
   async () => {
     const r = await pending.same;
     expect(r.stderr).toBe("");
-    expect(r.code).toBe(0);
+    expect(r.code, said(r)).toBe(0);
     expect(r.stdout).toContain("exactly like base");
     expect(r.left, "the work dir, removed").toEqual([]);
     for (const run of ["base", "base2", "head"]) {
@@ -208,7 +208,7 @@ test(
   "a question the CLI refuses is answered with its status and stderr, also under --json, and the run goes on",
   async () => {
     const r = await pending.same;
-    expect(r.code).toBe(0);
+    expect(r.code, said(r)).toBe(0);
     const refused = (json: string) => (tree: string) =>
       `== ls @/nope${json}\nexit 2\n-- stdout\n${json ? '{\n  "error": {\n    "code": "NOT_FOUND",\n    "exit": 2\n  }\n}\n' : ""}` +
       `-- stderr\nfreespace: is not in the snapshot: ls <work>/${tree}/nope${json}\nfix: freespace scan\n`;
@@ -234,7 +234,7 @@ test(
   "a head that differs only in its version matches: each build's own version is masked, no other",
   async () => {
     const r = await pending.same;
-    expect(r.code).toBe(0);
+    expect(r.code, said(r)).toBe(0);
     const [head, base] = ["head", "base"].map((run) => readFileSync(join(r.out, `${run}/fixture.txt`), "utf8"));
     expect(head).toContain("== --version\nexit 0\n-- stdout\nfreespace <version>\n-- stderr\n");
     expect(head).toContain("freespace <version> help\n");
@@ -349,7 +349,7 @@ test(
   "one changed data byte in head fails with the difference on stdout, in every phase",
   async () => {
     const r = await pending.byte;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     for (const phase of ["fixture", "start", "fresh", "config"]) expect(r.stdout, phase).toContain(`\n+++ head/${phase}.txt\n`);
     expect(r.stdout).toContain("-entries 3\n+entries 4\n");
     expect(r.stdout).toContain('-  "entries": 3\n+  "entries": 4\n');
@@ -366,7 +366,7 @@ test(
   "a head whose next scan needs other space fails: that figure is not masked as live",
   async () => {
     const r = await pending.unlike;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     expect(r.stdout).toContain(
       "-next scan needs 512 M free, <size> available; scanned in <seconds>\n+next scan needs 1.0 G free, <size> available; scanned in <seconds>\n",
     );
@@ -385,7 +385,7 @@ test(
   "a head that leaves a stray file, a wider mode or another schema in the snapshot folder, $HOME or the unit dir fails",
   async () => {
     const r = await pending.unlike;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     expect(r.stdout).toMatch(/^\+\.\/id f 666$/m);
     expect(r.stdout).toMatch(/^\+\.\/leftover\.tmp f \d+$/m);
     expect(r.stdout).toMatch(/^\+\.\/\.leak f \d+$/m);
@@ -405,7 +405,7 @@ test(
   "a head that hangs on a question is stopped and killed, and that question answers exit 124",
   async () => {
     const r = await pending.unlike;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     expect(r.stdout).toContain(" == diff @\n-exit 0\n+exit 124\n");
     // the call was killed, not left behind, and so was the work dir
     const hung = readFileSync(join(tmp, "unlike.hung"), "utf8").trim().split("\n").map(Number);
@@ -423,7 +423,7 @@ test(
   "a head that refuses a question with another exit status fails, with the status in the difference",
   async () => {
     const r = await pending.other;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     expect(r.stdout).toContain("-exit 2\n+exit 5\n");
     expect(r.stderr).toContain("head answers differently from base");
   },
@@ -437,7 +437,7 @@ test(
   "a head that words a refusal differently fails: stderr is compared as text, also under --json",
   async () => {
     const r = await pending.other;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     expect(r.stdout).toContain("-freespace: is not in the snapshot: ls <work>/tree/nope\n+freespace: nothing at: ls <work>/tree/nope\n");
     expect(r.stdout).toContain(
       "-freespace: is not in the snapshot: ls <work>/tree/nope --json\n+freespace: nothing at: ls <work>/tree/nope --json\n",
@@ -456,7 +456,7 @@ test(
   "a base that answers two runs differently is unreliable: exit 3, and head never runs",
   async () => {
     const r = await pending.flaky;
-    expect(r.code).toBe(3);
+    expect(r.code, said(r)).toBe(3);
     // the answers are JSON (each pid a number), not text that differs anyway
     expect(r.stdout).toMatch(/^- {2}"pid": \d+,\n\+ {2}"pid": \d+,$/m);
     expect(r.stderr).toContain("the comparison is unreliable");
@@ -481,7 +481,7 @@ test(
   "a base that refuses a question the harness asks, or answers one it should refuse, stops the job as stale",
   async () => {
     const r = await pending.stale;
-    expect(r.code).toBe(4);
+    expect(r.code, said(r)).toBe(4);
     for (const line of [
       "fixture: top @ --min-size 100K --sort mtime: answered 2, the harness expects 0",
       "fresh: top @ --min-size 100K --sort mtime: answered 2, the harness expects 0",
@@ -514,7 +514,7 @@ test(
   "a base whose server or gui does not start stops the job as stale",
   async () => {
     const r = await pending.noserve;
-    expect(r.code).toBe(4);
+    expect(r.code, said(r)).toBe(4);
     for (const line of [
       "serve: start: answered no address, the harness expects an address",
       "serve: stop: answered 1, the harness expects 0",
@@ -551,7 +551,7 @@ test(
       ["midrefresh", "base", "its refreshes", /^\+stray f \d+ 0 1 [\d.]+$/m],
     ] as const) {
       const r = await pending[name];
-      expect(r.code, name).toBe(1);
+      expect(r.code, `${name}: ${said(r)}`).toBe(1);
       expect(r.stderr, name).toMatch(change);
       expect(r.stderr, name).toContain(`/bin/${bin}/freespace changed the tree it read`);
       expect(r.stderr, name).toContain(`during ${phase}\n`);
@@ -625,7 +625,7 @@ test(
   "a head whose server answers with another header, or whose gui writes its token for everyone or stops otherwise, fails",
   async () => {
     const r = await pending.other;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     expect(r.stdout).toContain("-x-frame-options: DENY\n+x-frame-options: SAMEORIGIN\n");
     // past the 200 lines of difference the job prints for fixture.txt: the answers themselves
     const file = (side: string) => section(read(r, `${side}/fixture.txt`), "== gui here, a browser opens", "-- xdg-open got");
@@ -732,7 +732,7 @@ test(
   "a base whose server prints an address nobody answers on stops the job as stale",
   async () => {
     const r = await pending.deadserve;
-    expect(r.code).toBe(4);
+    expect(r.code, said(r)).toBe(4);
     expect(r.stderr).toMatch(/^serve: status: answered curl failed: curl: \(7\) .+, the harness expects 200$/m);
     expect(read(r, "base/fixture.txt")).toContain("== serve: status\nhttp curl failed: curl: (7) ");
     expect(read(r, "base/fixture.txt")).toContain(" 127.0.0.1 port <port>");
@@ -819,7 +819,7 @@ test(
   "each database the CLI keeps is listed row by row, its live values masked",
   async () => {
     const r = await pending.same;
-    expect(r.code).toBe(0);
+    expect(r.code, said(r)).toBe(0);
     const fresh = read(r, "head/fresh.txt");
     const hex = (path: string) => Buffer.from(path).toString("hex").toUpperCase();
     const db = (commands: string[], walked: string) =>
@@ -849,7 +849,7 @@ test(
   "a head whose database holds other values in as many rows fails",
   async () => {
     const r = await pending.unlike;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     for (const [side, command] of [
       ["base", "scan"],
       ["head", "SCAN"],
@@ -867,7 +867,7 @@ test(
   "a head that ends its lines in CRLF fails",
   async () => {
     const r = await pending.unlike;
-    expect(r.code).toBe(1);
+    expect(r.code, said(r)).toBe(1);
     const answer = (side: string) => section(read(r, `${side}/fixture.txt`), "== completions bash", "== completions zsh");
     expect(answer("base")).toContain("-- stdout\n# completions for bash\n-- stderr\n");
     expect(answer("head")).toContain("-- stdout\n# completions for bash\r\n-- stderr\n");
@@ -917,4 +917,47 @@ files "$2"`;
   expect(text).toContain(`\n-- bin.dat\n(binary: 3 bytes, sha256 ${sum})\n`);
   expect(text).toContain("\na\"b'c|d rows 1\na\"b'c|d: x'y=1 z=2\n");
   expect(text).toContain("\nhardlinks rows 1\nhardlinks: entry_id=1 dev=7 ino=<the inode of entry none>\n");
+});
+
+// Value: protects=the serve and gui phases list the addresses a server listens on from the kernel's list for the one
+//   port asked about: a `tcp <address>` line for each socket there (loopback, every interface, IPv6 in brackets), none
+//   for a port nobody listens on, none for a socket at another port; fails_when=listening() lists a socket of another
+//   port or a closed one, writes an address in another form, or loses its `ss` call; why_new=it read /proc/net/tcp in a
+//   shell loop that, beside runs opening and closing sockets, lost the server's own line or listed it twice, and base
+//   answered two runs differently (exit 3 on #47 and #60); a race has no test of its own, this one holds what the
+//   answer says; seam=real listening sockets, IPv6 ones where the host has them; no_claim=a busy host, where the old
+//   loop failed
+test("the addresses a server listens on are listed for its port alone, one line for each socket", () => {
+  const listeners: { stop: (closeActive?: boolean) => void }[] = [];
+  // a listener on HOSTNAME at a port of the kernel's choosing: its port, or 0 where the host has no such address (IPv6 off)
+  const open = (hostname: string) => {
+    try {
+      const listener = Bun.listen({ hostname, port: 0, socket: { data() {} } });
+      listeners.push(listener);
+      return listener.port;
+    } catch {
+      return 0;
+    }
+  };
+  // what the serve and gui phases print for PORT: the real listening() beside the real sockets
+  const ask = (port: number) => {
+    const sh = `. "$1/scripts/rust-diff/serve.sh"; listening "$2"`;
+    const p = Bun.spawnSync(["bash", "-c", `set -Eeuo pipefail\n${sh}`, "listening", repo, String(port)], { stderr: "pipe" });
+    expect(p.stderr.toString(), `port ${port}`).toBe("");
+    expect(p.exitCode, `port ${port}`).toBe(0);
+    return p.stdout.toString();
+  };
+  try {
+    const [loopback, wildcard, loopback6, wildcard6] = [open("127.0.0.1"), open("0.0.0.0"), open("::1"), open("::")];
+    const closed = open("127.0.0.1");
+    listeners.pop()?.stop(true);
+    expect(ask(loopback)).toBe("== serve listens on\ntcp 127.0.0.1\n");
+    // older iproute2 writes a wildcard as *
+    expect(ask(wildcard)).toMatch(/^== serve listens on\ntcp (0\.0\.0\.0|\*)\n$/);
+    if (loopback6 > 0) expect(ask(loopback6)).toBe("== serve listens on\ntcp [::1]\n");
+    if (wildcard6 > 0) expect(ask(wildcard6)).toMatch(/^== serve listens on\ntcp (\[::\]|\*)\n$/);
+    expect(ask(closed)).toBe("== serve listens on\n");
+  } finally {
+    for (const listener of listeners) listener.stop(true);
+  }
 });

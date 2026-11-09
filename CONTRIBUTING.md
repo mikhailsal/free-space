@@ -48,7 +48,7 @@ The hook runs all five checks against the current work tree. CI checks the pushe
 
 Split code before crossing a limit. Never raise a limit or add an exception without the user's agreement. Move long Rust tests into a `tests.rs` submodule. Run relevant tests locally as you work; full e2e, the gate canary, and `refactor-guard` comparisons run on GitHub.
 
-`bun test tests/unit` also runs `scripts/rust-diff.sh` and `scripts/coverage-functions.sh` on made-up input, so `jq`, `curl`, `perl`, `sqlite3`, `script`, `flock` and `setsid` (util-linux), `c++filt` (binutils), `getfacl`/`setfacl` (acl) and tzdata must be installed.
+`bun test tests/unit` also runs `scripts/rust-diff.sh` and `scripts/coverage-functions.sh` on made-up input, so `jq`, `curl`, `perl`, `sqlite3`, `script`, `flock` and `setsid` (util-linux), `ss` (iproute2), `c++filt` (binutils), `getfacl`/`setfacl` (acl) and tzdata must be installed.
 
 The pre-gate runner, `scripts/test-files.sh`, routes selected Rust files (including integration helpers and source modules with unit tests) to one Cargo run per crate. Cargo runs at low priority with two build jobs and one test thread. It needs `setsid` from util-linux to stop Cargo and its descendants together; e2e, shots and guard runs need `flock` too. Its unit tests also use these tools.
 

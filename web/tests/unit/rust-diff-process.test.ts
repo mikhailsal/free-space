@@ -153,7 +153,7 @@ test("a diff that cannot compare is a harness error, exit 5", async () => {
   }
 }, 240_000);
 
-// Value: protects=a missing tool, any of the six, missing time zones, or a run as root stops the job before anything
+// Value: protects=a missing tool, any of the seven, missing time zones, or a run as root stops the job before anything
 //   runs: exit 2, no out dir; fails_when=a tool leaves the check (the job then dies midway at a command not found), the
 //   zone check goes or asks date (without tzdata the C library takes UTC and TZ_QUERIES test nothing, and uutils' date,
 //   the ubuntu-latest runner's since 26.04, has zones of its own, so it says +0530 without them), or the root check goes
@@ -161,8 +161,8 @@ test("a diff that cannot compare is a harness error, exit 5", async () => {
 //   out (testing review of A0), and no zone was checked (red team of A0); seam=PATH, TZDIR; no_claim=a real run as root
 //   (a stub `id` says 0) or a host without tzdata (an empty TZDIR stands in)
 test("a missing tool, missing time zones or a run as root stop the job before anything runs", () => {
-  const tools = ["jq", "curl", "script", "flock", "perl", "sqlite3"];
-  // each case links the other five: one missing here would make the case fail for the wrong tool
+  const tools = ["jq", "curl", "script", "flock", "ss", "perl", "sqlite3"];
+  // each case links the other six: one missing here would make the case fail for the wrong tool
   for (const tool of tools) expect(Bun.which(tool), `${tool} on this host`).not.toBeNull();
   const cases: [Record<string, string>, string][] = tools.map((tool) => {
     const dir = join(tmp, `path-without-${tool}`);
@@ -226,8 +226,8 @@ test("with a uutils timeout first on PATH the calls run under GNU's, found as gn
 test("without a GNU timeout the job stops with exit 2 before anything runs", () => {
   const dir = join(tmp, "path-uutils-only");
   mkdirSync(dir, { recursive: true });
-  // the six tools the job checks first, and the three commands it runs before the lookup
-  for (const tool of ["jq", "curl", "script", "flock", "perl", "sqlite3", "id", "dirname", "realpath"]) {
+  // the seven tools the job checks first, and the three commands it runs before the lookup
+  for (const tool of ["jq", "curl", "script", "flock", "ss", "perl", "sqlite3", "id", "dirname", "realpath"]) {
     symlinkSync(Bun.which(tool) ?? tool, join(dir, tool));
   }
   writeStub(dir, "timeout", UUTILS_TIMEOUT);
